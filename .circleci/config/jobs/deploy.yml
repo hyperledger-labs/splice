@@ -9,6 +9,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       use_published_artifacts:
         type: boolean
         default: false
@@ -109,6 +110,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
       - when:
           condition: << parameters.send_deployment_notification >>
@@ -125,6 +127,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       use_published_artifacts:
         type: boolean
         default: false
@@ -219,6 +222,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
   deploy_multivalidator:
@@ -276,6 +280,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       restore_cluster:
         type: boolean
         default: false
@@ -431,6 +436,7 @@ jobs:
                   fi
                 cmd_retry_count: 5
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
       - when:
           condition: << parameters.send_deployment_notification >>
@@ -507,10 +513,7 @@ jobs:
   reset_cluster:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     machine:
       image: ubuntu-2204:2024.01.1
     environment:

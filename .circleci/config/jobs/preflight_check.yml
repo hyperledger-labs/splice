@@ -2,10 +2,7 @@ jobs:
   preflight_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       test_names_file:
         type: string
         default: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log,test-full-class-names-validator1-preflight.log"
@@ -134,10 +131,7 @@ jobs:
   preflight_sv_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       cluster_version:
         type: string
         default: ""
@@ -232,10 +226,7 @@ jobs:
   preflight_validator_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       cluster_version:
         type: string
         default: ""

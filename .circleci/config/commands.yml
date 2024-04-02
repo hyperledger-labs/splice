@@ -1129,9 +1129,7 @@ commands:
   notify-cluster-deployment:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     steps:
       - slack/notify:
           channel: << parameters.channel_notify >>

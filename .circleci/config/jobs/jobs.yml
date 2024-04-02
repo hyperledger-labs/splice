@@ -684,10 +684,7 @@ jobs:
   test_DR:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     machine:
       image: ubuntu-2204:2024.01.1
     environment:

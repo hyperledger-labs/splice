@@ -96,6 +96,12 @@ notify-fail: &notify-fail
         custom: |
           { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
+channel-notify-parameter: &channel-notify-parameter
+  channel_notify:
+    type: string
+    # #team-canton-network-internal-ci
+    default: C05DT77QF5M
+
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum

@@ -101,6 +101,12 @@ notify-fail: &notify-fail
         custom: |
           { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
+channel-notify-parameter: &channel-notify-parameter
+  channel_notify:
+    type: string
+    # #team-canton-network-internal-ci
+    default: C05DT77QF5M
+
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
@@ -1269,9 +1275,7 @@ commands:
   notify-cluster-deployment:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     steps:
       - slack/notify:
           channel: << parameters.channel_notify >>
@@ -1369,6 +1373,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       use_published_artifacts:
         type: boolean
         default: false
@@ -1469,6 +1474,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
       - when:
           condition: << parameters.send_deployment_notification >>
@@ -1485,6 +1491,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       use_published_artifacts:
         type: boolean
         default: false
@@ -1579,6 +1586,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
   deploy_multivalidator:
@@ -1636,6 +1644,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       restore_cluster:
         type: boolean
         default: false
@@ -1791,6 +1800,7 @@ jobs:
                   fi
                 cmd_retry_count: 5
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
       - when:
           condition: << parameters.send_deployment_notification >>
@@ -1867,10 +1877,7 @@ jobs:
   reset_cluster:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2630,10 +2637,7 @@ jobs:
   test_DR:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2718,10 +2722,7 @@ jobs:
   preflight_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       test_names_file:
         type: string
         default: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log,test-full-class-names-validator1-preflight.log"
@@ -2850,10 +2851,7 @@ jobs:
   preflight_sv_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       cluster_version:
         type: string
         default: ""
@@ -2948,10 +2946,7 @@ jobs:
   preflight_validator_check:
     parameters:
       <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
+      <<: *channel-notify-parameter
       cluster_version:
         type: string
         default: ""
@@ -5045,6 +5040,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -5056,6 +5052,7 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -5066,6 +5063,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -5077,6 +5075,7 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           # require deploy_cluster and deploy_sv_runbook for stability and reliability
@@ -5089,6 +5088,7 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           requires:
@@ -5100,6 +5100,7 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           requires:
@@ -5125,6 +5126,7 @@ workflows:
             branches:
               only:
                 - deployment/devnet
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           context:
             - artifactory
@@ -5245,6 +5247,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           deploy_version: "testnet-next"
           use_published_artifacts: true
@@ -5257,6 +5260,7 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           cluster_version: "testnet-next"
           requires:
@@ -5284,6 +5288,7 @@ workflows:
             branches:
               only:
                 - deployment/testnet
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           context:
             - artifactory

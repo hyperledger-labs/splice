@@ -15,6 +15,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -26,6 +27,7 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -36,6 +38,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -47,6 +50,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           # require deploy_cluster and deploy_sv_runbook for stability and reliability
@@ -59,6 +63,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           requires:
@@ -70,6 +75,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           cluster_version: "devnet-next"
           requires:
@@ -95,6 +101,7 @@ workflow:
             branches:
               only:
                 - deployment/devnet
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           context:
             - artifactory
