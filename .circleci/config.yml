@@ -1849,7 +1849,7 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
-            cncluster partial_upgrade $(get-snapshot-version latest_main)
+            cncluster partial_upgrade $(get-snapshot-version)
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:
