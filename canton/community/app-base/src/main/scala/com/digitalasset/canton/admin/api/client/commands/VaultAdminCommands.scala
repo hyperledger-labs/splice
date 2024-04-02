@@ -25,7 +25,7 @@ object VaultAdminCommands {
 
   abstract class BaseVaultAdminCommand[Req, Res, Result]
       extends GrpcAdminCommand[Req, Res, Result] {
-    override type Srvc = VaultServiceStub
+    override type Svc = VaultServiceStub
     override def createService(channel: ManagedChannel): VaultServiceStub =
       v30.VaultServiceGrpc.stub(channel)
   }

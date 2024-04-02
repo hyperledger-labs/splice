@@ -41,10 +41,10 @@ class GrpcCtlRunnerTest extends AsyncWordSpec with BaseTest {
     val channel = mock[ManagedChannel]
     val service = new TestAbstractStub(channel)
     val command = new GrpcAdminCommand[String, String, String] {
-      override type Srvc = TestAbstractStub
-      override def createService(channel: ManagedChannel): Srvc = service
+      override type Svc = TestAbstractStub
+      override def createService(channel: ManagedChannel): Svc = service
       override def createRequest(): Either[String, String] = Right("request")
-      override def submitRequest(service: Srvc, request: String): Future[String] =
+      override def submitRequest(service: Svc, request: String): Future[String] =
         if (service == service && request == "request") Future.successful("response")
         else Future.failed(new Exception("Invalid"))
       override def handleResponse(response: String): Either[String, String] = Right("result")

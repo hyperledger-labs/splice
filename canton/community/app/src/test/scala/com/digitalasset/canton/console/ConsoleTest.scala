@@ -169,7 +169,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       (result, errorStream.toString)
     }
 
-    def setupAdminCommandResponse[Srvc <: AbstractStub[Srvc], Result](
+    def setupAdminCommandResponse[Svc <: AbstractStub[Svc], Result](
         id: String,
         result: Either[String, Result],
     ): Unit =

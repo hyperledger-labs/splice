@@ -25,7 +25,7 @@ object EnterpriseSequencerAdminCommands {
 
   abstract class BaseSequencerAdministrationCommand[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Srvc =
+    override type Svc =
       v30.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub
     override def createService(
         channel: ManagedChannel
@@ -35,7 +35,7 @@ object EnterpriseSequencerAdminCommands {
 
   abstract class BaseSequencerPruningAdministrationCommand[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Srvc =
+    override type Svc =
       v30.SequencerPruningAdministrationServiceGrpc.SequencerPruningAdministrationServiceStub
     override def createService(
         channel: ManagedChannel
@@ -49,7 +49,7 @@ object EnterpriseSequencerAdminCommands {
         v30.InitializeSequencerFromOnboardingStateResponse,
         InitializeSequencerResponse,
       ] {
-    override type Srvc = v30.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
+    override type Svc = v30.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
 
     override def createService(
         channel: ManagedChannel
@@ -81,7 +81,7 @@ object EnterpriseSequencerAdminCommands {
         v30.InitializeSequencerFromGenesisStateResponse,
         InitializeSequencerResponse,
       ] {
-    override type Srvc = v30.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
+    override type Svc = v30.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
 
     override def createService(
         channel: ManagedChannel

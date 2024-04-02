@@ -69,7 +69,7 @@ object ParticipantAdminCommands {
   object Package {
 
     sealed trait PackageCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
-      override type Srvc = PackageServiceStub
+      override type Svc = PackageServiceStub
 
       override def createService(channel: ManagedChannel): PackageServiceStub =
         PackageServiceGrpc.stub(channel)
@@ -316,7 +316,7 @@ object ParticipantAdminCommands {
 
     final case class SetPartyDisplayName(partyId: PartyId, displayName: String)
         extends GrpcAdminCommand[SetPartyDisplayNameRequest, SetPartyDisplayNameResponse, Unit] {
-      override type Srvc = PartyNameManagementServiceStub
+      override type Svc = PartyNameManagementServiceStub
 
       override def createService(channel: ManagedChannel): PartyNameManagementServiceStub =
         PartyNameManagementServiceGrpc.stub(channel)
@@ -401,7 +401,7 @@ object ParticipantAdminCommands {
           CancellableContext,
         ] {
 
-      override type Srvc = ParticipantRepairServiceStub
+      override type Svc = ParticipantRepairServiceStub
 
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
@@ -448,7 +448,7 @@ object ParticipantAdminCommands {
     ) extends GrpcAdminCommand[ImportAcsRequest, ImportAcsResponse, Map[LfContractId, LfContractId]]
         with StreamingMachinery[ImportAcsRequest, ImportAcsResponse] {
 
-      override type Srvc = ParticipantRepairServiceStub
+      override type Svc = ParticipantRepairServiceStub
 
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
@@ -498,7 +498,7 @@ object ParticipantAdminCommands {
         ignoreAlreadyPurged: Boolean,
     ) extends GrpcAdminCommand[PurgeContractsRequest, PurgeContractsResponse, Unit] {
 
-      override type Srvc = ParticipantRepairServiceStub
+      override type Svc = ParticipantRepairServiceStub
 
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
@@ -526,7 +526,7 @@ object ParticipantAdminCommands {
         sourceDomainAlias: DomainAlias,
         targetDomainConfig: CDomainConnectionConfig,
     ) extends GrpcAdminCommand[MigrateDomainRequest, MigrateDomainResponse, Unit] {
-      override type Srvc = ParticipantRepairServiceStub
+      override type Svc = ParticipantRepairServiceStub
 
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
@@ -563,7 +563,7 @@ object ParticipantAdminCommands {
         workflowId: String,
         id: String,
     ) extends GrpcAdminCommand[PingRequest, PingResponse, Either[String, Duration]] {
-      override type Srvc = PingServiceStub
+      override type Svc = PingServiceStub
 
       override def createService(channel: ManagedChannel): PingServiceStub =
         PingServiceGrpc.stub(channel)
@@ -606,7 +606,7 @@ object ParticipantAdminCommands {
   object DomainConnectivity {
 
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Srvc = DomainConnectivityServiceStub
+      override type Svc = DomainConnectivityServiceStub
 
       override def createService(channel: ManagedChannel): DomainConnectivityServiceStub =
         DomainConnectivityServiceGrpc.stub(channel)
@@ -798,7 +798,7 @@ object ParticipantAdminCommands {
   object Transfer {
 
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Srvc = TransferServiceStub
+      override type Svc = TransferServiceStub
 
       override def createService(channel: ManagedChannel): TransferServiceStub =
         TransferServiceGrpc.stub(channel)
@@ -849,7 +849,7 @@ object ParticipantAdminCommands {
 
   object Resources {
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Srvc = ResourceManagementServiceStub
+      override type Svc = ResourceManagementServiceStub
 
       override def createService(channel: ManagedChannel): ResourceManagementServiceStub =
         ResourceManagementServiceGrpc.stub(channel)
@@ -886,7 +886,7 @@ object ParticipantAdminCommands {
   object Inspection {
 
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Srvc = InspectionServiceStub
+      override type Svc = InspectionServiceStub
 
       override def createService(channel: ManagedChannel): InspectionServiceStub =
         InspectionServiceGrpc.stub(channel)
@@ -979,7 +979,7 @@ object ParticipantAdminCommands {
 
   object Pruning {
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Srvc = PruningServiceStub
+      override type Svc = PruningServiceStub
 
       override def createService(channel: ManagedChannel): PruningServiceStub =
         PruningServiceGrpc.stub(channel)
@@ -1061,7 +1061,7 @@ object ParticipantAdminCommands {
         )
 
       override def submitRequest(
-          service: Srvc,
+          service: Svc,
           request: pruning.v30.SetParticipantSchedule.Request,
       ): Future[pruning.v30.SetParticipantSchedule.Response] =
         service.setParticipantSchedule(request)
@@ -1086,7 +1086,7 @@ object ParticipantAdminCommands {
         )
 
       override def submitRequest(
-          service: Srvc,
+          service: Svc,
           request: pruning.v30.GetParticipantSchedule.Request,
       ): Future[pruning.v30.GetParticipantSchedule.Response] =
         service.getParticipantSchedule(request)
@@ -1104,7 +1104,7 @@ object ParticipantAdminCommands {
 
     final case class SetPassiveCommand()
         extends GrpcAdminCommand[SetPassive.Request, SetPassive.Response, Unit] {
-      override type Srvc = EnterpriseParticipantReplicationServiceStub
+      override type Svc = EnterpriseParticipantReplicationServiceStub
 
       override def createService(
           channel: ManagedChannel
@@ -1134,7 +1134,7 @@ object ParticipantAdminCommands {
           TrafficControlStateResponse,
           MemberTrafficStatus,
         ] {
-      override type Srvc = TrafficControlServiceGrpc.TrafficControlServiceStub
+      override type Svc = TrafficControlServiceGrpc.TrafficControlServiceStub
 
       override def createService(
           channel: ManagedChannel

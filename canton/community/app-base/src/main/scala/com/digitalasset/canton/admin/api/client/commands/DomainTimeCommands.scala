@@ -26,7 +26,7 @@ import scala.concurrent.Future
 object DomainTimeCommands {
 
   abstract class BaseDomainTimeCommand[Req, Rep, Res] extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Srvc = DomainTimeServiceStub
+    override type Svc = DomainTimeServiceStub
     override def createService(channel: ManagedChannel): DomainTimeServiceStub =
       v30.DomainTimeServiceGrpc.stub(channel)
   }

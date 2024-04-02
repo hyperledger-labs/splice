@@ -101,8 +101,8 @@ object CantonGrpcUtil {
     * @param logPolicy          use this to configure log levels for errors
     * @param retryPolicy        invoked after an error to determine whether to retry
     */
-  def sendGrpcRequest[Srvc <: AbstractStub[Srvc], Res](client: Srvc, serverName: String)(
-      send: Srvc => Future[Res],
+  def sendGrpcRequest[Svc <: AbstractStub[Svc], Res](client: Svc, serverName: String)(
+      send: Svc => Future[Res],
       requestDescription: String,
       timeout: Duration,
       logger: TracedLogger,
@@ -178,18 +178,18 @@ object CantonGrpcUtil {
     *
     * Based on [[sendGrpcRequest]]
     */
-  def sendSingleGrpcRequest[Srvc <: AbstractStub[Srvc], Res](
+  def sendSingleGrpcRequest[Svc <: AbstractStub[Svc], Res](
       serverName: String,
       requestDescription: String,
       channel: ManagedChannel,
-      stubFactory: Channel => Srvc,
+      stubFactory: Channel => Svc,
       timeout: Duration,
       logger: TracedLogger,
       logPolicy: GrpcError => TracedLogger => TraceContext => Unit = err =>
         logger => traceContext => err.log(logger)(traceContext),
       retryPolicy: GrpcError => Boolean = _.retry,
   )(
-      send: Srvc => Future[Res]
+      send: Svc => Future[Res]
   )(implicit traceContext: TraceContext): EitherT[Future, GrpcError, Res] = {
 
     val closeableChannel = Lifecycle.toCloseableChannel(channel, logger, "sendSingleGrpcRequest")

@@ -471,7 +471,7 @@ object ParticipantAdminConnection {
   final case class LookupDarByteString(
       darHash: Hash
   ) extends GrpcAdminCommand[GetDarRequest, GetDarResponse, Option[ByteString]] {
-    override type Srvc = PackageServiceStub
+    override type Svc = PackageServiceStub
 
     override def createService(channel: ManagedChannel): PackageServiceStub =
       PackageServiceGrpc.stub(channel)
