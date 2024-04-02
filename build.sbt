@@ -387,7 +387,8 @@ lazy val `apps-common` =
         ),
         BuildInfoKey(
           "compatibleVersion",
-          BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version", "latest_main")),
+          BuildUtil
+            .runCommandOptionalLog(Seq("./build-tools/get-snapshot-version", "latest_release")),
         ),
       ),
       buildInfoPackage := "com.daml.network.environment",

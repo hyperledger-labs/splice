@@ -859,7 +859,9 @@ In light of the above, the process for cutting a new release is:
        branch with a commit message starting with the string `[release]`.
     7. Repeat step 4 to publish the official release externally.
 2. Create a PR for main that bumps `${REPO_ROOT}/VERSION` to the *next* planned release
-   (typically this will bump the minor version).
+   (typically this will bump the minor version), and `${REPO_ROOT}/LATEST_RELEASE` to the
+   version of the newly created release line
+
 
 ## Testing
 

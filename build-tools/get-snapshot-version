@@ -45,6 +45,13 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
         CNCLUSTER_STATIC_DIRTY_VERSION=""
         CI=1
         export CI_IGNORE_DIRTY_REPO=1
+    elif [[ "${OVERRIDE_VERSION}" == "latest_release" ]]; then
+        # TODO(#11038): eventually, latest_main, latest_base and latest_release should all be merged
+        latest_release=$(cat "${REPO_ROOT}/LATEST_RELEASE")
+        sha=$(git rev-parse heads/origin/release-line-"${latest_release}")
+        CNCLUSTER_STATIC_DIRTY_VERSION=""
+        CI=1
+        export CI_IGNORE_DIRTY_REPO=1
     elif [[ "${OVERRIDE_VERSION}" == "deployment_tag" ]]; then
         # The deployment tag name is just the deployment branch name with slashes replaced with hyphens.
         tag_name=$(echo "$branch" | tr '/' '-')

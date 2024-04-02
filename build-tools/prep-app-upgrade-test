@@ -9,7 +9,7 @@ _info "Re-versioning local Daml models from 0.1.0 to 0.1.1"
 find "daml" -name "daml.yaml" -exec sed -i 's/0.1.0/0.1.1/g' {} \;
 find . -name "*0.1.0.dar" -exec rm {} \;
 
-base_version=$(get-snapshot-version latest_main)
+base_version=$(get-snapshot-version latest_release)
 _info "Fetching and extracting release ${base_version} from GCP"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
