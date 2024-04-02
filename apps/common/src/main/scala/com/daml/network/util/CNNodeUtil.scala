@@ -411,8 +411,13 @@ object CNNodeUtil {
         0,
         RoundingMode.CEILING,
       )
-      .longValueExact
-    new Round(amulet.amount.createdAt.number + rounds)
+    try {
+      val roundsLong = rounds.longValueExact
+      new Round(amulet.amount.createdAt.number + roundsLong)
+    } catch {
+      case _: ArithmeticException =>
+        new Round(Long.MaxValue)
+    }
   }
 
   def relTimeToDuration(dt: RelTime): Duration =

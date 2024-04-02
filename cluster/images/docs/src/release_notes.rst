@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+0.1.2
+-----
+
+* Fixed a bug where coins with very large values broke ingestion in the SV and validator app due to an overflow.
+
 2024-04-01
 ----------
 
