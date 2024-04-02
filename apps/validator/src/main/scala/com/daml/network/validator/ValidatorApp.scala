@@ -262,6 +262,7 @@ class ValidatorApp(
   private def setupDarsForAcsImport(participantAdminConnection: ParticipantAdminConnection)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
+    // TODO(#11412): This potentially uploads versions that should not yet be uploaded. Consider using PackageVetting instead.
     logger.info(s"Uploading dars for ACS import.")
     val darFiles = packages.map(UploadablePackage.fromResource)
     for {
@@ -269,23 +270,6 @@ class ValidatorApp(
     } yield {
       logger.info(
         s"Finished Uploading dars for ACS import."
-      )
-    }
-  }
-
-  private def setupWalletDars(
-      participantAdminConnection: ParticipantAdminConnection
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.info(s"Attempting to setup wallet...")
-    val darFiles = Seq(
-      UploadablePackage.fromResource(DarResources.wallet.bootstrap),
-      UploadablePackage.fromResource(DarResources.amuletNameService.bootstrap),
-    )
-    for {
-      _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
-    } yield {
-      logger.info(
-        s"Finished wallet setup"
       )
     }
   }
@@ -482,11 +466,8 @@ class ValidatorApp(
         metrics.grpcClientMetrics,
         retryProvider,
       )
-      _ <- appInitStep("Setup wallet dars") {
-        setupWalletDars(participantAdminConnection)
-      }
-      // Upload the DAR bfeore starting automation. Otherwise ingestion will fail
-      // due to an unknown template.
+      // The app manager contracts are local to the validator, and the dar does not have dependencies on others,
+      // so for now we assume that it is kept static and just upload it here.
       _ <- appInitStep("Setup app manager dars") {
         config.appManager.traverse_ { _ =>
           val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)

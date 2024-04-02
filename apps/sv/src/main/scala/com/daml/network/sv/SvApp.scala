@@ -267,7 +267,7 @@ class SvApp(
           localSynchronizerNode,
           joiningConfig,
           participantId,
-          darFilesToUploadDuringInit,
+          Seq.empty, // A joining SV does not initially upload any DARs, they will be vetted by PackageVettingTrigger instead
           config,
           cometBftNode,
           ledgerClient,
@@ -306,7 +306,7 @@ class SvApp(
                 sys.error("Founding node must always specify a domain config")
               ),
               foundingConfig,
-              darFilesToUploadDuringInit,
+              darFilesToBootstrapNetwork,
               participantId,
               config,
               cometBftFoundingNode,
@@ -552,7 +552,7 @@ class SvApp(
   protected[this] override def automationServices(st: SvApp.State) =
     Seq(LeaderBasedAutomationService, st.svAutomation, st.dsoAutomation)
 
-  private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
+  private val darFilesToBootstrapNetwork: Seq[UploadablePackage] =
     Seq(
       SvApp.amuletPackage,
       SvApp.dsoGovernancePackage,

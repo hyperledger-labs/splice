@@ -241,8 +241,6 @@ class ScanApp(
   }
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredPackageIds = Set(DarResources.amulet.bootstrap.packageId)
-
   protected[this] override def automationServices(st: ScanApp.State) =
     Seq(st.automation)
 }

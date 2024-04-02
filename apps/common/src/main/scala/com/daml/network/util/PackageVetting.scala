@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import cats.syntax.traverse.*
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
@@ -36,7 +37,7 @@ class PackageVetting(
     val now = clock.now.plus(prevetDuration.asJava)
     val currentConfig = schedule.getConfigAsOf(now)
     for {
-      _ <- vetCurrentConfig(currentConfig)
+      _ <- vetUpToCurrentConfig(currentConfig)
       _ <- schedule.futureConfigs.traverse_ { case (time, config) =>
         val timestamp = CantonTimestamp.assertFromInstant(time)
         if (timestamp > now) {
@@ -49,21 +50,30 @@ class PackageVetting(
   }
 
   // The current config must be vetted.
-  private def vetCurrentConfig(
+  private def vetUpToCurrentConfig(
       config: splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]
-  )(implicit tc: TraceContext): Future[Unit] =
+  )(implicit tc: TraceContext): Future[Unit] = {
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
-      val darResource = DarResources.lookupPackageMetadata(pkg.packageName, version)
-      darResource match {
-        case None =>
-          logger.error(
-            show"Package ${pkg.packageName} is required in version ${version.toString} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
-          )
-          Future.unit
-        case Some(resource) => uploadDar(resource)
-      }
+      for {
+        // Upload the version required by current config, and log an error if it is not part of the deployed release
+        _ <- DarResources.lookupPackageMetadata(pkg.packageName, version) match {
+          case None =>
+            logger.error(
+              show"Package ${pkg.packageName} is required in version ${version.toString} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
+            )
+            Future.unit
+          case Some(resource) => uploadDar(resource)
+        }
+        // upload all earlier versions of the same package
+        _ <- DarResources
+          .lookupAllPackageVersions(pkg.packageName)
+          .filter(_.metadata.version < version)
+          .map(uploadDar(_))
+          .sequence
+      } yield ()
     }
+  }
 
   // Future configs must not be vetted yet but we warn if the app does not know about a package version since this indicates
   // you must upgrade soon.
