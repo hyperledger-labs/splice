@@ -13,6 +13,7 @@ import java.util.Base64
 case class DomainDataSnapshot(
     genesisState: Option[ByteString],
     acsSnapshot: ByteString,
+    authorizedStoreSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
     domainWasPaused: Boolean,
@@ -20,6 +21,7 @@ case class DomainDataSnapshot(
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
+    Base64.getEncoder.encodeToString(authorizedStoreSnapshot.toByteArray),
     acsTimestamp.toString,
     dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
@@ -31,12 +33,13 @@ case class DomainDataSnapshot(
 
 object DomainDataSnapshot {
   private val base64Decoder = Base64.getDecoder()
-
   def fromHttp(
       src: http.DomainDataSnapshot
-  ) = {
+  ): Either[String, DomainDataSnapshot] = {
     val genesisState = src.genesisState.map(s => ByteString.copyFrom(base64Decoder.decode(s)))
     val acsSnapshot = ByteString.copyFrom(base64Decoder.decode(src.acsSnapshot))
+    val authorizedStoreSnapshot =
+      ByteString.copyFrom(base64Decoder.decode(src.authorizedStoreSnapshot))
     val dars =
       src.dars.map { dar =>
         val decoded = base64Decoder.decode(dar.content)
@@ -47,6 +50,7 @@ object DomainDataSnapshot {
       DomainDataSnapshot(
         genesisState,
         acsSnapshot,
+        authorizedStoreSnapshot,
         acsTimestamp,
         dars,
         src.domainWasHalted,

@@ -1118,6 +1118,7 @@ components:
       type: object
       required:
         - acs_snapshot
+        - authorized_store_snapshot
         - acs_timestamp
         - dars
         - domain_was_halted
@@ -1129,6 +1130,10 @@ components:
         acs_snapshot:
           description: |
             base64 encoded string of acs snapshot for the requested party id, or for the dso and sv parties by default
+          type: string
+        authorized_store_snapshot:
+          description: |
+            base64 encoded string of authorized store snapshot
           type: string
         acs_timestamp:
           type: string

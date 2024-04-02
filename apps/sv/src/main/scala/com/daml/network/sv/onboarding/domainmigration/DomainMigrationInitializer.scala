@@ -12,17 +12,17 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalSynchronizerNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
+import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
-import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, DsoPartyHosting}
+import com.daml.network.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil, SetupUtil}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
-  loadDomainMigrationDump,
   SynchronizerNodeInitializer,
+  loadDomainMigrationDump,
 }
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
-import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
+import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -33,6 +33,7 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -76,6 +77,7 @@ class DomainMigrationInitializer(
     participantAdminConnection,
     loggerFactory,
   )
+  private val adminWorkflowsDarName = "AdminWorkflows"
 
   def migrateDomain(): Future[
     (
@@ -160,6 +162,11 @@ class DomainMigrationInitializer(
   ): Future[Unit] = {
     val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
     for {
+      _ <- importAuthorizedStoreSnapshot(
+        domainMigrationDump.nodeIdentities.domainId,
+        CantonTimestamp.assertFromInstant(domainMigrationDump.domainDataSnapshot.acsTimestamp),
+        domainMigrationDump.domainDataSnapshot.authorizedStoreSnapshot,
+      )
       _ <- initializeSynchronizerNode(
         domainMigrationDump.nodeIdentities,
         domainMigrationDump.domainDataSnapshot.genesisState.getOrElse(
@@ -187,6 +194,39 @@ class DomainMigrationInitializer(
       _ = logger.info("resumed domain")
     } yield {}
   }
+
+  private def checkNoUploadedDars() = {
+    for {
+      allUploadedDars <- participantAdminConnection.listDars()
+      dars = allUploadedDars.filter(_.name != adminWorkflowsDarName)
+      _ = if (dars.nonEmpty) {
+        sys.error(
+          s"No dars should be uploaded at this point. already uploaded dars: ${dars.map(_.name)}"
+        )
+      }
+    } yield ()
+  }
+
+  private def importAuthorizedStoreSnapshot(
+      domainId: DomainId,
+      timestamp: CantonTimestamp,
+      authorizedStoreSnapshot: ByteString,
+  ) = for {
+    txs <- participantAdminConnection.getVettedPackagesSnapshot(domainId, timestamp)
+    _ <-
+      if (txs.result.nonEmpty) {
+        logger.info(s"AuthorizedStore snapshot is already imported")
+        Future.unit
+      } else
+        for {
+          _ <- checkNoUploadedDars()
+          _ <- participantAdminConnection.importTopologySnapshot(
+            authorizedStoreSnapshot,
+            AuthorizedStore,
+          )
+          _ = logger.info(s"AuthorizedStore snapshot is imported")
+        } yield ()
+  } yield ()
 
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,

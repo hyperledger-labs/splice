@@ -475,6 +475,54 @@ abstract class TopologyAdminConnection(
       proposals = false,
     )
 
+  def exportTopologySnapshot(
+      domainId: DomainId,
+      proposals: Boolean,
+      excludeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
+      filterNamespace: String = "",
+  )(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    runCmd(
+      TopologyAdminCommandsX.Read.ExportTopologySnapshot(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = proposals,
+          timeQuery = TimeQuery.Range(from = None, until = None),
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterNamespace = filterNamespace,
+        excludeMappings = excludeMappings.map(_.code),
+      )
+    )
+  }
+
+  def importTopologySnapshot(
+      topologyTransactions: ByteString,
+      store: TopologyStoreId,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    runCmd(
+      TopologyAdminCommandsX.Write.ImportTopologySnapshot(topologyTransactions, store.filterName)
+    )
+  }
+
+  def exportAuthorizedStoreSnapshot(
+      domainId: DomainId,
+      participantId: UniqueIdentifier,
+  )(implicit
+      tc: TraceContext
+  ): Future[ByteString] =
+    exportTopologySnapshot(
+      domainId,
+      proposals = false,
+      excludeMappings = TopologyMappingX.Code.all.diff(Seq(TopologyMappingX.Code.VettedPackagesX)),
+      filterNamespace = participantId.namespace.filterString,
+    )
+
   def lookupTrafficControlState(
       domainId: DomainId,
       member: Member,
