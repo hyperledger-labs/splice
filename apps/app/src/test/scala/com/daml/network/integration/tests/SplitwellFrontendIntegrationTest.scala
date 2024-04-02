@@ -145,8 +145,6 @@ class SplitwellFrontendIntegrationTest
         clue("Checking Bob’s balance updates") {
 
           eventually() {
-            // TODO(#10755) Remove those noisy logs once the issue is fixed.
-            logger.debug("Querying Bob’s balance updates in frontend")
             val rows = findAll(className("balance-updates-list-item")).toSeq
             rows should have size 4
             // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
