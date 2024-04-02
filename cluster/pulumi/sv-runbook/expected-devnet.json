@@ -314,7 +314,8 @@
           "externalAddress": "svrun.network.com.network.canton.global:26016"
         },
         "genesis": {
-          "chainId": "svrun.network.com-0"
+          "chainId": "svrun.network.com-0",
+          "chainIdVersion": "0.1.1-snapshot.20240328.5498.0.vf695ebd5"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {

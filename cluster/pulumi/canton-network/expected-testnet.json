@@ -1083,7 +1083,8 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock-0"
+          "chainId": "mock-0",
+          "chainIdVersion": "0.1.1-snapshot.20240328.5498.0.vf695ebd5"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

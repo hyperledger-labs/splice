@@ -87,6 +87,8 @@ export function installCometBftNode(
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
             : `${CLUSTER_BASENAME}-${migrationId}`,
+        // TODO(#11434) Clean this up
+        chainIdVersion: '0.1.1-snapshot.20240328.5498.0.vf695ebd5',
       },
       metrics: {
         enable: true,
