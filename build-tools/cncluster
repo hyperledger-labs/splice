@@ -1501,22 +1501,42 @@ function subcmd_apply() {
     fi
 }
 
+subcommand_whitelist[export_to]="Exports the stack to the file passed as first argument."
+
+subcmd_export_to() {
+  local exportTo="$1"
+  _info "Exporting to $exportTo"
+  # remove first "Running Pulumi Command" line
+  subcmd_pulumi canton-network stack export | tail -n +2 | "$REPO_ROOT"/cluster/scripts/versions-from-dump.py > "$exportTo"
+}
+
 ###
 
 subcommand_whitelist[partial_upgrade]="Upgrades SV-1's sv-app and validator1's validator-app to the version passed"
 
 function subcmd_partial_upgrade() {
-    local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
-    template_file="${REPO_ROOT}/build-tools/partial_upgrade_versions_template.json"
     new_version=$1
+    original_versions_file=$2
+    json=$(cat "$original_versions_file")
 
-    sed -e "s/NEW_VERSION/${new_version}/g" "$template_file" > "$IMAGE_VERSIONS_FILE"
-
-    # Everything else should stay in the base version.
-    IMAGE_TAG=$("$REPO_ROOT"/build-tools/get-snapshot-version latest_base)
-    local -x IMAGE_TAG=$IMAGE_TAG
+    json_paths=(
+        '["sv-1","cn-participant"]'
+        '["sv-1","cn-global-domain"]'
+        '["sv-1","cn-cometbft"]'
+        '["sv-1","cn-scan"]'
+        '["sv-1","cn-sv-node"]'
+        '["sv-1","cn-validator"]'
+        '["validator1","cn-validator"]'
+        '["validator1","cn-participant"]'
+        '["validator1","cn-splitwell-web-ui"]'
+    )
+    for json_path in "${json_paths[@]}"; do
+      json=$(jq "setpath($json_path; \"$new_version\")" <<< "$json")
+    done
 
     _info "Upgrading sv-1 sv-app & validator1 validator-app to version $new_version"
+    local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
+    echo "$json" > "$IMAGE_VERSIONS_FILE"
 
     subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
 }

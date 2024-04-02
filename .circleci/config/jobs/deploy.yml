@@ -497,7 +497,9 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
-            cncluster partial_upgrade $(get-snapshot-version)
+            images="/tmp/ciupgrade.json"
+            cncluster export_to "$images"
+            cncluster partial_upgrade $(get-snapshot-version) "$images"
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:
