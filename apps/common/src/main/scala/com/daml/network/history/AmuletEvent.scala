@@ -1,6 +1,6 @@
 package com.daml.network.history
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, OpenMiningRound}
@@ -14,144 +14,63 @@ case class Transfer(
     ]
 )
 
-object Transfer extends ExerciseNodeCompanion {
-  override type Tpl = splice.amuletrules.AmuletRules
-  override type Arg = splice.amuletrules.AmuletRules_Transfer
-  override type Res = splice.amuletrules.TransferResult
-
-  override val template = splice.amuletrules.AmuletRules.COMPANION
-  override val choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Transfer
-
-  override val argDecoder = splice.amuletrules.AmuletRules_Transfer.valueDecoder()
-  override def argToValue(arg: splice.amuletrules.AmuletRules_Transfer) = arg.toValue
-
-  override val resDecoder = splice.amuletrules.TransferResult.valueDecoder
-  override def resToValue(res: splice.amuletrules.TransferResult) = res.toValue
-}
+object Transfer
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amuletrules.AmuletRules.COMPANION,
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Transfer,
+    )
 
 case class Tap(
     node: ExerciseNode[splice.amuletrules.AmuletRules_DevNet_Tap, amuletCodegen.Amulet.ContractId]
 )
 
-object Tap extends ExerciseNodeCompanion {
-  override type Tpl = splice.amuletrules.AmuletRules
-  override type Arg = splice.amuletrules.AmuletRules_DevNet_Tap
-  override type Res = splice.amuletrules.AmuletRules_DevNet_TapResult
+object Tap
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amuletrules.AmuletRules.COMPANION,
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_DevNet_Tap,
+    )
 
-  override val template = splice.amuletrules.AmuletRules.COMPANION
-  override val choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_DevNet_Tap
+object Mint
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amuletrules.AmuletRules.COMPANION,
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Mint,
+    )
 
-  override val argDecoder = splice.amuletrules.AmuletRules_DevNet_Tap.valueDecoder()
-  override def argToValue(arg: splice.amuletrules.AmuletRules_DevNet_Tap) = arg.toValue
+object LockedAmuletUnlock
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amulet.LockedAmulet.COMPANION,
+      choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_Unlock,
+    )
 
-  override val resDecoder = splice.amuletrules.AmuletRules_DevNet_TapResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
+object LockedAmuletOwnerExpireLock
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amulet.LockedAmulet.COMPANION,
+      choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock,
+    )
 
-object Mint extends ExerciseNodeCompanion {
-  override type Tpl = splice.amuletrules.AmuletRules
-  override type Arg = splice.amuletrules.AmuletRules_Mint
-  override type Res = splice.amuletrules.AmuletRules_MintResult
+object LockedAmuletExpireAmulet
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.LockedAmulet.COMPANION,
+      choice = amuletCodegen.LockedAmulet.CHOICE_LockedAmulet_ExpireAmulet,
+    )
 
-  override val template = splice.amuletrules.AmuletRules.COMPANION
-  override val choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Mint
+object AmuletRules_BuyMemberTraffic
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic,
+      template = splice.amuletrules.AmuletRules.COMPANION,
+    )
 
-  override val argDecoder = splice.amuletrules.AmuletRules_Mint.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
+object AnsRules_CollectInitialEntryPayment
+    extends ExerciseNodeCompanion.Mk(
+      choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment,
+      template = ansCodegen.AnsRules.COMPANION,
+    )
 
-  override val resDecoder = splice.amuletrules.AmuletRules_MintResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
-
-object LockedAmuletUnlock extends ExerciseNodeCompanion {
-  override type Tpl = splice.amulet.LockedAmulet
-  override type Arg = splice.amulet.LockedAmulet_Unlock
-  override type Res = splice.amulet.LockedAmulet_UnlockResult
-
-  override val template = splice.amulet.LockedAmulet.COMPANION
-  override val choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_Unlock
-
-  override val argDecoder = splice.amulet.LockedAmulet_Unlock.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder = splice.amulet.LockedAmulet_UnlockResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
-
-object LockedAmuletOwnerExpireLock extends ExerciseNodeCompanion {
-  override type Tpl = splice.amulet.LockedAmulet
-  override type Arg = splice.amulet.LockedAmulet_OwnerExpireLock
-  override type Res = splice.amulet.LockedAmulet_OwnerExpireLockResult
-
-  override val template = splice.amulet.LockedAmulet.COMPANION
-  override val choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock
-
-  override val argDecoder = splice.amulet.LockedAmulet_OwnerExpireLock.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder = splice.amulet.LockedAmulet_OwnerExpireLockResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
-
-object LockedAmuletExpireAmulet extends ExerciseNodeCompanion {
-  override type Tpl = amuletCodegen.LockedAmulet
-  override type Arg = amuletCodegen.LockedAmulet_ExpireAmulet
-  override type Res = amuletCodegen.LockedAmulet_ExpireAmuletResult
-
-  override val template = amuletCodegen.LockedAmulet.COMPANION
-  override val choice = amuletCodegen.LockedAmulet.CHOICE_LockedAmulet_ExpireAmulet
-
-  override val argDecoder = amuletCodegen.LockedAmulet_ExpireAmulet.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder = amuletCodegen.LockedAmulet_ExpireAmuletResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
-
-object AmuletRules_BuyMemberTraffic extends ExerciseNodeCompanion {
-  override type Tpl = splice.amuletrules.AmuletRules
-  override type Arg = splice.amuletrules.AmuletRules_BuyMemberTraffic
-  override type Res = splice.amuletrules.AmuletRules_BuyMemberTrafficResult
-  override val choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic
-  override val template = splice.amuletrules.AmuletRules.COMPANION
-  override val argDecoder = splice.amuletrules.AmuletRules_BuyMemberTraffic.valueDecoder()
-
-  override def argToValue(arg: Arg): Value = arg.toValue
-
-  override val resDecoder = splice.amuletrules.AmuletRules_BuyMemberTrafficResult.valueDecoder
-
-  override def resToValue(res: Res): Value = res.toValue
-}
-
-object AnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
-  override type Tpl = ansCodegen.AnsRules
-  override type Arg = ansCodegen.AnsRules_CollectInitialEntryPayment
-  override type Res = ansCodegen.AnsRules_CollectInitialEntryPaymentResult
-  override val choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment
-  override val template = ansCodegen.AnsRules.COMPANION
-  override val argDecoder = ansCodegen.AnsRules_CollectInitialEntryPayment.valueDecoder()
-
-  override def argToValue(arg: Arg): Value = arg.toValue
-
-  override val resDecoder = ansCodegen.AnsRules_CollectInitialEntryPaymentResult.valueDecoder
-
-  override def resToValue(res: Res): Value = res.toValue
-}
-
-object AnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
-  override type Tpl = ansCodegen.AnsRules
-  override type Arg = ansCodegen.AnsRules_CollectEntryRenewalPayment
-  override type Res = ansCodegen.AnsRules_CollectEntryRenewalPaymentResult
-  override val choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectEntryRenewalPayment
-  override val template = ansCodegen.AnsRules.COMPANION
-  override val argDecoder = ansCodegen.AnsRules_CollectEntryRenewalPayment.valueDecoder()
-
-  override def argToValue(arg: Arg): Value = arg.toValue
-
-  override val resDecoder = ansCodegen.AnsRules_CollectEntryRenewalPaymentResult.valueDecoder
-
-  override def resToValue(res: Res): Value = res.toValue
-}
+object AnsRules_CollectEntryRenewalPayment
+    extends ExerciseNodeCompanion.Mk(
+      choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectEntryRenewalPayment,
+      template = ansCodegen.AnsRules.COMPANION,
+    )
 
 object AmuletArchive {
   // Matches on any consuming exercise on a amulet
@@ -191,20 +110,11 @@ object LockedAmuletCreate {
   }
 }
 
-object AmuletExpire extends ExerciseNodeCompanion {
-  override type Tpl = amuletCodegen.Amulet
-  override type Arg = amuletCodegen.Amulet_Expire
-  override type Res = amuletCodegen.Amulet_ExpireResult
-
-  override val template = amuletCodegen.Amulet.COMPANION
-  override val choice = amuletCodegen.Amulet.CHOICE_Amulet_Expire
-
-  override val argDecoder = amuletCodegen.Amulet_Expire.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder = splice.amulet.Amulet_ExpireResult.valueDecoder()
-  override def resToValue(res: Res) = res.toValue
-}
+object AmuletExpire
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.Amulet.COMPANION,
+      choice = amuletCodegen.Amulet.CHOICE_Amulet_Expire,
+    )
 
 // TODO(#2930): This is not really a Amulet event - consider either renaming the file, or splitting it into different ones based on event "types"
 object OpenMiningRoundCreate {
