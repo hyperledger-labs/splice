@@ -591,6 +591,7 @@ function subcmd_set_machine_type() {
            --enable-autoscaling \
            --min-nodes "${GCP_CLUSTER_MIN_NODES}" \
            --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
+           --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
            || _error "Could not recreate default node pool. Terminating early."
 
     _info "Deleting temporary node pool..."
@@ -791,7 +792,9 @@ function subcmd_create() {
                --addons=GcePersistentDiskCsiDriver \
                --enable-autoscaling \
                --min-nodes "${GCP_CLUSTER_MIN_NODES}" \
-               --max-nodes "${GCP_CLUSTER_MAX_NODES}"
+               --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
+               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}"
+
 
         #### Enable Firewall Access
         gcloud container clusters update "${GCP_CLUSTER_NAME}" \
