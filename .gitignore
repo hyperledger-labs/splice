@@ -1,5 +1,6 @@
 .daml
 *.dar
+!daml/dars/*
 *.log
 .DS_Store
 node_modules/

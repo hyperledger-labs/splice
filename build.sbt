@@ -1150,7 +1150,8 @@ lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `can
 cleanCnDars := {
   val log = streams.value.log
   runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
-  runCommand(Seq("find", "daml", "-name", "*.dar", "-delete"), log)
+  // daml/dars contains the versions of all dars that we want to keep committed, so we don't delete them
+  runCommand(Seq("find", "daml", "-name", "*.dar", "-not", "-path", "*daml/dars/*", "-delete"), log)
 }
 
 lazy val checkErrors = taskKey[Unit](
