@@ -1260,6 +1260,9 @@
         "meshConfig": {
           "accessLogEncoding": "JSON",
           "accessLogFile": "/dev/stdout",
+          "defaultConfig": {
+            "holdApplicationUntilProxyStarts": true
+          },
           "enablePrometheusMerge": false
         }
       },

@@ -58,6 +58,10 @@ function configureIstiod(
           accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
           enablePrometheusMerge: false,
+          defaultConfig: {
+            // wait for the istio container to start before starting apps to avoid network errors
+            holdApplicationUntilProxyStarts: true,
+          },
         },
       },
     },
