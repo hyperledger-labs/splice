@@ -1,35 +1,52 @@
 package com.daml.network.build_tools
 
 import better.files.*
-import com.daml.lf.archive.DarParser
+import com.daml.lf.archive.{DarDecoder, DarParser}
 
 object DarLockChecker {
   def main(args: Array[String]): Unit = {
     args.toSeq match {
       case cmd +: outputFileName +: inputFileNames =>
-        val darHashes = inputFileNames
-          .filter(!_.endsWith("-current.dar"))
-          .map(name => {
-            val hash = DarParser.assertReadArchiveFromFile(File(name).toJava).main.getHash
-            name + " " + hash + System.lineSeparator()
+        val dars = inputFileNames
+          .map(filename => {
+            val hash = DarParser.assertReadArchiveFromFile(File(filename).toJava).main.getHash
+            val metadata =
+              DarDecoder.assertReadArchiveFromFile(File(filename).toJava).main._2.metadata
+            (metadata.name, metadata.version.toString()) -> hash
           })
+          .foldLeft(Map.empty[(String, String), String]) {
+            case (map, ((name, version), hash)) => {
+              val _ = map
+                .get((name, version))
+                .foreach(_hash =>
+                  if (_hash != hash)
+                    sys.error(
+                      s"Conflicting hashes for version ${version} of package ${name}. If you modified daml models, please bump the package version."
+                    )
+                )
+              map + ((name, version) -> hash)
+            }
+          }
+        val lockStr = dars
+          .map({ case (name, version) -> hash => s"$name $version $hash" })
+          .toSeq
           .sorted
-          .mkString
+          .mkString(System.lineSeparator())
         cmd match {
           case "check" =>
             val currentHashes = File(outputFileName).contentAsString
-            if (currentHashes != darHashes)
+            if (currentHashes != lockStr)
               sys.error(
                 Seq(
-                  "Error: .dar file hashes do not match",
+                  "Error: daml lockfile is not up-to-date",
                   "Expected:",
-                  darHashes,
+                  lockStr,
                   "Actual:",
                   currentHashes,
                 ).mkString(System.lineSeparator())
               )
           case "update" =>
-            val _ = File(outputFileName).overwrite(darHashes)
+            val _ = File(outputFileName).overwrite(lockStr)
           case _ =>
             printHelpAndError(s"unknown command '$cmd'")
         }

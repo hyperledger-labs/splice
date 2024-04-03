@@ -1,15 +1,15 @@
-daml/splice-amulet-name-service-test/.daml/dist/splice-amulet-name-service-test-0.1.0.dar bc2289c1296874a726af0822a8f47f5e79d8817b737d951c667ceae5292e075a
-daml/splice-amulet-name-service/.daml/dist/splice-amulet-name-service-0.1.0.dar 2598a415893cd496306499d4d0a29614621e0ef2ceeed55a63d3bdbb0f57830a
-daml/splice-amulet-test/.daml/dist/splice-amulet-test-0.1.0.dar 6142c2d49c934c356fd551c8fde6d0b87ab38ffbbb97ef0f374125ff43c0f9d4
-daml/splice-amulet/.daml/dist/splice-amulet-0.1.0.dar 48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351
-daml/splice-app-manager/.daml/dist/splice-app-manager-0.1.0.dar e3605e0112595187ec963700d28f17fe042f3b80c862363e299003b9423a1844
-daml/splice-dso-governance-test/.daml/dist/splice-dso-governance-test-0.1.0.dar 16669aa4ccfbb0b5a9bedb5ffcfdc0ca2f26331c59eaf982c881959f366de43c
-daml/splice-dso-governance/.daml/dist/splice-dso-governance-0.1.0.dar 7e0e82bdbe3941ebd13d029b86bb60640ddc9b7287012d6274194f26cd7b858c
-daml/splice-util/.daml/dist/splice-util-0.1.0.dar 0f319b3bcc9a418836d58c86deae25b38d3f018f1b0c117456cd9011cface7f1
-daml/splice-validator-lifecycle-test/.daml/dist/splice-validator-lifecycle-test-0.1.0.dar ae6d84bb4b5fb2fde601fb9228ebdcb95ee8234800a5564b0a3b853db6ffa284
-daml/splice-validator-lifecycle/.daml/dist/splice-validator-lifecycle-0.1.0.dar cef96fac957362f1fc097120bd13686cac7f84fbc8053afa994a1f9214d9570c
-daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-0.1.0.dar 50f762c0e3c94db34ccb4fb38e95c190479ee95f1aea4ebce4406a71d4e395e9
-daml/splice-wallet-test/.daml/dist/splice-wallet-test-0.1.0.dar e349603a14ad7d19e9f32f4ff95a4eaceeeb4040a33235bc5084b11fec206d6d
-daml/splice-wallet/.daml/dist/splice-wallet-0.1.0.dar 5f384fba007e8b93c8ff1ac151cdc2d035ae1e0506f5e5770de469048713024c
-daml/splitwell-test/.daml/dist/splitwell-test-0.1.0.dar b57964f8ff5d81843b5010f93972301467ab145dd48468617cb7126014a46afe
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar 075c76de553ab88383a7c69de134afa82aacfdf8ea8fcfe8852c4b199c3b2669
+splice-amulet 0.1.0 48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351
+splice-amulet-name-service 0.1.0 2598a415893cd496306499d4d0a29614621e0ef2ceeed55a63d3bdbb0f57830a
+splice-amulet-name-service-test 0.1.0 bc2289c1296874a726af0822a8f47f5e79d8817b737d951c667ceae5292e075a
+splice-amulet-test 0.1.0 6142c2d49c934c356fd551c8fde6d0b87ab38ffbbb97ef0f374125ff43c0f9d4
+splice-app-manager 0.1.0 e3605e0112595187ec963700d28f17fe042f3b80c862363e299003b9423a1844
+splice-dso-governance 0.1.0 7e0e82bdbe3941ebd13d029b86bb60640ddc9b7287012d6274194f26cd7b858c
+splice-dso-governance-test 0.1.0 16669aa4ccfbb0b5a9bedb5ffcfdc0ca2f26331c59eaf982c881959f366de43c
+splice-util 0.1.0 0f319b3bcc9a418836d58c86deae25b38d3f018f1b0c117456cd9011cface7f1
+splice-validator-lifecycle 0.1.0 cef96fac957362f1fc097120bd13686cac7f84fbc8053afa994a1f9214d9570c
+splice-validator-lifecycle-test 0.1.0 ae6d84bb4b5fb2fde601fb9228ebdcb95ee8234800a5564b0a3b853db6ffa284
+splice-wallet 0.1.0 5f384fba007e8b93c8ff1ac151cdc2d035ae1e0506f5e5770de469048713024c
+splice-wallet-payments 0.1.0 50f762c0e3c94db34ccb4fb38e95c190479ee95f1aea4ebce4406a71d4e395e9
+splice-wallet-test 0.1.0 e349603a14ad7d19e9f32f4ff95a4eaceeeb4040a33235bc5084b11fec206d6d
+splitwell 0.1.0 075c76de553ab88383a7c69de134afa82aacfdf8ea8fcfe8852c4b199c3b2669
+splitwell-test 0.1.0 b57964f8ff5d81843b5010f93972301467ab145dd48468617cb7126014a46afe

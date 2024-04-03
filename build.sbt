@@ -115,8 +115,10 @@ lazy val root = (project in file("."))
         path = file.toPath
         if !path.startsWith(cantonPath)
       } yield basePath.relativize(path)
+      val committedDarFiles =
+        java.nio.file.Paths.get("daml").resolve("dars").toFile.listFiles("*.dar").toSeq
       val outputFile = "daml/dars.lock"
-      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
+      " " + (Seq(outputFile) ++ darPaths ++ committedDarFiles).mkString(" ")
     },
     cantonDarsLockCheckerFileArg := {
       val darFiles: Seq[File] = damlBuild.all(allDarsFilter).value.flatten
