@@ -3,12 +3,7 @@ package com.daml.network.sv.onboarding.joining
 import cats.data.OptionT
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{
-  catsSyntaxTuple2Semigroupal,
-  catsSyntaxTuple3Semigroupal,
-  catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
-}
+import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
@@ -283,6 +278,7 @@ class JoiningNodeInitializer(
       _ <- (
         waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
         waitForDsoMembership(dsoStore),
+        waitUntilCometBftNodeIsValidator,
         SetupUtil.ensureDsoPartyMetadataAnnotation(
           svSvAutomationService.connection,
           config,
@@ -369,6 +365,33 @@ class JoiningNodeInitializer(
     )
   }
 
+  private def waitUntilCometBftNodeIsValidator = {
+    newCometBftClient
+      .map(cometBftClient =>
+        retryProvider.waitUntil(
+          RetryFor.WaitingOnInitDependency,
+          "cometbft_is_validator",
+          "CometBFT node is a validator",
+          cometBftClient
+            .nodeStatus()
+            .map { status =>
+              if (status.validatorInfo.votingPower.toDouble == 0) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"CometBFT node is not a validator; voting power is 0."
+                  )
+                  .asRuntimeException()
+              }
+            },
+          logger,
+        )
+      )
+      .getOrElse({
+        logger.info("No CometBFT node found, so not waiting on CometBFT validator.")
+        Future.unit
+      })
+  }
+
   private def waitUntilCometBftNodeHasCaughtUp = {
     newCometBftClient
       .map(cometBftClient =>
@@ -378,7 +401,7 @@ class JoiningNodeInitializer(
           "CometBFT node has caught up",
           cometBftClient
             .nodeStatus()
-            .map(status =>
+            .map { status =>
               if (status.syncInfo.catchingUp) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
@@ -386,7 +409,7 @@ class JoiningNodeInitializer(
                   )
                   .asRuntimeException()
               }
-            ),
+            },
           logger,
         )
       )
