@@ -16,7 +16,19 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-sequencer
+        cn-component: sequencer
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: cn-component
+                    operator: In
+                    values:
+                      - sequencer
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {} # search in all namespaces
       containers:
         - name: sequencer
         {{- if eq .Values.sequencer.driver.type "cometbft"}}
