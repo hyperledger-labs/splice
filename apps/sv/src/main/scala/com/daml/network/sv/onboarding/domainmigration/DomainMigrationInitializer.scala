@@ -1,5 +1,6 @@
 package com.daml.network.sv.onboarding.domainmigration
 
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import com.daml.network.environment.{
   CNLedgerClient,
@@ -13,8 +14,8 @@ import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
+import com.daml.network.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
 import com.daml.network.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil, SetupUtil}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
@@ -50,6 +51,8 @@ class DomainMigrationInitializer(
     localSynchronizerNode: LocalSynchronizerNode,
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
+    cometBftConfig: Option[CometBftConfig],
+    cometBftClient: Option[CometBftClient],
     override protected val config: SvAppBackendConfig,
     override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: CNLedgerClient,
@@ -58,7 +61,10 @@ class DomainMigrationInitializer(
     override protected val storage: Storage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    joiningNodeInitializer: JoiningNodeInitializer,
+    newJoiningNodeInitializer: (
+        Option[SvOnboardingConfig.JoinWithKey],
+        Option[CometBftNode],
+    ) => JoiningNodeInitializer,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -140,9 +146,30 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
+      signer <-
+        CometBftRequestSigner.getOrGenerateSigner(
+          "cometbft-governance-keys",
+          participantAdminConnection,
+          logger,
+          true,
+        )
+      newCometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+        new CometBftNode(client, signer, config, loggerFactory)
+      )
       dsoAutomationService =
-        newSvDsoAutomationService(svStore, dsoStore, Some(localSynchronizerNode))
-      _ <- joiningNodeInitializer.onboard(
+        new SvDsoAutomationService(
+          clock,
+          config,
+          svStore,
+          dsoStore,
+          ledgerClient,
+          participantAdminConnection,
+          retryProvider,
+          newCometBftNode,
+          Some(localSynchronizerNode),
+          loggerFactory,
+        )
+      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,

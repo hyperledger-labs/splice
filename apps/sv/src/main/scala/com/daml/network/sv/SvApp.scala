@@ -232,14 +232,6 @@ class SvApp(
     val cometBftClient = newCometBftClient
 
     for {
-      signer <- CometBftRequestSigner.getOrGenerateSigner(
-        "cometbft-governance-keys",
-        participantAdminConnection,
-        logger,
-      )
-      cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-        new CometBftNode(client, signer, config, loggerFactory)
-      )
       (_, participantId) <- (
         // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
         // reconnect all domains at the beginning of SV initialization just in case.
@@ -262,7 +254,10 @@ class SvApp(
           )
         },
       ).tupled
-      newJoiningNodeInitializer = (joiningConfig: Option[SvOnboardingConfig.JoinWithKey]) =>
+      newJoiningNodeInitializer = (
+          joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
+          cometBftNode: Option[CometBftNode],
+      ) =>
         new JoiningNodeInitializer(
           localSynchronizerNode,
           joiningConfig,
@@ -318,38 +313,58 @@ class SvApp(
               loggerFactory,
             )
             initializer.bootstrapCollective()
-
           }
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
-          appInitStep("JoiningNodeInitializer joining collective with key") {
-            val initializer = newJoiningNodeInitializer(Some(joiningConfig))
-            initializer.joinCollectiveAndOnboardNodes()
-          }
+          for {
+            signer <- CometBftRequestSigner.getOrGenerateSigner(
+              "cometbft-governance-keys",
+              participantAdminConnection,
+              logger,
+            )
+            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+              new CometBftNode(client, signer, config, loggerFactory)
+            )
+            res <- appInitStep("JoiningNodeInitializer joining collective with key") {
+              val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
+              initializer.joinCollectiveAndOnboardNodes()
+            }
+          } yield res
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
-            val joiningNodeInitializer = newJoiningNodeInitializer(None)
             new DomainMigrationInitializer(
               localSynchronizerNode.getOrElse(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
               domainMigrationConfig,
               participantId,
+              cometBftConfig,
+              cometBftClient,
               config,
-              cometBftNode,
+              None,
               ledgerClient,
               participantAdminConnection,
               clock,
               storage,
               loggerFactory,
               retryProvider,
-              joiningNodeInitializer,
+              newJoiningNodeInitializer,
             ).migrateDomain()
           }
         case None =>
-          appInitStep("JoiningNodeInitializer joining collective") {
-            val initializer = newJoiningNodeInitializer(None)
-            initializer.joinCollectiveAndOnboardNodes()
-          }
+          for {
+            signer <- CometBftRequestSigner.getOrGenerateSigner(
+              "cometbft-governance-keys",
+              participantAdminConnection,
+              logger,
+            )
+            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+              new CometBftNode(client, signer, config, loggerFactory)
+            )
+            res <- appInitStep("JoiningNodeInitializer joining collective") {
+              val initializer = newJoiningNodeInitializer(None, cometBftNode)
+              initializer.joinCollectiveAndOnboardNodes()
+            }
+          } yield res
       }
 
       (_, _, isDevNet, _, _, _) <- (

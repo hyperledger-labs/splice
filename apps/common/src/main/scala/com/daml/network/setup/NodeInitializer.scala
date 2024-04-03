@@ -97,7 +97,9 @@ class NodeInitializer(
       dump: NodeIdentitiesDump,
       expectedId: NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Uploading node keys from dump for id ${dump.id}, new node id: $expectedId")
+    logger.info(
+      s"Uploading node keys ${dump.keys.map(_.name)} from dump for id ${dump.id}, new node id: $expectedId"
+    )
     // this is idempotent
     dump.keys.traverse_(key => connection.importKeyPair(key.keyPair.toArray, key.name))
   }

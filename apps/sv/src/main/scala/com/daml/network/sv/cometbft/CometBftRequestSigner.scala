@@ -45,21 +45,27 @@ object CometBftRequestSigner {
   def getGenesisSigner =
     new CometBftRequestSigner(PubKeyBase64, PrivateKeyBase64)
 
+  // TODO(#11367): get rid of useGenesisKeysIfAbsentFromKms
+  // We need useGenesisKeysIfAbsentFromKms for domain migration, where we need to get the genesis keys if they are absent
+  // from Canton KMS instead of generating new keys.
   def getOrGenerateSigner(
       name: String,
       participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
+      useGenesisKeysIfAbsentFromKms: Boolean = false,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[CometBftRequestSigner] = {
     for {
       keysMetadata <- participantAdminConnection.listMyKeys(name)
       fingerprint <-
-        if (keysMetadata.isEmpty) {
+        if (keysMetadata.isEmpty && !useGenesisKeysIfAbsentFromKms) {
           for {
             keypair <- participantAdminConnection.generateKeyPair(name)
           } yield {
             logger.info(s"Generating new $name keys with fingerprint ${keypair.id}.")
             keypair.id
           }
+        } else if (keysMetadata.isEmpty && useGenesisKeysIfAbsentFromKms) {
+          Future.successful(())
         } else {
           val fingerprint = keysMetadata.headOption
             .getOrElse(
@@ -73,11 +79,14 @@ object CometBftRequestSigner {
           logger.info(s"Using existing $name keys with fingerprint $fingerprint.")
           Future.successful(fingerprint)
         }
-      action <-
-        participantAdminConnection.exportKeyPair(
-          fingerprint
-        )
-    } yield action match {
+      keyBytes <- fingerprint match {
+        case fingerprint: Fingerprint =>
+          participantAdminConnection.exportKeyPair(
+            fingerprint
+          )
+        case _ => Future.successful(())
+      }
+    } yield keyBytes match {
       case keyBytes: ByteString =>
         val keyPair = CryptoKeyPair.fromByteString(keyBytes)
         val pubKey = keyPair
@@ -106,11 +115,15 @@ object CometBftRequestSigner {
           Base64.getEncoder.encodeToString(augmentedPrivKey),
         )
       case _ =>
-        throw Status.NOT_FOUND
-          .withDescription(
-            s"Could not export KeyPair $name from Canton KMS"
-          )
-          .asRuntimeException()
+        if (useGenesisKeysIfAbsentFromKms) {
+          getGenesisSigner
+        } else {
+          throw Status.NOT_FOUND
+            .withDescription(
+              s"Could not export KeyPair $name from Canton KMS"
+            )
+            .asRuntimeException()
+        }
     }
 
   }

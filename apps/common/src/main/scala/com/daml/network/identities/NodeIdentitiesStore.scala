@@ -37,12 +37,14 @@ class NodeIdentitiesStore(
           )
       )
       bootstrapTxs <- adminConnection.getIdentityBootstrapTransactions(None, id.uid)
-    } yield NodeIdentitiesDump(
-      id,
-      keys,
-      bootstrapTxs,
-      Some(BuildInfo.compiledVersion),
-    )
+    } yield {
+      NodeIdentitiesDump(
+        id,
+        keys,
+        bootstrapTxs,
+        Some(BuildInfo.compiledVersion),
+      )
+    }
 
   /** Write a dump of the node identities to the configured backup location.
     *
