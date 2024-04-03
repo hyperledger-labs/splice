@@ -14,6 +14,8 @@ Upcoming
 
 * Fixed a bug where coins with very large values broke ingestion in the SV and validator app due to an overflow.
 
+* Updated SV runbook for correct recommendation on pruning intervals.
+
 2024-04-01
 ----------
 
