@@ -1,8 +1,11 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
+import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
+
 import {
+  ChartValues,
   clusterLargeDisk,
   CNCustomResourceOptions,
   defaultVersion,
@@ -11,7 +14,7 @@ import {
   installCNHelmChart,
   installPostgresPasswordSecret,
   sanitizedForHelm,
-} from 'cn-pulumi-common';
+} from '.';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
 
@@ -45,7 +48,7 @@ export interface Postgres extends pulumi.Resource {
   readonly secretName: string;
 }
 
-class CloudPostgres extends pulumi.ComponentResource implements Postgres {
+export class CloudPostgres extends pulumi.ComponentResource implements Postgres {
   name: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
@@ -53,12 +56,12 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
 
   private readonly pgSvc: gcp.sql.DatabaseInstance;
 
-  constructor(xns: ExactNamespace, name: string, uniqueSecretName: boolean) {
+  constructor(xns: ExactNamespace, name: string, secretName: string) {
     const logicalName = xns.logicalName + '-' + name;
     super('canton:cloud:postgres', logicalName);
     this.name = name;
     this.namespace = xns;
-    this.secretName = uniqueSecretName ? this.name + '-secrets' : 'postgres-secrets';
+    this.secretName = secretName;
 
     this.pgSvc = new gcp.sql.DatabaseInstance(
       logicalName,
@@ -131,21 +134,21 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
   }
 }
 
-class CNPostgres extends pulumi.ComponentResource implements Postgres {
+export class CNPostgres extends pulumi.ComponentResource implements Postgres {
   name: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   pg: Release;
   secretName: string;
 
-  constructor(xns: ExactNamespace, name: string, uniqueSecretName: boolean) {
+  constructor(xns: ExactNamespace, name: string, secretName: string, values?: ChartValues) {
     const logicalName = xns.logicalName + '-' + name;
     super('canton:network:postgres', logicalName);
 
     this.name = name;
     this.namespace = xns;
+    this.secretName = secretName;
     this.address = pulumi.output(`${this.name}.${this.namespace.logicalName}.svc.cluster.local`);
-    this.secretName = uniqueSecretName ? this.name + '-secrets' : 'postgres-secrets';
     const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
@@ -154,14 +157,17 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
       xns,
       name,
       'cn-postgres',
-      {
-        db: {
-          volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
+      _.merge(
+        {
+          db: {
+            volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
+          },
+          persistence: {
+            secretName: this.secretName,
+          },
         },
-        persistence: {
-          secretName: this.secretName,
-        },
-      },
+        values || {}
+      ),
       defaultVersion,
       { dependsOn: [passwordSecret] }
     );
@@ -204,10 +210,11 @@ export function installPostgres(
   uniqueSecretName = false
 ): Postgres {
   let ret: Postgres;
+  const secretName = uniqueSecretName ? name + '-secrets' : 'postgres-secrets';
   if (enableCloudSql) {
-    ret = new CloudPostgres(xns, name, uniqueSecretName);
+    ret = new CloudPostgres(xns, name, secretName);
   } else {
-    ret = new CNPostgres(xns, name, uniqueSecretName);
+    ret = new CNPostgres(xns, name, secretName);
   }
   return ret;
 }

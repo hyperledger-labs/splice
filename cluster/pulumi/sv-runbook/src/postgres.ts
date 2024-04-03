@@ -1,27 +1,20 @@
-import * as k8s from '@pulumi/kubernetes';
-import * as random from '@pulumi/random';
-import {
-  ChartValues,
-  defaultVersion,
-  ExactNamespace,
-  installCNRunbookHelmChart,
-  installPostgresPasswordSecret,
-} from 'cn-pulumi-common';
+import { envFlag, ExactNamespace, loadYamlFromFile, REPO_ROOT } from 'cn-pulumi-common';
+import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
+
+const cloudSqlEnabled = envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
 
 export function installPostgres(
   xns: ExactNamespace,
   name: string,
   secretName: string,
-  values: ChartValues
-): k8s.helm.v3.Release {
-  const password = new random.RandomPassword(`${xns.logicalName}-${name}-passwd`, {
-    length: 16,
-    overrideSpecial: '_%@',
-    special: true,
-  }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
-
-  return installCNRunbookHelmChart(xns, name, 'cn-postgres', values, defaultVersion, [
-    passwordSecret,
-  ]);
+  selfHostedValuesFile: string
+): CNPostgres | CloudPostgres {
+  if (cloudSqlEnabled) {
+    return new CloudPostgres(xns, name, secretName);
+  } else {
+    const values = loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`
+    );
+    return new CNPostgres(xns, name, secretName, values);
+  }
 }

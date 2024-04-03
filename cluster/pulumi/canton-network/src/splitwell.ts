@@ -15,9 +15,9 @@ import {
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
-import * as postgres from './postgres';
+import * as postgres from '../../common/src/postgres';
+import { installPostgresMetrics } from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
-import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(

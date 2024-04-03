@@ -28,23 +28,17 @@ export function installDecentralizedSynchronizerNode(
     dependencies
   );
 
-  const sequencerPgValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-sequencer.yaml`
-  );
   const sequencerPg = installPostgres(
     svNamespace,
     `sequencer-pg`,
     'sequencer-pg-secret',
-    sequencerPgValues
-  );
-  const mediatorPgValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-mediator.yaml`
+    'postgres-values-sequencer.yaml'
   );
   const mediatorPg = installPostgres(
     svNamespace,
     `mediator-pg`,
     'mediator-pg-secret',
-    mediatorPgValues
+    'postgres-values-mediator.yaml'
   );
 
   return installMigrationIdSpecificComponent(
@@ -73,6 +67,17 @@ export function installDecentralizedSynchronizerNode(
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             ...sequencerResources,
+            persistence: {
+              ...decentralizedSynchronizerValues.sequencer.persistence,
+              host: sequencerPg.address,
+            },
+          },
+          mediator: {
+            ...decentralizedSynchronizerValues.mediator,
+            persistence: {
+              ...decentralizedSynchronizerValues.mediator.persistence,
+              host: mediatorPg.address,
+            },
           },
         },
         version,

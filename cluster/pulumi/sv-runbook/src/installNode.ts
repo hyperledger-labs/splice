@@ -35,6 +35,7 @@ import {
   defaultVersion,
   disableCantonAutoInit,
 } from 'cn-pulumi-common';
+import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { retry } from 'cn-pulumi-common/src/retries';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 import fetch from 'node-fetch';
@@ -175,6 +176,16 @@ type SvConfig = {
   disableOnboardingParticipantPromotionDelay: boolean;
 };
 
+function persistenceForPostgres(pg: CNPostgres | CloudPostgres, values: ChartValues) {
+  return {
+    persistence: {
+      ...values?.persistence,
+      host: pg.address,
+      secretName: pg.secretName,
+    },
+  };
+}
+
 async function installSvAndValidator(
   config: SvConfig,
   resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
@@ -218,14 +229,11 @@ async function installSvAndValidator(
   );
   const svKeySecret_ = svKeySecret(xns, svKey);
 
-  const participantPgValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-participant.yaml`
-  );
   const participantPg = installPostgres(
     xns,
     `participant-pg`,
     'participant-pg-secret',
-    participantPgValues
+    'postgres-values-participant.yaml'
   );
 
   const participant = installMigrationIdSpecificComponent(
@@ -252,6 +260,7 @@ async function installSvAndValidator(
 
       const participantValuesWithSpecifiedAud: ChartValues = {
         ...participantValues,
+        ...persistenceForPostgres(participantPg, participantValues),
         auth: {
           ...participantValues.auth,
           targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
@@ -271,10 +280,7 @@ async function installSvAndValidator(
     }
   ).activeComponent;
 
-  const appsPgValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-apps.yaml`
-  );
-  const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', appsPgValues);
+  const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
   const sv234NameSet = new Set<string>([
     'Digital-Asset-Eng-2',
@@ -340,6 +346,7 @@ async function installSvAndValidator(
 
   const svValuesWithSpecifiedAud: ChartValues = {
     ...svValues,
+    ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
       audience: auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
@@ -391,6 +398,7 @@ async function installSvAndValidator(
 
   const scanValuesWithFixedTokens = {
     ...scanValues,
+    ...persistenceForPostgres(appsPg, scanValues),
     ...fixedTokensValue,
   };
 
@@ -425,6 +433,7 @@ async function installSvAndValidator(
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
+    ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
       audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,

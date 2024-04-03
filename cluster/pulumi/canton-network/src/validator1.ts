@@ -13,9 +13,9 @@ import {
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
-import * as postgres from './postgres';
+import * as postgres from '../../common/src/postgres';
+import { installPostgresMetrics } from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
-import { installPostgresMetrics } from './postgres';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export async function installValidator1(

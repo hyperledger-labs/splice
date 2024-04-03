@@ -14,8 +14,8 @@ import {
   sanitizedForPostgres,
 } from 'cn-pulumi-common';
 
-import * as postgres from './postgres';
-import { installPostgresMetrics, Postgres } from './postgres';
+import * as postgres from '../../common/src/postgres';
+import { installPostgresMetrics, Postgres } from '../../common/src/postgres';
 
 export function installMigrationSpecificValidatorParticipant(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,

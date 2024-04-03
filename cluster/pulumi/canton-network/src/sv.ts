@@ -37,10 +37,10 @@ import {
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
-import * as postgres from './postgres';
+import * as postgres from '../../common/src/postgres';
+import { installPostgresMetrics, Postgres } from '../../common/src/postgres';
 import { DecentralizedSynchronizerNode } from './decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
-import { installPostgresMetrics, Postgres } from './postgres';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 

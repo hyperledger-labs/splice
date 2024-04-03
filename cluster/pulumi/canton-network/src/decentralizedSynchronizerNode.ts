@@ -11,8 +11,8 @@ import {
   sequencerResources,
 } from 'cn-pulumi-common';
 
+import { Postgres, installPostgresMetrics } from '../../common/src/postgres';
 import { installCometBftNode } from './cometbft';
-import { Postgres, installPostgresMetrics } from './postgres';
 import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
 export class DecentralizedSynchronizerNode extends ComponentResource {
