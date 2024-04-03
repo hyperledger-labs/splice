@@ -10,28 +10,34 @@ find "daml" -name "daml.yaml" -exec sed -i 's/0.1.0/0.1.1/g' {} \;
 find . -name "*0.1.0.dar" -exec rm {} \;
 
 base_version=$(get-snapshot-version latest_release)
-_info "Fetching and extracting release ${base_version} from GCP"
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+
+ALL_BUNDLES_DIR="${REPO_ROOT}/apps/app/src/test/resources/bundles"
+mkdir -p "${ALL_BUNDLES_DIR}"
 tarball="${base_version}_cn-node-0.1.0-SNAPSHOT.tar.gz"
-export CLOUDSDK_CORE_PROJECT=da-cn-shared
-set +e
-num_retries=0
-# Builds on main aren't serialized, so the previous release might not be available yet.
-# The bundle step takes about 13 minutes currently, so waiting for 20 minutes should be enough.
-max_retries=120
-until gsutil cp "gs://cn-release-bundles/$tarball" "$tmp"; do
+
+if [ -f "${ALL_BUNDLES_DIR}/${tarball}" ]; then
+  _info "Release ${base_version} exists locally already"
+else
+  _info "Fetching and extracting release ${base_version} from GCP"
+  export CLOUDSDK_CORE_PROJECT=da-cn-shared
+  set +e
+  num_retries=0
+  # Builds on main aren't serialized, so the previous release might not be available yet.
+  # The bundle step takes about 13 minutes currently, so waiting for 20 minutes should be enough.
+  max_retries=120
+  until gsutil cp "gs://cn-release-bundles/$tarball" "${ALL_BUNDLES_DIR}"; do
   ((++num_retries))
   if ((num_retries>max_retries)); then
     _error "Failed to download release after $max_retries attempts"
   fi
   sleep 10
-done
-set -e
+  done
+  set -e
+fi
 
-BUNDLE_DIR="${REPO_ROOT}/apps/app/src/test/resources/bundles/${base_version}"
+BUNDLE_DIR="${ALL_BUNDLES_DIR}/${base_version}"
 mkdir -p "${BUNDLE_DIR}"
-tar zxf "$tmp/$tarball" -C "$BUNDLE_DIR"
+tar zxf "${ALL_BUNDLES_DIR}/$tarball" -C "$BUNDLE_DIR"
 
 _info "Copying dar files into the respective daml directories"
 dars=$(find "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/dars -name "*-0.1.0.dar" -exec basename {} \;)
