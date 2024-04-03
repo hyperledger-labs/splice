@@ -34,8 +34,8 @@ import com.daml.network.setup.{NodeInitializer, ParticipantInitializer, Particip
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{
-  BackupDump,
   AmuletConfigSchedule,
+  BackupDump,
   HasHealth,
   PackageVetting,
   UploadablePackage,
@@ -192,12 +192,16 @@ class ValidatorApp(
                 domainConnector.ensureDecentralizedSynchronizerRegistered()
             }
             _ <- domainConnector.ensureExtraDomainsRegistered()
-            _ <- config.migrateValidatorParty match {
-              case Some(MigrateValidatorPartyConfig(scanConfig)) =>
-                val partyHint = config.validatorPartyHint
+            _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
+              case (
+                    Some(MigrateValidatorPartyConfig(scanConfig, partiesToMigrate)),
+                    Some(participantBootstrappingConfig),
+                  ) =>
+                val validatorPartyHint = config.validatorPartyHint
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
+
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,
@@ -206,11 +210,15 @@ class ValidatorApp(
                   loggerFactory,
                 )
                 for {
+                  nodeIdentitiesDump <- ParticipantInitializer.getDump(
+                    participantBootstrappingConfig
+                  )
                   (_, partyId) <- (
                     setupDarsForAcsImport(participantAdminConnection),
                     participantPartyMigrator
                       .migrate(
-                        partyHint,
+                        nodeIdentitiesDump,
+                        validatorPartyHint,
                         config.ledgerApiUser,
                         config.domains.global.alias,
                         partyId =>
@@ -223,10 +231,15 @@ class ValidatorApp(
                             scanConnection.getAcsSnapshot(partyId)
                           },
                         Seq(DarResources.amulet.bootstrap),
+                        partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                       ),
                   ).tupled
                 } yield partyId
-              case None =>
+              case (Some(_), None) =>
+                sys.error(
+                  "ParticipantBootstrappingDumpConfig is required if MigrateValidatorPartyConfig is set"
+                )
+              case (None, _) =>
                 // Note that for the validator of an SV app, the user will be created by the SV app with a
                 // primary party set to the SV app already so this is a noop.
                 connection.ensureUserPrimaryPartyIsAllocated(

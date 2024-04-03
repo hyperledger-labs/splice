@@ -122,6 +122,7 @@ class WalletFrontendTimeBasedIntegrationTest
         BigDecimal(1),
         sv1ScanBackend,
         Duration.ofDays(1),
+        getLedgerTime,
       )
 
       withFrontEnd("alice") { implicit webDriver =>

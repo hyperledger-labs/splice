@@ -1,8 +1,6 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amuletrules.TransferOutput
-import com.daml.network.codegen.java.splice.expiry.TimeLock
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.console.*
@@ -86,96 +84,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       }
     }
   }
-
-  def transferOutputAmulet(
-      receiver: PartyId,
-      receiverFeeRatio: BigDecimal,
-      amount: BigDecimal,
-  ): splice.amuletrules.TransferOutput = {
-    new TransferOutput(
-      receiver.toProtoPrimitive,
-      receiverFeeRatio.bigDecimal,
-      amount.bigDecimal,
-      None.toJava,
-    )
-  }
-
-  def transferOutputLockedAmulet(
-      receiver: PartyId,
-      lockHolders: Seq[PartyId],
-      receiverFeeRatio: BigDecimal,
-      amount: BigDecimal,
-      expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
-    val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
-    val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
-
-    new TransferOutput(
-      receiver.toProtoPrimitive,
-      receiverFeeRatio.bigDecimal,
-      amount.bigDecimal,
-      Some(
-        new TimeLock(
-          lockHolders.map(_.toProtoPrimitive).asJava,
-          expiration.toInstant,
-        )
-      ).toJava,
-    )
-  }
-
-  def lockAmulets(
-      userValidator: ValidatorAppBackendReference,
-      userParty: PartyId,
-      validatorParty: PartyId,
-      amulets: Seq[HttpWalletAppClient.AmuletPosition],
-      amount: BigDecimal,
-      scan: ScanAppBackendReference,
-      expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): Unit =
-    clue(s"Locking $amount amulets for $userParty") {
-      val amulet = amulets.find(_.effectiveAmount >= amount).value
-      val amuletRules = scan.getAmuletRules()
-      val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
-      val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
-
-      userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-        Seq(userParty, validatorParty),
-        optTimeout = None,
-        commands = transferContext.amuletRules
-          .exerciseAmuletRules_Transfer(
-            new splice.amuletrules.Transfer(
-              userParty.toProtoPrimitive,
-              userParty.toProtoPrimitive,
-              Seq[splice.amuletrules.TransferInput](
-                new splice.amuletrules.transferinput.InputAmulet(
-                  amulet.contract.contractId
-                )
-              ).asJava,
-              Seq[splice.amuletrules.TransferOutput](
-                transferOutputLockedAmulet(
-                  userParty,
-                  Seq(userParty),
-                  BigDecimal(0.0),
-                  amount,
-                  expiredDuration,
-                )
-              ).asJava,
-            ),
-            new splice.amuletrules.TransferContext(
-              transferContext.openMiningRound,
-              Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-              Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
-              // note: we don't provide a featured app right as sender == provider
-              None.toJava,
-            ),
-          )
-          .commands
-          .asScala
-          .toSeq,
-        disclosedContracts =
-          DisclosedContracts(amuletRules, openRound).toLedgerApiDisclosedContracts,
-      )
-    }
 
   /** Directly exercises the AmuletRules_Transfer choice.
     * Note that all parties participating in the transfer need to be hosted on the same participant

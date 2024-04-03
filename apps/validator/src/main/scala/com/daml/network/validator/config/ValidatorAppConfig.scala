@@ -134,7 +134,10 @@ final case class MigrateValidatorPartyConfig(
     // The scan instance the ACS snapshot should be fetched from.
     // We don't require a BFT read as ACS commitments are a sufficient indicator
     // that something went wrong.
-    scan: ScanAppClientConfig
+    scan: ScanAppClientConfig,
+    // if it is not set, it will get the list of parties from the participant
+    // otherwise, it will be used to filter the list of parties to migrate
+    partiesToMigrate: Option[Seq[String]] = None,
 )
 
 case class ValidatorAppBackendConfig(

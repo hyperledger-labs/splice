@@ -106,6 +106,7 @@ class WalletTimeBasedIntegrationTest
           walletUsdToAmulet(25),
           sv1ScanBackend,
           Duration.ofDays(10),
+          getLedgerTime,
         )
 
         clue("Check wallet after locking amulets") {
@@ -168,6 +169,7 @@ class WalletTimeBasedIntegrationTest
         lockedQty,
         sv1ScanBackend,
         Duration.ofDays(10),
+        getLedgerTime,
       )
 
       clue("Check balance after advancing round and locking amulets") {
@@ -496,6 +498,7 @@ class WalletTimeBasedIntegrationTest
         0.000005,
         sv1ScanBackend,
         Duration.ofMinutes(1),
+        getLedgerTime,
       )
 
       clue("Check wallet after locking amulets") {

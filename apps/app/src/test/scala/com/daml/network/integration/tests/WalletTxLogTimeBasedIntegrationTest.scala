@@ -291,6 +291,7 @@ class WalletTxLogTimeBasedIntegrationTest
           BigDecimal(0.000005),
           sv1ScanBackend,
           java.time.Duration.ofMinutes(5),
+          getLedgerTime,
         ),
       )(
         "Wait for locked amulet to appear",

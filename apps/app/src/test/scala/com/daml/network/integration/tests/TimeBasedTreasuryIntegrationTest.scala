@@ -86,6 +86,7 @@ class TimeBasedTreasuryIntegrationTest
         10,
         sv1ScanBackend,
         Duration.ofDays(10),
+        getLedgerTime,
       )
       checkBalance(
         aliceWalletClient,

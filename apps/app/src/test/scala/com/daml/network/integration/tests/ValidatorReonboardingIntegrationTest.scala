@@ -19,6 +19,7 @@ import com.daml.network.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
@@ -49,6 +50,12 @@ class ValidatorReonboardingIntegrationTest
 
   private def aliceValidatorLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
     wc("aliceValidatorWalletLocal")
+
+  private def aliceLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+    wc("aliceWalletLocal")
+
+  private def charlieLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+    wc("charlieWalletLocal")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -110,6 +117,28 @@ class ValidatorReonboardingIntegrationTest
                     .copy(url = bumpUrl(22_100, aliceValidatorWalletConfig.adminApi.url.toString()))
                 )
             }
+          ) + (
+            InstanceName.tryCreate("aliceWalletLocal") -> {
+              val aliceWalletConfig =
+                config.walletAppClients(InstanceName.tryCreate("aliceWallet"))
+
+              aliceWalletConfig
+                .copy(
+                  adminApi = aliceWalletConfig.adminApi
+                    .copy(url = bumpUrl(22_100, aliceWalletConfig.adminApi.url.toString()))
+                )
+            }
+          ) + (
+            InstanceName.tryCreate("charlieWalletLocal") -> {
+              val charlieWalletConfig =
+                config.walletAppClients(InstanceName.tryCreate("charlieWallet"))
+
+              charlieWalletConfig
+                .copy(
+                  adminApi = charlieWalletConfig.adminApi
+                    .copy(url = bumpUrl(22_100, charlieWalletConfig.adminApi.url.toString()))
+                )
+            }
           ),
         )
       )
@@ -122,6 +151,31 @@ class ValidatorReonboardingIntegrationTest
     val aliceValidatorWalletParty =
       PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
     aliceValidatorWalletClient.tap(100)
+
+    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    aliceWalletClient.tap(150)
+    val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+    charlieWalletClient.tap(100)
+
+    val lockedAmount = walletUsdToAmulet(BigDecimal(50))
+    actAndCheck(
+      "alice locks a amulet that both aliceParty and aliceValidatorWalletParty are stake holders",
+      lockAmulets(
+        aliceValidatorBackend,
+        aliceParty,
+        aliceValidatorWalletParty,
+        aliceWalletClient.list().amulets,
+        lockedAmount,
+        sv1ScanBackend,
+        java.time.Duration.ofMinutes(5),
+        CantonTimestamp.now(),
+      ),
+    )(
+      "Wait for locked amulet to appear",
+      _ => {
+        aliceWalletClient.list().lockedAmulets.loneElement.effectiveAmount shouldBe lockedAmount
+      },
+    )
 
     val dump = aliceValidatorBackend.dumpParticipantIdentities()
     clue("Stop aliceValidator") {
@@ -143,43 +197,72 @@ class ValidatorReonboardingIntegrationTest
           dump.toJson.noSpaces
         )
       aliceValidatorLocalBackend.startSync()
-      val mapping = aliceValidatorLocalBackend.appState.participantAdminConnection
-        .getPartyToParticipant(
-          decentralizedSynchronizerId,
-          aliceValidatorWalletParty,
-        )
-        .futureValue
-        .mapping
-      mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
-        aliceValidatorLocalBackend.participantClient.id
-      )
 
-      aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
-      aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNew"
-
-      clue("alice amulet balance is preserved") {
-        val expectedAmulets: Range = 99 to 100
-        checkWallet(
-          aliceValidatorWalletParty,
-          aliceValidatorLocalWalletClient,
-          Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
-        )
+      clue("onboard users on the new validator") {
+        onboardWalletUser(aliceLocalWalletClient, aliceValidatorLocalBackend) shouldBe aliceParty
+        onboardWalletUser(
+          charlieLocalWalletClient,
+          aliceValidatorLocalBackend,
+        ) shouldBe charlieParty
       }
 
-      actAndCheck(
-        "Alice validator wallet user tap again on re-onboarded validator",
-        aliceValidatorLocalWalletClient.tap(50.0),
-      )(
-        "balance updated",
-        _ => {
-          val expectedAmulets: Range = 149 to 150
-          checkWallet(
-            aliceValidatorWalletParty,
-            aliceValidatorLocalWalletClient,
-            Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
+      Seq(
+        aliceValidatorWalletParty -> aliceValidatorLocalWalletClient,
+        aliceParty -> aliceLocalWalletClient,
+        charlieParty -> charlieLocalWalletClient,
+      ).foreach { case (partyId, walletAppClient) =>
+        clue(s"check amulet balance of $partyId") {
+          val mapping = aliceValidatorLocalBackend.appState.participantAdminConnection
+            .getPartyToParticipant(
+              decentralizedSynchronizerId,
+              partyId,
+            )
+            .futureValue
+            .mapping
+          mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
+            aliceValidatorLocalBackend.participantClient.id
           )
-        },
-      )
+
+          aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
+          aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNew"
+
+          clue(s"party $partyId amulet balance is preserved") {
+            val expectedAmulets: Range = 99 to 100
+            checkWallet(
+              partyId,
+              walletAppClient,
+              Seq(
+                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
+              ),
+            )
+          }
+
+          actAndCheck(
+            s"party $partyId tap again on re-onboarded validator",
+            walletAppClient.tap(50.0),
+          )(
+            "balance updated",
+            _ => {
+              val expectedAmulets: Range = 149 to 150
+              checkWallet(
+                partyId,
+                walletAppClient,
+                Seq(
+                  (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
+                ),
+              )
+            },
+          )
+        }
+      }
+
+      clue("alice still see the locked amulet") {
+        aliceLocalWalletClient
+          .list()
+          .lockedAmulets
+          .loneElement
+          .effectiveAmount shouldBe lockedAmount
+      }
     }
   }
 }

@@ -35,6 +35,23 @@ object ParticipantInitializer {
     participantInitializer
       .ensureInitializedWithExpectedId()
   }
+
+  def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
+    config match {
+      case ParticipantBootstrapDumpConfig.File(file, _) => getDumpFromFile(file)
+    }
+
+  private def getDumpFromFile(file: Path): Future[NodeIdentitiesDump] = {
+    NodeIdentitiesDump.fromJsonFile(file, ParticipantId.tryFromProtoPrimitive) match {
+      case Right(dump) => Future.successful(dump)
+      case Left(error) =>
+        Future.failed(
+          Status.INVALID_ARGUMENT
+            .withDescription(s"Could not parse participant bootstrap dump at $file: $error")
+            .asRuntimeException()
+        )
+    }
+  }
 }
 
 class ParticipantInitializer(
@@ -53,8 +70,9 @@ class ParticipantInitializer(
   def ensureInitializedWithExpectedId(): Future[Unit] =
     dumpConfig match {
       case Some(c: ParticipantBootstrapDumpConfig.File) =>
+        logger.info(s"Loading participant identities dump from file with config $c")
         for {
-          dump <- getDump(c)
+          dump <- ParticipantInitializer.getDump(c)
           newParticipantId = c.newParticipantIdentifier.fold(dump.id)(id =>
             ParticipantId(UniqueIdentifier(Identifier.tryCreate(id), dump.id.uid.namespace))
           )
@@ -86,22 +104,4 @@ class ParticipantInitializer(
             logger,
           )
     }
-
-  private def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
-    config match {
-      case ParticipantBootstrapDumpConfig.File(file, _) => getDumpFromFile(file)
-    }
-
-  private def getDumpFromFile(file: Path): Future[NodeIdentitiesDump] = {
-    logger.info(s"Loading participant identities dump from file at $file")
-    NodeIdentitiesDump.fromJsonFile(file, ParticipantId.tryFromProtoPrimitive) match {
-      case Right(dump) => Future.successful(dump)
-      case Left(error) =>
-        Future.failed(
-          Status.INVALID_ARGUMENT
-            .withDescription(s"Could not parse participant bootstrap dump at $file: $error")
-            .asRuntimeException()
-        )
-    }
-  }
 }
