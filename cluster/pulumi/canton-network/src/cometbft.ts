@@ -1,5 +1,4 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Service } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
@@ -15,6 +14,11 @@ import {
 } from 'cn-pulumi-common';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svConfigs';
+
+export type Cometbft = {
+  rpcServiceName: string;
+  release: Release;
+};
 
 /**
  * The CometBft deployment uses a different port for the istio VirtualService for each node
@@ -39,7 +43,7 @@ export function installCometBftNode(
   version: CnChartVersion = defaultVersion,
   syncSource?: Release,
   opts?: CustomResourceOptions
-): Service {
+): Cometbft {
   const configs = new CometBftNodeConfig(migrationId, nodeConfigs);
   const nodeConfig = configs.nodeConfigs[nodename];
   let stateSyncConfig;
@@ -52,7 +56,7 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
-  const cometbftRelease = installCNHelmChart(
+  const release = installCNHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
     'cn-cometbft',
@@ -102,10 +106,7 @@ export function installCometBftNode(
       ...{ dependsOn: syncSource ? [syncSource] : [] },
     }
   );
-  return Service.get(
-    `${nodename}-${migrationId}-cometbft-rpc`,
-    pulumi.interpolate`${cometbftRelease.status.namespace}/${nodeConfig.identifier}-cometbft-rpc`
-  );
+  return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };
 }
 
 interface NodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {

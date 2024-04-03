@@ -1047,14 +1047,6 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
-    "id": "undefined/global-domain-0-cometbft-cometbft-rpc",
-    "inputs": {},
-    "name": "sv-1-0-cometbft-rpc",
-    "provider": "",
-    "type": "kubernetes:core/v1:Service"
-  },
-  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -1198,7 +1190,7 @@
         },
         "sequencer": {
           "driver": {
-            "host": "undefined.undefined.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
@@ -1708,7 +1700,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "connectionUri": "http://undefined:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",

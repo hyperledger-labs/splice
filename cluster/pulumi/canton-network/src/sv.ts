@@ -470,7 +470,7 @@ function installSvApp(
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,
-      connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcService.metadata.name}:26657`,
+      connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
     },
     decentralizedSynchronizerUrl: decentralizedSynchronizer.founderInternalSequencerAddress,
     domain:

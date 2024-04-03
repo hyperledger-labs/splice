@@ -1,5 +1,4 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Service } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
 import {
@@ -24,7 +23,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     onboardingName: string;
     syncSource?: Release;
   };
-  cometbftRpcService: Service;
+  cometbftRpcServiceName: string;
   active: boolean;
   version: CnChartVersion;
 
@@ -59,7 +58,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
 
-    const cometBftService = installCometBftNode(
+    const cometbftRelease = installCometBftNode(
       xns,
       cometbft.name,
       cometbft.onboardingName,
@@ -71,7 +70,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       { parent: this }
     );
 
-    this.cometbftRpcService = cometBftService;
+    this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
     const synchronizerNodeRelease = installCNHelmChart(
       xns,
@@ -86,7 +85,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
           },
           driver: {
             type: 'cometbft',
-            host: pulumi.interpolate`${cometBftService.metadata.name}.${cometBftService.metadata.namespace}.svc.cluster.local`,
+            host: pulumi.interpolate`${this.cometbftRpcServiceName}.${xns.logicalName}.svc.cluster.local`,
             port: 26657,
           },
           ...sequencerResources,
@@ -106,7 +105,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
         nodeIdentifier,
       },
       version,
-      { dependsOn: [cometBftService], parent: this }
+      { dependsOn: [cometbftRelease.release], parent: this }
     );
 
     installPostgresMetrics(mediatorPostgres, mediatorDbName, [synchronizerNodeRelease]);
