@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
-import * as fs from 'fs';
 import * as _ from 'lodash';
-import { Resource } from '@pulumi/pulumi';
+import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 import {
   ExactNamespace,
   isDevNet,
@@ -12,19 +11,44 @@ import {
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   disableCometBftStateSync,
+  svCometBftKeysFromSecret,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
 import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
 
-const nodeKeyContent = fs.readFileSync(
-  `${REPO_ROOT}/cluster/pulumi/sv-runbook/cometbft/node_key.json`,
-  'utf-8'
-);
-const privValidatorKeyContent = fs.readFileSync(
-  `${REPO_ROOT}/cluster/pulumi/sv-runbook/cometbft/priv_validator_key.json`,
-  'utf-8'
-);
+type NodeKeyContent = { priv_key: { type: string; value: Output<string> | string } };
+type ValidatorKeyContent = {
+  address: string;
+  pub_key: {
+    type: string;
+    value: Output<string> | string;
+  };
+  priv_key: {
+    type: string;
+    value: Output<string> | string;
+  };
+};
+
+const svCometBftKeys = svCometBftKeysFromSecret('sv-cometbft-keys');
+
+const nodeKeyContent: NodeKeyContent = {
+  priv_key: {
+    type: 'tendermint/PrivKeyEd25519',
+    value: svCometBftKeys.nodePrivateKey,
+  },
+};
+const validatorKeyContent: ValidatorKeyContent = {
+  address: '0647E4FF27908B8B874C2647536AC986C9EA0BAB',
+  pub_key: {
+    type: 'tendermint/PubKeyEd25519',
+    value: svCometBftKeys.validatorPublicKey,
+  },
+  priv_key: {
+    type: 'tendermint/PrivKeyEd25519',
+    value: svCometBftKeys.validatorPrivateKey,
+  },
+};
 
 export function installCometBftNode(
   xns: ExactNamespace,
@@ -41,8 +65,12 @@ export function installCometBftNode(
       },
       type: 'Opaque',
       data: {
-        'node_key.json': Buffer.from(nodeKeyContent).toString('base64'),
-        'priv_validator_key.json': Buffer.from(privValidatorKeyContent).toString('base64'),
+        'node_key.json': jsonStringify(nodeKeyContent).apply(s =>
+          Buffer.from(s).toString('base64')
+        ),
+        'priv_validator_key.json': jsonStringify(validatorKeyContent).apply(s =>
+          Buffer.from(s).toString('base64')
+        ),
       },
     },
     { dependsOn: dependencies.concat([xns.ns]) }
