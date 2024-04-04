@@ -528,17 +528,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
       val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty)
 
-      val sequencerUrlSetBeforeUpgrade = clue("validator should connect to all sequencer urls") {
-        eventually() {
-          val urlSet =
-            getSequencerUrlSet(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              decentralizedSynchronizerAlias,
-            )
-          urlSet should have size 4
-          urlSet
+      val sequencerUrlSetBeforeUpgrade =
+        clue("validator should connect to all sequencer urls on the old network") {
+          eventually() {
+            val urlSet =
+              getSequencerUrlSet(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                decentralizedSynchronizerAlias,
+              )
+            urlSet should have size 4
+            urlSet
+          }
         }
-      }
 
       Using.resources(
         createUpgradeNode(

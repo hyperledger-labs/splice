@@ -48,6 +48,8 @@ import io.grpc.stub.{AbstractStub, StreamObserver}
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import java.util.concurrent.TimeUnit
 
 sealed abstract class DedupConfig
 
@@ -211,6 +213,7 @@ private[environment] class LedgerClient(
       commands: Seq[Command],
       disclosedContracts: DisclosedContracts,
       waitFor: SubmitAndWaitFor[Z],
+      deadline: Option[NonNegativeFiniteDuration] = None,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
       .setDomainId(domainId)
@@ -236,7 +239,13 @@ private[environment] class LedgerClient(
       .setCommands(commandsBuilder.build)
       .build()
     for {
-      stub <- withCredentialsAndTraceContext(commandServiceStub)
+      stubWithCredsAndTraceContext <- withCredentialsAndTraceContext(commandServiceStub)
+      stub = deadline
+        .map(duration =>
+          stubWithCredsAndTraceContext
+            .withDeadlineAfter(duration.asJava.toMillis(), TimeUnit.MILLISECONDS)
+        )
+        .getOrElse(stubWithCredsAndTraceContext)
       res <-
         waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res

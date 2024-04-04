@@ -29,6 +29,7 @@ import org.apache.pekko.http.scaladsl.model.Uri
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
+import com.daml.network.config.CNNodeConfigTransform
 
 object CNNodeConfigTransforms {
 
@@ -182,6 +183,7 @@ object CNNodeConfigTransforms {
       reducePollingInterval,
       withPauseSvDomainComponentsOffboardingTriggers(),
       disableOnboardingParticipantPromotionDelay(),
+      setDefaultGrpcDeadlineForBuyExtraTraffic(),
     )
   }
 
@@ -244,6 +246,18 @@ object CNNodeConfigTransforms {
 
   private def disableOnboardingParticipantPromotionDelay(): CNNodeConfigTransform =
     updateAllSvAppConfigs_(c => c.focus(_.enableOnboardingParticipantPromotionDelay).replace(false))
+
+  private def setDefaultGrpcDeadlineForBuyExtraTraffic(): CNNodeConfigTransform =
+    CNNodeConfigTransforms.updateAllValidatorAppConfigs_(c =>
+      c.copy(domains =
+        c.domains.copy(global =
+          c.domains.global.copy(buyExtraTraffic =
+            c.domains.global.buyExtraTraffic
+              .copy(grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(10)))
+          )
+        )
+      )
+    )
 
   private def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig

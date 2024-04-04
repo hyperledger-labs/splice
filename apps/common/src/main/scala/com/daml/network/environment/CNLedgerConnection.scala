@@ -60,6 +60,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 /** BaseLedgerConnection is a read-only ledger connection, typically used during initialization when we don't
   * want to allow command submissions yet.
@@ -710,8 +711,18 @@ class CNLedgerConnection(
       readAs: Seq[PartyId],
       update: C,
       priority: CommandPriority = CommandPriority.Low,
+      deadline: Option[NonNegativeFiniteDuration] = None,
   )(implicit assignment: UpdateAssignment[C, DomId]): submit[C, Any, DomId] =
-    new submit(actAs, readAs, update, (), assignment.run(update), DisclosedContracts(), priority)
+    new submit(
+      actAs,
+      readAs,
+      update,
+      (),
+      assignment.run(update),
+      DisclosedContracts(),
+      priority,
+      deadline,
+    )
 
   final class submit[C, CmdId, DomId] private[CNLedgerConnection] (
       actAs: Seq[PartyId],
@@ -721,6 +732,7 @@ class CNLedgerConnection(
       domainId: DomId,
       disclosedContracts: DisclosedContracts,
       priority: CommandPriority,
+      deadline: Option[NonNegativeFiniteDuration] = None,
   ) {
     private type DedupNotSpecifiedYet = CmdId =:= Any
     private type DomainIdRequired = DomId <:< DomainId
@@ -730,6 +742,7 @@ class CNLedgerConnection(
         commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
         domainId: DomId0 = this.domainId,
         disclosedContracts: DisclosedContracts = this.disclosedContracts,
+        deadline: Option[NonNegativeFiniteDuration] = this.deadline,
     ): submit[C, CmdId0, DomId0] =
       new submit(
         actAs,
@@ -739,6 +752,7 @@ class CNLedgerConnection(
         domainId,
         disclosedContracts,
         priority,
+        deadline,
       )
 
     def withDedup(commandId: CommandId, deduplicationOffset: String)(implicit
@@ -840,6 +854,7 @@ class CNLedgerConnection(
                 commands = commands,
                 disclosedContracts = disclosedContracts assertOnDomain domainId,
                 waitFor = waitFor,
+                deadline = deadline,
               )
             )(getOffsetAndResult)
 

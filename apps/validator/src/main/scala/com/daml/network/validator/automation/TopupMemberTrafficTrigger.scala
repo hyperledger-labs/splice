@@ -196,6 +196,7 @@ class TopupMemberTrafficTrigger(
                 Instant.ofEpochSecond(0),
               ),
               priority = CommandPriority.High,
+              deadline = buyExtraTrafficConfig.grpcDeadline,
             )
             .withDedup(
               CNLedgerConnection.CommandId(

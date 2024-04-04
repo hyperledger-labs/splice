@@ -87,6 +87,15 @@ final case class BuyExtraTrafficConfig(
       * a minimal top-up amount larger than `targetThroughput * minTopupInterval`.
       */
     minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+
+    /** maximum amount of time to wait for grpc calls to complete
+      *
+      * This is used to set the deadline for grpc calls to the participant.
+      * If the call takes longer than this, it will be cancelled and retried.
+      * This is only intended for testing purposes.
+      * TODO(#11501) block and unblock submissions on domain reconnect
+      */
+    grpcDeadline: Option[NonNegativeFiniteDuration] = None,
 )
 
 case class ValidatorDecentralizedSynchronizerConfig(
