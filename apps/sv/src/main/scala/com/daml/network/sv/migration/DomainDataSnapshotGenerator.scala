@@ -2,7 +2,11 @@ package com.daml.network.sv.migration
 
 import cats.syntax.traverse.*
 import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
-import com.daml.network.migration.{AcsExporter, DarExporter}
+import com.daml.network.migration.{
+  AcsExporter,
+  DarExporter,
+  DomainParametersStateTopologyConnection,
+}
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -21,6 +25,10 @@ class DomainDataSnapshotGenerator(
 ) {
 
   private val darExporter = new DarExporter(participantAdminConnection)
+
+  private val domainStateTopology = new DomainParametersStateTopologyConnection(
+    participantAdminConnection
+  )
 
   def getDomainDataSnapshot(
       timestamp: Instant,
@@ -58,9 +66,15 @@ class DomainDataSnapshotGenerator(
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-    domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(
-      decentralizedSynchronizer
-    )
+    domainParamsStateTopology <- domainStateTopology
+      .firstAuthorizedStateForTheLatestDomainParametersState(
+        decentralizedSynchronizer
+      )
+      .getOrElse {
+        throw Status.FAILED_PRECONDITION
+          .withDescription("No domain state topology found")
+          .asRuntimeException()
+      }
     timestamp = CantonTimestamp.tryFromInstant(domainParamsStateTopology.base.validFrom)
     genesisState <- sequencerAdminConnection.traverse(
       _.getGenesisState(timestamp)

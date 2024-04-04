@@ -25,6 +25,9 @@ class AcsExporter(
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
+  private val domainStateTopology = new DomainParametersStateTopologyConnection(
+    participantAdminConnection
+  )
   def exportAcsAtTimestamp(domain: DomainId, timestamp: Instant, parties: PartyId*)(implicit
       tc: TraceContext
   ): Future[ByteString] = {
@@ -59,10 +62,9 @@ class AcsExporter(
       ec: ExecutionContext,
   ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
     for {
-      domainParamsStateTopology <- EitherT
-        .liftF[Future, AcsExportFailure, TopologyResult[DomainParametersStateX]](
-          participantAdminConnection.getDomainParametersState(domain)
-        )
+      domainParamsStateTopology <- domainStateTopology
+        .firstAuthorizedStateForTheLatestDomainParametersState(domain)
+        .toRight(AcsExporter.DomainStateNotFound)
       domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
         domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero,
@@ -133,4 +135,5 @@ object AcsExporter {
   sealed trait AcsExportFailure
 
   case object DomainNotPaused extends AcsExportFailure
+  case object DomainStateNotFound extends AcsExportFailure
 }

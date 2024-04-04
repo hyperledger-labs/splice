@@ -1397,12 +1397,32 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
+    listDomainParametersState(domainId, proposals, TimeQuery.HeadState)
+      .map(_.headOption.getOrElse {
+        throw Status.NOT_FOUND
+          .withDescription(s"No DomainParametersState state domain $domainId")
+          .asRuntimeException
+      })
+  }
+
+  def listDomainParametersState(
+      domainId: DomainId,
+      proposals: TopologyTransactionType = AuthorizedState,
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersStateX]]] = {
+    listDomainParametersState(domainId, proposals, TimeQuery.Range(None, None))
+  }
+
+  private def listDomainParametersState(
+      domainId: DomainId,
+      proposals: TopologyTransactionType,
+      timeQuery: TimeQuery,
+  )(implicit tc: TraceContext) = {
     runCmd(
       TopologyAdminCommandsX.Read.DomainParametersState(
         BaseQueryX(
           domainId.filterString,
           proposals = proposals.proposals,
-          TimeQuery.HeadState,
+          timeQuery,
           None,
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
@@ -1410,11 +1430,6 @@ abstract class TopologyAdminConnection(
         domainId.filterString,
       )
     ).map(_.map(r => TopologyResult(r.context, DomainParametersStateX(domainId, r.item))))
-      .map(_.headOption.getOrElse {
-        throw Status.NOT_FOUND
-          .withDescription(s"No DomainParametersState state domain $domainId")
-          .asRuntimeException
-      })
   }
 
   def listVettedPackages(
