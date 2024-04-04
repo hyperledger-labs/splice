@@ -239,7 +239,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-istio-gateway/",
+      "chart": "../../../cluster/helm/cn-istio-gateway/",
       "compat": "true",
       "name": "cluster-gateway",
       "namespace": "cluster-ingress",

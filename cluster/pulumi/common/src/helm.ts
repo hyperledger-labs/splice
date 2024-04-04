@@ -195,7 +195,7 @@ export function installCNRunbookHelmChart(
   );
 }
 
-function chartPath(chartName: string, version: CnChartVersion): string {
+export function chartPath(chartName: string, version: CnChartVersion): string {
   return version.type === 'local'
     ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${chartName}/`
     : chartName;

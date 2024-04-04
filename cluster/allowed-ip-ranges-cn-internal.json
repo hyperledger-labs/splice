@@ -1,6 +1,10 @@
 {
   "devnet": {
-    "Digital Asset Engineering Internal": {}
+    "Digital Asset Engineering Internal": {
+      "Digital Asset Zurich Office": [
+        "146.4.45.122/32"
+      ]
+    }
   },
   "testnet": {}
 }

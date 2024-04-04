@@ -2,7 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 
-import { loadIPRanges } from '../../common';
+import { chartPath, loadIPRanges } from '../../common';
 import { clusterBasename } from './config';
 
 export const istioVersion = {
@@ -262,13 +262,13 @@ function configureGateway(
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc?: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
-  const repo_root = process.env.REPO_ROOT;
   return new k8s.helm.v3.Release(
     'cluster-gateway',
     {
       name: 'cluster-gateway',
       namespace: ingressNs.metadata.name,
-      chart: repo_root + '/cluster/helm/cn-istio-gateway/',
+      // We always install the local chart for this
+      chart: chartPath('cn-istio-gateway', { type: 'local' }),
       values: {
         cluster: {
           hostname: `${clusterBasename}.network.canton.global`,
