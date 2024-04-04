@@ -209,10 +209,28 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                   path: '/var/lib/grafana/dashboards/istio',
                 },
               },
+              {
+                name: 'gid-testing',
+                orgId: 1,
+                folder: 'testing',
+                type: 'file',
+                disableDeletion: false,
+                editable: true,
+                options: {
+                  path: '/var/lib/grafana/dashboards/k6s',
+                },
+              },
             ],
           },
         },
         dashboards: {
+          k6s: {
+            native_prometheus: {
+              gnetId: 18030,
+              datasource: 'Prometheus',
+              revision: 8,
+            },
+          },
           istio: {
             control_plane: {
               gnetId: 7645,

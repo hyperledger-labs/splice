@@ -42,7 +42,7 @@ function createConfigMapForFolder(
   });
   new k8s.core.v1.ConfigMap(`grafana-dashboards-${folderName}`, {
     metadata: {
-      name: `grafana-dashboards-${folderName}`,
+      name: `cn-grafana-dashboards-${folderName}`,
       namespace: namespace,
       labels: {
         grafana_dashboard: '1',

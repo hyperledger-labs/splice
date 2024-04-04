@@ -381,7 +381,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-canton-network",
+        "name": "cn-grafana-dashboards-canton-network",
         "namespace": "observability"
       }
     },
@@ -405,7 +405,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-canton",
+        "name": "cn-grafana-dashboards-canton",
         "namespace": "observability"
       }
     },
@@ -433,7 +433,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-database",
+        "name": "cn-grafana-dashboards-database",
         "namespace": "observability"
       }
     },
@@ -457,7 +457,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-jvm",
+        "name": "cn-grafana-dashboards-jvm",
         "namespace": "observability"
       }
     },
@@ -482,7 +482,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-k8s",
+        "name": "cn-grafana-dashboards-k8s",
         "namespace": "observability"
       }
     },
@@ -511,7 +511,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-participant",
+        "name": "cn-grafana-dashboards-participant",
         "namespace": "observability"
       }
     },
@@ -539,7 +539,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-platform",
+        "name": "cn-grafana-dashboards-platform",
         "namespace": "observability"
       }
     },
@@ -564,7 +564,7 @@
         "labels": {
           "grafana_dashboard": "1"
         },
-        "name": "grafana-dashboards-testing",
+        "name": "cn-grafana-dashboards-testing",
         "namespace": "observability"
       }
     },
@@ -1335,6 +1335,17 @@
                   },
                   "orgId": 1,
                   "type": "file"
+                },
+                {
+                  "disableDeletion": false,
+                  "editable": true,
+                  "folder": "testing",
+                  "name": "gid-testing",
+                  "options": {
+                    "path": "/var/lib/grafana/dashboards/k6s"
+                  },
+                  "orgId": 1,
+                  "type": "file"
                 }
               ]
             }
@@ -1370,6 +1381,13 @@
                 "datasource": "Prometheus",
                 "gnetId": 7630,
                 "revision": 201
+              }
+            },
+            "k6s": {
+              "native_prometheus": {
+                "datasource": "Prometheus",
+                "gnetId": 18030,
+                "revision": 8
               }
             }
           },
