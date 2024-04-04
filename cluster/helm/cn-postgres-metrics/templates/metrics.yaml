@@ -23,7 +23,7 @@ spec:
               - key: postgresPassword
                 path: postgresPassword
       containers:
-      - name: {{ .Release.Name }}
+      - name: postgres-exporter
         image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
         env:
           - name: DATA_SOURCE_PASS_FILE
@@ -32,6 +32,9 @@ spec:
             value: cnadmin
           - name: DATA_SOURCE_URI
             value: {{ .Values.persistence.host }}:{{ .Values.persistence.port }}/{{ .Values.persistence.databaseName }}?sslmode=disable
+        command:
+          - '/bin/postgres_exporter'
+          - '--log.format=json'
         volumeMounts:
           - name: postgres-password
             mountPath: "/tmp/pwd"
@@ -41,7 +44,7 @@ spec:
       # If postgres is not yet ready, postgres-exporter fails when initializing the collector
       # but never retries nor indicates non-readiness, so we unfortunately need to wait for it
       # to be ready before spinning up postgres-exporter.
-      - name: {{ .Release.Name }}-init
+      - name: postgres-exporter-init
         image: postgres:14
         env:
           - name: PGPASSWORD
