@@ -4,6 +4,8 @@ import DamlPlugin.autoImport.*
 import BuildCommon.defs.*
 import java.io.ByteArrayInputStream
 import scala.reflect.io.Streamable
+import java.nio
+import scala.jdk.CollectionConverters.*
 import sbtassembly.{MergeStrategy, PathList}
 
 /*
@@ -115,10 +117,8 @@ lazy val root = (project in file("."))
         path = file.toPath
         if !path.startsWith(cantonPath)
       } yield basePath.relativize(path)
-      val committedDarFiles =
-        java.nio.file.Paths.get("daml").resolve("dars").toFile.listFiles("*.dar").toSeq
       val outputFile = "daml/dars.lock"
-      " " + (Seq(outputFile) ++ darPaths ++ committedDarFiles).mkString(" ")
+      " " + (Seq(outputFile) ++ darPaths ++ getCommittedDarFiles).mkString(" ")
     },
     cantonDarsLockCheckerFileArg := {
       val darFiles: Seq[File] = damlBuild.all(allDarsFilter).value.flatten
@@ -1017,6 +1017,10 @@ lazy val `openapi-typescript-template` =
       cleanFiles += baseDirectory.value / "typescript",
     )
 
+def getCommittedDarFiles = {
+  java.nio.file.Paths.get("daml").resolve("dars").toFile.listFiles("*.dar").toSeq
+}
+
 // Copied from Canton. Can probably be removed once we use Canton as a library.
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
@@ -1093,13 +1097,17 @@ lazy val bundleTask = {
         (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
         (`splice-util-daml` / Compile / damlBuild).value,
       )
+
+    val committedDarFiles = getCommittedDarFiles
     val args: Seq[String] =
       license ++ examples ++ testResources ++ transformConfig ++ webUis.flatMap({
         case ((source, _), name) =>
           Seq[String]("-r", source.toString, s"web-uis/$name")
-      }) ++ dars.flatten.flatMap({ case dar =>
+      }) ++ dars.flatten.flatMap({ dar =>
         Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
-      })
+      }) ++ committedDarFiles.flatMap { dar =>
+        Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
+      }
     val cacheDir = streams.value.cacheDirectory
     val main = (assembly / mainClass).value.get
     val cache = FileFunction.cached(cacheDir) { _ =>
@@ -1118,7 +1126,8 @@ lazy val bundleTask = {
       webUis.foldLeft(Set.empty[File]) { case (acc, ((_, buildFiles), _)) =>
         acc union buildFiles
       } ++
-        dars.foldLeft(Set.empty[File]) { case (a, b) => a ++ b } +
+        dars.foldLeft(Set.empty[File]) { case (a, b) => a ++ b } ++
+        committedDarFiles.toSet +
         assemblyJar
     (assemblyJar, cache(sourceFiles))
   }
