@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
+import path from 'path';
 
 import {
   CHARTS_VERSION,
@@ -97,16 +98,14 @@ export function installCNHelmChart(
 function cnChartValues(
   nsLogicalName: string,
   version: CnChartVersion,
-  chartPath: string,
+  chartName: string,
   overrideValues: ChartValues = {}
 ): ChartValues {
   // This is useful for the `expected` jsons but functionally redundant, so we only do this when using local charts
   const chartDefaultValues =
-    version.type === 'local'
-      ? loadYamlFromFile(process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml')
-      : {};
+    version.type === 'local' ? loadYamlFromFile(`${chartPath(chartName, version)}values.yaml`) : {};
 
-  const imageVersionFromFile = getVersionOverrideFromVersionsFile(nsLogicalName, chartPath);
+  const imageVersionFromFile = getVersionOverrideFromVersionsFile(nsLogicalName, chartName);
   const finalOverride = imageVersionFromFile || imageTagOverride;
 
   if (imageTagOverride && version.type == 'remote' && version.version != imageTagOverride) {
@@ -197,7 +196,9 @@ export function installCNRunbookHelmChart(
 }
 
 function chartPath(chartName: string, version: CnChartVersion): string {
-  return version.type === 'local' ? REPO_ROOT + '/cluster/helm/' + chartName + '/' : chartName;
+  return version.type === 'local'
+    ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${chartName}/`
+    : chartName;
 }
 
 function versionString(version: CnChartVersion, nsLogicalName: string, chartPath: string) {

@@ -72,7 +72,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-validator",
       "namespace": "validator",
@@ -149,7 +149,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-participant/",
+      "chart": "../../../cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
       "namespace": "validator",
@@ -189,7 +189,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "postgres",
       "namespace": "validator",
@@ -235,7 +235,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-validator/",
+      "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator",
       "namespace": "validator",

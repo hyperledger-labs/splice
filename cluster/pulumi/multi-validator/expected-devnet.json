@@ -3,7 +3,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
       "namespace": "multi-validator",

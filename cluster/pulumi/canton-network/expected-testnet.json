@@ -549,7 +549,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-docs/",
+      "chart": "../../../cluster/helm/cn-docs/",
       "compat": "true",
       "name": "docs",
       "namespace": "docs",
@@ -607,7 +607,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
@@ -650,7 +650,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
       "namespace": "splitwell",
@@ -681,7 +681,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-participant/",
+      "chart": "../../../cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant-0",
       "namespace": "splitwell",
@@ -743,7 +743,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-splitwell-app/",
+      "chart": "../../../cluster/helm/cn-splitwell-app/",
       "compat": "true",
       "name": "splitwell-app",
       "namespace": "splitwell",
@@ -799,7 +799,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "splitwell-pg-participant-0-e",
       "namespace": "splitwell",
@@ -842,7 +842,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "splitwell-pg-val-splitwell-e",
       "namespace": "splitwell",
@@ -881,7 +881,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "splitwell-pg",
       "namespace": "splitwell",
@@ -925,7 +925,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-validator/",
+      "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator-splitwell",
       "namespace": "splitwell",
@@ -1050,7 +1050,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cometbft/",
+      "chart": "../../../cluster/helm/cn-cometbft/",
       "compat": "true",
       "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
@@ -1147,7 +1147,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-global-domain/",
+      "chart": "../../../cluster/helm/cn-global-domain/",
       "compat": "true",
       "name": "global-domain-0",
       "namespace": "sv-1",
@@ -1210,7 +1210,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-1",
@@ -1253,7 +1253,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
       "namespace": "sv-1",
@@ -1284,7 +1284,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-participant/",
+      "chart": "../../../cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant-0",
       "namespace": "sv-1",
@@ -1346,7 +1346,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-global-domain-0-mediator-e",
       "namespace": "sv-1",
@@ -1377,7 +1377,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-global-domain-0-sequencer-e",
       "namespace": "sv-1",
@@ -1408,7 +1408,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-participant-0-e",
       "namespace": "sv-1",
@@ -1451,7 +1451,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-scan-sv-1-e",
       "namespace": "sv-1",
@@ -1482,7 +1482,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-sv-sv-1-e",
       "namespace": "sv-1",
@@ -1513,7 +1513,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-validator-sv-1-e",
       "namespace": "sv-1",
@@ -1552,7 +1552,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "postgres",
       "namespace": "sv-1",
@@ -1596,7 +1596,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-scan/",
+      "chart": "../../../cluster/helm/cn-scan/",
       "compat": "true",
       "name": "scan",
       "namespace": "sv-1",
@@ -1652,7 +1652,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-sv-node/",
+      "chart": "../../../cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv-1",
@@ -1816,7 +1816,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-validator/",
+      "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator-sv-1",
       "namespace": "sv-1",
@@ -1919,7 +1919,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
@@ -1963,7 +1963,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
       "namespace": "validator1",
@@ -1994,7 +1994,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-participant/",
+      "chart": "../../../cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant-0",
       "namespace": "validator1",
@@ -2056,7 +2056,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-participant-0-e",
       "namespace": "validator1",
@@ -2099,7 +2099,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "chart": "../../../cluster/helm/cn-postgres-metrics/",
       "compat": "true",
       "name": "postgres-validator1-e",
       "namespace": "validator1",
@@ -2138,7 +2138,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "postgres",
       "namespace": "validator1",
@@ -2182,7 +2182,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-splitwell-web-ui/",
+      "chart": "../../../cluster/helm/cn-splitwell-web-ui/",
       "compat": "true",
       "name": "splitwell-web-ui",
       "namespace": "validator1",
@@ -2214,7 +2214,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-validator/",
+      "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator-validator1",
       "namespace": "validator1",

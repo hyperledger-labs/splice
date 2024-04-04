@@ -119,7 +119,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-sv",
       "namespace": "sv",
@@ -311,7 +311,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cometbft/",
+      "chart": "../../../cluster/helm/cn-cometbft/",
       "compat": "true",
       "name": "global-domain-0-cometbft",
       "namespace": "sv",
@@ -359,7 +359,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-global-domain/",
+      "chart": "../../../cluster/helm/cn-global-domain/",
       "compat": "true",
       "name": "global-domain-0",
       "namespace": "sv",
@@ -410,7 +410,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-participant/",
+      "chart": "../../../cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant-0",
       "namespace": "sv",
@@ -443,7 +443,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-scan/",
+      "chart": "../../../cluster/helm/cn-scan/",
       "compat": "true",
       "name": "scan",
       "namespace": "sv",
@@ -493,7 +493,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "apps-pg",
       "namespace": "sv",
@@ -537,7 +537,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-sv-node/",
+      "chart": "../../../cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv",
@@ -651,7 +651,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "mediator-pg",
       "namespace": "sv",
@@ -715,7 +715,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "participant-pg",
       "namespace": "sv",
@@ -779,7 +779,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
+      "chart": "../../../cluster/helm/cn-postgres/",
       "compat": "true",
       "name": "sequencer-pg",
       "namespace": "sv",
@@ -840,7 +840,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-validator/",
+      "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator",
       "namespace": "sv",
