@@ -144,23 +144,27 @@ class ValidatorApp(
   )(implicit traceContext: TraceContext) =
     for {
       _ <- config.appManager.traverse_ { appManagerConfig =>
-        connection.ensureIdentityProviderConfig(
-          BaseLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
-          appManagerConfig.issuerUrl.toString,
-          appManagerConfig.jwksUri.toString,
-          appManagerConfig.audience,
-        )
+        appInitStep("Ensuring identity provider config") {
+          connection.ensureIdentityProviderConfig(
+            BaseLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
+            appManagerConfig.issuerUrl.toString,
+            appManagerConfig.jwksUri.toString,
+            appManagerConfig.audience,
+          )
+        }
       }
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
-            scanConnection <- client.BftScanConnection(
-              ledgerClient,
-              config.scanClient,
-              clock,
-              retryProvider,
-              loggerFactory,
-            )
+            scanConnection <- appInitStep("Getting BFT scan connection") {
+              client.BftScanConnection(
+                ledgerClient,
+                config.scanClient,
+                clock,
+                retryProvider,
+                loggerFactory,
+              )
+            }
             domainConnector = new DomainConnector(
               config,
               participantAdminConnection,
@@ -178,20 +182,26 @@ class ValidatorApp(
                 )
                 domainConnector.getDecentralizedSynchronizerSequencerConnections.flatMap {
                   sequencerConnections =>
-                    decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
-                      connection,
-                      config.ledgerApiUser,
-                      config.domains.global.alias,
-                      migrationDump.domainId,
-                      sequencerConnections,
-                      migrationDump.dars,
-                      migrationDump.acsSnapshot,
-                    )
+                    appInitStep("Connecting domain and restoring data") {
+                      decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
+                        connection,
+                        config.ledgerApiUser,
+                        config.domains.global.alias,
+                        migrationDump.domainId,
+                        sequencerConnections,
+                        migrationDump.dars,
+                        migrationDump.acsSnapshot,
+                      )
+                    }
                 }
               case None =>
-                domainConnector.ensureDecentralizedSynchronizerRegistered()
+                appInitStep("Ensuring decentralized synchronizer registered") {
+                  domainConnector.ensureDecentralizedSynchronizerRegistered()
+                }
             }
-            _ <- domainConnector.ensureExtraDomainsRegistered()
+            _ <- appInitStep("Ensuring extra domains registered") {
+              domainConnector.ensureExtraDomainsRegistered()
+            }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
               case (
                     Some(MigrateValidatorPartyConfig(scanConfig, partiesToMigrate)),
@@ -209,32 +219,34 @@ class ValidatorApp(
                   retryProvider,
                   loggerFactory,
                 )
-                for {
-                  nodeIdentitiesDump <- ParticipantInitializer.getDump(
-                    participantBootstrappingConfig
-                  )
-                  (_, partyId) <- (
-                    setupDarsForAcsImport(participantAdminConnection),
-                    participantPartyMigrator
-                      .migrate(
-                        nodeIdentitiesDump,
-                        validatorPartyHint,
-                        config.ledgerApiUser,
-                        config.domains.global.alias,
-                        partyId =>
-                          SingleScanConnection.withSingleScanConnection(
-                            scanConfig,
-                            clock,
-                            retryProvider,
-                            loggerFactory,
-                          ) { scanConnection =>
-                            scanConnection.getAcsSnapshot(partyId)
-                          },
-                        Seq(DarResources.amulet.bootstrap),
-                        partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
-                      ),
-                  ).tupled
-                } yield partyId
+                appInitStep("Migrating party data") {
+                  for {
+                    nodeIdentitiesDump <- ParticipantInitializer.getDump(
+                      participantBootstrappingConfig
+                    )
+                    (_, partyId) <- (
+                      setupDarsForAcsImport(participantAdminConnection),
+                      participantPartyMigrator
+                        .migrate(
+                          nodeIdentitiesDump,
+                          validatorPartyHint,
+                          config.ledgerApiUser,
+                          config.domains.global.alias,
+                          partyId =>
+                            SingleScanConnection.withSingleScanConnection(
+                              scanConfig,
+                              clock,
+                              retryProvider,
+                              loggerFactory,
+                            ) { scanConnection =>
+                              scanConnection.getAcsSnapshot(partyId)
+                            },
+                          Seq(DarResources.amulet.bootstrap),
+                          partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
+                        ),
+                    ).tupled
+                  } yield partyId
+                }
               case (Some(_), None) =>
                 sys.error(
                   "ParticipantBootstrappingDumpConfig is required if MigrateValidatorPartyConfig is set"
@@ -242,14 +254,16 @@ class ValidatorApp(
               case (None, _) =>
                 // Note that for the validator of an SV app, the user will be created by the SV app with a
                 // primary party set to the SV app already so this is a noop.
-                connection.ensureUserPrimaryPartyIsAllocated(
-                  config.ledgerApiUser,
-                  config.validatorPartyHint
-                    .getOrElse(
-                      BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                    ),
-                  participantAdminConnection,
-                ) whenA !config.svValidator
+                appInitStep("Ensuring user primary party is allocated") {
+                  connection.ensureUserPrimaryPartyIsAllocated(
+                    config.ledgerApiUser,
+                    config.validatorPartyHint
+                      .getOrElse(
+                        BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                      ),
+                    participantAdminConnection,
+                  )
+                } whenA !config.svValidator
             }
           } yield ()
         }

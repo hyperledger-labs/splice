@@ -1,12 +1,13 @@
 package com.daml.network.util
 
 import com.daml.network.console.SvAppBackendReference
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.Suite
 
 trait StandaloneCanton extends PostgresAroundEach with NamedLogging with ProcessTestUtil {
-  self: Suite =>
+  self: Suite & BaseTest =>
 
   // While tests do not run in parallel, their initialization does, so we force using unique DB names
   def dbsSuffix: String
@@ -109,9 +110,15 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         ("AUTO_INIT_ALL" -> autoInit.toString)) ++ extraParticipantsEnvMap.toList
 
     logger.debug(
-      s"Starting standalone canton with config files:\n  ${configs
-          .mkString("\n  ")} \nand extra env variables:\n  ${allExtraEnv.mkString("\n  ")}"
-    )
+      s"""
+         |Starting standalone canton with log suffix \n
+         |  $logSuffix\n
+         |and config files:\n
+         |  ${configs.mkString("\n  ")}\n
+         |and extra env variables:\n
+         |  ${allExtraEnv.mkString("\n  ")}
+         |""".stripMargin
+    )(tc)
 
     withCanton(
       configs,

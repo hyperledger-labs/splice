@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import better.files.{File, *}
+import com.digitalasset.canton.BaseTest
 
 import scala.util.Using.Releasable
 import java.io.File as JFile
@@ -47,7 +48,7 @@ object ProcessTestUtil {
   }
 }
 
-trait ProcessTestUtil {
+trait ProcessTestUtil { this: BaseTest =>
   import ProcessTestUtil.*
 
   val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
@@ -59,12 +60,24 @@ trait ProcessTestUtil {
       extraEnv: (String, String)*
   )(test: => A): A = {
     Using.resource(
-      startCantonInternal(
-        configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
-        logSuffix,
-        extraEnv*
+      clue(s"Starting external Canton process $logSuffix")(
+        startCantonInternal(
+          configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(
+            Seq("-C", _)
+          ),
+          logSuffix,
+          extraEnv*
+        )
       )
-    )(_ => test)
+    )(_ =>
+      clue(s"Using external Canton process $logSuffix") {
+        test
+      }
+    )((resource: Process) => {
+      clue(s"Destroying external Canton process $logSuffix") {
+        resource.destroyAndWait()
+      }
+    })
   }
 
   protected def withBundledCN[A](
