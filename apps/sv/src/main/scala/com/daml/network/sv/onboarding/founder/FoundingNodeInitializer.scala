@@ -142,7 +142,6 @@ class FoundingNodeInitializer(
           currentMigrationId =
             config.domainMigrationId, // Note: not guaranteed to be 0 for the founding node
           acsRecordTime = None, // No previous migration, we're starting the network
-          domainWasPaused = true,
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)

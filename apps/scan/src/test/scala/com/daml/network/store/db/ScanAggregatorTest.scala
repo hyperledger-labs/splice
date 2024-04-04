@@ -676,7 +676,6 @@ class ScanAggregatorTest
       DomainMigrationInfo(
         0,
         None,
-        true,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
     )(parallelExecutionContext, implicitly, implicitly)

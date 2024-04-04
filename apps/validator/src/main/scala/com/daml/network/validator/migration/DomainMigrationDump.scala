@@ -4,6 +4,7 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.Dar
 import com.daml.network.util
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.google.protobuf.ByteString
 import io.circe.{Codec, Decoder, Encoder}
@@ -13,7 +14,7 @@ import java.util.Base64
 import java.time.Instant
 import scala.annotation.nowarn
 
-case class DomainMigrationDump(
+final case class DomainMigrationDump(
     domainId: DomainId,
     migrationId: Long,
     participant: NodeIdentitiesDump,
@@ -21,7 +22,19 @@ case class DomainMigrationDump(
     acsTimestamp: Instant,
     dars: Seq[Dar],
     createdAt: Instant,
-)
+) extends PrettyPrinting {
+  override def pretty: Pretty[DomainMigrationDump.this.type] =
+    Pretty.prettyNode(
+      "DomainMigrationDump",
+      param("domainId", _.domainId),
+      param("migrationId", _.migrationId),
+      param("participant", _.participant),
+      param("acsSnapshotSize", _.acsSnapshot.size),
+      param("acsTimestamp", _.acsTimestamp),
+      param("darsSize", _.dars.size),
+      param("createdAt", _.createdAt),
+    )
+}
 
 object DomainMigrationDump {
 

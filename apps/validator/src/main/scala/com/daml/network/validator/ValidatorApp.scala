@@ -543,7 +543,6 @@ class ValidatorApp(
       domainMigrationInfo = DomainMigrationInfo(
         config.domainMigrationId,
         None,
-        true,
       )
       store = ValidatorStore(
         key,

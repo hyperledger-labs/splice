@@ -1481,7 +1481,6 @@ class DbUserWalletStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
-        true,
       ),
       participantId = mkParticipantId("UserWalletStoreTest"),
     )

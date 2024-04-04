@@ -43,11 +43,9 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import io.circe.syntax.EncoderOps
 import org.scalatest.time.{Minute, Span}
-import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -175,7 +173,6 @@ class DisasterRecoveryIntegrationTest
         val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster))
         svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
-          dump.domainWasPaused should be(false)
           dump.acsTimestamp should be(timestampBeforeDisaster)
           writeMigrationDumpFile(sv, ids, dump)
         }
@@ -189,7 +186,6 @@ class DisasterRecoveryIntegrationTest
         val dump =
           sv2Backend
             .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.dsoPartyId))
-        dump.domainWasPaused should be(false)
         dump.acsTimestamp should be(timestampBeforeDisaster)
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
@@ -362,29 +358,13 @@ class DisasterRecoveryIntegrationTest
               )
 
             withClueAndLog("Starting new SV apps") {
-              // UpdateHistory and DbMultiDomainAcsStore warn about deleting historical data
-              // after a rollback, which is expected in this test.
-              loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-                startAllSync(
-                  sv1LocalBackend,
-                  sv2LocalBackend,
-                  sv3LocalBackend,
-                  sv4LocalBackend,
-                  sv1ScanLocalBackend,
-                  sv1ValidatorLocalBackend,
-                ),
-                entries => {
-                  entries should not be empty
-                  // Both UpdateHistory and DbMultiDomainAcsStore should roll back data
-                  forAtLeast(1, entries) { _.loggerName should include("UpdateHistory") }
-                  forAtLeast(1, entries) { _.loggerName should include("DbMultiDomainAcsStore") }
-                  // This part of the warning message is shared between UpdateHistory and DbMultiDomainAcsStore
-                  forAll(entries) {
-                    _.warningMessage should include(
-                      "This is expected during a disaster recovery, where we are rolling back the domain to a previous state"
-                    )
-                  }
-                },
+              startAllSync(
+                sv1LocalBackend,
+                sv2LocalBackend,
+                sv3LocalBackend,
+                sv4LocalBackend,
+                sv1ScanLocalBackend,
+                sv1ValidatorLocalBackend,
               )
             }
 

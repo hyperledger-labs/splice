@@ -1281,44 +1281,12 @@ final class DbMultiDomainAcsStore[TXE](
       val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
       domainMigrationInfo.acsRecordTime match {
         case Some(acsRecordTime) =>
-          if (domainMigrationInfo.domainWasPaused) {
-            verifyNoRolledBackData(storeId, previousMigrationId, acsRecordTime)
-          } else {
-            deleteRolledBackTxLogEntries(storeId, previousMigrationId, acsRecordTime)
-          }
+          deleteRolledBackTxLogEntries(storeId, previousMigrationId, acsRecordTime)
         case _ =>
           logger.debug("No previous domain migration, not checking or deleting txlog entries")
           Future.unit
       }
     }
-  }
-
-  private[this] def verifyNoRolledBackData(
-      storeId: Int, // Not using the storeId from the state, as the state might not be updated yet
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  )(implicit tc: TraceContext) = {
-    val action =
-      sql"""
-            select count(*) from #$txLogTableName
-            where store_id = $storeId and migration_id = $migrationId and record_time > $recordTime
-          """
-        .as[Long]
-        .head
-        .map(rows =>
-          if (rows > 0) {
-            logger.error(
-              s"Found $rows rows for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime, " +
-                "but the configuration says the domain was paused during the migration. " +
-                "Check the domain migration configuration and the content of the txlog database."
-            )
-          } else {
-            logger.debug(
-              s"No txlog entries found for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime"
-            )
-          }
-        )
-    storage.query(action, "deleteRolledBackTxLogEntries")
   }
 
   private[this] def deleteRolledBackTxLogEntries(
@@ -1335,13 +1303,13 @@ final class DbMultiDomainAcsStore[TXE](
             where store_id = $storeId and migration_id = $migrationId and record_time > $recordTime
           """.map(rows =>
         if (rows > 0) {
-          logger.warn(
+          logger.info(
             s"Deleted $rows txlog entries for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime. " +
               "This is expected during a disaster recovery, where we are rolling back the domain to a previous state. " +
               "In is NOT expected during regular hard domain migrations."
           )
         } else {
-          logger.debug(s"No entries deleted for $storeDescriptor.")
+          logger.info(s"No entries deleted for $storeDescriptor.")
         }
       )
     storage.update(action, "deleteRolledBackTxLogEntries")

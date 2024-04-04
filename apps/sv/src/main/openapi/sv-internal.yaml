@@ -1121,7 +1121,6 @@ components:
         - authorized_store_snapshot
         - acs_timestamp
         - dars
-        - domain_was_halted
       properties:
         genesis_state:
           description: |
@@ -1141,8 +1140,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
-        domain_was_halted:
-          type: boolean
 
     Dar:
       type: object

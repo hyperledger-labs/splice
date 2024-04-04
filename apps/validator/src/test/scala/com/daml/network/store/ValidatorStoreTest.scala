@@ -617,7 +617,6 @@ class DbValidatorStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
-        true,
       ),
       participantId = mkParticipantId("ValidatorStoreTest"),
     )

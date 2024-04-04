@@ -40,6 +40,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     sequencerAdminConnection,
     dsoStore,
     new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
+    loggerFactory,
   )
 
   override protected def getSchedule(implicit

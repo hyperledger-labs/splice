@@ -3,6 +3,7 @@ package com.daml.network.sv.migration
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.migration.Dar
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.google.protobuf.ByteString
 
 import java.time.Instant
@@ -10,14 +11,13 @@ import java.util.Base64
 
 // TODO(#11100) Split domain data snapshots for validators and SVs to avoid
 // the optional mess.
-case class DomainDataSnapshot(
+final case class DomainDataSnapshot(
     genesisState: Option[ByteString],
     acsSnapshot: ByteString,
     authorizedStoreSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
-    domainWasPaused: Boolean,
-) {
+) extends PrettyPrinting {
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
@@ -27,8 +27,17 @@ case class DomainDataSnapshot(
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
       http.Dar(dar.hash.toHexString, content)
     }.toVector,
-    domainWasPaused,
   )
+
+  override def pretty: Pretty[DomainDataSnapshot.this.type] =
+    Pretty.prettyNode(
+      "DomainDataSnapshot",
+      paramIfDefined("genesisStateSize", _.genesisState.map(_.size)),
+      param("acsSnapshotSize", _.acsSnapshot.size),
+      param("authorizedStoreSnapshotSize", _.authorizedStoreSnapshot.size),
+      param("acsTimestamp", _.acsTimestamp),
+      param("darsSize", _.dars.size),
+    )
 }
 
 object DomainDataSnapshot {
@@ -53,7 +62,6 @@ object DomainDataSnapshot {
         authorizedStoreSnapshot,
         acsTimestamp,
         dars,
-        src.domainWasHalted,
       )
     )
   }

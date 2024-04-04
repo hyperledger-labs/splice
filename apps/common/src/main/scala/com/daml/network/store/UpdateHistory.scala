@@ -449,68 +449,11 @@ final class UpdateHistory(
     val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
     domainMigrationInfo.acsRecordTime match {
       case Some(acsRecordTime) =>
-        if (domainMigrationInfo.domainWasPaused) {
-          verifyNoRolledBackData(historyId, previousMigrationId, acsRecordTime)
-        } else {
-          deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
-        }
+        deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
       case _ =>
         logger.debug("No previous domain migration, not checking or deleting updates")
         Future.unit
     }
-  }
-  private[this] def verifyNoRolledBackData(
-      historyId: Long, // Not using the storeId from the state, as the state might not be updated yet
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    val action = DBIO
-      .sequence(
-        Seq(
-          sql"""
-            select count(*) from update_history_creates
-            where update_row_id in (
-              select row_id
-              from update_history_transactions
-              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-            )
-          """.as[Long].head,
-          sql"""
-            select count(*) from update_history_exercises
-            where update_row_id in (
-              select row_id
-              from update_history_transactions
-              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-            )
-          """.as[Long].head,
-          sql"""
-            select count(*) from update_history_transactions
-            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-          """.as[Long].head,
-          sql"""
-            select count(*) from update_history_assignments
-            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-          """.as[Long].head,
-          sql"""
-            select count(*) from update_history_unassignments
-            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-          """.as[Long].head,
-        )
-      )
-      .map(rows =>
-        if (rows.sum > 0) {
-          logger.error(
-            s"Found $rows rows for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
-              "but the configuration says the domain was paused during the migration. " +
-              "Check the domain migration configuration and the content of the update history database."
-          )
-        } else {
-          logger.debug(
-            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
-          )
-        }
-      )
-    storage.query(action, "deleteRolledBackUpdateHistory")
   }
 
   private[this] def deleteRolledBackUpdateHistory(
@@ -556,13 +499,13 @@ final class UpdateHistory(
       )
       .map(rows =>
         if (rows.sum > 0) {
-          logger.warn(
+          logger.info(
             s"Deleted $rows rows for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime. " +
               "This is expected during a disaster recovery, where we are rolling back the domain to a previous state. " +
               "In is NOT expected during regular hard domain migrations."
           )
         } else {
-          logger.debug(s"No rows deleted for $updateStreamParty")
+          logger.info(s"No rows deleted for $updateStreamParty")
         }
       )
     storage.update(action, "deleteRolledBackUpdateHistory")

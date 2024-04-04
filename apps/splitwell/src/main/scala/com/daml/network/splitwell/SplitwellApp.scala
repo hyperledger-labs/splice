@@ -109,7 +109,6 @@ class SplitwellApp(
     migrationInfo = DomainMigrationInfo(
       config.domainMigrationId,
       None,
-      true,
     )
     store = SplitwellStore(
       storeKey,

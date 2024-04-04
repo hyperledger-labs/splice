@@ -6,6 +6,7 @@ import com.daml.network.migration.{AcsExporter, DarExporter}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import java.time.Instant
@@ -39,16 +40,21 @@ class DomainMigrationDumpGenerator(
         .rethrowT
       nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
       dars <- darExporter.exportAllDars()
+      createdAt = Instant.now()
     } yield {
-      DomainMigrationDump(
+      val result = DomainMigrationDump(
         domainId = domain,
         migrationId = migrationId,
         participant = nodeIdentities,
         acsSnapshot = acsSnapshot,
         acsTimestamp = acsTimestamp,
         dars = dars,
-        createdAt = Instant.now(),
+        createdAt = createdAt,
       )
+      logger.info(
+        show"Finished generating $result"
+      )
+      result
     }
   }
 

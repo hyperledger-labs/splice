@@ -9,8 +9,10 @@ import com.daml.network.migration.{
 }
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import java.time.Instant
@@ -22,7 +24,8 @@ class DomainDataSnapshotGenerator(
     sequencerAdminConnection: Option[SequencerAdminConnection],
     dsoStore: SvDsoStore,
     acsExporter: AcsExporter,
-) {
+    override val loggerFactory: NamedLoggerFactory,
+) extends NamedLogging {
 
   private val darExporter = new DarExporter(participantAdminConnection)
 
@@ -58,7 +61,6 @@ class DomainDataSnapshotGenerator(
     authorizedStoreSnapshot,
     acsTimestamp = timestamp,
     dars,
-    domainWasPaused = false,
   )
 
   def getDomainMigrationSnapshot(implicit
@@ -91,12 +93,15 @@ class DomainDataSnapshotGenerator(
       participantId,
     )
     dars <- darExporter.exportAllDars()
-  } yield DomainDataSnapshot(
-    genesisState,
-    acsSnapshot,
-    authorizedStoreSnapshot,
-    acsTimestamp,
-    dars,
-    domainWasPaused = true,
-  )
+  } yield {
+    val result = DomainDataSnapshot(
+      genesisState,
+      acsSnapshot,
+      authorizedStoreSnapshot,
+      acsTimestamp,
+      dars,
+    )
+    logger.info(show"Finished generating $result")
+    result
+  }
 }

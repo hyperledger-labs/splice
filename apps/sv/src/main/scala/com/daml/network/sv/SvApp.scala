@@ -480,6 +480,7 @@ class SvApp(
           ),
           dsoStore,
           new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          loggerFactory,
         ),
         clock,
         retryProvider,

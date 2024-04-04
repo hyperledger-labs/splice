@@ -1448,7 +1448,6 @@ class DbScanStoreTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
-        true,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)

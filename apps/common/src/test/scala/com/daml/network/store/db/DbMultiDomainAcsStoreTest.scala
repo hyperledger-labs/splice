@@ -174,7 +174,6 @@ class DbMultiDomainAcsStoreTest
       DomainMigrationInfo(
         migrationId,
         None,
-        true,
       ),
       participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

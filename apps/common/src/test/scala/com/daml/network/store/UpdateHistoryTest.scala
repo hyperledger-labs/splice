@@ -347,7 +347,6 @@ class UpdateHistoryTest
       DomainMigrationInfo(
         domainMigrationId,
         None,
-        true,
       ),
       participantId,
       updateStreamParty,
