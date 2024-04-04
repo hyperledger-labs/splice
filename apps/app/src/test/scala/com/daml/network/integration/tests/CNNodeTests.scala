@@ -26,8 +26,9 @@ import com.digitalasset.canton.metrics.MetricsFactoryType.External
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
-import io.opentelemetry.api.{GlobalOpenTelemetry, OpenTelemetry}
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.typesafe.scalalogging.LazyLogging
+import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
 import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.Done
@@ -47,9 +48,12 @@ import scala.util.chaining.scalaUtilChainingOps
 import scala.util.control.NonFatal
 
 /** Analogue to Canton's CommunityTests */
-object CNNodeTests {
+object CNNodeTests extends LazyLogging {
+  val IsCI: Boolean = sys.env.contains("CI")
+
   private val configuredOpenTelemetry: OpenTelemetry =
-    Option(GlobalOpenTelemetry.get()).getOrElse(
+    if (IsCI) {
+      logger.info("Initializing opentelemetry to expose test metrics on port 25001")
       OpenTelemetryFactory
         .initializeOpenTelemetry(
           initializeGlobalOpenTelemetry = true,
@@ -68,10 +72,13 @@ object CNNodeTests {
           loggerFactory = NamedLoggerFactory.root,
         )
         .tap { otel =>
-          sys.addShutdownHook(otel.close())
+          sys.addShutdownHook {
+            logger.info("Shutting down opentelemetry test metrics")
+            otel.close()
+          }
         }
         .openTelemetry
-    )
+    } else OpenTelemetry.noop()
 
   type CNNodeTestConsoleEnvironment = TestConsoleEnvironment[CNNodeEnvironmentImpl]
   type SharedCNNodeEnvironment =
