@@ -35,7 +35,7 @@ Requirements
 
 5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
-.. code-block:: bash
+.. parsed-literal::
 
   tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
 
