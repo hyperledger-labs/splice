@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
-
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
@@ -14,6 +13,7 @@ import com.daml.network.util.{ProcessTestUtil, SplitwellTestUtil, WalletTestUtil
 
 import java.nio.file.{Path, Paths}
 import better.files.*
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.{BuildInfo, DarResources}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -41,6 +41,10 @@ class AppUpgradeIntegrationTest
     // We don't currently register the upgrade of splitwell in app manager, just want to test
     // that we can actually upgrade splitwell and use the new payment APIs in it.
     .withoutInitialManagerApps
+    .addConfigTransform((_, config) => {
+      // Makes the test a bit faster and easier to debug. See #11488
+      CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+    })
 
   "A set of CN apps" should {
     "be upgradeable" in { implicit env =>
