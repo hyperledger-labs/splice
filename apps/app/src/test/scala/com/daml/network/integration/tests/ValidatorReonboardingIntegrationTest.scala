@@ -93,7 +93,7 @@ class ValidatorReonboardingIntegrationTest
                   },
                   participantBootstrappingDump = Some(
                     ParticipantBootstrapDumpConfig
-                      .File(dumpPath, Some("aliceValidatorLocalNew"))
+                      .File(dumpPath, Some("aliceValidatorLocalNewForValidatorReonboardingIT"))
                   ),
                   migrateValidatorParty = Some(
                     MigrateValidatorPartyConfig(
@@ -224,7 +224,7 @@ class ValidatorReonboardingIntegrationTest
           )
 
           aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
-          aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNew"
+          aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNewForValidatorReonboardingIT"
 
           clue(s"party $partyId amulet balance is preserved") {
             val expectedAmulets: Range = 99 to 100
