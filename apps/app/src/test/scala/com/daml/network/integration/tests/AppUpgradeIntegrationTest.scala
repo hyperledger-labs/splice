@@ -144,12 +144,12 @@ class AppUpgradeIntegrationTest
             amuletConfig.decentralizedSynchronizer,
             amuletConfig.tickDuration,
             new splice.amuletconfig.PackageConfig(
-              "0.1.1",
-              "0.1.1",
-              "0.1.1",
-              "0.1.0",
-              "0.1.1",
-              "0.1.1",
+              DarResources.amulet.bootstrap.metadata.version.toString(),
+              DarResources.amuletNameService.bootstrap.metadata.version.toString(),
+              DarResources.dsoGovernance.bootstrap.metadata.version.toString(),
+              DarResources.validatorLifecycle.bootstrap.metadata.version.toString(),
+              DarResources.wallet.bootstrap.metadata.version.toString(),
+              DarResources.walletPayments.bootstrap.metadata.version.toString(),
             ),
           )
           val upgradeAction = new ARC_AmuletRules(

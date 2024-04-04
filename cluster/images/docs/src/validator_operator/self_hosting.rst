@@ -238,7 +238,7 @@ are running the validator (the one using "validator.conf"), and type:
 
 .. parsed-literal::
 
-   @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
+   @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-current.dar")
 
 As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the CNS and wallet UIs:
 

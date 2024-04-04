@@ -87,7 +87,7 @@ their participant. For that, go to the terminal in which you started
 their validator (configured using ``examples/validator/validator.conf``)
 and run the following command: ::
 
-  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
+  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-current.dar")
 
 
 To interact with splitwell, the release includes an example configuration that
@@ -173,7 +173,7 @@ again until you have onboarded ``alice`` and ``bob``.
 
 Upload the DAR to their participant, via their validator: ::
 
-  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
+  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-current.dar")
 
 And connect their participant to the domain you setup above: ::
 

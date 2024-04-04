@@ -37,7 +37,7 @@ class WalletTxLogIntegrationTest
     with WalletTxLogTestUtil
     with TriggerTestUtil {
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 

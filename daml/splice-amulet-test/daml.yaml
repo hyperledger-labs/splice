@@ -12,8 +12,8 @@ dependencies:
   - daml-stdlib
   - daml3-script
 data-dependencies:
-  - ../splice-util/.daml/dist/splice-util-0.1.0.dar
-  - ../splice-amulet/.daml/dist/splice-amulet-0.1.0.dar
+  - ../splice-util/.daml/dist/splice-util-current.dar
+  - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

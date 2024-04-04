@@ -52,7 +52,7 @@ class WalletTimeBasedIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil {
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://ans-dir-url.com"
   private val testEntryDescription = "Sample CNS Entry Description"

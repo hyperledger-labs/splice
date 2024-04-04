@@ -27,7 +27,7 @@ class SplitwellUpgradeIntegrationTest
     with SplitwellTestUtil
     with WalletTestUtil {
 
-  private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

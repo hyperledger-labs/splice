@@ -142,7 +142,7 @@ class AppManagerIntegrationTest
         .loneElement
 
       val uploadedDar =
-        ByteString.readFrom(new FileInputStream("daml/splitwell/.daml/dist/splitwell-0.1.0.dar"))
+        ByteString.readFrom(new FileInputStream("daml/splitwell/.daml/dist/splitwell-current.dar"))
       val downloadedDar = splitwellValidatorBackend.getDarFile(darHash)
       uploadedDar shouldBe downloadedDar
     }

@@ -7,13 +7,13 @@ dependencies:
   - daml-stdlib
   - daml3-script
 data-dependencies:
-  - ../splice-amulet/.daml/dist/splice-amulet-0.1.0.dar
-  - ../splice-amulet-test/.daml/dist/splice-amulet-test-0.1.0.dar
-  - ../splice-util/.daml/dist/splice-util-0.1.0.dar
-  - ../splitwell/.daml/dist/splitwell-0.1.0.dar
-  - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-0.1.0.dar
-  - ../splice-wallet/.daml/dist/splice-wallet-0.1.0.dar
-  - ../splice-wallet-test/.daml/dist/splice-wallet-test-0.1.0.dar
+  - ../splice-amulet/.daml/dist/splice-amulet-current.dar
+  - ../splice-amulet-test/.daml/dist/splice-amulet-test-current.dar
+  - ../splice-util/.daml/dist/splice-util-current.dar
+  - ../splitwell/.daml/dist/splitwell-current.dar
+  - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
+  - ../splice-wallet/.daml/dist/splice-wallet-current.dar
+  - ../splice-wallet-test/.daml/dist/splice-wallet-test-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

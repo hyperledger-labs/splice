@@ -7,9 +7,9 @@ import com.daml.network.util.SvTestUtil
 trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
 
   protected val amuletDarPath =
-    "daml/splice-amulet/.daml/dist/splice-amulet-0.1.0.dar"
+    "daml/splice-amulet/.daml/dist/splice-amulet-current.dar"
   protected val dsoGovernanceDarPath =
-    "daml/splice-dso-governance/.daml/dist/splice-dso-governance-0.1.0.dar"
+    "daml/splice-dso-governance/.daml/dist/splice-dso-governance-current.dar"
 
   override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition

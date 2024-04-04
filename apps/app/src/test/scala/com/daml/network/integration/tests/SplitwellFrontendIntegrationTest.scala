@@ -26,7 +26,7 @@ class SplitwellFrontendIntegrationTest
     with SplitwellFrontendTestUtil
     with FrontendLoginUtil {
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

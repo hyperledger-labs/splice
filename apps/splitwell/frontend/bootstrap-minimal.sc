@@ -18,7 +18,7 @@ sv1Scan.waitForInitialization()
 println("Uploading DAR files...")
 // all user validator shared the same participant so we can only upload once.
 aliceValidator.participantClient.upload_dar_unless_exists(
-  "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  "daml/splitwell/.daml/dist/splitwell-current.dar"
 )
 
 println("Onboarding users...")

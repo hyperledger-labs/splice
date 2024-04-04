@@ -10,8 +10,8 @@ app-bundle := ${REPO_ROOT}/apps/app/target/release/cn-node-0.1.0-SNAPSHOT.tar.gz
 
 load-tester := ${REPO_ROOT}/load-tester/dist
 
-canton-amulet-dar := ${REPO_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-0.1.0.dar
-wallet-payments-dar := ${REPO_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-0.1.0.dar
+canton-amulet-dar := ${REPO_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-current.dar
+wallet-payments-dar := ${REPO_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 
 .PHONY: build
 build: $(app-bundle) $(load-tester) cluster/build ## Build the Canton Coin app bundle and ensure cluster scripts are ready to run.
