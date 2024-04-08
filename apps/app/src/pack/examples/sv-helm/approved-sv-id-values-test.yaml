@@ -7,11 +7,13 @@ approvedSvIdentities:
     rewardWeightBps: 30000
   - name: Digital-Asset-1
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==
-    # TODO (#10463): revisit this amount
-    rewardWeightBps: 140000 # the other half is part of the founder
-  - name: Cumberland
-    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUqL9Y0mFB8xQXGAAJk+7q5/E/SyrwM20pKWB4ZhwGGmyR7L7ss5hr56dwcCURLUGnIlKssuV89XFUwFfwhz3AA==
-    rewardWeightBps: 240000
+    rewardWeightBps: 140000
+  - name: Cumberland-1
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEE0FEwOWZIsogzxbfkFDvg6iVR2P8zmzCwemylXF9/hxynlJOPo4vg3W9AS7y50X5qqj9yrWvVeT9iC1dDMIE0g==
+    rewardWeightBps: 120000
+  - name: Cumberland-2
+    public-key: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdbZaNrBDaGGpZZ3URiMHoSL2N0WSIt/aVlkQYATwoc7htI9FkysxE8dN1yimjSKYz6VcDCr8NqRfd5ENMVEscg==
+    rewardWeightBps: 120000
   - name: Global-Synchronizer-Foundation
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==
     rewardWeightBps: 120000
