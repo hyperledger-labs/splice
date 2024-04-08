@@ -1488,9 +1488,9 @@ The following steps assume that:
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
-1. Backup our SVs and validators: `cncluster backup_nodes sv-1 sv-2 sv-3 sv-4 sv validator1 splitwell validator`.
+1. Backup our SVs and validators: `cncluster backup_nodes sv-1 sv-2 sv-3 sv-4 validator1 splitwell`.
    This processes the nodes list sequentially and can be very slow.
-   Consider running multiple `cncluster backup_noces X Y Z` invocations in parallel.
+   Consider running multiple `cncluster backup_nodes X Y Z` invocations in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
@@ -1503,6 +1503,11 @@ The following steps assume that:
    (Check the logs of failing pods to be sure that there is no other problem.)
    For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
    followed by `pulumi up` parameters such as `--yes --skip-preview`.
+   To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
+   you can filter participant logs for `Persisted.*DomainParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   and inspect the (number of) signatures on the latest of those entries
+   (you need slightly over 2/3 of SVs to sign this).
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
    Communicate the result of your check to the rest of the DSO to conclude the migration.
 1. [Patch](patching-healthchecks-against-a-deployed-cluster) our health checks
@@ -1520,7 +1525,7 @@ In addition to inquiring about the status of partners on [Slack](https://daholdi
 here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs | .[] | .[1].synchronizerNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.sv_node_states | .[] | .payload.state.synchronizerNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
 ```
 
 This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...

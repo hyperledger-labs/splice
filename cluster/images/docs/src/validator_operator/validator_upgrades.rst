@@ -17,10 +17,11 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 2. SVs agree and eventually confirm via an on-ledger vote on which specific date and time the network downtime necessary for the upgrade will start. Information about the downtime window is communicated to validators.
 3. At the start of the downtime window, the DSO automatically pauses all traffic on the operating version of the global synchronizer.
 4. Shortly after traffic on the global synchronizer has been paused (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the validator node software automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`validator-upgrades-dumps`.
-5. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.
-6. Validator wait until the DSO has signaled that the migration has been successful.
-7. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
-8. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
+5. Validator operators verify that their nodes have caught up to the now-paused global synchronizer. See :ref:`validator-upgrades-catching-up`.
+6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.
+7. Validator wait until the DSO has signaled that the migration has been successful.
+8. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
+9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
 
 Technical Details
 -----------------
@@ -62,6 +63,17 @@ As part of the Helm-based deployment of the validator app (``cn-validator``),
 a persistent Kubernetes volume is attached to the ``validator-app`` pod and configured as the target storage location for migration dumps.
 When redeploying the validator app as part of the migration process (see :ref:`validator-upgrades-deploying`),
 the validator app will automatically consume the migration dump and initialize the participant based on the contents of this dump.
+
+.. _validator-upgrades-catching-up:
+
+Catching Up Before the Migration
+++++++++++++++++++++++++++++++++
+
+In order for the migration to the new synchronizer to be safe and successful, it is important that the validator node is fully caught up on the existing synchronizer before proceeding to :ref:`validator-upgrades-deploying`.
+
+* For making sure that the validator participant has caught up and the :ref:`migration dump <validator-upgrades-dumps>` has been created as expected, operators can check the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages.
+* For making sure that the validator app has caught up, operators can check the logs of the ``validator-app`` pod for the message ``Ingested transaction``.
+  If the latest such message is 10 or more minutes old, the validator app has very likely (with a large safety margin) caught up to the state on the participant, and hence to the state of the existing (paused) synchronizer.
 
 .. _validator-upgrades-deploying:
 

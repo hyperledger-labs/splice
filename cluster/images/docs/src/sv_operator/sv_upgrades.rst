@@ -15,11 +15,12 @@ Overview
 3. Once the downtime has been scheduled, all SVs deploy new Kubernetes pods containing the new versions of the Canton components of their Super Validator node (participant, sequencer, and mediator) as well as a new CometBFT node, alongside the old versioned ones which are not yet deleted. See :ref:`sv-upgrades-deploying-domain`.
 4. At the start of the downtime window, the SV app of SVs automatically pauses all traffic on the operating version of the global synchronizer.
 5. Shortly after pausing traffic on the global synchronizer (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the node software of SVs and validators automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`sv-upgrades-dumps`.
-6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`sv_backups`.
-7. All SVs upgrade theirs CN apps pods. See :ref:`sv-upgrades-deploying-apps`.
-8. Upon (re-)initialization, the SV node backend automatically consumes the migration dump and initializes all components based on the contents of this dump. The process is analogous for validators, where the validator app is tasked with importing the dump and initializing components. App databases are :ref:`preserved <sv-upgrades-state>`.
-9. Once a BFT majority (i.e., >⅔) of SVs have initialized their upgraded nodes, the new version of the synchronizer (with an incremented migration ID and, during a real upgrade, a new version of the core Canton components) becomes operational automatically. The end of the downtime window is therefore determined by the speed at which a sufficient number of SVs complete the necessary deployment and initialization steps.
-10. The remaining (Canton and CometBFT) components of the old synchronizer can be retired now. We recommend to only do so after (non-super) validators have had sufficient time to :ref:`catch up <validator-upgrades>` to the latest state from before the pause.
+6. SV operators verify that their nodes have caught up to the now-paused global synchronizer. See :ref:`sv-upgrades-catching-up`.
+7. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`sv_backups`.
+8. All SVs upgrade theirs CN apps pods. See :ref:`sv-upgrades-deploying-apps`.
+9. Upon (re-)initialization, the SV node backend automatically consumes the migration dump and initializes all components based on the contents of this dump. The process is analogous for validators, where the validator app is tasked with importing the dump and initializing components. App databases are :ref:`preserved <sv-upgrades-state>`.
+10. Once a BFT majority (i.e., >⅔) of SVs have initialized their upgraded nodes, the new version of the synchronizer (with an incremented migration ID and, during a real upgrade, a new version of the core Canton components) becomes operational automatically. The end of the downtime window is therefore determined by the speed at which a sufficient number of SVs complete the necessary deployment and initialization steps.
+11. The remaining (Canton and CometBFT) components of the old synchronizer can be retired now. We recommend to only do so after (non-super) validators have had sufficient time to :ref:`catch up <validator-upgrades>` to the latest state from before the pause.
 
 Technical Details
 -----------------
@@ -98,6 +99,17 @@ While doing so, please note the following:
   There is no fundamental need to use the port numbers suggested in the runbook, the only requirement is that either the (external) host IP of the CometBFT pod must be different for each migration ID or its (external) port number.
 * Note that these instructions do not yet support an actual upgrade of the Canton software during a synchronizer migration. We will follow-up with instructions on configuring different Canton versions in a future iteration.
 
+.. _sv-upgrades-catching-up:
+
+Catching Up Before the Migration
+++++++++++++++++++++++++++++++++
+
+In order for the migration to the new synchronizer to be safe and successful, it is important that the SV node is fully caught up on the existing synchronizer before proceeding to :ref:`sv-upgrades-deploying-apps`.
+
+* For making sure that the SV participant has caught up and the :ref:`migration dump <sv-upgrades-dumps>` has been created as expected, operators can check the logs of the ``sv-app`` pod for the message ``Wrote domain migration dump``.
+* For making sure that alls apps - ``sv-app``, ``scan-app``, and ``validator-app`` - have caught up, operators can check the logs of the respective pods for ``Ingested transaction`` messages.
+  If the latest such message for a given app is 10 or more minutes old, that app has very likely (with a large safety margin) caught up to the state on the participant, and hence to the state of the existing (paused) synchronizer.
+
 .. _sv-upgrades-deploying-apps:
 
 Updating Apps
@@ -139,7 +151,7 @@ Organizational Details
 Coordination calls
 ++++++++++++++++++
 
-For keeping upgrade downtimes short and assisting with the quick resolution of individual issues, we propose to perform upgrades and :ref:`upgrade tests <sv-upgrades-testing>` in a synchronized manner, with coordination over a group call (Zoom meeting). All SV operators will hereby be invited to join a call that starts shortly before the beginning of the downtime window (step 4 above) and ends once the upgrade and synchronizer migration has concluded (step 9 above). Our aim is that the core of the upgrade procedure (steps 4-9) can in principle be completed within one hour, realizing that the first coordinated tests will likely take longer.
+For keeping upgrade downtimes short and assisting with the quick resolution of individual issues, we propose to perform upgrades and :ref:`upgrade tests <sv-upgrades-testing>` in a synchronized manner, with coordination over a group call (Zoom meeting). All SV operators will hereby be invited to join a call that starts shortly before the beginning of the downtime window (step 4 above) and ends once the upgrade and synchronizer migration has concluded (step 10 above). Our aim is that the core of the upgrade procedure (steps 4-10) can in principle be completed within one hour, realizing that the first coordinated tests will likely take longer.
 
 Each SV must be represented in these calls by at least one person that is capable of performing the steps described in :ref:`sv-upgrades-deploying-domain` and :ref:`sv-upgrades-deploying-apps`.
 The operators representing an SV must be:
@@ -169,12 +181,14 @@ The following steps can be performed before the downtime window has started
 and even before a synchronizer upgrade has been formally scheduled:
 
 1. Ensure that the :ref:`backup and restore <sv_backups>` process for the SV works as expected.
-2. Deploy a new version of the CometBFT component as per :ref:`sv-upgrades-deploying-domain`,
+2. Deploy a new version of the CometBFT component as per :ref:`sv-upgrades-deploying-domain`
+   (``MIGRATION_ID += 1`` compared to the currently active synchronizer),
    including setting up the ingress for this component.
    Ensure that the pod reports as healthy.
    For checking that the ingress rules are set up correctly, ensure that TCP connections to the new CometBFT port are possible,
    for example by using the ``nc`` command: ``nc -vz <cometbft host> <cometbft port>``.
-3. Deploy new versions of the Canton components (participant, sequencer, mediator) as per :ref:`sv-upgrades-deploying-domain`,
+3. Deploy new versions of the Canton components (participant, sequencer, mediator) as per :ref:`sv-upgrades-deploying-domain`
+   (``MIGRATION_ID += 1`` compared to the currently active synchronizer),
    including setting up the ingress for the new sequencer.
    Note that these components are only initialized by the SV app once the synchronizer migration has started.
    Ensure that all pods report as healthy.
@@ -196,8 +210,8 @@ Specifically, coordinated tests involve:
 
 - Scheduling a :ref:`group call <sv-upgrades-coordination>` covering the planned synchronizer downtime.
 - Pausing the global synchronizer via a governance vote.
-  For DevNet-based tests, the pausing of the synchronizer can optionally be scheduled during the coordination call itself (with an effective date in the immediate future).
-- Creating full backups of SV nodes after the synchronizer has been paused.
+- Each SV making sure that all of its node's components have caught up to the final state of the existing synchronizer - see :ref:`sv-upgrades-catching-up`.
+- Creating full backups of SV nodes after they have fully caught up and the synchronizer has been paused.
 - Performing all remaining deployment steps necessary for a successful migration to the new synchronizer.
   If :ref:`sv-upgrades-testing-preparation` was followed, this involves only the steps outlined in :ref:`sv-upgrades-deploying-apps`.
   It is fully supported that SVs perform these deployment steps concurrently after the synchronizer has been paused.

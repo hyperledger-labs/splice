@@ -8,6 +8,7 @@ Upcoming
 
 * The Scan frontend shows information about currently open mining rounds
   in the current configuration box.
+* Minor documentation improvements related to synchronizer upgrades with downtime.
 
 0.1.2
 -----
