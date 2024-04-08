@@ -58,7 +58,7 @@ export default {
         timeUnit: '1m',
 
         // Pre-allocate VUs
-        preAllocatedVUs: 50,
+        preAllocatedVUs: 20,
       },
     },
   },
