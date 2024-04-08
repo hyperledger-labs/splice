@@ -125,7 +125,11 @@ object CNNodeConfigTransforms {
 
   def reducePollingInterval: CNNodeConfigTransform = { config =>
     def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig =
-      config.focus(_.pollingInterval).replace(NonNegativeFiniteDuration.ofSeconds(1))
+      config
+        .focus(_.pollingInterval)
+        .replace(NonNegativeFiniteDuration.ofSeconds(1))
+        .focus(_.rewardOperationPollingInterval)
+        .replace(NonNegativeFiniteDuration.ofSeconds(1))
 
     updateAllAutomationConfigs(setPollingIntervalInternal)(config)
   }

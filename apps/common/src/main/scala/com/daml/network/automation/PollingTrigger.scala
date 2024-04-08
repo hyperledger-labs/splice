@@ -29,6 +29,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     "trigger_type" -> "polling",
   )
 
+  protected def isRewardOperationTrigger: Boolean = false
+
+  private val (pollingInterval, pollingJitter) =
+    if (isRewardOperationTrigger)
+      (context.config.rewardOperationPollingInterval, context.config.rewardOperationPollingJitter)
+    else (context.config.pollingInterval, context.config.pollingJitter)
+
   /** The main body of the polling trigger
     *
     * It should check whether there is work to be done and if yes, perform it.
@@ -87,7 +94,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     Map.empty,
     "transient",
     "non-transient",
-    s"restarting after ${context.config.pollingInterval}",
+    s"restarting after ${pollingInterval}",
     context.metricsFactory,
     mc.labels,
     context.retryProvider,
@@ -116,8 +123,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 .scheduleAfterUnlessShutdown(
                   pollingLoop(newState, Future.successful(true)),
                   context.pollingClock,
-                  context.config.pollingInterval,
-                  context.config.pollingJitter,
+                  pollingInterval,
+                  pollingJitter,
                 )
                 .onShutdown(Done)
             }
@@ -139,7 +146,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 val newState =
                   if (numConsecutiveTransientFailures > context.config.maxNumSilentPollingRetries) {
                     logger.warn(
-                      s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval ${context.config.pollingInterval}).\nThe last one was:",
+                      s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval ${pollingInterval}).\nThe last one was:",
                       ex,
                     )
                     PollingTrigger.initialPollingTriggerState
@@ -156,7 +163,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                   pollingLoop(PollingTrigger.initialPollingTriggerState, performWorkIfNotPaused())
                 } else {
                   logger.trace(
-                    show"No work performed. Sleeping for ${context.config.pollingInterval}"
+                    show"No work performed. Sleeping for ${pollingInterval}"
                   )
                   loopWithDelay(PollingTrigger.initialPollingTriggerState)
                 }

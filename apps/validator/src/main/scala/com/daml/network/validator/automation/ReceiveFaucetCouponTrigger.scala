@@ -33,6 +33,8 @@ class ReceiveFaucetCouponTrigger(
     materializer: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[ReceiveFaucetCouponTrigger.Task] {
 
+  override def isRewardOperationTrigger = true
+
   private val validatorParty = validatorStore.key.validatorParty
 
   override protected def retrieveTasks()(implicit

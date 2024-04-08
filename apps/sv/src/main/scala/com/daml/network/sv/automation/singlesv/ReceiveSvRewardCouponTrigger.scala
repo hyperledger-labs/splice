@@ -34,6 +34,8 @@ class ReceiveSvRewardCouponTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ReceiveSvRewardCouponTrigger.Task] {
 
+  override def isRewardOperationTrigger: Boolean = true
+
   private val svParty = store.key.svParty
   private val dsoParty = store.key.dsoParty
 

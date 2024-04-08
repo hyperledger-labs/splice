@@ -22,6 +22,8 @@ class CollectRewardsAndMergeAmuletsTrigger(
     override val tracer: Tracer,
 ) extends PollingTrigger {
 
+  override def isRewardOperationTrigger: Boolean = true
+
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     treasury
       .enqueueAmuletOperation(

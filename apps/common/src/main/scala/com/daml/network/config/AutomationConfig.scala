@@ -21,6 +21,15 @@ case class AutomationConfig(
       * `[pollingInterval * (1 - 0.5*pollingJitter), pollingInterval * (1 + 0.5 * pollingJitter)]`
       */
     pollingJitter: Double = 0.2,
+    /** Reward operations can result in spikes overloading sequencers on each round switch so we
+      * use a lower polling interval of 1/2 tick with tick = 600s
+      */
+    rewardOperationPollingInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(300),
+    /** Reward operations can result in spikes overloading sequencers on each round switch so we
+      * use higher jitter.
+      */
+    rewardOperationPollingJitter: Double = 0.5,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,
