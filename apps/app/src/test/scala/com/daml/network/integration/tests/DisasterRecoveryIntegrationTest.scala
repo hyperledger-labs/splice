@@ -3,8 +3,12 @@ package com.daml.network.integration.tests
 import better.files.File
 import better.files.File.apply
 import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
-import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.console.{
+  CNNodeAppBackendReference,
+  ScanAppBackendReference,
+  SvAppBackendReference,
+}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -221,7 +225,7 @@ class DisasterRecoveryIntegrationTest
         s"sequencers-mediators-before-disaster-$cantonInstanceSuffix",
         participants = false,
       )() {
-        startAllSync(
+        val allAppsBeforeDisaster = Seq[CNNodeAppBackendReference](
           sv1ScanBackend,
           sv1Backend,
           sv2Backend,
@@ -229,6 +233,10 @@ class DisasterRecoveryIntegrationTest
           sv4Backend,
           sv1ValidatorBackend,
         )
+
+        clue("Starting old apps") {
+          startAllSync(allAppsBeforeDisaster*)
+        }
 
         val identities = withClueAndLog("Getting node identities dump") {
           svBackends.map(_.getSynchronizerNodeIdentitiesDump())
@@ -290,6 +298,10 @@ class DisasterRecoveryIntegrationTest
         // TODO(#11099): Once taking the migration dump does not need sequencers to be running, move this further down.
         withClueAndLog("Getting and writing disaster recovery dumps") {
           getAndWriteDumps(identities, timestampBeforeDisaster)
+        }
+
+        clue("Shutting down old apps") {
+          stopAllAsync(allAppsBeforeDisaster*).futureValue
         }
       }
 
@@ -368,7 +380,9 @@ class DisasterRecoveryIntegrationTest
               )
             }
 
-            checkMigrateDomainOnNodes(allNodes, dsoParty)
+            withClueAndLog("checking domain migration") {
+              checkMigrateDomainOnNodes(allNodes, sv1ScanLocalBackend.getDsoPartyId())
+            }
 
             withClueAndLog("Old balance has been transferred to new domain") {
               assertInRange(

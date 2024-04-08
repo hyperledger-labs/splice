@@ -82,7 +82,4 @@ DB_CONNECTION_LOST.*Database health check failed to establish a valid connection
 # The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
 The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response
 
-# TODO (#11370): Investigate
-Gave up ensuring Extra traffic limit for MED.*DisasterRecoveryIntegrationTest.*UNAVAILABLE.*
-
 # Make sure to have a trailing newline
