@@ -4,6 +4,7 @@ metadata:
   name: load-tester
 spec:
   schedule: "{{ .Values.schedule }}"
+  concurrencyPolicy: Replace
   jobTemplate:
     spec:
       template:
