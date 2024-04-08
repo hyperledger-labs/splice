@@ -61,13 +61,19 @@ else
   trust_period=${STATE_SYNC_TRUST_PERIOD:-"168h0m0s"}  # trust period defaults to 1 week
   latest_block_height=$( _json_rpc_call "${base_url}" '{"id": "0", "method": "status"}' | jq -r '.result.sync_info.latest_block_height' )
   echo "Latest block height: $latest_block_height"
+  trust_height=$(( latest_block_height - min_trust_height_age ))
   # Disable state sync entirely if latest_block_height is less than min_trust_height_age
-  if [ "$latest_block_height" -le "$min_trust_height_age" ]; then
-    echo "Latest block height is less than the min trust height age $min_trust_height_age. State sync will be disabled."
+  if [ "$trust_height" -le 0 ]; then
+    echo "Latest block height is not greater than the min trust height age $min_trust_height_age. State sync will be disabled."
+    _set_state_sync_disabled
+  elif [ "$trust_height" -eq 1 ]; then
+    # The genesis block we add as part of our genesis file is dated as of 2023-02-27. With the default trust_period of 1 week,
+    # most blocks would fall outside the trust_period window if we specify the trust_height for state sync as 1, resulting in state sync failures.
+    # This is why we treat it as a special case and disable state sync in this scenario.
+    echo "Trust height computed as 1. This would use the genesis block for state sync, which has a fixed date likely to be much older than the configured trust period. State sync will be disabled."
     _set_state_sync_disabled
   else
     enable=true
-    trust_height=$(( latest_block_height - min_trust_height_age ))
     trust_hash=$( _json_rpc_call "${base_url}" '{"id": "1", "method": "block", "params": {"height": "'"${trust_height}"'"}}' | jq -r '.result.block_id.hash' )
   fi
 fi
