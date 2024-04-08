@@ -11,6 +11,7 @@ import {
   DomainMigrationIndex,
   defaultVersion,
   CnChartVersion,
+  stableCometBftChainId,
 } from 'cn-pulumi-common';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svConfigs';
@@ -91,6 +92,7 @@ export function installCometBftNode(
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
             : `${CLUSTER_BASENAME}-${migrationId}`,
+        chainIdVersion: stableCometBftChainId ? 'stable' : undefined,
       },
       metrics: {
         enable: true,

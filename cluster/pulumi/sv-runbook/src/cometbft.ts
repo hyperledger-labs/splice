@@ -12,6 +12,7 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   disableCometBftStateSync,
   svCometBftKeysFromSecret,
+  stableCometBftChainId,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
@@ -107,6 +108,7 @@ export function installCometBftNode(
               `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
                 ? 'test'
                 : cometBftValues.genesis.chainId,
+            chainIdVersion: stableCometBftChainId ? 'stable' : undefined,
           },
           stateSync: {
             ...cometBftValues.stateSync,

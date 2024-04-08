@@ -13,4 +13,5 @@ export * from './onboarding';
 export * from './persistence';
 export * from './runbook-backup';
 export * from './secrets';
+export * from './cometbft';
 export * from './utils';
