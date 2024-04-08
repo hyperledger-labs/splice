@@ -58,6 +58,7 @@ import com.daml.network.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
 }
+import com.daml.network.wallet.automation.ExpireTransferOfferTrigger
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -69,6 +70,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
@@ -82,8 +84,9 @@ import org.slf4j.event.Level
 
 import java.io.File
 import java.nio.file.Path
-import java.time.Instant
+import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
@@ -526,7 +529,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
-      val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty, charlieUserParty)
 
       val sequencerUrlSetBeforeUpgrade =
         clue("validator should connect to all sequencer urls on the old network") {
@@ -762,19 +766,59 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             )
 
             val aliceValidatorLocal = v("aliceValidatorLocal")
+            val aliceWalletLocalClient = uwc("aliceWalletLocal")
             withClueAndLog("validator can migrate to the new domain") {
               val validatorThatMigrates = aliceValidatorLocal
               startValidatorAndTapAmulet(
                 validatorThatMigrates,
-                uwc("aliceWalletLocal"),
+                aliceWalletLocalClient,
                 // tap 2 times (100) minus splitwell transfer (42)
                 expectedAmulets = 57 to 58,
               )
             }
+            withClueAndLog("User automation works before user is reonboarded") {
+              val aliceUser = aliceWalletLocalClient.config.ledgerApiUser
+              val charlieUser = uwc("charlieWalletLocal").config.ledgerApiUser
+              clue("Pause expiration so we can catch the contract") {
+                aliceValidatorLocal
+                  .userWalletAutomation(aliceUser)
+                  .trigger[ExpireTransferOfferTrigger]
+                  .pause()
+                  .futureValue
+                aliceValidatorLocal
+                  .userWalletAutomation(charlieUser)
+                  .trigger[ExpireTransferOfferTrigger]
+                  .pause()
+                  .futureValue
+              }
+              actAndCheck(
+                "Alice creates almost expired transfer",
+                aliceWalletLocalClient.createTransferOffer(
+                  charlieUserParty,
+                  10,
+                  "transfer 10 amulets to Charlie",
+                  CantonTimestamp.now().plus(Duration.ofSeconds(2)),
+                  UUID.randomUUID.toString,
+                ),
+              )(
+                "Alice sees expired transfer offer",
+                _ => aliceWalletLocalClient.listTransferOffers() should have length 1,
+              )
+              actAndCheck(
+                "Unpause Charlie's expiration automation",
+                aliceValidatorLocal
+                  .userWalletAutomation(charlieUser)
+                  .trigger[ExpireTransferOfferTrigger]
+                  .resume(),
+              )(
+                "Transfer offer was expired by Charlie's automation",
+                _ => {
+                  aliceWalletLocalClient.listTransferOffers() should have length 0
+                },
+              )
+            }
 
-            val charlieUserParty = onboardWalletUser(uwc("charlieWalletLocal"), aliceValidatorLocal)
-
-            clue(s"validator should connect to sequencers in upgraded domain $charlieUserParty") {
+            clue(s"validator should connect to sequencers in upgraded domain") {
               eventually() {
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
                   case Seq(DomainSequencers(domainId, sequencers)) =>
@@ -997,9 +1041,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   }
 
   private def createSplitwellGroupAndTransfer(
-      aliceUserParty: PartyId
+      aliceUserParty: PartyId,
+      charlieUserParty: PartyId,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
     startAllSync(
       splitwellValidatorBackend,
       splitwellBackend,
