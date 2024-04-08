@@ -700,7 +700,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -757,7 +757,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -781,6 +781,7 @@
         "postgres": "splitwell-pg.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
+            "cpu": "2",
             "memory": "1536Mi"
           },
           "requests": {
@@ -958,7 +959,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
@@ -1006,6 +1007,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": 3,
             "memory": "8Gi"
           },
           "requests": {
@@ -1162,7 +1164,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1181,6 +1183,7 @@
         "nodeIdentifier": "Digital-Asset-2",
         "resources": {
           "limits": {
+            "cpu": "3",
             "memory": "4Gi"
           },
           "requests": {
@@ -1303,7 +1306,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1611,7 +1614,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isFounder": true,
@@ -1634,6 +1637,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "2",
             "memory": "1536Mi"
           },
           "requests": {
@@ -1709,7 +1713,7 @@
           "enabled": true
         },
         "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -1800,6 +1804,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": 3,
             "memory": "4096Mi"
           },
           "requests": {
@@ -1839,7 +1844,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
@@ -1881,6 +1886,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": 3,
             "memory": "8Gi"
           },
           "requests": {
@@ -2018,7 +2024,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2201,7 +2207,6 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "resources": {
           "limits": {
@@ -2238,7 +2243,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
@@ -2286,6 +2291,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": 3,
             "memory": "8Gi"
           },
           "requests": {
