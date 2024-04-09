@@ -186,6 +186,7 @@ class DbSvDsoStore(
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingConfirmed.TEMPLATE_ID
                 )}""",
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listSvOnboardingConfirmed",
           )

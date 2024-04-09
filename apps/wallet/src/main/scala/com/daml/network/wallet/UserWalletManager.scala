@@ -7,7 +7,7 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.Limit
+import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
@@ -47,7 +47,8 @@ class UserWalletManager(
     close: CloseContext,
 ) extends AutoCloseable
     with NamedLogging
-    with HasHealth {
+    with HasHealth
+    with LimitHelpers {
 
   // map from end user name to end-user treasury service
   private[this] val endUserWalletsMap
@@ -215,9 +216,7 @@ class UserWalletManager(
       validatorUserStore: UserWalletStore,
       limit: Limit,
       activeIssuingRounds: Option[Set[Long]],
-  )(implicit
-      tc: TraceContext
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Seq[
       Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
     ]
@@ -258,7 +257,11 @@ class UserWalletManager(
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
-    } yield validatorRewardCoupons.flatten.take(limit.limit)
+    } yield applyLimit(
+      "listValidatorRewardCouponsCollectableBy",
+      limit,
+      validatorRewardCoupons.flatten,
+    )
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)
 
