@@ -295,6 +295,9 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
+        "db": {
+          "volumeStorageClass": "premium-rwo"
+        },
         "founder": {
           "externalAddress": "svrun.network.com.network.canton.global:26016"
         },

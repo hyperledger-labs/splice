@@ -123,6 +123,9 @@ export function installCometBftNode(
             enable: true,
             labels: [{ key: 'active_migration', value: isActive }],
           },
+          db: {
+            volumeStorageClass: 'premium-rwo',
+          },
           extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
         }),
         version,
