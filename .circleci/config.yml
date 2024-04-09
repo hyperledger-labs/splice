@@ -1861,6 +1861,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            # All CI-deployed clusters use split postgres instances per app, to support backups.
+            export SPLIT_POSTGRES_INSTANCES=1
             images="/tmp/ciupgrade.json"
             cncluster export_to "$images"
             cncluster partial_upgrade $(get-snapshot-version) "$images"
