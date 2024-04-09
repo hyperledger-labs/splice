@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 13,
+  "id": 74,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -928,8 +928,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
+        "h": 7,
+        "w": 12,
         "x": 0,
         "y": 18
       },
@@ -971,6 +971,143 @@
       ],
       "title": "Consensus round voting power",
       "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$DS"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Height for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#447ebc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Transactions for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef843c",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "hideTimeOverride": false,
+      "id": 49,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$DS"
+          },
+          "editorMode": "code",
+          "expr": "cometbft_consensus_num_txs{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "Transactions",
+          "refId": "A"
+        }
+      ],
+      "title": "Transactions",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -1070,10 +1207,10 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 26
+        "y": 25
       },
       "hideTimeOverride": false,
-      "id": 49,
+      "id": 50,
       "options": {
         "legend": {
           "calcs": [
@@ -1113,6 +1250,7 @@
         "type": "prometheus",
         "uid": "$DS"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1126,7 +1264,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1140,7 +1278,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1150,10 +1288,8 @@
               "mode": "off"
             }
           },
-          "decimals": 0,
-          "links": [],
+          "decimals": 2,
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1167,82 +1303,52 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "cps"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Height for last 3 hours"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#447ebc",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total Transactions for last 3 hours"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ef843c",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 26
+        "y": 25
       },
       "hideTimeOverride": false,
-      "id": 50,
+      "id": 68,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "max",
-            "sum"
-          ],
+          "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "editorMode": "code",
-          "expr": "cometbft_consensus_num_txs{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "rate(cometbft_consensus_height{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval])",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "Transactions",
-          "refId": "A"
+          "range": true,
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Transactions",
+      "title": "Block Rate",
       "type": "timeseries"
     },
     {
@@ -1255,7 +1361,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 30
       },
       "id": 55,
       "panels": [],
@@ -1312,7 +1418,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 32
+        "y": 31
       },
       "hideTimeOverride": true,
       "id": 53,
@@ -1388,7 +1494,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 32
+        "y": 31
       },
       "hideTimeOverride": true,
       "id": 56,
@@ -1459,7 +1565,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 32
+        "y": 31
       },
       "hideTimeOverride": true,
       "id": 60,
@@ -1532,7 +1638,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 32
+        "y": 31
       },
       "hideTimeOverride": true,
       "id": 61,
@@ -1976,7 +2082,6 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "",
   "schemaVersion": 39,
   "tags": [
     "Blockchain"
@@ -2124,6 +2229,6 @@
   "timezone": "",
   "title": "CometBFT",
   "uid": "UJyurCTWz",
-  "version": 2,
+  "version": 4,
   "weekStart": ""
 }
