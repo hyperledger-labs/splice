@@ -1686,7 +1686,7 @@
           },
           {
             "name": "Cumberland-2",
-            "public-key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdbZaNrBDaGGpZZ3URiMHoSL2N0WSIt/aVlkQYATwoc7htI9FkysxE8dN1yimjSKYz6VcDCr8NqRfd5ENMVEscg==",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdbZaNrBDaGGpZZ3URiMHoSL2N0WSIt/aVlkQYATwoc7htI9FkysxE8dN1yimjSKYz6VcDCr8NqRfd5ENMVEscg==",
             "rewardWeightBps": 120000
           },
           {

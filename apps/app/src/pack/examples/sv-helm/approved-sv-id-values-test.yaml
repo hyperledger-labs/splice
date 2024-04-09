@@ -12,7 +12,7 @@ approvedSvIdentities:
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEE0FEwOWZIsogzxbfkFDvg6iVR2P8zmzCwemylXF9/hxynlJOPo4vg3W9AS7y50X5qqj9yrWvVeT9iC1dDMIE0g==
     rewardWeightBps: 120000
   - name: Cumberland-2
-    public-key: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdbZaNrBDaGGpZZ3URiMHoSL2N0WSIt/aVlkQYATwoc7htI9FkysxE8dN1yimjSKYz6VcDCr8NqRfd5ENMVEscg==
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdbZaNrBDaGGpZZ3URiMHoSL2N0WSIt/aVlkQYATwoc7htI9FkysxE8dN1yimjSKYz6VcDCr8NqRfd5ENMVEscg==
     rewardWeightBps: 120000
   - name: Global-Synchronizer-Foundation
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==
