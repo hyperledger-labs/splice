@@ -563,6 +563,11 @@
             "rewardWeightBps": 140000
           },
           {
+            "name": "Digital-Asset-2",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPKz6BujCKqA6ACviIybPw8aYTsKOYkWN6spIWL4CTxiH26QCyrrYFH06OGxa8UykyPM0yuywDXKF3ZVpWyF0hw==",
+            "rewardWeightBps": 140000
+          },
+          {
             "name": "Cumberland-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEE0FEwOWZIsogzxbfkFDvg6iVR2P8zmzCwemylXF9/hxynlJOPo4vg3W9AS7y50X5qqj9yrWvVeT9iC1dDMIE0g==",
             "rewardWeightBps": 120000
