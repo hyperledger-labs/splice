@@ -1,0 +1,11 @@
+workflow:
+  determine_ciupgrade_work:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - cancel_if_current_commit_is_base_version:
+          <<: *main-branch-only
+      - launch_ciupgrade_workflow:
+          <<: *main-branch-only
+          requires:
+            - cancel_if_current_commit_is_base_version

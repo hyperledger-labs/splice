@@ -75,6 +75,10 @@ parameters:
   cluster:
     type: string
     default: "none"
+  # Controls whether to run partial upgrades in `deploy_ciupgrade`
+  run-partial-upgrade:
+    type: boolean
+    default: true
 
 notify-fail: &notify-fail
   context: slack-context

@@ -1,10 +1,8 @@
 workflow:
   deploy_ciupgrade:
     when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-ciupgrade, << pipeline.parameters.run-job >> ]
     jobs:
-      - cancel_if_current_commit_is_base_version:
-          <<: *main-branch-only
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -13,8 +11,6 @@ workflow:
             - slack-context
           workflow_names: "deploy_ciupgrade"
           wait_type: "wait_workflow"
-          requires:
-            - cancel_if_current_commit_is_base_version
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-only
@@ -93,6 +89,16 @@ workflow:
             - slack-context
           requires:
             - wait_for_previous_pipeline
+      - release_partial_upgrade_or_final:
+          <<: *main-branch-only
+          requires:
+            - docker_images_push
+            - preflight_check_initial
+            - preflight_sv_check_initial
+            - preflight_validator_initial
+      - hold_partial_upgrade:
+          <<: *main-branch-only
+          type: approval
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
           cluster: "ciupgrade"
@@ -102,10 +108,7 @@ workflow:
             - slack-context
           <<: *main-branch-only
           requires:
-            - docker_images_push
-            - preflight_check_initial
-            - preflight_sv_check_initial
-            - preflight_validator_initial
+            - hold_partial_upgrade
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
@@ -141,6 +144,15 @@ workflow:
           cluster: "ciupgrade"
           requires:
             - deploy_partial_upgrade
+      - release_final_upgrade:
+          <<: *main-branch-only
+          requires:
+            - preflight_check_partial_upgrade
+            - preflight_sv_check_partial_upgrade
+            - preflight_validator_partial_upgrade
+      - hold_final_upgrade:
+          <<: *main-branch-only
+          type: approval
       - deploy_cluster:
           name: "deploy_final_upgrade"
           <<: *main-branch-only
@@ -153,9 +165,7 @@ workflow:
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
-            - preflight_check_partial_upgrade
-            - preflight_sv_check_partial_upgrade
-            - preflight_validator_partial_upgrade
+            - hold_final_upgrade
       - preflight_check:
           name: "preflight_check_final_upgrade"
           <<: *main-branch-only

@@ -579,6 +579,34 @@ jobs:
               echo "Current commit is ${CIRCLE_SHA1}, latest base version is ${latest_base_version}."
             fi
 
+  launch_ciupgrade_workflow:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Launches the deploy_ciupgrade workflow, disabling partial upgrade if there are Helm/Pulumi changes
+          command: |
+            source .envrc.vars
+            
+            run_partial_upgrade=""
+            
+            if build-tools/helm-change-vs-base; then
+              echo "Proceeding with partial upgrade."
+              run_partial_upgrade="true"
+            else
+              echo "Skipping cluster partial upgrade and preflights steps."
+              run_partial_upgrade="false"
+            fi
+            
+            curl --fail-with-body --request POST \
+              --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
+              --header "Circle-Token: ${CIRCLECI_TOKEN}" \
+              --header 'content-type: application/json' \
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade}}"
+
   backup_cluster:
     parameters:
       <<: *cluster-parameter
@@ -724,15 +752,35 @@ jobs:
     docker:
       - image: cimg/base:2024.01
     steps:
+      - checkout_with_retry
       - run:
           name: Release main hold job
           command: |
-            approval_id=$(curl -s --location --request GET "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/job" --header "Circle-Token: ${CIRCLECI_TOKEN}" | jq -r '.items[]|select(.name == "hold_set_scratchnet").approval_request_id')
-            if [ -n "$approval_id" ]; then
-              curl -s --location --request POST "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/approve/$approval_id" --header "Circle-Token: ${CIRCLECI_TOKEN}"
+            .circleci/release-hold.sh "hold_set_scratchnet"
+
+  release_partial_upgrade_or_final:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Release main hold job
+          command: |
+            if [[ << pipeline.parameters.run-partial-upgrade >> == true ]]; then
+              .circleci/release-hold.sh "hold_partial_upgrade"
             else
-              echo "No approval request found for hold_set_scratchnet"
+              .circleci/release-hold.sh "hold_final_upgrade"
             fi
+
+  release_final_upgrade:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Release final upgrade
+          command: |
+            .circleci/release-hold.sh "hold_final_upgrade"
 
   # Persists the choice of scratchnet cluster to a CCI workspace
   set_scratchnet:
