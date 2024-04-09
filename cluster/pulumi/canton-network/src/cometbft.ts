@@ -100,7 +100,7 @@ export function installCometBftNode(
       },
       db: {
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
-        volumeStorageClass: 'premium-rwo',
+        volumeStorageClass: process.env.COMETBFT_STORAGE_CLASS || 'standard-rwo',
       },
       extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
     },

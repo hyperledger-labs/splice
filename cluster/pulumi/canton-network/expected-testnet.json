@@ -1068,7 +1068,7 @@
         "clusterUrl": "mock.network.canton.global",
         "db": {
           "volumeSize": "240Gi",
-          "volumeStorageClass": "premium-rwo"
+          "volumeStorageClass": "standard-rwo"
         },
         "founder": {
           "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
