@@ -19,17 +19,133 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 55,
+  "id": 69,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*failure/"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 50
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "increase(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", outcome=~\"success|failure\"}[$__rate_interval])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": false,
+          "instant": false,
+          "legendFormat": "{{node_name}} {{trigger_name}} {{outcome}} ",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Runs in ${__rate_interval",
+      "type": "timeseries"
+    },
     {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 10
       },
       "id": 3,
       "panels": [],
@@ -65,7 +181,7 @@
         "h": 7,
         "w": 4,
         "x": 0,
-        "y": 1
+        "y": 11
       },
       "id": 5,
       "options": {
@@ -74,13 +190,17 @@
         "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -96,7 +216,6 @@
         }
       ],
       "title": "Traffic",
-      "transformations": [],
       "type": "stat"
     },
     {
@@ -127,7 +246,7 @@
         "h": 7,
         "w": 4,
         "x": 4,
-        "y": 1
+        "y": 11
       },
       "id": 7,
       "options": {
@@ -136,13 +255,17 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -187,7 +310,7 @@
         "h": 7,
         "w": 4,
         "x": 8,
-        "y": 1
+        "y": 11
       },
       "id": 8,
       "options": {
@@ -196,13 +319,17 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -260,15 +387,17 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 9,
+        "w": 12,
         "x": 12,
-        "y": 1
+        "y": 11
       },
       "id": 6,
       "options": {
         "bucketOffset": 0,
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -346,7 +475,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 8
+        "y": 18
       },
       "id": 10,
       "options": {
@@ -354,14 +483,16 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "frameIndex": 0,
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -385,7 +516,9 @@
             "includeTimeField": false,
             "labelsToFields": true,
             "mode": "seriesToRows",
-            "reducers": ["sum"]
+            "reducers": [
+              "sum"
+            ]
           }
         },
         {
@@ -434,6 +567,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -480,14 +614,16 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 13,
+        "w": 16,
         "x": 8,
-        "y": 8
+        "y": 18
       },
       "id": 9,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -524,7 +660,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 26
       },
       "id": 11,
       "panels": [],
@@ -564,7 +700,7 @@
         "h": 7,
         "w": 4,
         "x": 0,
-        "y": 17
+        "y": 27
       },
       "id": 12,
       "options": {
@@ -573,13 +709,17 @@
         "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -595,7 +735,6 @@
         }
       ],
       "title": "Traffic",
-      "transformations": [],
       "type": "stat"
     },
     {
@@ -626,7 +765,7 @@
         "h": 7,
         "w": 4,
         "x": 4,
-        "y": 17
+        "y": 27
       },
       "id": 13,
       "options": {
@@ -635,13 +774,17 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -686,7 +829,7 @@
         "h": 7,
         "w": 4,
         "x": 8,
-        "y": 17
+        "y": 27
       },
       "id": 14,
       "options": {
@@ -695,13 +838,17 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -761,13 +908,15 @@
         "h": 7,
         "w": 9,
         "x": 12,
-        "y": 17
+        "y": 27
       },
       "id": 15,
       "options": {
         "bucketOffset": 0,
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -813,7 +962,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -844,7 +994,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 24
+        "y": 34
       },
       "id": 16,
       "options": {
@@ -852,14 +1002,16 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "frameIndex": 0,
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -883,7 +1035,9 @@
             "includeTimeField": false,
             "labelsToFields": true,
             "mode": "seriesToRows",
-            "reducers": ["sum"]
+            "reducers": [
+              "sum"
+            ]
           }
         },
         {
@@ -932,6 +1086,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -967,7 +1122,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -980,7 +1136,9 @@
               "id": "byNames",
               "options": {
                 "mode": "exclude",
-                "names": ["sv 10.116.5.6:10013 AdvanceOpenMiningRoundTrigger"],
+                "names": [
+                  "sv 10.116.5.6:10013 AdvanceOpenMiningRoundTrigger"
+                ],
                 "prefix": "All except:",
                 "readOnly": true
               }
@@ -1002,12 +1160,14 @@
         "h": 8,
         "w": 13,
         "x": 8,
-        "y": 24
+        "y": 34
       },
       "id": 17,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -1044,16 +1204,15 @@
     }
   ],
   "refresh": "",
-  "schemaVersion": 38,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
           "selected": true,
-          "text": "All",
-          "value": "$__all"
+          "text": "sv-1",
+          "value": "sv-1"
         },
         "datasource": {
           "type": "prometheus",
@@ -1133,13 +1292,13 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Automations",
   "uid": "a3e1385f-6f03-46d9-908c-34aca0f507a6",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }

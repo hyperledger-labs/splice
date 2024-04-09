@@ -7,18 +7,18 @@ groups:
     rules:
       - uid: fe73c0e7-dcb3-4975-a7d1-04ed8da087be
         title: Automation Failures
-        condition: fatal_error_rate_above_threshold
+        condition: failures
         data:
-          - refId: fatal_errors
+          - refId: failures
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
               disableTextWrap: false
-              editorMode: builder
+              editorMode: code
               exemplar: false
-              expr: sum by(namespace, node_type, trigger_name) (increase(cn_retries_failures{trigger_name=~".+", error_kind="fatal"}[10m]))
+              expr: ((sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="failure"}[10m]))) / (sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome=~"success|failure"}[10m])))) * 100
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -26,73 +26,25 @@ groups:
               legendFormat: __auto
               maxDataPoints: 43200
               range: false
-              refId: fatal_errors
+              refId: failures
               useBackend: false
-          - refId: successful_runs
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              disableTextWrap: false
-              editorMode: builder
-              exemplar: false
-              expr: sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="success"}[10m]))
-              fullMetaSearch: false
-              hide: false
-              includeNullMetadata: true
-              instant: true
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: false
-              refId: successful_runs
-              useBackend: false
-          - refId: fatal_error_rate_above_threshold
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - C
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
-              datasource:
-                type: __expr__
-                uid: __expr__
-              expression: fatal_errors
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: fatal_error_rate_above_threshold
-              type: threshold
         dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
         panelId: 8
         noDataState: OK
         execErrState: Error
-        for: 15m
+        for: 5m
         annotations:
           __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
           __panelId__: "8"
-          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "fatal_errors" }} fatal errors and a total of {{ index $values "successful_runs" }}
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "failures" }}% failures in the last 10 minutes.
           runbook_url: ""
           severity: |-
-            {{- if (eq (index $values "successful_runs").Value 0 -}}
+            {{- if (gt (index $values "failures").Value 90) -}}
             critical
             {{- else -}}
             medium
             {{- end -}}
-          summary: '{{ index $values "fatal_errors" }}/{{ index $values "successful_runs" }}  Fatal errors occurred in automation trigger'
+          summary: '{{ index $values "failures }}% fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:
           "": ""
         isPaused: false
