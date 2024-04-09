@@ -126,6 +126,15 @@ object CNNodeTests extends LazyLogging {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
+    override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
+      CNNodeMetricsFactory
+        .forConfig(
+          configuredOpenTelemetry.getMeterProvider,
+          metricsFactoryType = External,
+        )
+        .createLabeledMetricsFactory(MetricsContext.Empty)
+    }
+
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
     protected lazy val resetRequiredTopologyState: Boolean = true
