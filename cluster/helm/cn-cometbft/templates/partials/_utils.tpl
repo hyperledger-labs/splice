@@ -5,8 +5,9 @@
 {{- end }}
 
 {{- define "cliArgs" }}
+{{- $values := index . 0 -}}
 --home /cometbft \
---log_level="pex:debug,CantonNetworkApplication:debug,*:info" \
+--log_level="{{- if $values.extraLogLevelFlags }}{{- $values.extraLogLevelFlags }},{{- end }}pex:debug,CantonNetworkApplication:debug,*:info" \
 {{- end }}
 
 {{- define "isTestNet" -}}

@@ -74,7 +74,7 @@ spec:
               "${HOME}"/configure-state-sync.sh "${HOME}"/config/config.toml
               cp -n "${HOME}"/initial-data/* "${HOME}"/data || :
               cometbft-canton-network start \
-              {{ include "cliArgs" (list $ .) | indent 14 | trim }}
+              {{ include "cliArgs" (list $.Values) | indent 14 | trim }}
           {{- with $.Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}

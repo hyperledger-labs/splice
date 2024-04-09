@@ -123,6 +123,7 @@ export function installCometBftNode(
             enable: true,
             labels: [{ key: 'active_migration', value: isActive }],
           },
+          extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
         }),
         version,
         dependencies

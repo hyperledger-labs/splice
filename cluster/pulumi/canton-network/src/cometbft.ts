@@ -101,6 +101,7 @@ export function installCometBftNode(
       db: {
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
+      extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
     },
     version,
     {
