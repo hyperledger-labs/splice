@@ -10,6 +10,7 @@ import {
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
   sequencerResources,
+  sequencerTokenExpirationTime,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -67,6 +68,7 @@ export function installDecentralizedSynchronizerNode(
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             ...sequencerResources,
+            tokenExpirationTime: sequencerTokenExpirationTime,
             persistence: {
               ...decentralizedSynchronizerValues.sequencer.persistence,
               host: sequencerPg.address,

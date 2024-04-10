@@ -85,6 +85,8 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
         },
       }
     : {};
+export const sequencerTokenExpirationTime: string | undefined =
+  process.env.SEQUENCER_TOKEN_EXPIRATION_TIME;
 
 export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_INTERVAL'];
 

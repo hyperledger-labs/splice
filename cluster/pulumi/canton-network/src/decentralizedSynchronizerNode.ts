@@ -9,6 +9,7 @@ import {
   defaultVersion,
   CnChartVersion,
   sequencerResources,
+  sequencerTokenExpirationTime,
 } from 'cn-pulumi-common';
 
 import { Postgres, installPostgresMetrics } from '../../common/src/postgres';
@@ -88,6 +89,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             host: pulumi.interpolate`${this.cometbftRpcServiceName}.${xns.logicalName}.svc.cluster.local`,
             port: 26657,
           },
+          tokenExpirationTime: sequencerTokenExpirationTime,
           ...sequencerResources,
         },
         mediator: {

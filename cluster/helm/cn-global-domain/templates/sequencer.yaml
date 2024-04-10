@@ -74,6 +74,10 @@ spec:
                   type = explicit
                   name = "{{ .Values.nodeIdentifier }}"
                 }
+            {{- with .Values.sequencer.tokenExpirationTime }}
+            - name: SEQUENCER_TOKEN_EXPIRATION_TIME
+              value: "{{ . }}"
+            {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008
