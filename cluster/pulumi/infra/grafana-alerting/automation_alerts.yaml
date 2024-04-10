@@ -16,9 +16,9 @@ groups:
             datasourceUid: prometheus
             model:
               disableTextWrap: false
-              editorMode: builder
+              editorMode: code
               exemplar: false
-              expr: sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="failure"}[10m])) / on(namespace,node_type,trigger_name) sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome=~"success|failure"}[10m]))
+              expr: ((sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="failure"}[10m])) / sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome=~"success|failure"}[10m]))) > 0) * 100
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -39,12 +39,12 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "failures" }}% failures in the last 10 minutes.
           runbook_url: ""
           severity: |-
-            {{- if (gt (index $values "failures").Value 0.9) -}}
+            {{- if (gt (index $values "failures").Value 50) -}}
             critical
             {{- else -}}
             medium
             {{- end -}}
-          summary: '{{ index $values "failures" }}% (1 = 100%) fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
+          summary: '{{ index $values "failures" }}% fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:
           "": ""
         isPaused: false
