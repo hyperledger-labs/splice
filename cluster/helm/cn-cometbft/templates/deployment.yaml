@@ -18,7 +18,19 @@ spec:
     metadata:
       labels:
         app: {{ $.Values.node.identifier }}
+        cn-component: cometbft
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: cn-component
+                    operator: In
+                    values:
+                      - cometbft
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {} # search in all namespaces
       containers:
         - name: "cometbft"
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
