@@ -13,9 +13,9 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
 }
 import com.daml.network.sv.config.*
 import com.daml.network.validator.config.{
+  AnsAppExternalClientConfig,
   AppManagerAppClientConfig,
   AppManagerConfig,
-  AnsAppExternalClientConfig,
   ValidatorAppBackendConfig,
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -27,9 +27,9 @@ import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.collection.mutable
+import scala.collection.parallel.CollectionConverters.ImmutableMapIsParallelizable
 import scala.concurrent.duration.*
 import scala.io.Source
-import com.daml.network.config.CNNodeConfigTransform
 
 object CNNodeConfigTransforms {
 
@@ -246,7 +246,7 @@ object CNNodeConfigTransforms {
     cantonConfig =>
       cantonConfig
         .focus(_.scanApps)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+        .modify(_.par.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) }.seq)
 
   private def disableOnboardingParticipantPromotionDelay(): CNNodeConfigTransform =
     updateAllSvAppConfigs_(c => c.focus(_.enableOnboardingParticipantPromotionDelay).replace(false))
@@ -269,7 +269,7 @@ object CNNodeConfigTransforms {
     cantonConfig =>
       cantonConfig
         .focus(_.validatorApps)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+        .modify(_.par.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) }.seq)
 
   def updateAllSvAppConfigs(
       update: (String, SvAppBackendConfig) => SvAppBackendConfig
@@ -277,7 +277,9 @@ object CNNodeConfigTransforms {
     cantonConfig =>
       cantonConfig
         .focus(_.svApps)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+        .modify(
+          _.par.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) }.seq
+        )
 
   def updateAllSvAppConfigs_(
       update: SvAppBackendConfig => SvAppBackendConfig
@@ -289,13 +291,13 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs_(c =>
       c.focus(_.onboarding)
-        .modify(_ match {
+        .modify {
           case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
             Some(update(foundCollective))
           case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
           case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
           case None => None
-        })
+        }
     )
 
   def noDevNet: CNNodeConfigTransform =
@@ -307,7 +309,7 @@ object CNNodeConfigTransforms {
     cantonConfig =>
       cantonConfig
         .focus(_.validatorApps)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+        .modify(_.par.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) }.seq)
 
   def updateAllValidatorConfigs_(
       update: ValidatorAppBackendConfig => ValidatorAppBackendConfig
@@ -317,9 +319,13 @@ object CNNodeConfigTransforms {
   def updateAllValidatorAppConfigs_(
       update: ValidatorAppTransform
   ): CNNodeConfigTransform =
-    _.focus(_.validatorApps).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
+    _.focus(_.validatorApps).modify(
+      _.par
+        .map { case (name, config) =>
+          (name, update(config))
+        }
+        .seq
+    )
 
   def updateAllAppManagerConfigs_(
       update: AppManagerConfig => AppManagerConfig

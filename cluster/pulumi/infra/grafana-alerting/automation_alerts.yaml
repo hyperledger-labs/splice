@@ -39,7 +39,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "failures" }}% failures in the last 10 minutes.
           runbook_url: ""
           severity: |-
-            {{- if (gt (index $values "failures").Value 50) -}}
+            {{- if (gt $values.failures.Value 50.0) -}}
             critical
             {{- else -}}
             medium

@@ -376,6 +376,7 @@ lazy val `apps-common` =
         jwks_rsa,
         spray_json,
         pekko_spray_json,
+        Dependencies.parallel_collections,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](

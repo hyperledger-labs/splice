@@ -55,4 +55,6 @@ object Dependencies {
 
   lazy val kubernetes_client = "io.fabric8" % "kubernetes-client" % "6.8.1" % "provided"
 
+  lazy val parallel_collections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
+
 }
