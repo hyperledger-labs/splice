@@ -468,6 +468,9 @@ jobs:
       cancel_workflow_on_failure:
         type: boolean
         default: false
+      run:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - setup_nix
@@ -477,7 +480,9 @@ jobs:
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            if [[ << parameters.run >> == true ]]; then
+              make cluster/build
+            fi
           cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
@@ -500,14 +505,16 @@ jobs:
             --keep SLACK_ACCESS_TOKEN
           gce_authenticate: true
           cmd: |
-            cncluster activate
-            # All CI-deployed clusters use split postgres instances per app, to support backups.
-            export SPLIT_POSTGRES_INSTANCES=1
-            # TODO (#11584): remove this once there's a new base version.
-            export ENABLE_CLOUD_SQL=false
-            images="/tmp/ciupgrade.json"
-            cncluster export_to "$images"
-            cncluster partial_upgrade $(get-snapshot-version) "$images"
+            if [[ << parameters.run >> == true ]]; then
+              cncluster activate
+              # All CI-deployed clusters use split postgres instances per app, to support backups.
+              export SPLIT_POSTGRES_INSTANCES=1
+              # TODO (#11584): remove this once there's a new base version.
+              export ENABLE_CLOUD_SQL=false
+              images="/tmp/ciupgrade.json"
+              cncluster export_to "$images"
+              cncluster partial_upgrade $(get-snapshot-version) "$images"
+            fi
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:

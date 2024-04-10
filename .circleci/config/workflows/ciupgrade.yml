@@ -89,16 +89,6 @@ workflow:
             - slack-context
           requires:
             - wait_for_previous_pipeline
-      - release_partial_upgrade_or_final:
-          <<: *main-branch-only
-          requires:
-            - docker_images_push
-            - preflight_check_initial
-            - preflight_sv_check_initial
-            - preflight_validator_initial
-      - hold_partial_upgrade:
-          <<: *main-branch-only
-          type: approval
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
           cluster: "ciupgrade"
@@ -107,8 +97,12 @@ workflow:
             - artifactory
             - slack-context
           <<: *main-branch-only
+          run: << pipeline.parameters.run-partial-upgrade >>
           requires:
-            - hold_partial_upgrade
+            - docker_images_push
+            - preflight_check_initial
+            - preflight_sv_check_initial
+            - preflight_validator_initial
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
@@ -118,6 +112,7 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "ciupgrade"
+          run: << pipeline.parameters.run-partial-upgrade >>
           wait_for_sv: false
           parallelism: 1
           requires:
@@ -131,6 +126,7 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "ciupgrade"
+          run: << pipeline.parameters.run-partial-upgrade >>
           requires:
             - deploy_partial_upgrade
       - preflight_validator_check:
@@ -142,17 +138,9 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "ciupgrade"
+          run: << pipeline.parameters.run-partial-upgrade >>
           requires:
             - deploy_partial_upgrade
-      - release_final_upgrade:
-          <<: *main-branch-only
-          requires:
-            - preflight_check_partial_upgrade
-            - preflight_sv_check_partial_upgrade
-            - preflight_validator_partial_upgrade
-      - hold_final_upgrade:
-          <<: *main-branch-only
-          type: approval
       - deploy_cluster:
           name: "deploy_final_upgrade"
           <<: *main-branch-only
@@ -165,7 +153,9 @@ workflow:
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
-            - hold_final_upgrade
+            - preflight_check_partial_upgrade
+            - preflight_sv_check_partial_upgrade
+            - preflight_validator_partial_upgrade
       - preflight_check:
           name: "preflight_check_final_upgrade"
           <<: *main-branch-only

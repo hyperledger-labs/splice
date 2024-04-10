@@ -758,30 +758,6 @@ jobs:
           command: |
             .circleci/release-hold.sh "hold_set_scratchnet"
 
-  release_partial_upgrade_or_final:
-    docker:
-      - image: cimg/base:2024.01
-    steps:
-      - checkout_with_retry
-      - run:
-          name: Release main hold job
-          command: |
-            if [[ << pipeline.parameters.run-partial-upgrade >> == true ]]; then
-              .circleci/release-hold.sh "hold_partial_upgrade"
-            else
-              .circleci/release-hold.sh "hold_final_upgrade"
-            fi
-
-  release_final_upgrade:
-    docker:
-      - image: cimg/base:2024.01
-    steps:
-      - checkout_with_retry
-      - run:
-          name: Release final upgrade
-          command: |
-            .circleci/release-hold.sh "hold_final_upgrade"
-
   # Persists the choice of scratchnet cluster to a CCI workspace
   set_scratchnet:
     parameters:
