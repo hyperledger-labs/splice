@@ -300,6 +300,11 @@ class ScanAggregatorTest
             round,
           )
         }
+        _ <- aggr
+          .getLastCompletelyClosedRoundAfter(Some(0), 2)
+          .map(
+            _.value shouldBe lastRound withClue "aggregate counts rounds over multiple query pages"
+          )
       } yield {
         val closedRound = 1L
         val lastClosedRound = closedRound

@@ -377,22 +377,24 @@ final class ScanAggregator(
       )
   }
 
+  private[this] val closedRoundsSinceLimit = 100
+
   /** Returns the last completely closed round for which no more events can occur, after the previously aggregated round.
     * (no incomplete reassignments, no open, issuing or summarizing rounds)
     * and all previous rounds are closed.
     */
-  def getLastCompletelyClosedRoundAfter(lastAggregatedRoundO: Option[Long])(implicit
+  def getLastCompletelyClosedRoundAfter(
+      lastAggregatedRoundO: Option[Long],
+      closedRoundsSinceLimit: Int = closedRoundsSinceLimit,
+  )(implicit
       traceContext: TraceContext
   ): Future[Option[Long]] = {
     val lastAggregatedRound = lastAggregatedRoundO.getOrElse(-1L)
-    for {
-      rounds <- getClosedMiningRoundsSinceLastAggregated(lastAggregatedRound)
-      _ = if (rounds.nonEmpty) {
-        // Just in case the rounds_total table is truncated.
-        val roundsReported =
-          if (rounds.size < 100) rounds.mkString(", ")
-          else rounds.take(100).mkString(", ") + "..."
-        logger.debug(s"Closed mining rounds since last aggregated: $roundsReported")
+    def go(candidateLastRound: Long): Future[Option[Long]] = for {
+      rounds <- getClosedMiningRoundsSinceLastAggregated(candidateLastRound)
+      _ = if (rounds.nonEmpty) logger.debug {
+        val roundsReported = rounds.mkString(", ")
+        s"Closed mining rounds since last aggregated: $roundsReported"
       }
       // TODO (#11316): find a different approach for finding in-flight closed rounds
       roundsIncomplete <- getIncompleteRoundsByContract(
@@ -410,38 +412,48 @@ final class ScanAggregator(
           "Open issuing or summarizing rounds for closed rounds: " + roundsOpenIssuingOrSummarizing
             .mkString(", ")
         )
-    } yield {
-      val lastRound =
-        (rounds
-          .map(_._1)
-          .toSet -- (roundsIncomplete ++ roundsOpenIssuingOrSummarizing).toSet).toList.sorted
-          .foldLeft(lastAggregatedRound) { (lastClosedRound, round) =>
-            if (round == lastClosedRound + 1) round else lastClosedRound
-          }
-
-      if (lastRound == lastAggregatedRound) {
-        None
-      } else if (lastRound < lastAggregatedRound) {
-        logger.error(
-          s"The last completely closed round: ${lastRound} is smaller than the previously aggregated round: ${lastAggregatedRound}"
-        )
-        None
-      } else {
-        if (lastAggregatedRound == -1) {
-          if (isFounder) {
-            // only allowed to start from round zero with no previous total rounds if the scan is reading from participant begin (the founder)
-            Some(lastRound)
-          } else {
-            logger.debug(
-              s"Cannot start from round zero when not reading from participant-begin, store_id = $storeId"
-            )
-            None
-          }
-        } else {
-          Some(lastRound)
-        }
+      availableClosedRounds = (rounds
+        .map(_._1)
+        .toSet -- (roundsIncomplete ++ roundsOpenIssuingOrSummarizing).toSet).toVector.sorted
+      lastRound = availableClosedRounds.foldLeft(candidateLastRound) { (lastClosedRound, round) =>
+        if (round == lastClosedRound + 1) round else lastClosedRound
       }
-    }
+      result <-
+        if ( // whether there might be another page
+          rounds.sizeIs >= closedRoundsSinceLimit
+          // whether the fold above might continue onto the next page
+          && availableClosedRounds.lastOption.contains(lastRound)
+        ) {
+          // effectively, if the fold above didn't terminate before the last
+          // element, it might keep folding if we retrieve more closed rounds
+          go(lastRound)
+        } else
+          Future successful {
+            if (lastRound == lastAggregatedRound) {
+              None
+            } else if (lastRound < lastAggregatedRound) {
+              logger.error(
+                s"The last completely closed round: ${lastRound} is smaller than the previously aggregated round: ${lastAggregatedRound}"
+              )
+              None
+            } else {
+              if (lastAggregatedRound == -1) {
+                if (isFounder) {
+                  // only allowed to start from round zero with no previous total rounds if the scan is reading from participant begin (the founder)
+                  Some(lastRound)
+                } else {
+                  logger.debug(
+                    s"Cannot start from round zero when not reading from participant-begin, store_id = $storeId"
+                  )
+                  None
+                }
+              } else {
+                Some(lastRound)
+              }
+            }
+          }
+    } yield result
+    go(lastAggregatedRound)
   }
 
   def findFirstOpenMiningRound()(implicit
@@ -463,7 +475,12 @@ final class ScanAggregator(
       .value
   }
 
-  private def getClosedMiningRoundsSinceLastAggregated(lastAggregatedRound: Long)(implicit
+  // invariant: every result element has _1 > lastAggregatedRound
+  // invariant: ordered by _1
+  private def getClosedMiningRoundsSinceLastAggregated(
+      lastAggregatedRound: Long,
+      closedRoundsSinceLimit: Int = closedRoundsSinceLimit,
+  )(implicit
       traceContext: TraceContext
   ) =
     storage
@@ -476,7 +493,8 @@ final class ScanAggregator(
             where    store_id = $storeId
             and      entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
             and      round > $lastAggregatedRound
-            order by round desc
+            order by round asc
+            limit $closedRoundsSinceLimit
           """.as[(Long, Option[ContractId[Any]])],
         "getClosedMiningRoundsSinceLastAggregated",
       )
