@@ -404,6 +404,10 @@ jobs:
             fi
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
+            # TODO (#11584): remove this once there's a new base version.
+            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
+                export ENABLE_CLOUD_SQL=false
+            fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -499,6 +503,8 @@ jobs:
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
+            # TODO (#11584): remove this once there's a new base version.
+            export ENABLE_CLOUD_SQL=false
             images="/tmp/ciupgrade.json"
             cncluster export_to "$images"
             cncluster partial_upgrade $(get-snapshot-version) "$images"
