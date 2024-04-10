@@ -70,7 +70,7 @@ function backup_pvc_postgres() {
 function backup_cloudsql() {
   local description=$1
   local instance=$2
-  MAX_RETRIES=60
+  MAX_RETRIES=10
   retry_count=0
 
   _info "** Backing up $description **"
@@ -88,9 +88,18 @@ function backup_cloudsql() {
 
   _info "Starting backup of $description db ($db_id)"
   until [ $retry_count -gt $MAX_RETRIES ]; do
-    if gcloud sql backups create --instance "$db_id" --description "$RUN_ID" --async | grep -q 'another operation was already in progress'; then
-      retry_count=$((retry_count+1))
-      sleep 10
+    output=$(gcloud sql backups create --instance "$db_id" --description "$RUN_ID" 2>&1)
+    backup_exit_code=$?
+
+    if [ $backup_exit_code -ne 0 ]; then
+      if [[ $output == *"another operation was already in progress"* ]]; then
+        retry_count=$((retry_count+1))
+        sleep 25
+      else
+        _error output
+      fi
+    else
+      exit 0
     fi
 
     if [ $retry_count -gt $MAX_RETRIES ]; then

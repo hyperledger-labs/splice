@@ -129,6 +129,8 @@ function await_confirmation() {
 
 function restore_cloudsql_postgres() {
   local -r component=$1
+  MAX_RETRIES=10
+  retry_count=0
 
   cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
   backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
@@ -137,8 +139,32 @@ function restore_cloudsql_postgres() {
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
   await_confirmation
 
+  # Wait for any existing operations to finish (to avoid e.g. conflicting with automated periodic backups)
+  gcloud sql operations list --instance="$cloudsql_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
+
   _info "Restoring CloudSQL DB instance $cloudsql_id from backup $backup_id"
-  gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet --async
+
+  until [ $retry_count -gt $MAX_RETRIES ]; do
+    output=$(gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet 2>&1)
+    restore_exit_code=$?
+
+    if [ $restore_exit_code -ne 0 ]; then
+      if [[ $output == *"another operation was already in progress"* ]]; then
+        retry_count=$((retry_count+1))
+        sleep 25
+      else
+        _error output
+      fi
+    else
+      exit 0
+    fi
+
+
+    if [ $retry_count -gt $MAX_RETRIES ]; then
+      _error "Restore of DB instance $cloudsql_id from backup $backup_id exceeded max retries"
+      exit 1
+    fi
+  done
 }
 
 function restore_component() {
