@@ -1201,6 +1201,16 @@
             "databaseName": "global_domain_0_sequencer",
             "host": "postgres.sv-1.svc.cluster.local",
             "secretName": "postgres-secrets"
+          },
+          "resources": {
+            "limits": {
+              "cpu": "4",
+              "memory": "6Gi"
+            },
+            "requests": {
+              "cpu": "3",
+              "memory": "4Gi"
+            }
           }
         }
       }

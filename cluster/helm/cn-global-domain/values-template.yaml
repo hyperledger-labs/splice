@@ -18,6 +18,13 @@ sequencer:
     host: postgres.sv-1.svc.cluster.local
     secretName: "postgres-secrets"
     databaseName: cantonnet_sequencer
+  resources:
+    limits:
+      cpu: "4"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 4Gi
 
 mediator:
   persistence:

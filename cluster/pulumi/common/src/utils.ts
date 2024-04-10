@@ -69,18 +69,18 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
-const highResourceSequencer = envFlag('SEQUENCER_HIGH_RESOURCES', false);
+const lowResourceSequencer = envFlag('SEQUENCER_LOW_RESOURCES', false);
 export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
-  highResourceSequencer
+  lowResourceSequencer
     ? {
         resources: {
           limits: {
-            cpu: '4',
-            memory: '6Gi',
-          },
-          requests: {
             cpu: '3',
             memory: '4Gi',
+          },
+          requests: {
+            cpu: '1',
+            memory: '2Gi',
           },
         },
       }

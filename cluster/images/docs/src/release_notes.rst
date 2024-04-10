@@ -14,6 +14,9 @@ Upcoming
 * Set the ``validatorFaucetCap`` explicitly to 2.85 instead of leaving it unset to make
   reviewing the config easier. This has no  effect since unset defaults to 2.85.
   Existing clusters need to be changed through a voting process.
+* The resource requests for sequencers have been increased to match our target scale.
+  If needed, they can be reduced using the ``sequencer.resources`` value of the
+  ``cn-global-domain`` but please try to get them to a comparable value in time for mainnet.
 
 0.1.2
 -----
