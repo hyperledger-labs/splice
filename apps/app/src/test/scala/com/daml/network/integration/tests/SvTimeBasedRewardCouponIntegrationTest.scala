@@ -133,7 +133,10 @@ class SvTimeBasedRewardCouponIntegrationTest
           Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
             b.subtype.value shouldBe BalanceChangeTransactionSubtype.SvRewardCollected.toProto
             b.receiver should be(sv1Party.toProtoPrimitive)
-            b.amount should beWithin(BigDecimal(eachSvGetInRound0) - smallAmount, eachSvGetInRound0)
+            b.amount should beWithin(
+              BigDecimal(eachSvGetInRound0) - smallAmount,
+              BigDecimal(eachSvGetInRound0) + smallAmount,
+            )
           },
         )
       }
@@ -146,7 +149,7 @@ class SvTimeBasedRewardCouponIntegrationTest
             b.receiver should be(aliceValidatorParty.toProtoPrimitive)
             b.amount should beWithin(
               BigDecimal(expectedAliceAmount) - smallAmount,
-              expectedAliceAmount,
+              BigDecimal(expectedAliceAmount) + smallAmount,
             )
           },
         )
@@ -172,11 +175,11 @@ class SvTimeBasedRewardCouponIntegrationTest
           } yield (reward.amuletOwner, reward.amuletAmount)).toMap
           BigDecimal(txs(sv1Party.toProtoPrimitive)) should beWithin(
             BigDecimal(eachSvGetInRound0) - smallAmount,
-            eachSvGetInRound0,
+            BigDecimal(eachSvGetInRound0) + smallAmount,
           )
           BigDecimal(txs(aliceValidatorParty.toProtoPrimitive)) should beWithin(
             BigDecimal(expectedAliceAmount) - smallAmount,
-            expectedAliceAmount,
+            BigDecimal(expectedAliceAmount) + smallAmount,
           )
         }
       }

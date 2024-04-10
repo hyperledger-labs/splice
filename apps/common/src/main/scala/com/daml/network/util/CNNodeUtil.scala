@@ -167,7 +167,7 @@ object CNNodeUtil {
     damlDecimal(0.6),
 
     // validatorFaucetCap
-    None.toJava, // use the default introduced as part of CIP-3 in the Daml codebase
+    Some(damlDecimal(2.85)).toJava,
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
@@ -175,7 +175,7 @@ object CNNodeUtil {
   // Curve taken as-is from whitepaper: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
   val defaultIssuanceCurve: splice.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
-      issuanceConfig(40e9, 0.5, 0.15),
+      issuanceConfig(40e9, 0.05, 0.15),
       Seq(
         new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4)),
         new Tuple2(hours(3 * 365 * 12), issuanceConfig(10e9, 0.18, 0.62)),

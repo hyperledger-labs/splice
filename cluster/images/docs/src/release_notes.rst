@@ -9,6 +9,11 @@ Upcoming
 * The Scan frontend shows information about currently open mining rounds
   in the current configuration box.
 * Minor documentation improvements related to synchronizer upgrades with downtime.
+* Fixed the initial validator rewards tranche to be 5% of the total issuance (it was wrongly set to 50%). Note that this only has an effect
+  on newly bootstrapped clusters. Existing clusters need to be changed through a voting process.
+* Set the ``validatorFaucetCap`` explicitly to 2.85 instead of leaving it unset to make
+  reviewing the config easier. This has no  effect since unset defaults to 2.85.
+  Existing clusters need to be changed through a voting process.
 
 0.1.2
 -----

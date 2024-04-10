@@ -541,11 +541,11 @@ class ScanIntegrationTest
           .map(BigDecimal(_))
           .filter(_ != zero)
         val inputValidatorAmount = inputValidatorAmounts
-        // TODO (#10940) change both 78... and 79... to walletUsdToAmulet(2.85)
+        // TODO (#10940) change both 7.6... and 7.9... to walletUsdToAmulet(2.85)
         inputValidatorAmount should contain theSameElementsAs (Seq(
-          validatorRewardAmount + 78.9594799594
+          validatorRewardAmount + 7.6124479960
         ) ++ Seq
-          .fill(2)(BigDecimal(79.2744799594).setScale(10))) // 2 validator faucets
+          .fill(2)(BigDecimal(7.9274479960).setScale(10))) // 2 validator faucets
       }
     }
   }
