@@ -1,0 +1,4 @@
+approvedSvIdentities:
+  - name: Orb-1-LP
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFrvlZgglwf5vFP1QnMrHUTpCcjk5BQjm00fmbZ5gKRL3KkZiQra6mpeb7hJa8OFtH8DrNBJkivxlq2ScSFga9w==
+    rewardWeightBps: 100000
