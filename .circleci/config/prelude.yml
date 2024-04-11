@@ -29,6 +29,7 @@ parameters:
         deploy-cidaily,
         deploy-cilr,
         deploy-ciupgrade,
+        deploy-ciupgrade-migration,
         deploy-devnet,
         deploy-testnet,
         healthcheck-cidaily,
