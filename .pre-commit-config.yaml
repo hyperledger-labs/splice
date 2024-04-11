@@ -78,3 +78,9 @@ repos:
         entry: "./scripts/check-daml-warts.sh"
         pass_filenames: false
         always_run: true
+      - id: check-daml-return-types
+        name: Check all Daml return types
+        language: system
+        entry: "./scripts/check-daml-return-types.sh"
+        pass_filenames: false
+        always_run: true

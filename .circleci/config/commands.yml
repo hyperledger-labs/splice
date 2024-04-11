@@ -1053,6 +1053,12 @@ commands:
           cmd_name: Check for Daml warts
           cmd: ./scripts/check-daml-warts.sh
 
+  run_daml_return_types_check:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Check Daml choice return types
+          cmd: ./scripts/check-daml-return-types.sh
+
   set-failed-parallel-run-url:
     steps:
       - run:

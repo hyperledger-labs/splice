@@ -18,6 +18,7 @@ jobs:
       # Run the cheap checks before the sbt based ones to provide fast feedback
       - run_trailing_whitespace_check
       - run_daml_warts_check
+      - run_daml_return_types_check
       - run_todo_script
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
