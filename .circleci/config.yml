@@ -2564,9 +2564,9 @@ jobs:
           name: Launches the deploy_ciupgrade workflow, disabling partial upgrade if there are Helm/Pulumi changes
           command: |
             source .envrc.vars
-            
+
             run_partial_upgrade=""
-            
+
             if build-tools/helm-change-vs-base; then
               echo "Proceeding with partial upgrade."
               run_partial_upgrade="true"
@@ -2574,7 +2574,7 @@ jobs:
               echo "Skipping cluster partial upgrade and preflights steps."
               run_partial_upgrade="false"
             fi
-            
+
             curl --fail-with-body --request POST \
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
@@ -3130,11 +3130,17 @@ workflows:
             - artifactory
             - slack-context
       - publish_public_release:
+          <<: *notify-fail
           context:
             - artifactory
             - slack-context
           requires:
             - docker_images_push
+      - bundle:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
 
   build:
     when:
@@ -5419,4 +5425,3 @@ workflows:
             - slack-context
           requires:
             - wait_for_previous_pipeline
-
