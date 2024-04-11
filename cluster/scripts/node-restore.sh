@@ -139,8 +139,12 @@ function restore_cloudsql_postgres() {
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
   await_confirmation
 
+  echo "Waiting for any operations on $cloudsql_id to finish"
+
   # Wait for any existing operations to finish (to avoid e.g. conflicting with automated periodic backups)
   gcloud sql operations list --instance="$cloudsql_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
+
+  echo "All operations finished"
 
   _info "Restoring CloudSQL DB instance $cloudsql_id from backup $backup_id"
 
@@ -150,19 +154,21 @@ function restore_cloudsql_postgres() {
 
     if [ $restore_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then
+        echo "Restore failed due to another operation in progress, retrying: $output"
         retry_count=$((retry_count+1))
         sleep 25
       else
         _error output
       fi
     else
-      exit 0
+      echo "Restore succeeded"
+      return 0
     fi
 
 
     if [ $retry_count -gt $MAX_RETRIES ]; then
       _error "Restore of DB instance $cloudsql_id from backup $backup_id exceeded max retries"
-      exit 1
+      return 1
     fi
   done
 }

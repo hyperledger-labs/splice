@@ -83,8 +83,12 @@ function backup_cloudsql() {
     _error "No CloudSQL instance $instance found"
   fi
 
+  echo "Waiting for any operations on $instance to finish"
+
   # Wait for any existing operations to finish (to avoid e.g. conflicting with automated periodic backups)
   gcloud sql operations list --instance="$db_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
+
+  echo "All operations finished"
 
   _info "Starting backup of $description db ($db_id)"
   until [ $retry_count -gt $MAX_RETRIES ]; do
@@ -93,18 +97,20 @@ function backup_cloudsql() {
 
     if [ $backup_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then
+        echo "Backup failed due to another operation in progress, retrying: $output"
         retry_count=$((retry_count+1))
         sleep 25
       else
         _error output
       fi
     else
-      exit 0
+      echo "Backup succeeded"
+      return 0
     fi
 
     if [ $retry_count -gt $MAX_RETRIES ]; then
       _error "Backup of $description db exceeded max retries"
-      exit 1
+      return 1
     fi
   done
 }
