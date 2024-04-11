@@ -18,7 +18,9 @@ import scala.util.Try
 final case class NodeIdentitiesDump(
     id: NodeIdentity,
     keys: Seq[NodeIdentitiesDump.NodeKey],
-    bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
+    authorizedStoreSnapshot: Option[ByteString],
+    // TODO(#11594): Deprecated; to be removed in a future version.
+    bootstrapTxs: Option[Seq[GenericSignedTopologyTransactionX]],
     version: Option[String],
 ) extends PrettyPrinting {
   def toHttp: http.NodeIdentitiesDump = {
@@ -27,7 +29,8 @@ final case class NodeIdentitiesDump(
       keys
         .map(key => http.NodeKey(Base64.getEncoder.encodeToString(key.keyPair.toArray), key.name))
         .toVector,
-      bootstrapTxs.map(tx => Base64.getEncoder.encodeToString(tx.toByteArray)).toVector,
+      authorizedStoreSnapshot.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
+      bootstrapTxs.map(_.map(tx => Base64.getEncoder.encodeToString(tx.toByteArray)).toVector),
       version,
     )
   }
@@ -43,6 +46,7 @@ final case class NodeIdentitiesDump(
       param("id", _.id),
       param("numberOfKeys", _.keys.size),
       param("bootstrapTxs", _.bootstrapTxs),
+      param("authorizedStoreSnapshotSize", _.authorizedStoreSnapshot.map(_.size)),
       param("version", _.version.map(_.singleQuoted)),
     )
 }
@@ -56,10 +60,15 @@ object NodeIdentitiesDump {
         id = id(response.id),
         keys =
           response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair).toSeq, k.name)),
-        bootstrapTxs = response.bootstrapTxs.toSeq.map(t =>
-          SignedTopologyTransactionX
-            .fromByteStringUnsafe(ByteString.copyFrom(Base64.getDecoder.decode(t)))
-            .fold(err => throw new IllegalArgumentException(err.message), identity)
+        authorizedStoreSnapshot = response.authorizedStoreSnapshot.map(s =>
+          ByteString.copyFrom(Base64.getDecoder.decode(s))
+        ),
+        bootstrapTxs = response.bootstrapTxs.map(
+          _.toSeq.map(t =>
+            SignedTopologyTransactionX
+              .fromByteStringUnsafe(ByteString.copyFrom(Base64.getDecoder.decode(t)))
+              .fold(err => throw new IllegalArgumentException(err.message), identity)
+          )
         ),
         version = response.version,
       )

@@ -66,7 +66,7 @@ components:
       required:
         - id
         - keys
-        - bootstrapTxs
+        # TODO(#11594): Make authorizedStoreSnapshot mandatory
       properties:
         id:
           type: string
@@ -74,6 +74,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NodeKey"
+        authorizedStoreSnapshot:
+          description: |
+            base64 encoded string of authorized store snapshot
+          type: string
+        # TODO(#11594): Deprecated; to be removed in a future version.
         bootstrapTxs:
           type: array
           items:

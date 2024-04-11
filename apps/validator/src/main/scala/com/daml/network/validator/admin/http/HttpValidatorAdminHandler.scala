@@ -86,11 +86,10 @@ class HttpValidatorAdminHandler(
   ): Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.dumpParticipantIdentities") { _ => _ =>
-      identitiesStore
-        .getNodeIdentitiesDump()
-        .map(response =>
-          v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
-        )
+      for {
+        domain <- getAmuletRulesDomain()(tracedContext)
+        response <- identitiesStore.getNodeIdentitiesDump(domain)
+      } yield v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
     }
   }
 

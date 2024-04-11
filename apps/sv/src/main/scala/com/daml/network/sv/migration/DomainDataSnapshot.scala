@@ -14,14 +14,12 @@ import java.util.Base64
 final case class DomainDataSnapshot(
     genesisState: Option[ByteString],
     acsSnapshot: ByteString,
-    authorizedStoreSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
 ) extends PrettyPrinting {
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
-    Base64.getEncoder.encodeToString(authorizedStoreSnapshot.toByteArray),
     acsTimestamp.toString,
     dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
@@ -34,7 +32,6 @@ final case class DomainDataSnapshot(
       "DomainDataSnapshot",
       paramIfDefined("genesisStateSize", _.genesisState.map(_.size)),
       param("acsSnapshotSize", _.acsSnapshot.size),
-      param("authorizedStoreSnapshotSize", _.authorizedStoreSnapshot.size),
       param("acsTimestamp", _.acsTimestamp),
       param("darsSize", _.dars.size),
     )
@@ -47,8 +44,6 @@ object DomainDataSnapshot {
   ): Either[String, DomainDataSnapshot] = {
     val genesisState = src.genesisState.map(s => ByteString.copyFrom(base64Decoder.decode(s)))
     val acsSnapshot = ByteString.copyFrom(base64Decoder.decode(src.acsSnapshot))
-    val authorizedStoreSnapshot =
-      ByteString.copyFrom(base64Decoder.decode(src.authorizedStoreSnapshot))
     val dars =
       src.dars.map { dar =>
         val decoded = base64Decoder.decode(dar.content)
@@ -59,7 +54,6 @@ object DomainDataSnapshot {
       DomainDataSnapshot(
         genesisState,
         acsSnapshot,
-        authorizedStoreSnapshot,
         acsTimestamp,
         dars,
       )

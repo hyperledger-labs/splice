@@ -6,6 +6,7 @@ import com.daml.network.environment.{BuildInfo, TopologyAdminConnection}
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -20,7 +21,7 @@ class NodeIdentitiesStore(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def getNodeIdentitiesDump()(implicit
+  def getNodeIdentitiesDump(domain: DomainId)(implicit
       tc: TraceContext
   ): Future[NodeIdentitiesDump] =
     for {
@@ -36,12 +37,13 @@ class NodeIdentitiesStore(
             )
           )
       )
-      bootstrapTxs <- adminConnection.getIdentityBootstrapTransactions(None, id.uid)
+      authorizedStoreSnapshot <- adminConnection.exportAuthorizedStoreSnapshot(domain, id.uid)
     } yield {
       NodeIdentitiesDump(
         id,
         keys,
-        bootstrapTxs,
+        Some(authorizedStoreSnapshot),
+        None,
         Some(BuildInfo.compiledVersion),
       )
     }
@@ -52,37 +54,38 @@ class NodeIdentitiesStore(
     *
     * @return: the name of the file to which the backup was written
     */
-  def backupNodeIdentities()(implicit traceContext: TraceContext): Future[Path] = for {
-    (dumpConfig, clock) <- Future {
-      backup.getOrElse(
-        throw new IllegalStateException(
-          "cannot backup identities as no backup location is configured"
+  def backupNodeIdentities(domain: DomainId)(implicit traceContext: TraceContext): Future[Path] =
+    for {
+      (dumpConfig, clock) <- Future {
+        backup.getOrElse(
+          throw new IllegalStateException(
+            "cannot backup identities as no backup location is configured"
+          )
         )
-      )
-    }
-    dump <- getNodeIdentitiesDump()
-    path <- Future {
-      blocking {
-        // determine target file
-        val now = clock.now.toInstant
-        // Deliberately not using better files here
-        // because it turns this into an absolute path which
-        // then makes all the logging stuff below very confusing.
-        val filename = NodeIdentitiesStore.dumpFilename(now)
-        val fileDesc =
-          s"node identities dump containing ${dump.keys.size} keys to ${dumpConfig.location.locationDescription} at path: $filename"
-        logger.debug(s"Attempting to write $fileDesc")
-        val path = BackupDump.write(
-          dumpConfig.location,
-          filename,
-          dump.toJson.noSpaces,
-          loggerFactory,
-        )
-        logger.info(s"Wrote $fileDesc")
-        path
       }
-    }
-  } yield path
+      dump <- getNodeIdentitiesDump(domain)
+      path <- Future {
+        blocking {
+          // determine target file
+          val now = clock.now.toInstant
+          // Deliberately not using better files here
+          // because it turns this into an absolute path which
+          // then makes all the logging stuff below very confusing.
+          val filename = NodeIdentitiesStore.dumpFilename(now)
+          val fileDesc =
+            s"node identities dump containing ${dump.keys.size} keys to ${dumpConfig.location.locationDescription} at path: $filename"
+          logger.debug(s"Attempting to write $fileDesc")
+          val path = BackupDump.write(
+            dumpConfig.location,
+            filename,
+            dump.toJson.noSpaces,
+            loggerFactory,
+          )
+          logger.info(s"Wrote $fileDesc")
+          path
+        }
+      }
+    } yield path
 }
 
 object NodeIdentitiesStore {

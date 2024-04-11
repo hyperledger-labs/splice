@@ -27,7 +27,6 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt,
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
 import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -38,11 +37,9 @@ import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
-  StoredTopologyTransactionsX,
   TimeQuery,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
@@ -420,63 +417,6 @@ abstract class TopologyAdminConnection(
       }
     }
 
-  private def getSnapshot(
-      domainId: DomainId,
-      timestamp: CantonTimestamp,
-      proposals: Boolean,
-      excludeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[GenericStoredTopologyTransactionsX] = {
-    runCmd(
-      TopologyAdminCommandsX.Read.ListAll(
-        BaseQueryX(
-          filterStore = domainId.filterString,
-          proposals = proposals,
-          timeQuery = TimeQuery.Range(from = None, until = None),
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        filterNamespace = "",
-        excludeMappings = excludeMappings.map(_.code),
-      )
-    ).map(txns =>
-      StoredTopologyTransactionsX(
-        // Note that we explicitly do not specify an until in the call to ListAll and filter afterwards.
-        // until filters on validFrom whereas we need to filter on sequenced.
-        txns.result
-          .filter(_.sequenced.value <= timestamp)
-      )
-        // Turn it into a snapshot which sets validUntil = None
-        // in case we filtered out a newer transaction.
-        .asSnapshotAtMaxEffectiveTime
-    )
-  }
-
-  def getTopologySnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[GenericStoredTopologyTransactionsX] = {
-    for {
-      proposals <- getSnapshot(domainId, timestamp, proposals = true)
-      authorizedTxs <- getSnapshot(domainId, timestamp, proposals = false)
-    } yield {
-      StoredTopologyTransactionsX(
-        (proposals.result ++ authorizedTxs.result).sortBy(_.sequenced.value)
-      )
-    }
-  }
-
-  def getVettedPackagesSnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[GenericStoredTopologyTransactionsX] =
-    getSnapshot(
-      domainId,
-      timestamp,
-      excludeMappings = TopologyMappingX.Code.all.diff(Seq(TopologyMappingX.Code.VettedPackagesX)),
-      proposals = false,
-    )
-
   def exportTopologySnapshot(
       domainId: DomainId,
       proposals: Boolean,
@@ -521,7 +461,15 @@ abstract class TopologyAdminConnection(
     exportTopologySnapshot(
       domainId,
       proposals = false,
-      excludeMappings = TopologyMappingX.Code.all.diff(Seq(TopologyMappingX.Code.VettedPackagesX)),
+      excludeMappings = TopologyMappingX.Code.all.diff(
+        Seq(
+          TopologyMappingX.Code.NamespaceDelegationX,
+          TopologyMappingX.Code.OwnerToKeyMappingX,
+          TopologyMappingX.Code.IdentifierDelegationX,
+          // only relevant for participants
+          TopologyMappingX.Code.VettedPackagesX,
+        )
+      ),
       filterNamespace = participantId.namespace.filterString,
     )
 

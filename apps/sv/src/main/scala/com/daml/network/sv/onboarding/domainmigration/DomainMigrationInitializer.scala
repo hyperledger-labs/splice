@@ -34,7 +34,6 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -83,7 +82,6 @@ class DomainMigrationInitializer(
     participantAdminConnection,
     loggerFactory,
   )
-  private val adminWorkflowsDarName = "AdminWorkflows"
 
   def migrateDomain(): Future[
     (
@@ -188,11 +186,6 @@ class DomainMigrationInitializer(
   ): Future[Unit] = {
     val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
     for {
-      _ <- importAuthorizedStoreSnapshot(
-        domainMigrationDump.nodeIdentities.domainId,
-        CantonTimestamp.assertFromInstant(domainMigrationDump.domainDataSnapshot.acsTimestamp),
-        domainMigrationDump.domainDataSnapshot.authorizedStoreSnapshot,
-      )
       _ <- initializeSynchronizerNode(
         domainMigrationDump.nodeIdentities,
         domainMigrationDump.domainDataSnapshot.genesisState.getOrElse(
@@ -220,39 +213,6 @@ class DomainMigrationInitializer(
       _ = logger.info("resumed domain")
     } yield {}
   }
-
-  private def checkNoUploadedDars() = {
-    for {
-      allUploadedDars <- participantAdminConnection.listDars()
-      dars = allUploadedDars.filter(_.name != adminWorkflowsDarName)
-      _ = if (dars.nonEmpty) {
-        sys.error(
-          s"No dars should be uploaded at this point. already uploaded dars: ${dars.map(_.name)}"
-        )
-      }
-    } yield ()
-  }
-
-  private def importAuthorizedStoreSnapshot(
-      domainId: DomainId,
-      timestamp: CantonTimestamp,
-      authorizedStoreSnapshot: ByteString,
-  ) = for {
-    txs <- participantAdminConnection.getVettedPackagesSnapshot(domainId, timestamp)
-    _ <-
-      if (txs.result.nonEmpty) {
-        logger.info(s"AuthorizedStore snapshot is already imported")
-        Future.unit
-      } else
-        for {
-          _ <- checkNoUploadedDars()
-          _ <- participantAdminConnection.importTopologySnapshot(
-            authorizedStoreSnapshot,
-            AuthorizedStore,
-          )
-          _ = logger.info(s"AuthorizedStore snapshot is imported")
-        } yield ()
-  } yield ()
 
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,

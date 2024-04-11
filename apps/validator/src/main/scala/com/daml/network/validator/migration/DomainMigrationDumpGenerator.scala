@@ -38,7 +38,7 @@ class DomainMigrationDumpGenerator(
             .asRuntimeException()
         )
         .rethrowT
-      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
+      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump(domain)
       dars <- darExporter.exportAllDars()
       createdAt = Instant.now()
     } yield {

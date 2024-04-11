@@ -49,16 +49,10 @@ class DomainDataSnapshotGenerator(
         timestamp,
         partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
       )
-    participantId <- participantAdminConnection.getId()
-    authorizedStoreSnapshot <- participantAdminConnection.exportAuthorizedStoreSnapshot(
-      decentralizedSynchronizer,
-      participantId,
-    )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     topologySnapshot,
     acsSnapshot,
-    authorizedStoreSnapshot,
     acsTimestamp = timestamp,
     dars,
   )
@@ -87,17 +81,11 @@ class DomainDataSnapshotGenerator(
         Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
       )
       .rethrowT
-    participantId <- participantAdminConnection.getId()
-    authorizedStoreSnapshot <- participantAdminConnection.exportAuthorizedStoreSnapshot(
-      decentralizedSynchronizer,
-      participantId,
-    )
     dars <- darExporter.exportAllDars()
   } yield {
     val result = DomainDataSnapshot(
       genesisState,
       acsSnapshot,
-      authorizedStoreSnapshot,
       acsTimestamp,
       dars,
     )
