@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 74,
+  "id": 96,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -490,7 +490,39 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "decimals": 2,
           "mappings": [
@@ -513,7 +545,7 @@
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 2
               }
             ]
           },
@@ -530,20 +562,16 @@
       "hideTimeOverride": true,
       "id": 39,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "mean"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "10.4.0",
       "targets": [
@@ -552,7 +580,7 @@
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "rate(cometbft_consensus_block_interval_seconds_sum{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval]) / rate(cometbft_consensus_block_interval_seconds_count{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval])",
+          "expr": "histogram_quantile(0.999, sum by(le) (rate(cometbft_consensus_block_interval_seconds_bucket{namespace=\"$namespace\",chain_id=\"$chain_id\",job=\"$instance\"}[$__rate_interval])))",
           "format": "time_series",
           "interval": "30s",
           "intervalFactor": 1,
@@ -561,7 +589,7 @@
         }
       ],
       "title": "Avg Block Time",
-      "type": "stat"
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -1748,10 +1776,10 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 36
+        "y": 35
       },
       "hideTimeOverride": true,
-      "id": 68,
+      "id": 70,
       "options": {
         "legend": {
           "calcs": [],
@@ -1849,7 +1877,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 36
+        "y": 35
       },
       "hideTimeOverride": true,
       "id": 69,
@@ -1950,7 +1978,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 40
       },
       "id": 59,
       "options": {
@@ -2048,7 +2076,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 40
       },
       "id": 58,
       "options": {
@@ -2140,8 +2168,8 @@
       {
         "current": {
           "selected": false,
-          "text": "dev-0-0.1.1-snapshot.20240328.5498.0.vf695ebd5",
-          "value": "dev-0-0.1.1-snapshot.20240328.5498.0.vf695ebd5"
+          "text": "cilr-0-stable",
+          "value": "cilr-0-stable"
         },
         "datasource": {
           "type": "prometheus",
@@ -2229,6 +2257,6 @@
   "timezone": "",
   "title": "CometBFT",
   "uid": "UJyurCTWz",
-  "version": 4,
+  "version": 1,
   "weekStart": ""
 }
