@@ -10,11 +10,17 @@ workflow:
             - artifactory
             - slack-context
       - publish_public_release:
+          <<: *notify-fail
           context:
             - artifactory
             - slack-context
           requires:
             - docker_images_push
+      - bundle:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
 
   build:
     when:
