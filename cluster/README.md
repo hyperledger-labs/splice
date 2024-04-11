@@ -964,6 +964,29 @@ The hostname can be found by describing the relevant pods that use the database 
 The password can be found in the `postgres-secrets` secret of the namespace:
 (e.g. using `kubectl get secret postgres-secrets -n sv-1 -o jsonpath='{.data.postgresPassword}' | base64 -d`).
 
+#### Inspecting daml transactions
+
+Daml transactions are too large to be logged in full, so they are truncated in the cluster logs.
+To view historical transaction data, you can inspect the UpdateHistory database of the scan or validator application:
+the scan application stores all transactions visible to the DSO party, the validator application stores all transactions visible to end-user parties.
+
+To inspect the update history, connect to the postgres database of a validator or scan application as described in the previous section.
+In the `psql` shell, run:
+
+- `\dn` to list all schemas, and note the schema used by the application.
+- `select row_id from <schema>.update_history_transactions where update_id = '<update_id>'`
+  to get the row_id of a transaction with a given update ID.
+  Note that you might get multiple results if the transaction was visible to multiple parties.
+- `select * from <schema>.update_history_exercises where update_row_id = <update_row_id>`
+  with the row_id from the previous query to get the details of all exercise nodes in the transaction.
+
+For more complex queries, inspect the database schema in the Flyway migration scripts in `apps/common/src/main/resources/db/migration`.
+
+There is no easy way to pretty-print contract arguments, choice arguments, or exercise results
+the same way they used to be pretty-printed in the logs.
+The postgres function `jsonb_pretty` can be used to pretty-print generic JSONB columns,
+but the result is very verbose and does not contain daml record field names.
+
 ### Checking Pod Node Assignments and Memory Usage
 
 Kubernetes runs Docker images in `Pod`s of containers that it
