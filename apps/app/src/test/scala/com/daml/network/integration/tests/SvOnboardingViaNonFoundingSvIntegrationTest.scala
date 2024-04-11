@@ -34,6 +34,11 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
+          config
+        )
+      )
       .withPreSetup(_ => ())
       .withOnboardingParticipantPromotionDelayEnabled() // Test onboarding with participant promotion delay
       .addConfigTransformsToFront(
@@ -157,6 +162,9 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             ).map(_.getDsoInfo().svParty.toProtoPrimitive)
           },
         )
+        clue("Stop SV1") {
+          sv1Backend.stop()
+        }
         clue("SV1 is offboarded from the Decentralized Namespace") {
           eventually() {
             val decentralizedNamespaces =
@@ -173,9 +181,6 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
                 .toSet
             }
           }
-        }
-        clue("Stop SV1") {
-          sv1Backend.stop()
         }
         actAndCheck(
           "Onboard SV3",

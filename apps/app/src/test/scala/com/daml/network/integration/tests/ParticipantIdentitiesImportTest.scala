@@ -57,7 +57,7 @@ abstract class ParticipantIdentitiesImportTestBase
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
+        CNNodeConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms(
         (_, config) => ensureNovelDamlNames()(config),

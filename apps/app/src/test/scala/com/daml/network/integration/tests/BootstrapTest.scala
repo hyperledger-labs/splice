@@ -26,7 +26,7 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
+        CNNodeConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
       // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as

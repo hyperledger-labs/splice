@@ -64,7 +64,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
+        CNNodeConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(2000)(conf))
       .addConfigTransforms((_, conf) =>

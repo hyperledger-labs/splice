@@ -9,6 +9,7 @@ import com.daml.network.splitwell.config.{
 }
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
+  SvOffboardingPartyToParticipantProposalTrigger,
   SvOffboardingSequencerTrigger,
 }
 import com.daml.network.sv.config.*
@@ -185,7 +186,7 @@ object CNNodeConfigTransforms {
       ensureNovelDamlNames(testId),
       useSelfSignedTokensForLedgerApiAuth("test"),
       reducePollingInterval,
-      withPauseSvDomainComponentsOffboardingTriggers(),
+      withPausedSvDomainComponentsOffboardingTriggers(),
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
     )
@@ -201,10 +202,16 @@ object CNNodeConfigTransforms {
   type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
-  def withPauseSvDomainComponentsOffboardingTriggers(): CNNodeConfigTransform =
+  def withPausedSvDomainComponentsOffboardingTriggers(): CNNodeConfigTransform =
     updateAutomationConfig(ConfigurableApp.Sv)(
       _.withPausedTrigger[SvOffboardingMediatorTrigger]
         .withPausedTrigger[SvOffboardingSequencerTrigger]
+    )
+
+  def withPausedSvOffboardingMediatorAndPartyToParticipantTriggers(): CNNodeConfigTransform =
+    updateAutomationConfig(ConfigurableApp.Sv)(
+      _.withPausedTrigger[SvOffboardingMediatorTrigger]
+        .withPausedTrigger[SvOffboardingPartyToParticipantProposalTrigger]
     )
 
   def setAmuletPrice(price: BigDecimal): CNNodeConfigTransform =
