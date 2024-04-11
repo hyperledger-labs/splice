@@ -2,6 +2,8 @@
 
 set -eou pipefail
 
+DOCKER_POSTGRES_IMAGE_NAME="postgres:14"
+
 # Postgres settings
 DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-cn-node"
 LOCAL_POSTGRES_DATA_DIRECTORY="$REPO_ROOT/temp/postgres"
@@ -16,6 +18,13 @@ LOG_FILE="/dev/null"
 POSTGRES_CANTON_USER=canton
 POSTGRES_CANTON_PASSWORD=supersafe
 
+# This pulls the image used by the `docker run` command in the `docker_start` step.
+# It is not necessary to run this command as docker automatically pulls the image if it is not present,
+# however, `docker pull` is more likely to be idempotent and can safely be retried.
+function docker_pull() {
+  echo "Pulling Postgres docker image"
+  docker pull $DOCKER_POSTGRES_IMAGE_NAME
+}
 
 function docker_start() {
   echo "Starting Postgres docker container"
@@ -26,7 +35,7 @@ function docker_start() {
     -e POSTGRES_USER="$POSTGRES_USER" \
     -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
     -p 5432:5432 \
-    postgres:14 \
+    $DOCKER_POSTGRES_IMAGE_NAME \
     postgres \
     -c max_connections=8000 \
     -c log_statement=all \
@@ -124,6 +133,9 @@ function psql_dropdb() {
 }
 
 case "$1_$2" in
+    docker_pull)
+        docker_pull
+    ;;
     docker_start)
         docker_start
         docker_wait
@@ -193,5 +205,6 @@ case "$1_$2" in
         echo "    createdb <name>  creates a new database with the given name"
         echo "    dropdb   <name>  drops an existing database with the given name"
         echo "    stop             removes the postgres instance along with all data"
+        echo "    pull             (docker mode only) makes sure the postgres image is available locally"
     ;;
 esac
