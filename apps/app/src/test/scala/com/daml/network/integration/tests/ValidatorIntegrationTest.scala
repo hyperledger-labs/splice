@@ -63,6 +63,9 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
     // onboard end user
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+
+    // the party is available via the scan proxy
+    aliceValidatorBackend.scanProxy.getDsoParty() shouldBe dsoParty
   }
 
   "validator apps connect to all DSO sequencers" in { implicit env =>

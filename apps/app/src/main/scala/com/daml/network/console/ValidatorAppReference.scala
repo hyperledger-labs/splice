@@ -12,6 +12,7 @@ import com.daml.network.validator.admin.api.client.commands.{
   HttpAppManagerAdminAppClient,
   HttpAppManagerAppClient,
   HttpAppManagerPublicAppClient,
+  HttpScanProxyAppClient,
   HttpValidatorAdminAppClient,
   HttpValidatorAppClient,
   HttpValidatorPublicAppClient,
@@ -233,6 +234,18 @@ abstract class ValidatorAppReference(
         HttpAppManagerPublicAppClient.Oauth2Token(grantType, code, redirectUri, clientId)
       )
     }
+
+  object scanProxy {
+
+    def getDsoParty(): PartyId = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.GetDsoParty
+        )
+      }
+    }
+
+  }
 }
 
 final class ValidatorAppBackendReference(

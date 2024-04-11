@@ -7,6 +7,18 @@ tags:
 servers:
   - url: https://example.com/api/validator
 paths:
+  /v0/scan-proxy/dso-party-id:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getDsoPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetDsoPartyIdResponse"
   /v0/scan-proxy/featured-apps/{provider_party_id}:
     get:
       tags: [ scan-proxy ]
@@ -49,7 +61,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAmuletRulesProxyResponse"
-  /v0/ans-entries/by-party/{party}:
+  /v0/scan-proxy/ans-entries/by-party/{party}:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
@@ -69,7 +81,7 @@ paths:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/ans-entries:
+  /v0/scan-proxy/ans-entries:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
@@ -92,7 +104,7 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/ListEntriesResponse"
-  /v0/ans-entries/by-name/{name}:
+  /v0/scan-proxy/ans-entries/by-name/{name}:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy

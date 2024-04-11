@@ -24,6 +24,21 @@ class HttpScanProxyHandler(
 
   private val workflowId = this.getClass.getSimpleName
 
+  override def getDsoPartyId(
+      respond: v0.ScanproxyResource.GetDsoPartyIdResponse.type
+  )()(tUser: TracedUser): Future[v0.ScanproxyResource.GetDsoPartyIdResponse] = {
+    implicit val TracedUser(_, traceContext) = tUser
+    withSpan(s"$workflowId.getDsoPartyId") { implicit traceContext => _ =>
+      for {
+        dsoPartyId <- scanConnection.getDsoPartyId()
+      } yield {
+        respond.OK(
+          definitions.GetDsoPartyIdResponse(dsoPartyId.toProtoPrimitive)
+        )
+      }
+    }
+  }
+
   override def lookupFeaturedAppRight(
       respond: v0.ScanproxyResource.LookupFeaturedAppRightResponse.type
   )(
