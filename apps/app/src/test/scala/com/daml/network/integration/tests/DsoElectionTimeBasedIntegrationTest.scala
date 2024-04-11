@@ -125,7 +125,9 @@ class DsoElectionTimeBasedIntegrationTest
           sv2Backend.getDsoInfo().dsoRules.payload.dsoDelegate should not be currentLeader
         }
       }
-
+      clue("Sv1 stops") {
+        sv1Backend.stop()
+      }
       clue("Verify that the election request are outdated and expired") {
         advanceTime(pollingIntervalDuration)
         eventually() {

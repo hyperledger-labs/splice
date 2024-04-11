@@ -3,20 +3,21 @@ package com.daml.network.sv.onboarding
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.sv.LocalSynchronizerNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
+import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
+import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -117,5 +118,31 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
     retryProvider,
     loggerFactory,
   )
+
+  protected def isOnboarded(
+      svcStore: SvDsoStore
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = for {
+    dsoRules <- svcStore.lookupDsoRules()
+    isInDsoRulesMembers = dsoRules.exists(
+      _.payload.svs.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+    )
+    isMemberOfDecentralizedNamespace <-
+      if (isInDsoRulesMembers) {
+        participantAdminConnection
+          .getDecentralizedNamespaceDefinition(
+            dsoRules
+              .map(_.domain)
+              .getOrElse(
+                throw Status.NOT_FOUND
+                  .withDescription("Domain not found in DsoRules")
+                  .asRuntimeException()
+              ),
+            svcStore.key.dsoParty.uid.namespace,
+          )
+          .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
+      } else {
+        Future.successful(false)
+      }
+  } yield isInDsoRulesMembers && isMemberOfDecentralizedNamespace
 
 }

@@ -84,6 +84,30 @@ class SvDsoAutomationService(
       retryProvider,
     )
 
+  // required for triggers that must run in sim time as well
+  private val wallClockTriggerContext = triggerContext
+    .focus(_.clock)
+    .replace(
+      new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
+    )
+
+  private val onboardingTriggerContext = wallClockTriggerContext
+    .focus(_.config.pollingInterval)
+    .replace(
+      config.onboardingPollingInterval.getOrElse(wallClockTriggerContext.config.pollingInterval)
+    )
+
+  // Trigger that starts only after the SV namespace is added to the decentralized namespace
+  def registerSvNamespaceMembershipTrigger(): Unit = {
+    registerTrigger(
+      new SvNamespaceMembershipTrigger(
+        onboardingTriggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+  }
+
   // Triggers that require namespace permissions and the existence of the DsoRules and AmuletRules contracts
   def registerPostOnboardingTriggers(): Unit = {
     registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, dsoStore, connection))
@@ -171,19 +195,6 @@ class SvDsoAutomationService(
         dsoStore,
       )
     )
-
-    // required for triggers that must run in sim time as well
-    val wallClockTriggerContext = triggerContext
-      .focus(_.clock)
-      .replace(
-        new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
-      )
-
-    val onboardingTriggerContext = wallClockTriggerContext
-      .focus(_.config.pollingInterval)
-      .replace(
-        config.onboardingPollingInterval.getOrElse(wallClockTriggerContext.config.pollingInterval)
-      )
     registerTrigger(
       new SvOffboardingPartyToParticipantProposalTrigger(
         triggerContext,
@@ -219,13 +230,6 @@ class SvDsoAutomationService(
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
-      )
-    )
-    registerTrigger(
-      new SvNamespaceMembershipTrigger(
-        onboardingTriggerContext,
-        dsoStore,
-        participantAdminConnection,
       )
     )
     registerTrigger(

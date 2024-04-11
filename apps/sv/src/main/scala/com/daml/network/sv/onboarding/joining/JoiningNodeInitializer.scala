@@ -196,21 +196,10 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
               )
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
-            _ <- retryProvider.ensureThatB(
-              RetryFor.WaitingOnInitDependency,
-              "dso_onboard",
-              show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
-              isOnboarded(dsoStore), {
-                for {
-                  (joiningConfig, svConnection) <- svConnection
-                  _ <- withSvStore.startOnboardingWithDsoPartyHosted(
-                    dsoAutomation,
-                    svConnection,
-                    joiningConfig,
-                  )
-                } yield ()
-              },
-              logger,
+            _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+              dsoAutomation,
+              dsoStore,
+              withSvStore,
             )
           } yield dsoAutomation
         } else {
@@ -235,6 +224,11 @@ class JoiningNodeInitializer(
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
       _ <- onboard(decentralizedSynchronizer, dsoAutomation, svAutomation)
+      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+        dsoAutomation,
+        dsoStore,
+        withSvStore,
+      )
     } yield {
       (
         decentralizedSynchronizer,
@@ -322,6 +316,33 @@ class JoiningNodeInitializer(
       ()
     }
   }
+
+  private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+      dsoAutomation: SvDsoAutomationService,
+      dsoStore: SvDsoStore,
+      withSvStore: WithSvStore,
+  ) =
+    retryProvider
+      .ensureThatB(
+        RetryFor.WaitingOnInitDependency,
+        "dso_onboard",
+        show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
+        isOnboarded(dsoStore), {
+          for {
+            (joiningConfig, svConnection) <- svConnection
+            _ <- withSvStore.startOnboardingWithDsoPartyHosted(
+              dsoAutomation,
+              svConnection,
+              joiningConfig,
+            )
+          } yield ()
+        },
+        logger,
+      )
+      .andThen(_ => {
+        logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
+        dsoAutomation.registerSvNamespaceMembershipTrigger()
+      })
 
   private def waitForSvParticipantToHaveSubmissionRights(dsoParty: PartyId, domainId: DomainId) = {
     val description =

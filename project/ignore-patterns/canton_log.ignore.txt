@@ -59,9 +59,6 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an i
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
-# # TODO(#10653): Remove once we start namespace triggers only after being added to the namespace
-UNAUTHORIZED_TOPOLOGY_TRANSACTION
-
 # TODO(#8507): investigate and decide if we want to remove it once fixed
 Late processing \(or clock skew\) of batch with counter.*after sequencing
 

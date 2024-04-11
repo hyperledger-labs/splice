@@ -11,3 +11,6 @@ Rejected transaction due to a participant determined timeout
 
 RequestRefused\(SenderUnknown\(The following senders in the aggregation rule are unknown: .*MED::sv4StandaloneMediator
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv4ReonboardNew
+
+# Caused by svs being off-boarded
+UNAUTHORIZED_TOPOLOGY_TRANSACTION
