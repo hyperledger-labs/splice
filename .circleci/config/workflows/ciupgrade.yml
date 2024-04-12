@@ -1,5 +1,6 @@
 workflow:
   deploy_ciupgrade:
+    # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
     when:
       equal: [ deploy-ciupgrade, << pipeline.parameters.run-job >> ]
     jobs:
@@ -21,13 +22,13 @@ workflow:
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           requires:
             - wait_for_previous_pipeline
       - preflight_check:
           name: "preflight_check_initial"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -39,7 +40,7 @@ workflow:
             - wait_for_previous_pipeline
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
             - artifactory
@@ -52,7 +53,7 @@ workflow:
       - preflight_sv_check:
            name: "preflight_sv_check_initial"
            <<: *main-branch-only
-           get_snapshot_version_override: "latest_base"
+           cluster_version: << pipeline.parameters.base-version >>
            context:
              - artifactory
              - canton-network-vpn
@@ -62,7 +63,7 @@ workflow:
              - deploy_cluster_for_upgrade
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
             - artifactory
@@ -73,7 +74,7 @@ workflow:
       - preflight_validator_check:
           name: "preflight_validator_initial"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -106,7 +107,7 @@ workflow:
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base" # the /version endpoint is not served by sv1 nor validator1
+          cluster_version: << pipeline.parameters.base-version >> # the /version endpoint is not served by sv1 nor validator1
           context:
             - artifactory
             - canton-network-vpn
@@ -120,7 +121,7 @@ workflow:
       - preflight_sv_check:
           name: "preflight_sv_check_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -132,7 +133,7 @@ workflow:
       - preflight_validator_check:
           name: "preflight_validator_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn

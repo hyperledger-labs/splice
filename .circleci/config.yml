@@ -85,6 +85,10 @@ parameters:
   run-partial-upgrade:
     type: boolean
     default: true
+  # The base version to be used as part of a `deploy_ciupgrade` job
+  base-version:
+    type: string
+    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -1420,13 +1424,6 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
-      - run:
-          name: Find latest base version
-          command: |
-            source .envrc.vars
-            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
-            echo "Latest base version is $LATEST_BASE_VERSION"
-            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
@@ -1535,13 +1532,6 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
-      - run:
-          name: Find latest base version
-          command: |
-            source .envrc.vars
-            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
-            echo "Latest base version is $LATEST_BASE_VERSION"
-            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
@@ -1698,13 +1688,6 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - run:
-          name: Find latest base version
-          command: |
-            source .envrc.vars
-            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
-            echo "Latest base version is $LATEST_BASE_VERSION"
-            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
@@ -2589,11 +2572,13 @@ jobs:
               run_partial_upgrade="false"
             fi
             
+            latest_base_version=$(build-tools/find_latest_base_version.sh)
+            
             curl --fail-with-body --request POST \
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade}}"
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade, \"base-version\": \"$latest_base_version\"}}"
 
   backup_cluster:
     parameters:
@@ -2803,9 +2788,6 @@ jobs:
       migration_id:
         type: integer
         default: 0
-      get_snapshot_version_override:
-        type: string
-        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2862,7 +2844,7 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
+                  VERSION=$(get-snapshot-version)
                   cncluster wait_version $VERSION
                   validator_app="validator-app"
                   # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
@@ -2932,9 +2914,6 @@ jobs:
       migration_id:
         type: integer
         default: 0
-      get_snapshot_version_override:
-        type: string
-        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2983,7 +2962,7 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
+                  VERSION=$(get-snapshot-version)
                   cncluster wait_version $VERSION
                   # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
                   cncluster wait sv validator-app << parameters.migration_id >>
@@ -3039,9 +3018,6 @@ jobs:
       migration_id:
         type: integer
         default: 0
-      get_snapshot_version_override:
-        type: string
-        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3090,7 +3066,7 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
+                  VERSION=$(get-snapshot-version)
                   cncluster wait_version $VERSION
                   # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
                   cncluster wait validator validator-app << parameters.migration_id >>
@@ -4189,6 +4165,7 @@ workflows:
             - preflight_check_migrated
 
   deploy_ciupgrade:
+    # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
     when:
       equal: [ deploy-ciupgrade, << pipeline.parameters.run-job >> ]
     jobs:
@@ -4210,13 +4187,13 @@ workflows:
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           requires:
             - wait_for_previous_pipeline
       - preflight_check:
           name: "preflight_check_initial"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -4228,7 +4205,7 @@ workflows:
             - wait_for_previous_pipeline
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
             - artifactory
@@ -4241,7 +4218,7 @@ workflows:
       - preflight_sv_check:
            name: "preflight_sv_check_initial"
            <<: *main-branch-only
-           get_snapshot_version_override: "latest_base"
+           cluster_version: << pipeline.parameters.base-version >>
            context:
              - artifactory
              - canton-network-vpn
@@ -4251,7 +4228,7 @@ workflows:
              - deploy_cluster_for_upgrade
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
-          deploy_version: "$LATEST_BASE_VERSION"
+          deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
             - artifactory
@@ -4262,7 +4239,7 @@ workflows:
       - preflight_validator_check:
           name: "preflight_validator_initial"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -4295,7 +4272,7 @@ workflows:
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base" # the /version endpoint is not served by sv1 nor validator1
+          cluster_version: << pipeline.parameters.base-version >> # the /version endpoint is not served by sv1 nor validator1
           context:
             - artifactory
             - canton-network-vpn
@@ -4309,7 +4286,7 @@ workflows:
       - preflight_sv_check:
           name: "preflight_sv_check_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -4321,7 +4298,7 @@ workflows:
       - preflight_validator_check:
           name: "preflight_validator_partial_upgrade"
           <<: *main-branch-only
-          get_snapshot_version_override: "latest_base"
+          cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
