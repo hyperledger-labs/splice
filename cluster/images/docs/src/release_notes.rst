@@ -17,6 +17,8 @@ Release Notes
 * The resource requests for sequencers have been increased to match our target scale.
   If needed, they can be reduced using the ``sequencer.resources`` value of the
   ``cn-global-domain`` but please try to get them to a comparable value in time for mainnet.
+* Fix a sequencer bug that resulted in it failing to process any further messages after a message
+  with high traffic costs.
 
 0.1.2
 -----
