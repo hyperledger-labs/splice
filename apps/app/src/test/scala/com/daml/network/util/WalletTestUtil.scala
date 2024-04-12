@@ -1,7 +1,9 @@
 package com.daml.network.util
 
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.expiry.TimeLock
 import com.daml.network.codegen.java.splice.fees as feesCodegen
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.wallet.{
@@ -10,9 +12,9 @@ import com.daml.network.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.codegen.java.splice
+
 import com.daml.network.codegen.java.splice.amuletrules.TransferOutput
-import com.daml.network.codegen.java.splice.expiry.TimeLock
+
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.console.{ValidatorAppBackendReference, *}
 import com.daml.network.http.v0.definitions as d0

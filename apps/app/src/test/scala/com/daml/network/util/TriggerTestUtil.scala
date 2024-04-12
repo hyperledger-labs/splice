@@ -1,6 +1,9 @@
 package com.daml.network.util
 
 import com.daml.network.automation.Trigger
+import com.daml.network.integration.CNNodeEnvironmentDefinition.sv1Backend
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.BaseTest
 
 trait TriggerTestUtil { self: BaseTest =>
@@ -21,4 +24,14 @@ trait TriggerTestUtil { self: BaseTest =>
     }
   }
 
+  // The trigger that advances rounds, running in the sv app
+  // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
+  def trigger(implicit env: CNNodeTestConsoleEnvironment) = sv1Backend.leaderBasedAutomation
+    .trigger[AdvanceOpenMiningRoundTrigger]
+
+  def advanceRoundsByOneTickViaAutomation(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+    eventually() {
+      trigger.runOnce().futureValue should be(true)
+    }
+  }
 }
