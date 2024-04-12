@@ -349,6 +349,9 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
+                  # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
+                  # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
+                  cncluster prefresh
                   cncluster reset
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
