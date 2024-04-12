@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 19,
+  "id": 103,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -103,8 +103,7 @@
               }
             ]
           },
-          "unit": "none",
-          "unitScale": true
+          "unit": "none"
         },
         "overrides": []
       },
@@ -208,8 +207,7 @@
               }
             ]
           },
-          "unit": "dateTimeAsIso",
-          "unitScale": true
+          "unit": "dateTimeAsIso"
         },
         "overrides": []
       },
@@ -312,8 +310,7 @@
               }
             ]
           },
-          "unit": "recpm",
-          "unitScale": true
+          "unit": "recpm"
         },
         "overrides": []
       },
@@ -419,8 +416,7 @@
                 "value": 1000
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -465,7 +461,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Should never go above 1, serves as a basic safeguard to see that the round structure makes progress from all sides.",
+      "description": "Should not go above 1 when all SVs are healthy, serves as a basic safeguard to see that the round structure makes progress from all SVs' point of view.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -521,8 +517,7 @@
                 "value": 10
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -632,8 +627,7 @@
               }
             ]
           },
-          "unit": "dateTimeAsIso",
-          "unitScale": true
+          "unit": "dateTimeAsIso"
         },
         "overrides": []
       },
@@ -729,8 +723,7 @@
               }
             ]
           },
-          "unit": "none",
-          "unitScale": true
+          "unit": "none"
         },
         "overrides": []
       },
@@ -821,8 +814,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -986,6 +978,6 @@
   "timezone": "",
   "title": "SV Status Reports",
   "uid": "caffa6f7-c421-4579-a839-b026d3b76826",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }
