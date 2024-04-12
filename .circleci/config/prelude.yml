@@ -30,8 +30,11 @@ parameters:
         deploy-cilr,
         deploy-ciupgrade,
         deploy-ciupgrade-migration,
-        deploy-devnet,
-        deploy-testnet,
+        # Disabled to avoid accidental use. We keep the code for now in case
+        # we do want to do a full reset.
+        # TODO(#11648) Consider deleting this.
+        # deploy-devnet,
+        # deploy-testnet,
         healthcheck-cidaily,
         healthcheck-cidaily-testnet,
         healthcheck-cilr,
