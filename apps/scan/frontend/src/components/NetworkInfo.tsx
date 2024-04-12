@@ -152,19 +152,9 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
       <Table>
         <TableBody>
           <FeeTableRow
-            name="Canton Coin Creation Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.createFee.fee)} CC`}
-            description="A fixed fee for the creation of new amulet records."
-          />
-          <FeeTableRow
-            name="Holding Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} CC/Round`}
-            description="A fixed fee for maintaining each active amulet record, charged per round."
-          />
-          <FeeTableRow
-            name="Lock Holder Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)} CC`}
-            description="A fixed fee for extra lock holders on amulet records."
+            name="Base Transfer Fee"
+            value={`${BigNumber(amuletConfig.transferConfig.createFee.fee)} USD`}
+            description="A fixed fee for each transfer."
           />
           <TransferFees transferFees={amuletConfig.transferConfig.transferFee} />
           <FeeTableRow
@@ -178,6 +168,16 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
               amuletConfig.decentralizedSynchronizer.fees.extraTrafficPrice
             )} $/MB`}
             description="Cost of processing 1 MB of transactions through the Global Synchronizer"
+          />
+          <FeeTableRow
+            name="Holding Fee"
+            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} USD/Round`}
+            description="A fixed fee for maintaining each active amulet record, charged per round."
+          />
+          <FeeTableRow
+            name="Lock Holder Fee"
+            value={`${BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)} USD`}
+            description="A fixed fee for extra lock holders on amulet records."
           />
         </TableBody>
       </Table>

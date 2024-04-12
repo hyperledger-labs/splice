@@ -111,16 +111,16 @@ class ScanFrontendTimeBasedIntegrationTest
         actAndCheck("Go to Scan UI main page", go to s"http://localhost:${scanUIPort}")(
           "Check the initial amulet config matches the defaults",
           _ => {
-            find(id("canton-coin-creation-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultCreateFee.fee.doubleValue()} CC"
+            find(id("base-transfer-fee")).value.text should matchText(
+              s"${CNNodeUtil.defaultCreateFee.fee.doubleValue()} USD"
             )
 
             find(id("holding-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultHoldingFee.rate} CC/Round"
+              s"${CNNodeUtil.defaultHoldingFee.rate} USD/Round"
             )
 
             find(id("lock-holder-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultLockHolderFee.fee.doubleValue()} CC"
+              s"${CNNodeUtil.defaultLockHolderFee.fee.doubleValue()} USD"
             )
 
             find(id("round-tick-duration")).value.text should matchText(
@@ -176,7 +176,7 @@ class ScanFrontendTimeBasedIntegrationTest
         _ => {
           withFrontEnd("scan-ui") { implicit webDriver =>
             find(id("holding-fee")).value.text should matchText(
-              s"${2 * newHoldingFee} CC/Round"
+              s"${2 * newHoldingFee} USD/Round"
             )
 
             find(id("next-config-update-time")).value.text should equal(
@@ -211,7 +211,7 @@ class ScanFrontendTimeBasedIntegrationTest
         _ => {
           withFrontEnd("scan-ui") { implicit webDriver =>
             find(id("holding-fee")).value.text should matchText(
-              s"${sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
+              s"${sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} USD/Round"
             )
 
             find(id("next-config-update-time")).value.text should equal("1 day").or(
