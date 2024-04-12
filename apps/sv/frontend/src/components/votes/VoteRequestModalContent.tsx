@@ -266,7 +266,7 @@ const VoteRows: React.FC<{
           sv={vote.voter}
           svName={getMemberName(vote.voter)}
           reasonBody={vote.reason?.body || ''}
-          reasonUrl={vote.reason?.body || ''}
+          reasonUrl={vote.reason?.url || ''}
         />
       );
     })}
