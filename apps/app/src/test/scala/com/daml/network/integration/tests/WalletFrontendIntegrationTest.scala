@@ -127,13 +127,16 @@ class WalletFrontendIntegrationTest
           )(
             "Alice has unchanged balance and sees error message",
             _ => {
+              import WalletFrontendTestUtil.*
               val ccText = find(id("wallet-balance-cc")).value.text.trim
               val usdText = find(id("wallet-balance-usd")).value.text.trim
-              val errorMessage = find(className("error-display-message")).value.text.trim
+              val errorMessage = find(className(errorDisplayElementClass)).value.text.trim
 
               ccText should not be "..."
               usdText should not be "..."
               errorMessage should be("Tap operation failed")
+              find(className(errorDetailsElementClass)).value.text.trim should
+                include("Failed to decode: Invalid Decimal string \\\"NaN, as it does not match")
 
               val cc = BigDecimal(ccText.split(" ").head)
               val usd = BigDecimal(usdText.split(" ").head)

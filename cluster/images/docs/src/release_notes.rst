@@ -19,6 +19,8 @@ Release Notes
   ``cn-global-domain`` but please try to get them to a comparable value in time for mainnet.
 * Fix a sequencer bug that resulted in it failing to process any further messages after a message
   with high traffic costs.
+* If a tap fails in the wallet frontend, the error message includes extra technical details that
+  may be useful for diagnosis.
 
 0.1.2
 -----

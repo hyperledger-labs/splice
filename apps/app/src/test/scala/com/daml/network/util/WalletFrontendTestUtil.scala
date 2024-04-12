@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.integration.tests.FrontendTestCommon
-import com.daml.network.util.WalletFrontendTestUtil.FrontendTransaction
+import com.daml.network.util.WalletFrontendTestUtil.*
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
@@ -29,6 +29,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       // This will have to change if we add a reload button here instead of auto-refreshing transactions.
       // The long eventually makes this robust against `StaleElementReferenceException` errors
       eventually(timeUntilSuccess = 2.minute) {
+        find(className(errorDisplayElementClass)).map { errElem =>
+          (errElem.text.trim, find(className(errorDetailsElementClass)).map(_.text.trim))
+        } shouldBe empty
         val tapsAfter = findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
         val newTaps = tapsAfter.diff(tapsBefore)
         forExactly(1, newTaps) { tap =>
@@ -207,4 +210,6 @@ object WalletFrontendTestUtil {
       rate: String,
   )
 
+  val errorDisplayElementClass = "error-display-message"
+  val errorDetailsElementClass = "error-display-details"
 }

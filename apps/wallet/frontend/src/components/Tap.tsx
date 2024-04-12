@@ -38,7 +38,9 @@ const Tap: React.FC = () => {
         </Button>
       </DisableConditionally>
 
-      {mutation.isError ? <ErrorDisplay message={'Tap operation failed'} /> : null}
+      {mutation.isError ? (
+        <ErrorDisplay message={'Tap operation failed'} details={JSON.stringify(mutation.error)} />
+      ) : null}
     </Stack>
   );
 };
