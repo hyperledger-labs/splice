@@ -1,26 +1,29 @@
 import BigNumber from 'bignumber.js';
 import { ErrorDisplay, Loading } from 'common-frontend';
-import { useTotalRewards } from 'common-frontend/scan-api';
+import { useAmuletPrice, useTotalRewards } from 'common-frontend/scan-api';
 
 import AmountSummary from './AmountSummary';
 
 export const TotalRewards: React.FC = () => {
   const totalRewardsQuery = useTotalRewards();
+  const amuletPriceQuery = useAmuletPrice();
 
-  switch (totalRewardsQuery.status) {
-    case 'loading':
-      return <Loading />;
-    case 'error':
-      return <ErrorDisplay message={'Could not retrieve total rewards'} />;
-    case 'success':
-      return (
-        <AmountSummary
-          title="Total App & Validator Rewards"
-          amount={new BigNumber(totalRewardsQuery.data.amount)}
-          idCC="total-rewards-cc"
-        />
-      );
-  }
+  const isLoading = totalRewardsQuery.isLoading || amuletPriceQuery.isLoading;
+  const isError = totalRewardsQuery.isError || amuletPriceQuery.isError;
+
+  return isLoading ? (
+    <Loading />
+  ) : isError ? (
+    <ErrorDisplay message={'Could not retrieve total rewards or amulet price'} />
+  ) : (
+    <AmountSummary
+      title="Total App & Validator Rewards"
+      amount={new BigNumber(totalRewardsQuery.data.amount)}
+      idCC="total-rewards-cc"
+      idUSD="total-rewards-usd"
+      amuletPrice={amuletPriceQuery.data}
+    />
+  );
 };
 
 export default TotalRewards;

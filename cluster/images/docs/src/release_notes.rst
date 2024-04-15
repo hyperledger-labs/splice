@@ -5,7 +5,9 @@ Release Notes
 
 0.1.4
 -----
+
 * Default PVC sizes updated: 640Gi for CometBFT and 1300Gi for Postgres.
+* Bugfix in Total balance and Total rewards in USD in Scan UI.
 
 0.1.3
 -----

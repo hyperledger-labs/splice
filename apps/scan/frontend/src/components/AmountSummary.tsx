@@ -3,11 +3,13 @@ import { AmountDisplay } from 'common-frontend';
 
 import { Card, CardContent, Typography } from '@mui/material';
 
-const NetworkTotal: React.FC<{ title: string; amount: BigNumber; idCC?: string }> = ({
-  title,
-  amount,
-  idCC,
-}) => {
+const NetworkTotal: React.FC<{
+  title: string;
+  amount: BigNumber;
+  idCC: string;
+  idUSD: string;
+  amuletPrice: BigNumber;
+}> = ({ title, amount, idCC, idUSD, amuletPrice }) => {
   return (
     <Card>
       <CardContent>
@@ -17,8 +19,13 @@ const NetworkTotal: React.FC<{ title: string; amount: BigNumber; idCC?: string }
         <Typography variant="h1" mb={1} id={idCC}>
           <AmountDisplay amount={amount} currency="AmuletUnit" />
         </Typography>
-        <Typography variant="h4">
-          <AmountDisplay amount={amount} currency="USDUnit" />
+        <Typography variant="h4" id={idUSD}>
+          <AmountDisplay
+            amount={amount}
+            currency="AmuletUnit"
+            convert="CCtoUSD"
+            amuletPrice={amuletPrice}
+          />
         </Typography>
       </CardContent>
     </Card>

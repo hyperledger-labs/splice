@@ -358,6 +358,9 @@ class ScanFrontendTimeBasedIntegrationTest
             val totalText = seleniumText(find(id("total-amulet-balance-cc")))
             val totalBalance = sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)
             BigDecimal(totalText.stripSuffix(" CC")) shouldBe totalBalance
+            val totalUsdText = seleniumText(find(id("total-amulet-balance-usd")))
+            val totalUsdBalance = totalBalance * amuletPrice
+            BigDecimal(totalUsdText.stripSuffix(" USD")) shouldBe totalUsdBalance
           },
         )
       }
