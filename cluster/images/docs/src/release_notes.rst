@@ -3,6 +3,10 @@
 Release Notes
 =============
 
+0.1.4
+-----
+* Default PVC sizes updated: 640Gi for CometBFT and 1300Gi for Postgres.
+
 0.1.3
 -----
 

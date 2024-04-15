@@ -6,7 +6,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 
 import {
   ChartValues,
-  clusterLargeDisk,
+  clusterSmallDisk,
   CNCustomResourceOptions,
   defaultVersion,
   envFlag,
@@ -153,6 +153,7 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
+    const overrideDiskSize = clusterSmallDisk ? { volumeSize: '240Gi' } : {};
     const pg = installCNHelmChart(
       xns,
       name,
@@ -160,7 +161,7 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
       _.merge(
         {
           db: {
-            volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
+            ...overrideDiskSize,
           },
           persistence: {
             secretName: this.secretName,

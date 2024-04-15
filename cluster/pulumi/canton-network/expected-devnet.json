@@ -1398,7 +1398,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2082,7 +2082,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3002,7 +3002,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3884,7 +3884,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4766,7 +4766,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -5345,7 +5345,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
+          "volumeSize": "1300Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

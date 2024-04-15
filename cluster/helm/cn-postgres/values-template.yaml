@@ -10,7 +10,7 @@ resources:
     memory: 1Gi
 
 db:
-  volumeSize: 480Gi
+  volumeSize: 1300Gi
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
   maxConnections: 300

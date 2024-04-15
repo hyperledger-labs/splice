@@ -4,7 +4,7 @@ import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_DNS_NAME,
-  clusterLargeDisk,
+  clusterSmallDisk,
   ExactNamespace,
   installCNHelmChart,
   isDevNet,
@@ -57,6 +57,7 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
+  const overrideDiskSize = clusterSmallDisk ? { volumeSize: '240Gi' } : {};
   const release = installCNHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -99,7 +100,7 @@ export function installCometBftNode(
         labels: isActiveDomain ? [{ key: 'active_migration', value: 'true' }] : [],
       },
       db: {
-        volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
+        ...overrideDiskSize,
         volumeStorageClass: process.env.COMETBFT_STORAGE_CLASS || 'standard-rwo',
       },
       extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
