@@ -1554,7 +1554,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "240Gi",
+          "volumeSize": "640Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
@@ -2478,7 +2478,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "240Gi",
+          "volumeSize": "640Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
@@ -3360,7 +3360,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "240Gi",
+          "volumeSize": "640Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
@@ -4242,7 +4242,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "240Gi",
+          "volumeSize": "640Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
