@@ -7,6 +7,8 @@ import {
   SV_NAMESPACE,
   DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
   validatorWalletUserName,
+  SV_BENEFICIARY_VALIDATOR1,
+  getValidator1PartyId,
 } from './utils';
 
 async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
@@ -20,7 +22,15 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
     walletUserName: validatorWalletUserName,
   };
 
-  await installNode(auth0Fetch, SV_NAMESPACE, svAppConfig, validatorAppConfig);
+  const resolveValidator1PartyId = SV_BENEFICIARY_VALIDATOR1 ? getValidator1PartyId : undefined;
+
+  await installNode(
+    auth0Fetch,
+    SV_NAMESPACE,
+    svAppConfig,
+    validatorAppConfig,
+    resolveValidator1PartyId
+  );
 
   await auth0Fetch.saveAuth0Cache();
 }

@@ -36,9 +36,7 @@ import {
   disableCantonAutoInit,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
-import { retry } from 'cn-pulumi-common/src/retries';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
-import fetch from 'node-fetch';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installDecentralizedSynchronizerNode } from './decentralizedSynchronizer';
@@ -78,7 +76,7 @@ export async function installNode(
   svNamespaceStr: string,
   svAppConfig: SvAppConfig,
   validatorAppConfig: ValidatorAppConfig,
-  resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
+  resolveValidator1PartyId?: () => Promise<string>
 ): Promise<void> {
   console.error(
     defaultVersion.type === 'local'
@@ -188,7 +186,7 @@ function persistenceForPostgres(pg: CNPostgres | CloudPostgres, values: ChartVal
 
 async function installSvAndValidator(
   config: SvConfig,
-  resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
+  resolveValidator1PartyId?: () => Promise<string>
 ) {
   const {
     xns,
@@ -313,7 +311,14 @@ async function installSvAndValidator(
     }
   );
 
-  const validator1PartyId: pulumi.Output<string> = pulumi.Output.create(resolveValidator1PartyId());
+  const extraBeneficiaries = resolveValidator1PartyId
+    ? [
+        {
+          partyId: pulumi.Output.create(resolveValidator1PartyId()),
+          percentage: '33.33',
+        },
+      ]
+    : [];
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
@@ -333,12 +338,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
-    extraBeneficiaries: [
-      {
-        partyId: validator1PartyId,
-        percentage: '33.33',
-      },
-    ],
+    extraBeneficiaries: extraBeneficiaries,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
@@ -471,20 +471,4 @@ async function installSvAndValidator(
   );
 
   return { sv, validator };
-}
-
-async function getValidator1PartyId(): Promise<string> {
-  return retry('getValidator1PartyId', 1000, 100, async () => {
-    const response = await fetch(
-      `https://wallet.validator1.${CLUSTER_BASENAME}.network.canton.global/api/validator/v0/validator-user`
-    );
-    const json = await response.json();
-    if (!response.ok) {
-      throw new Error(`Response is not OK: ${JSON.stringify(json)}`);
-    } else if (!json.party_id) {
-      throw new Error(`JSON does not contain party_id: ${JSON.stringify(json)}`);
-    } else {
-      return json.party_id;
-    }
-  });
 }
