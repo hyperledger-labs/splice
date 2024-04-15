@@ -105,7 +105,9 @@
   },
   "mainnet": {
     "svs": {
-      "Orb-1-LP": ["54.94.148.61/32"]
+      "Orb-1-LP": ["54.94.148.61/32"],
+      "Liberty-City-Ventures": ["3.127.60.187/32"],
+      "Global-Synchronizer-Foundation": ["52.28.183.68/32"]
     }
   }
 }

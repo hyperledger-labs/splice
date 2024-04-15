@@ -2,3 +2,9 @@ approvedSvIdentities:
   - name: Orb-1-LP
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFrvlZgglwf5vFP1QnMrHUTpCcjk5BQjm00fmbZ5gKRL3KkZiQra6mpeb7hJa8OFtH8DrNBJkivxlq2ScSFga9w==
     rewardWeightBps: 100000
+  - name: Liberty-City-Ventures
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeZ7ocmkxbNggLzGcSPxSF/pb1SK5lf2ReUxKokBH1KUZLeyQMNn8E5Xr4K3D4buoBxsnupO2IRkjWKQHRgsf0Q==
+    rewardWeightBps: 30000
+  - name: Global-Synchronizer-Foundation
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==
+    rewardWeightBps: 120000
