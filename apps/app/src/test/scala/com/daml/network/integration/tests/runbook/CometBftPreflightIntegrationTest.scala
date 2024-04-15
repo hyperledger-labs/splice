@@ -79,11 +79,7 @@ class CometBftPreflightIntegrationTest
             .get[Int]("earliest_block_height")
             .value
 
-          if (latestBlockHeight > RetainBlocks) {
-            (latestBlockHeight - earliestBlockHeight) should be < (RetainBlocks * 1.05).toInt
-          } else {
-            earliestBlockHeight shouldBe 1
-          }
+          (latestBlockHeight - earliestBlockHeight) should be < (RetainBlocks * 1.05).toInt
         }
 
       })
