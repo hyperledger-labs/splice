@@ -143,15 +143,13 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      signer <-
-        CometBftRequestSigner.getOrGenerateSigner(
-          "cometbft-governance-keys",
-          participantAdminConnection,
-          logger,
-          true,
-        )
+      signer <- CometBftRequestSigner.getOrGenerateSigner(
+        "cometbft-governance-keys",
+        participantAdminConnection,
+        logger,
+      )
       newCometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-        new CometBftNode(client, signer, config, loggerFactory)
+        new CometBftNode(client, signer, config, loggerFactory, retryProvider)
       )
       dsoAutomationService =
         new SvDsoAutomationService(
@@ -171,6 +169,13 @@ class DomainMigrationInitializer(
         dsoAutomationService,
         svAutomation,
       )
+      _ <- ensureCometBftGovernanceKeysAreSet(
+        cometBftNode,
+        svStore.key.svParty,
+        dsoStore,
+        dsoAutomationService,
+      )
+      _ <- rotateGenesisGovernanceKeyForFounder(newCometBftNode, domainMigrationConfig.name)
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

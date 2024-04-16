@@ -14,21 +14,21 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalSynchronizerNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
+import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
-  SynchronizerNodeReconciler,
+  DsoPartyHosting,
   NodeInitializerUtil,
   SetupUtil,
-  DsoPartyHosting,
+  SynchronizerNodeReconciler,
 }
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
-import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
+import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
-import com.daml.network.util.CNNodeUtil.{defaultAnsConfig, defaultAmuletConfig}
+import com.daml.network.util.CNNodeUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -46,8 +46,8 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.{
@@ -104,12 +104,12 @@ class FoundingNodeInitializer(
         SvDsoAutomationService,
     )
   ] = {
-    val initConnection = ledgerClient.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
-
     for {
+      _ <- rotateGenesisGovernanceKeyForFounder(cometBftNode, foundingConfig.name)
+      initConnection = ledgerClient.readOnlyConnection(
+        this.getClass.getSimpleName,
+        loggerFactory,
+      )
       (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
@@ -199,6 +199,12 @@ class FoundingNodeInitializer(
           withDsoStore.foundCollective()
         },
         logger,
+      )
+      _ <- ensureCometBftGovernanceKeysAreSet(
+        cometBftNode,
+        svParty,
+        dsoStore,
+        dsoAutomation,
       )
       // Only start the triggers once DsoRules and AmuletRules have been bootstrapped
       _ = dsoAutomation.registerPostOnboardingTriggers()

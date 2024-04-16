@@ -1,10 +1,15 @@
 package com.daml.network.sv.onboarding
 
-import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  ParticipantAdminConnection,
+  RetryFor,
+  RetryProvider,
+}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
@@ -12,16 +17,18 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
+
+import scala.jdk.CollectionConverters.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
-trait NodeInitializerUtil extends NamedLogging with Spanning {
+trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
   protected val config: SvAppBackendConfig
   protected val storage: Storage
@@ -118,6 +125,73 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
     retryProvider,
     loggerFactory,
   )
+
+  protected def rotateGenesisGovernanceKeyForFounder(
+      cometBftNode: Option[CometBftNode],
+      name: String,
+  )(implicit tc: TraceContext): Future[Unit] =
+    cometBftNode match {
+      case Some(cometBftNode) =>
+        cometBftNode.rotateGenesisGovernanceKeyForFounder(name)
+      case _ => Future.unit
+    }
+
+  protected def ensureCometBftGovernanceKeysAreSet(
+      cometBftNode: Option[CometBftNode],
+      svParty: PartyId,
+      dsoStore: SvDsoStore,
+      dsoAutomation: SvDsoAutomationService,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    cometBftNode match {
+      case Some(cometBftNode) =>
+        for {
+          _ <- retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "updated_node_config_dso_state",
+            "Governance keys are updated in the dso state",
+            for {
+              (rulesAndState, synchronizerNodeConfig) <- getCometBftNodeConfigDsoState(
+                dsoStore,
+                svParty,
+              ).getOrElse(throw new RuntimeException("No DSO rules with SV node state found"))
+              governanceKeysPubKey = synchronizerNodeConfig match {
+                case Some(synchronizerNodeConfig) =>
+                  synchronizerNodeConfig.cometBft.governanceKeys.asScala.map(_.pubKey).toSeq
+                case None => Seq.empty
+              }
+              genesisKeysPubKey = CometBftRequestSigner.getGenesisSigner.PublicKeyBase64
+              governanceKeyNotUpdatedInDsoState = governanceKeysPubKey.contains(
+                genesisKeysPubKey
+              )
+              _ = if (governanceKeyNotUpdatedInDsoState) {
+                for {
+                  localSvNodeConfig <- cometBftNode.getLocalNodeConfig()
+                  newSvNodeConfig = getNewSynchronizerNodeConfig(
+                    synchronizerNodeConfig,
+                    localSvNodeConfig,
+                  )
+                  _ <- updateSynchronizerNodeConfig(
+                    rulesAndState,
+                    newSvNodeConfig,
+                    dsoStore,
+                    dsoAutomation.connection,
+                  )
+                } yield ()
+              }
+            } yield {
+              if (governanceKeyNotUpdatedInDsoState)
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    "New governance keys is not in the dso state"
+                  )
+                  .asRuntimeException()
+            },
+            logger,
+          )
+        } yield ()
+      case None => Future.unit
+    }
+  }
 
   protected def isOnboarded(
       svcStore: SvDsoStore

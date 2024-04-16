@@ -3,14 +3,20 @@ package com.daml.network.sv.cometbft
 import cats.Show.Shown
 import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.splice as daml
+import com.daml.network.environment.{RetryFor, RetryProvider}
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.drivers as proto
+import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
 import com.digitalasset.canton.drivers.cometbft.{
+  GovernanceKey,
   NetworkConfigChangeRequest,
   SvBootstrapConfigChangeRequest,
   SvNodeConfig,
+  SvNodeConfigChange,
+  SvNodeConfigChangeRequest,
 }
+import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange.Kind.SetConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.topology.DomainId
@@ -22,18 +28,104 @@ import java.time.Instant
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import io.grpc.Status
 
 /** A handle to a CometBFT node.
   */
 class CometBftNode(
     cometBftClient: CometBftClient,
-    cometBftRequestSigner: CometBftRequestSigner,
+    val cometBftRequestSigner: CometBftRequestSigner,
     val cometBftConfig: CometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   import com.daml.network.sv.cometbft.CometBftNode.*
+
+  /** Rotate the founder keys of the CometBFT network.
+    */
+  def rotateGenesisGovernanceKeyForFounder(
+      owningSvNode: String
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      actualConfig <- cometBftClient.readNetworkConfig()
+      genesisSigner = CometBftRequestSigner.getGenesisSigner
+      currentKeysSetToGenesisKeys <- areGenesisGovernanceKeysConfigured(
+        owningSvNode,
+        genesisSigner,
+      )
+      _ =
+        if (currentKeysSetToGenesisKeys) {
+          logger.info(
+            s"Rotating founder governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints) as they are set to the genesis keys."
+          )
+          val governanceKeysToKeep = actualConfig.svNodeConfigStates
+            .get(owningSvNode)
+            .flatMap(_.currentConfig.map(_.governanceKeys)) match {
+            case Some(govKeys) => govKeys.filterNot(_.pubKey == genesisSigner.PublicKeyBase64)
+            case None => List.empty
+          }
+          val currentConfigRevision =
+            actualConfig.svNodeConfigStates
+              .get(owningSvNode)
+              .map(_.currentConfigRevision)
+              .getOrElse(1L)
+          val request = NetworkConfigChangeRequest(
+            chainId = actualConfig.chainId,
+            submitterSvNodeId = owningSvNode,
+            submitterKeyId = genesisSigner.Fingerprint,
+            submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
+            kind = NodeConfigChangeRequest(
+              SvNodeConfigChangeRequest.of(
+                owningSvNode,
+                currentConfigRevision = currentConfigRevision,
+                change = Some(
+                  SvNodeConfigChange.of(
+                    SetConfig(
+                      SvNodeConfig(
+                        governanceKeys = governanceKeysToKeep :+
+                          GovernanceKey(
+                            cometBftRequestSigner.PublicKeyBase64,
+                            cometBftRequestSigner.Fingerprint,
+                          )
+                      )
+                    )
+                  )
+                ),
+              )
+            ),
+          )
+          submitChangeRequest(request, genesisSigner)
+        }
+      _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
+        "keys_rotated",
+        "Governance keys are not set to the genesis keys anymore",
+        areGenesisGovernanceKeysConfigured(owningSvNode, genesisSigner).map(
+          genesisKeysConfigured => {
+            if (genesisKeysConfigured)
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  "Governance keys are set to genesis keys"
+                )
+                .asRuntimeException()
+          }
+        ),
+        logger,
+      )
+    } yield {
+      if (currentKeysSetToGenesisKeys) {
+        logger.info(
+          s"Successfully rotated founder governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints)"
+        )
+      } else {
+        logger.info(
+          s"Skipping rotating founder governance keys as they are not set to the genesis keys."
+        )
+      }
+    }
+  }
 
   /** Reconcile the CometBFT network config seen by this node with the target configuration specified
     * in the `DsoRules` contract.
@@ -116,14 +208,15 @@ class CometBftNode(
                         networkConfigChanges.requests.map(_.getNodeConfigChangeRequest)
                       )
                     ),
-                  )
+                  ),
+                  cometBftRequestSigner,
                 )
               } else {
                 logger.debug(
                   show"Reconciling difference in CometBft network configuration: $summary"
                 )
                 networkConfigChanges.requests.traverse(
-                  submitChangeRequest
+                  submitChangeRequest(_, cometBftRequestSigner)
                 )
               }
             } else {
@@ -137,8 +230,25 @@ class CometBftNode(
     }
   }
 
+  private def areGenesisGovernanceKeysConfigured(
+      owningSvNode: String,
+      genesisSigner: CometBftRequestSigner,
+  )(implicit tc: TraceContext) = {
+    for {
+      actualConfig <- cometBftClient.readNetworkConfig()
+    } yield actualConfig.svNodeConfigStates
+      .get(owningSvNode)
+      .exists(state =>
+        state.currentConfig.exists(config =>
+          config.governanceKeys
+            .exists(_.pubKey == genesisSigner.PublicKeyBase64)
+        )
+      )
+  }
+
   private def submitChangeRequest(
-      changeRequest: proto.cometbft.NetworkConfigChangeRequest
+      changeRequest: proto.cometbft.NetworkConfigChangeRequest,
+      signer: CometBftRequestSigner,
   )(implicit tc: TraceContext) = {
     @SuppressWarnings(Array("org.wartremover.warts.Product"))
     implicit val prettyNetworkConfigChangeRequest
@@ -148,8 +258,8 @@ class CometBftNode(
     logger.debug(show"Applying CometBft network change: $changeRequest")
     val request = proto.cometbft.UpdateNetworkConfigRequest(
       changeRequestBytes = changeRequest.toByteString,
-      signature =
-        com.google.protobuf.ByteString.copyFrom(cometBftRequestSigner.signRequest(changeRequest)),
+      signature = com.google.protobuf.ByteString
+        .copyFrom(signer.signRequest(changeRequest)),
     )
     cometBftClient
       .updateNetworkConfig(request)

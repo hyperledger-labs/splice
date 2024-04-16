@@ -218,6 +218,12 @@ class JoiningNodeInitializer(
               )
           } yield dsoAutomation
         }
+      _ <- ensureCometBftGovernanceKeysAreSet(
+        cometBftNode,
+        svParty,
+        dsoStore,
+        dsoAutomation,
+      )
       // Set autoConnect=true now that DSO party migration is complete
       _ <- participantAdminConnection.modifyDomainConnectionConfig(
         config.domains.global.alias,
@@ -734,30 +740,6 @@ class JoiningNodeInitializer(
     ).flatMap { svConnection =>
       svConnection.getDsoInfo().map(_.dsoParty).andThen(_ => svConnection.close())
     }
-
-  private def isOnboarded(dsoStore: SvDsoStore): Future[Boolean] = for {
-    dsoRules <- dsoStore.lookupDsoRules()
-    isInDsoRulesMembers = dsoRules.exists(
-      _.payload.svs.keySet.contains(dsoStore.key.svParty.toProtoPrimitive)
-    )
-    isMemberOfDecentralizedNamespace <-
-      if (isInDsoRulesMembers) {
-        participantAdminConnection
-          .getDecentralizedNamespaceDefinition(
-            dsoRules
-              .map(_.domain)
-              .getOrElse(
-                throw Status.NOT_FOUND
-                  .withDescription("Domain not found in DsoRules")
-                  .asRuntimeException()
-              ),
-            dsoStore.key.dsoParty.uid.namespace,
-          )
-          .map(_.mapping.owners.contains(dsoStore.key.svParty.uid.namespace))
-      } else {
-        Future.successful(false)
-      }
-  } yield isInDsoRulesMembers && isMemberOfDecentralizedNamespace
 
   private def waitForDsoMembership(dsoStore: SvDsoStore): Future[Unit] = {
     val svParty = dsoStore.key.svParty

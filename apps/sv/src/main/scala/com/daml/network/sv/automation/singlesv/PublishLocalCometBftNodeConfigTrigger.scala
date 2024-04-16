@@ -8,27 +8,19 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice as daml
-import com.daml.network.codegen.java.splice.cometbft.SequencingKeyConfig
-import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
-  MediatorConfig,
-  ScanConfig,
-  SequencerConfig,
-}
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
 /** A trigger to publish the node-id's and validator keys of an SV's CometBFT nodes
   * to the DSO-wide shared configuration of what validators should be used in the network.
@@ -43,38 +35,30 @@ class PublishLocalCometBftNodeConfigTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
       PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
-    ] {
+    ]
+    with SynchronizerNodeConfigClient {
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      rulesAndState <- OptionT.liftF(store.getDsoRulesWithSvNodeState(store.key.svParty))
-      domainId = rulesAndState.dsoRules.domain
-      nodeState = rulesAndState.svNodeState.payload
-      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala.get(
-        domainId.toProtoPrimitive
-      )
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
+      (rulesAndState, synchronizerNodeConfig) <- getCometBftNodeConfigDsoState(
+        store,
+        store.key.svParty,
+      )
       // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
-      domainId = rulesAndState.dsoRules.domain
       // create a task if the local config is different than the one we have published to the DSO
       // or if no domain bft is configured
-      if
-      // "TODO(#4901): reconcile all configured CometBFT networks"
-      !synchronizerNodeConfig
+      if !synchronizerNodeConfig
         .map(synchronizerNodeConfig =>
           CometBftNode.svNodeConfigToProto(synchronizerNodeConfig.cometBft)
         )
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
-      nodeState.svName,
       rulesAndState,
-      synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
-      synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
-      synchronizerNodeConfig.flatMap(_.scan.toScala).toJava,
+      synchronizerNodeConfig,
       localSvNodeConfig,
-      domainId,
     )).value
       .map(_.toList)
 
@@ -83,19 +67,13 @@ class PublishLocalCometBftNodeConfigTrigger(
   )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val cmd = task.dsoRulesAndState.dsoRules.exercise(
-      _.exerciseDsoRules_SetSynchronizerNodeConfig(
-        store.key.svParty.toProtoPrimitive,
-        task.domainId.toProtoPrimitive,
-        task.damlSvNodeConfig,
-        task.dsoRulesAndState.svNodeState.contractId,
-      )
-    )
     for {
-      _ <- connection
-        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-        .noDedup
-        .yieldResult()
+      _ <- updateSynchronizerNodeConfig(
+        task.dsoRulesAndState,
+        task.damlSvNodeConfig,
+        store,
+        connection,
+      )
     } yield TaskSuccess(show"Updated DSO-wide CometBFT node configuration for ${store.key.svParty}")
   }
 
@@ -112,14 +90,11 @@ class PublishLocalCometBftNodeConfigTrigger(
 
 object PublishLocalCometBftNodeConfigTrigger {
   case class PublishLocalConfigTask(
-      svNodeId: String,
       dsoRulesAndState: DsoRulesWithSvNodeState,
-      sequencerConfig: Optional[SequencerConfig],
-      mediatorConfig: Optional[MediatorConfig],
-      scanConfig: Optional[ScanConfig],
+      synchronizerNodeConfig: Option[SynchronizerNodeConfig],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
-      domainId: DomainId,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrinting
+      with SynchronizerNodeConfigClient {
 
     import com.daml.network.util.PrettyInstances.*
 
@@ -133,25 +108,6 @@ object PublishLocalCometBftNodeConfigTrigger {
 
     // TODO(#5889): unify or align with CometBftNode.getLocalNodeConfig and the functions backing `diffNetworkConfig`
     val damlSvNodeConfig: daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig =
-      new daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig(
-        new daml.cometbft.CometBftConfig(
-          localSvNodeConfig.cometbftNodes.map { case (nodeId, config) =>
-            (
-              nodeId,
-              new daml.cometbft.CometBftNodeConfig(
-                config.validatorPubKey,
-                config.votingPower,
-              ),
-            )
-          }.asJava,
-          localSvNodeConfig.governanceKeys
-            .map(key => new daml.cometbft.GovernanceKeyConfig(key.pubKey))
-            .asJava,
-          localSvNodeConfig.sequencingKeys.map(key => new SequencingKeyConfig(key.pubKey)).asJava,
-        ),
-        sequencerConfig,
-        mediatorConfig,
-        scanConfig,
-      )
+      getNewSynchronizerNodeConfig(synchronizerNodeConfig, localSvNodeConfig)
   }
 }

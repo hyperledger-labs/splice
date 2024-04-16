@@ -144,6 +144,9 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
     // validate dump
     sv.cometBftNodeDump().abciInfo.isObject shouldBe true
     sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+    sv.appState.participantAdminConnection
+      .listMyKeys("cometbft-governance-keys")
+      .futureValue should not be empty
   }
 
   private def cometbftClientForSvApp(sv: SvAppBackendReference) = {

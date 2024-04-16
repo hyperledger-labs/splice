@@ -37,7 +37,6 @@ class CometBftRequestSigner(
 
 object CometBftRequestSigner {
 
-  // TODO(#11367): will rotate this hardcoded genesis key
   private val PubKeyBase64 = "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
   private val PrivateKeyBase64 =
     "+7VcQfNKGpd/LnjhA1+LQ13xWQLV2A44P8mbpnTy/YSbXqFovO/9386TThKbf0AGTR/QexJZg1nGshSLJD5wrw=="
@@ -45,27 +44,21 @@ object CometBftRequestSigner {
   def getGenesisSigner =
     new CometBftRequestSigner(PubKeyBase64, PrivateKeyBase64)
 
-  // TODO(#11367): get rid of useGenesisKeysIfAbsentFromKms
-  // We need useGenesisKeysIfAbsentFromKms for domain migration, where we need to get the genesis keys if they are absent
-  // from Canton KMS instead of generating new keys.
   def getOrGenerateSigner(
       name: String,
       participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
-      useGenesisKeysIfAbsentFromKms: Boolean = false,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[CometBftRequestSigner] = {
     for {
       keysMetadata <- participantAdminConnection.listMyKeys(name)
       fingerprint <-
-        if (keysMetadata.isEmpty && !useGenesisKeysIfAbsentFromKms) {
+        if (keysMetadata.isEmpty) {
           for {
             keypair <- participantAdminConnection.generateKeyPair(name)
           } yield {
             logger.info(s"Generating new $name keys with fingerprint ${keypair.id}.")
             keypair.id
           }
-        } else if (keysMetadata.isEmpty && useGenesisKeysIfAbsentFromKms) {
-          Future.successful(())
         } else {
           val fingerprint = keysMetadata.headOption
             .getOrElse(
@@ -79,13 +72,7 @@ object CometBftRequestSigner {
           logger.info(s"Using existing $name keys with fingerprint $fingerprint.")
           Future.successful(fingerprint)
         }
-      keyBytes <- fingerprint match {
-        case fingerprint: Fingerprint =>
-          participantAdminConnection.exportKeyPair(
-            fingerprint
-          )
-        case _ => Future.successful(())
-      }
+      keyBytes <- participantAdminConnection.exportKeyPair(fingerprint)
     } yield keyBytes match {
       case keyBytes: ByteString =>
         val keyPair = CryptoKeyPair.fromByteString(keyBytes)
@@ -115,15 +102,11 @@ object CometBftRequestSigner {
           Base64.getEncoder.encodeToString(augmentedPrivKey),
         )
       case _ =>
-        if (useGenesisKeysIfAbsentFromKms) {
-          getGenesisSigner
-        } else {
-          throw Status.NOT_FOUND
-            .withDescription(
-              s"Could not export KeyPair $name from Canton KMS"
-            )
-            .asRuntimeException()
-        }
+        throw Status.NOT_FOUND
+          .withDescription(
+            s"Could not export KeyPair $name from Canton KMS"
+          )
+          .asRuntimeException()
     }
 
   }

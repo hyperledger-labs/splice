@@ -286,34 +286,41 @@ class SvApp(
       // a fresh collective is fundamentally different from joining an existing collective
       config.onboarding match {
         case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
-          appInitStep("FoundingNodeInitializer founding collective") {
-            val cometBftFoundingNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+          for {
+            signer <- CometBftRequestSigner.getOrGenerateSigner(
+              "cometbft-governance-keys",
+              participantAdminConnection,
+              logger,
+            )
+            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
               new CometBftNode(
                 client,
-                CometBftRequestSigner.getGenesisSigner,
+                signer,
                 config,
                 loggerFactory,
+                retryProvider,
               )
             )
-            // TODO(#11367): rotate the keypair in bootstrap
-            val initializer = new FoundingNodeInitializer(
-              localSynchronizerNode.getOrElse(
-                sys.error("Founding node must always specify a domain config")
-              ),
-              foundingConfig,
-              darFilesToBootstrapNetwork,
-              participantId,
-              config,
-              cometBftFoundingNode,
-              ledgerClient,
-              participantAdminConnection,
-              clock,
-              storage,
-              retryProvider,
-              loggerFactory,
-            )
-            initializer.bootstrapCollective()
-          }
+            res <- appInitStep("FoundingNodeInitializer founding collective") {
+              val initializer = new FoundingNodeInitializer(
+                localSynchronizerNode.getOrElse(
+                  sys.error("Founding node must always specify a domain config")
+                ),
+                foundingConfig,
+                darFilesToBootstrapNetwork,
+                participantId,
+                config,
+                cometBftNode,
+                ledgerClient,
+                participantAdminConnection,
+                clock,
+                storage,
+                retryProvider,
+                loggerFactory,
+              )
+              initializer.bootstrapCollective()
+            }
+          } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           for {
             signer <- CometBftRequestSigner.getOrGenerateSigner(
@@ -322,7 +329,7 @@ class SvApp(
               logger,
             )
             cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-              new CometBftNode(client, signer, config, loggerFactory)
+              new CometBftNode(client, signer, config, loggerFactory, retryProvider)
             )
             res <- appInitStep("JoiningNodeInitializer joining collective with key") {
               val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
@@ -358,9 +365,9 @@ class SvApp(
               logger,
             )
             cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-              new CometBftNode(client, signer, config, loggerFactory)
+              new CometBftNode(client, signer, config, loggerFactory, retryProvider)
             )
-            res <- appInitStep("JoiningNodeInitializer joining collective") {
+            res <- {
               val initializer = newJoiningNodeInitializer(None, cometBftNode)
               initializer.joinCollectiveAndOnboardNodes()
             }

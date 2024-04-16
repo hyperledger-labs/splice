@@ -8,16 +8,13 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice as daml
-import com.daml.network.codegen.java.splice.cometbft.CometBftConfig
-import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
-  MediatorConfig,
-  SequencerConfig,
-}
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvScanConfig
+import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
@@ -31,9 +28,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
-import java.util.Optional
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
@@ -50,18 +45,18 @@ class PublishScanConfigTrigger(
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[
       PublishScanConfigTrigger.PublishLocalConfigTask
-    ] {
+    ]
+    with SynchronizerNodeConfigClient {
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[PublishScanConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      rulesAndState <- OptionT.liftF(store.getDsoRulesWithSvNodeState(store.key.svParty))
-      domainId = rulesAndState.dsoRules.domain
-      nodeState = rulesAndState.svNodeState.payload
-      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala.get(
-        domainId.toProtoPrimitive
+      case (rulesAndState, synchronizerNodeConfig) <- getCometBftNodeConfigDsoState(
+        store,
+        store.key.svParty,
       )
+      domainId = rulesAndState.dsoRules.domain
       damlScanConfig = new daml.dso.decentralizedsynchronizer.ScanConfig(
         scanConfig.publicUrl.toString
       )
@@ -102,11 +97,8 @@ class PublishScanConfigTrigger(
         }
       }
     } yield PublishScanConfigTrigger.PublishLocalConfigTask(
-      nodeState.svName,
       rulesAndState,
-      synchronizerNodeConfig.fold(SvUtil.emptyCometBftConfig)(_.cometBft),
-      synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
-      synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
+      synchronizerNodeConfig,
       damlScanConfig,
       // TODO(#4906): this domain-id is likely the wrong one to use in a soft-domain migration context
       domainId,
@@ -118,19 +110,13 @@ class PublishScanConfigTrigger(
   )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val cmd = task.dsoRulesAndState.dsoRules.exercise(
-      _.exerciseDsoRules_SetSynchronizerNodeConfig(
-        store.key.svParty.toProtoPrimitive,
-        task.domainId.toProtoPrimitive,
-        task.damlSvNodeConfig,
-        task.dsoRulesAndState.svNodeState.contractId,
-      )
-    )
     for {
-      _ <- connection
-        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-        .noDedup
-        .yieldResult()
+      _ <- updateSynchronizerNodeConfig(
+        task.dsoRulesAndState,
+        task.damlSvNodeConfig,
+        store,
+        connection,
+      )
     } yield TaskSuccess(show"Updated DSO-wide scan node configuration for ${store.key.svParty}")
   }
 
@@ -142,11 +128,8 @@ class PublishScanConfigTrigger(
 
 object PublishScanConfigTrigger {
   case class PublishLocalConfigTask(
-      svNodeId: String,
       dsoRulesAndState: DsoRulesWithSvNodeState,
-      cometBftConfig: CometBftConfig,
-      sequencerConfig: Optional[SequencerConfig],
-      mediatorConfig: Optional[MediatorConfig],
+      synchronizerNodeConfig: Option[SynchronizerNodeConfig],
       scanConfig: daml.dso.decentralizedsynchronizer.ScanConfig,
       domainId: DomainId,
   ) extends PrettyPrinting {
@@ -160,9 +143,9 @@ object PublishScanConfigTrigger {
 
     val damlSvNodeConfig: daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig =
       new daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig(
-        cometBftConfig,
-        sequencerConfig,
-        mediatorConfig,
+        synchronizerNodeConfig.fold(SvUtil.emptyCometBftConfig)(_.cometBft),
+        synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
+        synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
         Some(scanConfig).toJava,
       )
   }
