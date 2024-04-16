@@ -17,6 +17,7 @@ import {
 } from '.';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
+const protectCloudSql = !envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
 
 const cluster = process.env['GCP_CLUSTER_BASENAME'] || 'GCP_CLUSTER_BASENAME not set';
 
@@ -91,6 +92,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       },
       {
         parent: this,
+        protect: protectCloudSql,
       }
     );
 
@@ -105,12 +107,16 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         parent: this,
         deletedWith: this.pgSvc,
+        protect: protectCloudSql,
       }
     );
 
     installPostgresMetrics(this, 'cantonnet', [pgDB], { parent: this });
 
-    const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
+    const password = generatePassword(`${logicalName}-passwd`, {
+      parent: this,
+      protect: protectCloudSql,
+    }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
     new gcp.sql.User(
@@ -124,6 +130,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         parent: this,
         deletedWith: pgDB,
         dependsOn: [passwordSecret],
+        protect: protectCloudSql,
       }
     );
 
@@ -143,7 +150,7 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
 
   constructor(xns: ExactNamespace, name: string, secretName: string, values?: ChartValues) {
     const logicalName = xns.logicalName + '-' + name;
-    super('canton:network:postgres', logicalName);
+    super('canton:network:postgres', logicalName, [], { protect: protectCloudSql });
 
     this.name = name;
     this.namespace = xns;
