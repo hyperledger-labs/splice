@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- By default, CometBFT deployments now use the ``premium-rwo`` storage class for increased performance. Please override ``db.volumeStorageClass`` in your ``cometbft-values.yaml`` if this storage class is not supported by your Kubernetes cluster provider. Please use an SSD storage class for the CometBFT PVC.
+
 0.1.4
 -----
 

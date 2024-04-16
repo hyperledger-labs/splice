@@ -101,7 +101,6 @@ export function installCometBftNode(
       },
       db: {
         ...overrideDiskSize,
-        volumeStorageClass: process.env.COMETBFT_STORAGE_CLASS || 'standard-rwo',
       },
       extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
     },
