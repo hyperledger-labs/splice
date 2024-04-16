@@ -9,6 +9,7 @@ import {
   CLUSTER_DNS_NAME,
   GrafanaKeys,
   publicPrometheusRemoteWrite,
+  requireEnv,
 } from 'cn-pulumi-common';
 import { REPO_ROOT } from 'cn-pulumi-common';
 
@@ -335,7 +336,7 @@ function createGrafanaContactPoints(namespace: Input<string>) {
         'slackContactPoint.yaml': Buffer.from(
           readFile('slack_contact_point.yaml').replaceAll(
             '$SLACK_ACCESS_TOKEN',
-            process.env.SLACK_ACCESS_TOKEN as string
+            requireEnv('SLACK_ACCESS_TOKEN')
           )
         ).toString('base64'),
       },
