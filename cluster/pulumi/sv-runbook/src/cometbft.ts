@@ -108,7 +108,7 @@ export function installCometBftNode(
               `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
                 ? 'test'
                 : cometBftValues.genesis.chainId,
-            chainIdVersion: stableCometBftChainId ? 'stable' : undefined,
+            chainIdSuffix: stableCometBftChainId ? cometBftValues.genesis.chainIdSuffix : undefined,
           },
           stateSync: {
             ...cometBftValues.stateSync,

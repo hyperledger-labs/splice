@@ -3,8 +3,8 @@
 {{- define "genesisJson" }}
 {
   "genesis_time": "2023-02-27T13:07:44.448442974488Z",
-  {{- if .Values.genesis.chainIdVersion }}
-  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Values.genesis.chainIdVersion | trunc 50 }}",
+  {{- if .Values.genesis.chainIdSuffix }}
+  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Values.genesis.chainIdSuffix | trunc 50 }}",
   {{- else }}
   "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Chart.Version | trunc 50 }}",
   {{- end }}
