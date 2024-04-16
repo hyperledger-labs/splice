@@ -1931,7 +1931,7 @@ node (where a "node" in this context is a single SV or a single validator). It p
 of backups of all relevant persistent storage, identified by a RUN_ID. These backups are
 guaranteed to be consistent in terms of ordering requirements.
 
-This script can also be invoked from `cncluster` through `ansluster backup_nodes <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
+This script can also be invoked from `cncluster` through `cncluster backup_nodes <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
 
 For every node, at the end of the backup process, the script will report something like:
 ```
