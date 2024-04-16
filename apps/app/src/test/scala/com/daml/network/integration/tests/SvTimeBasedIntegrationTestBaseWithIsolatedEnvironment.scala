@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -106,6 +107,11 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     with SvTimeBasedIntegrationTestUtil {
   protected val baseEnvironmentDefinition: CNNodeEnvironmentDefinition = CNNodeEnvironmentDefinition
     .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
+    .addConfigTransforms((_, config) =>
+      CNNodeConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
+        config
+      )
+    )
     .withManualStart
     // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
     .withoutAutomaticRewardsCollectionAndAmuletMerging
