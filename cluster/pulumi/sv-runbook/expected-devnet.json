@@ -300,7 +300,7 @@
         },
         "genesis": {
           "chainId": "svrun.network.com-0",
-          "chaindIdSuffix": "0"
+          "chainIdSuffix": "0"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {

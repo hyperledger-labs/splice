@@ -8,7 +8,7 @@ Release Notes
 
 * Default PVC sizes updated: 640Gi for CometBFT and 1300Gi for Postgres.
 * Bugfix in Total balance and Total rewards in USD in Scan UI.
-* New value for ``cometbft-values.yaml``:  ``genesis.chaindIdSuffix``. Please explicitly set this to ``"0"`` as per the updated example.
+* New value for ``cometbft-values.yaml``:  ``genesis.chainIdSuffix``. Please explicitly set this to ``"0"`` as per the updated example.
   Note that this deprecates ``genesis.chainIdVersion``, which can be removed for deployments that use this and later releases.
 * By default, CometBFT deployments now use the ``premium-rwo`` storage class for increased performance. Please override ``db.volumeStorageClass`` in your ``cometbft-values.yaml`` if this storage class is not supported by your Kubernetes cluster provider. Please use an SSD storage class for the CometBFT PVC.
 
