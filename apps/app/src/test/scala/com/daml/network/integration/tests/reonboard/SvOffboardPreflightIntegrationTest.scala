@@ -1,29 +1,30 @@
-package com.daml.network.integration.tests.migration
+package com.daml.network.integration.tests.reonboard
 
 import cats.syntax.parallel.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.tests.runbook.SvUiIntegrationTestUtil
-import com.daml.network.util.SvFrontendTestUtil
+import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.FutureInstances.*
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
 import org.scalatest.time.{Minute, Span}
 
-import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
+import java.time.{Instant, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
-import scala.jdk.OptionConverters.*
+import scala.jdk.CollectionConverters.*
 
-class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4")
+class SvOffboardPreflightIntegrationTest
+    extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4", "sv")
     with SvUiIntegrationTestUtil
-    with SvFrontendTestUtil {
+    with SvFrontendTestUtil
+    with FrontendLoginUtil
+    with WalletFrontendTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
@@ -35,10 +36,36 @@ class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  "Global domain upgrade is scheduled" in { implicit env =>
-    import env.executionContext
+  private val svRunbookName = "DA-Helm-Test-Node"
+  private val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private val svUsername = s"admin@sv-dev.com"
+  private val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
-    // This triggers the pausing of the domain and the creation of dumps later on
+  "The SV can log in to their wallet and tap" in { _ =>
+    withFrontEnd("sv") { implicit webDriver =>
+      actAndCheck(
+        s"Logging in to wallet at ${walletUrl}", {
+          completeAuth0LoginWithAuthorization(
+            walletUrl,
+            svUsername,
+            svPassword,
+            () => find(id("logout-button")) should not be empty,
+          )
+        },
+      )(
+        "User is logged in and onboarded",
+        _ => {
+          userIsLoggedIn()
+        },
+      )
+
+      // 10020 is for the
+      tapAmulets(100020)
+    }
+  }
+
+  "SV runbook is offboarded" in { implicit env =>
+    import env.executionContext
 
     val requestReasonUrl = "This is a request reason url."
     val requestReasonBody = "This is a request reason."
@@ -49,30 +76,17 @@ class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
       withWebUiSv(1) { implicit webDriver =>
         click on "navlink-votes"
         val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-        dropDownAction.selectByValue("SRARC_SetConfig")
+        dropDownAction.selectByValue("SRARC_OffboardSv")
+
+        val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+        dropDownMember.selectByVisibleText(svRunbookName)
 
         click on "tab-panel-in-progress"
         val previousVoteRequestsInProgress = find(id("sv-voting-in-progress-table-body"))
           .map(_.findAllChildElements(className("vote-row-tracking-id")).toSeq.size)
           .getOrElse(0)
 
-        click on "enable-next-scheduled-domain-upgrade"
-
         val now = Instant.now()
-        val scheduledUpgradeTime = DateTimeFormatter.ISO_INSTANT.format(
-          now.plusSeconds(80).truncatedTo(ChronoUnit.SECONDS)
-        )
-        inside(find(id("nextScheduledSynchronizerUpgrade.time-value"))) { case Some(element) =>
-          element.underlying.clear()
-          element.underlying.sendKeys(scheduledUpgradeTime)
-        }
-
-        // We hard-coded 1 here for now. It should be more robust to calculated from the migration id of node currently deployed.
-        inside(find(id("nextScheduledSynchronizerUpgrade.migrationId-value"))) {
-          case Some(element) =>
-            element.underlying.clear()
-            element.underlying.sendKeys("1")
-        }
 
         inside(find(id("create-reason-summary"))) { case Some(element) =>
           element.underlying.sendKeys(requestReasonBody)
@@ -139,7 +153,7 @@ class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
               "sv operator can see the new vote request detail",
               _ => {
                 inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-                  element.text should matchText("SRARC_SetConfig")
+                  element.text should matchText("SRARC_OffboardSv")
                 }
               },
             )
@@ -175,21 +189,20 @@ class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
       }.futureValue
     }
 
-    clue("Domain migration should be scheduled") {
+    clue("SV should be offboarded") {
       // 240 to account for
       // - 60s expiration time of the vote request
       // - 60s buffer because we only set minutes not seconds
       // - 30s polling interval for the trigger to kick in
       // - general slowness
       eventuallySucceeds(timeUntilSuccess = 240.seconds) {
-        val nextScheduledSynchronizerUpgrade = sv1
+        sv1
           .getDsoInfo()
           .dsoRules
           .payload
-          .config
-          .nextScheduledSynchronizerUpgrade
-          .toScala
-        nextScheduledSynchronizerUpgrade.value.migrationId shouldBe 1L
+          .svs
+          .asScala
+          .filter(_._2.name == svRunbookName) shouldBe empty
       }
     }
   }

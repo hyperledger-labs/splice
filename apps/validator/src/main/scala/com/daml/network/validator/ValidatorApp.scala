@@ -241,7 +241,10 @@ class ValidatorApp(
                             ) { scanConnection =>
                               scanConnection.getAcsSnapshot(partyId)
                             },
-                          Seq(DarResources.amulet.bootstrap),
+                          Seq(
+                            DarResources.amulet.bootstrap,
+                            DarResources.amuletNameService.bootstrap,
+                          ),
                           partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                         ),
                     ).tupled

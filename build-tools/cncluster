@@ -1172,16 +1172,17 @@ subcommand_whitelist[get_ui_credentials]='Get UI auth0 credentials for a given a
 
 function subcmd_get_ui_credentials() {
 
-  if [ "$#" -ne 1 ]; then
-     _error "Usage: $0 <node>"
+  if [ "$#" -ne 2 ]; then
+     _error "Usage: $0 <configType> <node>"
   fi
 
-  node="$1"
+  configType="$1"
+  node="$2"
 
   client_ids=$(subcmd_pulumi infra stack output --json | grep -v "Running Pulumi Command")
-  client_id=$(echo "$client_ids" | jq -r '.auth0.cantonNetwork.appToClientId."'"$node"'"')
+  client_id=$(echo "$client_ids" | jq -r '.auth0."'"$configType"'".appToClientId."'"$node"'"')
   if [ -z "$client_id" ] || [ "$client_id" == "null" ]; then
-    known=$(echo "$client_ids" | jq -r '.auth0.cantonNetwork.appToClientId')
+    known=$(echo "$client_ids" | jq -r '.auth0."'"$configType"'".appToClientId')
     _error "No client ID found for node $node in infra stack. Known client IDs are: $known"
   fi
   secrets=$(kubectl get secret auth0-preflight-token-cache -o jsonpath="{.data}")
@@ -1990,7 +1991,7 @@ function subcmd_participant_console() {
     k8s_labels_for_app
 
     if ! participant_pod=$(_get_single_pod "$namespace" "$app"); then
-      _error "No participant found in namespace '$namespace'."
+      _error "No participant found in namespace $app '$namespace'."
     fi
 
     if (netstat -an | grep ".1100[12].*LISTEN"); then
@@ -2391,7 +2392,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Getting identity dumps"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_ui_credentials cantonNetwork sv-${sv})
     id=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
     echo "$id" > id-${sv}.json
   done
@@ -2404,7 +2405,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Finding agreed upon timestamp"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_ui_credentials cantonNetwork sv-${sv})
     done=0
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
@@ -2429,12 +2430,12 @@ function subcmd_disaster_recovery_test() {
 
   earliest=$(sort -n acs_times | head -1)
   dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "+%Y-%m-%dT%R:%S.%NZ")
-  _info "Decided on timestmp for dumps: $dump_timestamp"
+  _info "Decided on timestamp for dumps: $dump_timestamp"
   rm acs_times
 
   _info "Getting data dumps"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_ui_credentials cantonNetwork sv-${sv})
     data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
@@ -2475,6 +2476,34 @@ function subcmd_disaster_recovery_test() {
   export CN_INSTALL_VALIDATOR1="true"
   export CN_INSTALL_SPLITWELL="true"
   _cluster_apply "$version"
+}
+
+###
+
+subcommand_whitelist[offboard_sv_runbook]='Run the sv offboard preflights, preparing the SV runbook being offboarded'
+
+function subcmd_offboard_sv_runbook() {
+    _needs_auth0_management_api_creds
+
+    preflight_tests=$(_get_preflight_test_names "offboard-sv-runbook")
+    _log "Starting sv offboard preparation preflight tests: $preflight_tests"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[preflight_sv_reonboard]='Run the sv reonboard preflights'
+
+function subcmd_preflight_sv_reonboard() {
+    _needs_auth0_management_api_creds
+
+    preflight_tests=$(_get_preflight_test_names "re-onboard-sv-runbook")
+    _log "Starting sv re onboard preparation preflight tests: $preflight_tests"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly $preflight_tests"
 }
 
 ################################

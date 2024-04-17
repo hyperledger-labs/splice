@@ -23,7 +23,7 @@ trait SvFrontendTestUtil extends CNNodeTestCommon {
         // this does not happen very often …
         dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
         eventually()(
-          dateTimePicker.getAttribute("value") shouldBe dateTime
+          dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
       }
     }

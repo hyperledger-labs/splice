@@ -1678,7 +1678,7 @@ which prints a compatible token as part of its startup.
 For some UIs, we cache tokens in a secret in k8s, and have a utility `cncluster` command for easily retrieving them.
 At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one of them, run for example:
 ```
-export TOKEN=$(cncluster get_ui_credentials sv-1)
+export TOKEN=$(cncluster get_ui_credentials cantonNetwork sv-1)
 ```
 If the token saved in the secret is expired, run `cncluster preflight_get_auth0_tokens` to update the secret with fresh tokens.
 

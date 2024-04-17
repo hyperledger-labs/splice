@@ -11,6 +11,7 @@ Release Notes
 * New value for ``cometbft-values.yaml``:  ``genesis.chainIdSuffix``. Please explicitly set this to ``"0"`` as per the updated example.
   Note that this deprecates ``genesis.chainIdVersion``, which can be removed for deployments that use this and later releases.
 * By default, CometBFT deployments now use the ``premium-rwo`` storage class for increased performance. Please override ``db.volumeStorageClass`` in your ``cometbft-values.yaml`` if this storage class is not supported by your Kubernetes cluster provider. Please use an SSD storage class for the CometBFT PVC.
+* Updated SV runbook for Re-onboarding an SV.
 
 0.1.3
 -----

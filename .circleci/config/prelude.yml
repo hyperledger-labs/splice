@@ -30,6 +30,7 @@ parameters:
         deploy-cilr,
         deploy-ciupgrade,
         deploy-ciupgrade-migration,
+        deploy-ciperiodic-sv-reonboard,
         # Disabled to avoid accidental use. We keep the code for now in case
         # we do want to do a full reset.
         # TODO(#11648) Consider deleting this.
@@ -123,6 +124,7 @@ cluster-parameter: &cluster-parameter
         "cidaily",
         "cidaily-testnet",
         "cilr",
+        "ciperiodic",
         "ciupgrade",
         "devnet",
         "testnet",

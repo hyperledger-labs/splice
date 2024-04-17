@@ -541,6 +541,7 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
             cncluster prefresh
 
+
   deploy_infra:
     circleci_ip_ranges: true
     docker:

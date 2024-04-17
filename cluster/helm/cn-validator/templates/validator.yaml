@@ -168,7 +168,13 @@ spec:
             canton.validator-apps.validator_backend.participant-bootstrapping-dump {
               type = file
               file = /participant-bootstrapping-dump/content
+              {{ if .newParticipantIdentifier }} new-participant-identifier = {{ .newParticipantIdentifier | quote }} {{ end }}
             }
+        {{- end }}
+        {{- if  .Values.migrateValidatorParty }}
+        - name: ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY
+          value: |
+            canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = ${_scan.admin-api.address}
         {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |

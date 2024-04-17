@@ -273,6 +273,7 @@
         "metrics": {
           "enable": true
         },
+        "migrateValidatorParty": false,
         "migration": {
           "id": "0"
         },

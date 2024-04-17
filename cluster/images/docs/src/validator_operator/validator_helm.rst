@@ -101,6 +101,28 @@ The password can be setup with the following command, assuming you set the envir
         --from-literal=postgresPassword=${POSTGRES_PASSWORD} \
         -n validator
 
+.. _validator-participant-bootstrap-dump-restore:
+
+Restoring from a Participant Bootstrap Dump
+-------------------------------------------
+
+In the case of catastrophic failure, you may need to restore a participant from a bootstrap dump.
+You can restore from the dump by creating a Kubernetes secret with the content of that dump file.
+Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
+
+.. code-block:: bash
+
+    kubectl create secret generic participant-bootstrap-dump \
+        --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
+        -n validator
+
+Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
+
 Preparing for Validator Onboarding
 ----------------------------------
 

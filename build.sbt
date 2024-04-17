@@ -1312,6 +1312,14 @@ printTests := {
     isPreflightIntegrationTest(
       name
     ) && name.contains("DecentralizedSynchronizerUpgradeCluster")
+  def isSvOffboardPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(
+      name
+    ) && name.contains("SvOffboard")
+  def isSvReOnboardPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(
+      name
+    ) && name.contains("SvReOnboard")
   def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
 
@@ -1334,6 +1342,16 @@ printTests := {
       "Global domain upgrade cluster preflight",
       "test-full-class-names-global-domain-upgrade-preflight.log",
       (t: String) => isDecentralizedSynchronizerDeploymentPreflightIntegrationTest(t),
+    ),
+    (
+      "SV offboard preflight",
+      "test-full-class-names-offboard-sv-runbook-preflight.log",
+      (t: String) => isSvOffboardPreflightIntegrationTest(t),
+    ),
+    (
+      "SV reonboard preflight",
+      "test-full-class-names-re-onboard-sv-runbook-preflight.log",
+      (t: String) => isSvReOnboardPreflightIntegrationTest(t),
     ),
     (
       "Fetch UI credentials from Auth0 and store them in a k8s secret",

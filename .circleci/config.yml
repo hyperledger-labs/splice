@@ -35,6 +35,7 @@ parameters:
         deploy-cilr,
         deploy-ciupgrade,
         deploy-ciupgrade-migration,
+        deploy-ciperiodic-sv-reonboard,
         # Disabled to avoid accidental use. We keep the code for now in case
         # we do want to do a full reset.
         # TODO(#11648) Consider deleting this.
@@ -128,6 +129,7 @@ cluster-parameter: &cluster-parameter
         "cidaily",
         "cidaily-testnet",
         "cilr",
+        "ciperiodic",
         "ciupgrade",
         "devnet",
         "testnet",
@@ -1929,6 +1931,7 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
             cncluster prefresh
 
+
   deploy_infra:
     circleci_ip_ranges: true
     docker:
@@ -3113,6 +3116,104 @@ jobs:
                 name: Upload vpn log
                 path: /var/log/vpn.log
 
+  deploy_validator_to_recover_sv_amulets:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      restore_cluster:
+        type: boolean
+        default: false
+      reset_cluster:
+        type: boolean
+        default: true
+      validator_party_hint:
+        type: string
+        default: ""
+      validator_new_participant_id:
+        type: string
+        default: ""
+      restore_identity_from_sv_runbook:
+        type: boolean
+        default: false
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - setup_vpn # VPN is required to get sv runbook identities
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - when:
+          condition:
+            and:
+              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Reset Validator runbook
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: |
+                  cncluster activate
+                  cncluster ci_pdown_validator
+      - run_bash_command_in_nix:
+          cmd_name: Apply Validator runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
+            if (env-bool RESTORE_CLUSTER); then
+              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              fi
+            fi
+
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+
+            if [[ -n '<< parameters.validator_party_hint >>' ]]; then
+              echo "setting validator party hint << parameters.validator_party_hint >>"
+              export VALIDATOR_PARTY_HINT='<< parameters.validator_party_hint >>'
+            fi
+            if [[ -n '<< parameters.validator_new_participant_id >>' ]]; then
+              echo "using validator new participant id << parameters.validator_new_participant_id >>"
+              export VALIDATOR_NEW_PARTICIPANT_ID='<< parameters.validator_new_participant_id >>'
+              export VALIDATOR_MIGRATE_PARTY='true'
+            fi
+            if [[ << parameters.restore_identity_from_sv_runbook >> == true ]]; then
+              echo "restoring identity from sv runbook"
+              token=$(cncluster get_ui_credentials svRunbook sv)
+              id=$(curl -s "https://wallet.sv.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/participant/identities" -H "authorization: Bearer ${token}")
+              echo "$id" > id.json
+              export PARTICIPANT_IDENTITIES_FILE=$(readlink -f id.json)
+            fi
+
+            cncluster activate
+            cncluster ci_apply_validator $VERSION
+      - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
+          cluster: << parameters.cluster >>
+
 workflows:
   version: 2
 
@@ -4169,6 +4270,102 @@ workflows:
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
+
+  deploy_ciperiodic_sv_reonboard:
+    when:
+      equal: [ deploy-ciperiodic-sv-reonboard, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_ciperiodic_sv_reonboard"
+          wait_type: "wait_workflow"
+      - docker_images_push:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_cluster:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          name: "offboard_sv_runbook"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          test_names_file: "test-full-class-names-offboard-sv-runbook-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - deploy_sv_runbook
+      - deploy_validator_to_recover_sv_amulets:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          validator_party_hint: "DA-Helm-Test-Node"
+          validator_new_participant_id: "new-participant"
+          restore_identity_from_sv_runbook: true
+          cluster: "ciperiodic"
+          requires:
+            - offboard_sv_runbook
+      - deploy_sv_runbook:
+          name: "redeploy_sv_runbook"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - deploy_validator_to_recover_sv_amulets
+      - preflight_check:
+          name: "preflight_sv_reonboard_check"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          test_names_file: "test-full-class-names-re-onboard-sv-runbook-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - redeploy_sv_runbook
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_reonboard_check
 
   deploy_ciupgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow

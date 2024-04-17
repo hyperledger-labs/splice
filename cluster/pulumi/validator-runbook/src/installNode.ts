@@ -25,10 +25,17 @@ import {
   ValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   defaultVersion,
+  participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
-import { CLUSTER_BASENAME, VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE } from './utils';
+import {
+  CLUSTER_BASENAME,
+  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
+  VALIDATOR_PARTY_HINT,
+  VALIDATOR_MIGRATE_PARTY,
+  VALIDATOR_NEW_PARTICIPANT_ID,
+} from './utils';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -234,6 +241,16 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
+    validatorPartyHint: VALIDATOR_PARTY_HINT || validatorValuesFromYamlFiles.validatorPartyHint,
+    migrateValidatorParty: VALIDATOR_MIGRATE_PARTY,
+    participantIdentitiesDumpImport: participantBootstrapDumpSecret
+      ? {
+          secretName: participantBootstrapDumpSecretName,
+          newParticipantIdentifier:
+            VALIDATOR_NEW_PARTICIPANT_ID ||
+            validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier,
+        }
+      : undefined,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
