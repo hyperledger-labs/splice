@@ -29,7 +29,7 @@ class SequencerPruningIntegrationTest
                   pruning = Some(
                     SequencerPruningConfig(
                       pruningInterval = NonNegativeFiniteDuration(2.seconds),
-                      retentionPeriod = NonNegativeFiniteDuration(90.seconds),
+                      retentionPeriod = NonNegativeFiniteDuration(120.seconds),
                     )
                   )
                 )
