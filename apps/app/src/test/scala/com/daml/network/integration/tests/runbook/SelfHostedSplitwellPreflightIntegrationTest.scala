@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{CommonCNNodeAppInstanceReferences, ProcessTestUtil, SplitwellTestUtil}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.typesafe.config.ConfigFactory
@@ -75,6 +76,13 @@ class SelfHostedSplitwellPreflightIntegrationTest
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
       .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
+      // Reduce top-up trigger polling interval to ensure that the first top-up gets done quickly enough during onboarding
+      .addConfigTransform((_, conf) =>
+        CNNodeConfigTransforms.updateAllValidatorConfigs_(
+          _.focus(_.automation.topupTriggerPollingInterval)
+            .replace(Some(NonNegativeFiniteDuration.ofSeconds(2)))
+        )(conf)
+      )
       .withManualStart
   }
   "run through runbook with self-hosted splitwell" in { implicit env =>

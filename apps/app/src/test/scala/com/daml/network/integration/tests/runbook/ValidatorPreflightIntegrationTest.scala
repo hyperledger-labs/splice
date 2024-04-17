@@ -429,7 +429,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         () => find(id("onboard-button")) should not be empty,
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 1.minute)(
         "Onboard wallet user", {
           click on "onboard-button"
         },

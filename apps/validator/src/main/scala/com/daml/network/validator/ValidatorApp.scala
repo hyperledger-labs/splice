@@ -714,6 +714,7 @@ class ValidatorApp(
           walletManager,
           scanConnection,
           loggerFactory,
+          retryProvider,
         )
       )
 

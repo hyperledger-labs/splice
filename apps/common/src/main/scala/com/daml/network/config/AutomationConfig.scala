@@ -30,6 +30,12 @@ case class AutomationConfig(
       * use higher jitter.
       */
     rewardOperationPollingJitter: Double = 0.5,
+    /** Polling interval used for the top-up trigger.
+      *  Only set as different from the base pollingInterval for some tests.
+      * This allows running the top-up trigger at a higher frequency to ensure that a validator's first top-up gets
+      * done quickly enough during init preventing tests from failing due to lack of traffic.
+      */
+    topupTriggerPollingInterval: Option[NonNegativeFiniteDuration] = None,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,

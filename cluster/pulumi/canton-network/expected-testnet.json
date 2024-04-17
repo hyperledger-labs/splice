@@ -1021,7 +1021,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 20000
         },
         "useSequencerConnectionsFromScan": true,
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
@@ -1785,10 +1785,10 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "initialHoldingFee": 0.0000192901,
         "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 2000000,
-          "baseRateBurstWindowMins": 10,
-          "extraTrafficPrice": 1,
-          "minTopupAmount": 10000000,
+          "baseRateBurstAmount": 165000,
+          "baseRateBurstWindowMins": 20,
+          "extraTrafficPrice": 20,
+          "minTopupAmount": 165000,
           "readVsWriteScalingFactor": 200
         },
         "initialTickDuration": "600 seconds",
@@ -2321,7 +2321,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 333300
+          "targetThroughput": 200000
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",

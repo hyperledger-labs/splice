@@ -24,6 +24,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
@@ -109,7 +110,10 @@ class ValidatorAutomationService(
     else
       registerTrigger(
         new TopupMemberTrafficTrigger(
-          triggerContext,
+          triggerContext.config.topupTriggerPollingInterval.fold(triggerContext)(
+            topupTriggerPollingInterval =>
+              triggerContext.focus(_.config.pollingInterval).replace(topupTriggerPollingInterval)
+          ),
           store,
           connection,
           participantAdminConnection,

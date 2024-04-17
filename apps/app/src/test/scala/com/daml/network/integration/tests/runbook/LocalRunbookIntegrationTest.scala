@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.sv.config.ExpectedValidatorOnboardingConfig
 import com.daml.network.util.ProcessTestUtil
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.typesafe.config.ConfigFactory
@@ -117,6 +118,13 @@ class LocalRunbookIntegrationTest
         (_, conf) => expectValidatorOnboarding(conf, "validatorsecret"),
         (_, conf) => localValidatorSvSponsorUrl(conf),
         (_, conf) => localScanUrl(conf),
+      )
+      // Reduce top-up trigger polling interval to ensure that the first top-up gets done quickly enough during onboarding
+      .addConfigTransform((_, conf) =>
+        CNNodeConfigTransforms.updateAllValidatorConfigs_(
+          _.focus(_.automation.topupTriggerPollingInterval)
+            .replace(Some(NonNegativeFiniteDuration.ofSeconds(2)))
+        )(conf)
       )
       .withManualStart
       .withThisSetup(env => {

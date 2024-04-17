@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
+import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.external.ans.AnsResource as r0
 import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
@@ -18,6 +19,7 @@ class HttpExternalAnsHandler(
     override val walletManager: UserWalletManager,
     scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -35,41 +37,46 @@ class HttpExternalAnsHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createAnsEntry") { implicit traceContext => _ =>
       val connection = getUserWallet(user).connection
-      for {
-        partyId <- connection.getPrimaryParty(user)
-        ansRules <- scanConnection.getAnsRules()
-        ansRulesCt = ansRules.toAssignedContract.getOrElse(
-          throw Status.Code.FAILED_PRECONDITION.toStatus
-            .withDescription(
-              s"AnsRules contract is not assigned to a domain."
-            )
-            .asRuntimeException()
-        )
-        update = ansRulesCt.exercise(
-          _.exerciseAnsRules_RequestEntry(
-            body.name,
-            body.url,
-            body.description,
-            partyId.toProtoPrimitive,
-          )
-            .map { e =>
-              r0.CreateAnsEntryResponse.OK(
-                d0.CreateAnsEntryResponse(
-                  e.exerciseResult.entryCid.contractId,
-                  e.exerciseResult.requestCid.contractId,
-                  body.name,
-                  body.url,
-                  body.description,
-                )
+      retryProvider.retryForClientCalls(
+        "createAnsEntry",
+        "create ANS entry",
+        for {
+          partyId <- connection.getPrimaryParty(user)
+          ansRules <- scanConnection.getAnsRules()
+          ansRulesCt = ansRules.toAssignedContract.getOrElse(
+            throw Status.Code.FAILED_PRECONDITION.toStatus
+              .withDescription(
+                s"AnsRules contract is not assigned to a domain."
               )
-            }
-        )
-        res <- connection
-          .submit(Seq(partyId), Seq(partyId), update)
-          .withDisclosedContracts(DisclosedContracts(ansRules))
-          .noDedup
-          .yieldResult()
-      } yield res
+              .asRuntimeException()
+          )
+          update = ansRulesCt.exercise(
+            _.exerciseAnsRules_RequestEntry(
+              body.name,
+              body.url,
+              body.description,
+              partyId.toProtoPrimitive,
+            )
+              .map { e =>
+                r0.CreateAnsEntryResponse.OK(
+                  d0.CreateAnsEntryResponse(
+                    e.exerciseResult.entryCid.contractId,
+                    e.exerciseResult.requestCid.contractId,
+                    body.name,
+                    body.url,
+                    body.description,
+                  )
+                )
+              }
+          )
+          res <- connection
+            .submit(Seq(partyId), Seq(partyId), update)
+            .withDisclosedContracts(DisclosedContracts(ansRules))
+            .noDedup
+            .yieldResult()
+        } yield res,
+        logger,
+      )
     }
   }
 

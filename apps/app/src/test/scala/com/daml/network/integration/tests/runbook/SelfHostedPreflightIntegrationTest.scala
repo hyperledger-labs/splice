@@ -12,6 +12,8 @@ import com.daml.network.util.{
   ProcessTestUtil,
   WalletFrontendTestUtil,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import monocle.macros.syntax.lens.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 
@@ -59,6 +61,13 @@ class SelfHostedPreflightIntegrationTest
       // Obtain a fresh onboarding secret from an SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
+      // Reduce top-up trigger polling interval to ensure that the first top-up gets done quickly enough during onboarding
+      .addConfigTransform((_, conf) =>
+        CNNodeConfigTransforms.updateAllValidatorConfigs_(
+          _.focus(_.automation.topupTriggerPollingInterval)
+            .replace(Some(NonNegativeFiniteDuration.ofSeconds(2)))
+        )(conf)
+      )
       .withManualStart
 
   "run through runbook with self-hosted validator" in { implicit env =>

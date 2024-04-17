@@ -6,13 +6,14 @@ export type SynchronizerFeesConfig = {
   readVsWriteScalingFactor: number;
 };
 
-// default values for domain fees parameters within our clusters.
+// default values for domain fees parameters within our clusters,
+// assuming a network with 4-6 SVs and formula(s) outlined in #11286
 // These should generally be kept in sync with the values defined in the SynchronizerFeesConfig in SvAppConfig.scala
 const domainFeesDefaults: SynchronizerFeesConfig = {
-  extraTrafficPrice: 1.0,
-  minTopupAmount: 10_000_000,
-  baseRateBurstAmount: 100 * 20 * 1000,
-  baseRateBurstWindowMins: 10,
+  extraTrafficPrice: 20.0,
+  minTopupAmount: 165_000,
+  baseRateBurstAmount: 165_000,
+  baseRateBurstWindowMins: 20,
   readVsWriteScalingFactor: 200,
 };
 
@@ -47,6 +48,7 @@ export const initialSynchronizerFeesConfig: SynchronizerFeesConfig = {
 export type ValidatorTopupConfig = {
   targetThroughput: number;
   minTopupInterval: string;
+  trafficReservedForTopups?: number;
 };
 
 export const svValidatorTopupConfig: ValidatorTopupConfig = {
@@ -55,6 +57,7 @@ export const svValidatorTopupConfig: ValidatorTopupConfig = {
 };
 
 export const nonSvValidatorTopupConfig: ValidatorTopupConfig = {
-  targetThroughput: 33330, // 10x the base rate to reduce the chance of validators locking up (see #6313)
+  // TODO(#11377): Determine the best defaults here
+  targetThroughput: 20000,
   minTopupInterval: '1m',
 };
