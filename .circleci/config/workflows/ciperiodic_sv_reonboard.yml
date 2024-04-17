@@ -52,6 +52,7 @@ workflow:
           wait_for_sv: false
           requires:
             - deploy_sv_runbook
+            - preflight_sv_check
       - deploy_validator_to_recover_sv_amulets:
           <<: *main-branch-only
           context:
@@ -87,6 +88,15 @@ workflow:
           wait_for_sv: false
           requires:
             - redeploy_sv_runbook
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
