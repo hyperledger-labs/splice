@@ -2397,11 +2397,12 @@ function subcmd_disaster_recovery_test() {
     echo "$id" > id-${sv}.json
   done
 
-#    TODO(#10438): This test currently doesn't actually kill the domain because that breaks certain things.
-#   _info "Scaling down domain components"
-#   for sv in 1 2 3 4; do
-#     kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-cometbft global-domain-0-mediator global-domain-0-sequencer
-#   done
+  _info "Scaling down cometbft"
+  for sv in 1 2 3 4; do
+    kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-cometbft
+  done
+
+  # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
 
   _info "Finding agreed upon timestamp"
   for sv in 1 2 3 4; do
@@ -2451,8 +2452,10 @@ function subcmd_disaster_recovery_test() {
     echo "$dump" > dump${sv}.json
   done
 
-  _info "Preparing for upgrade (will create the PVCs and mount them to sv apps)"
-  GLOBAL_DOMAIN_PREPARE_UPGRADE="true" _cluster_apply "$version"
+  _info "Scaling down sequencers and mediators"
+  for sv in 1 2 3 4; do
+    kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-sequencer global-domain-0-mediator
+  done
 
   for sv in 1 2 3 4; do
     pod=$(kubectl get pod -n sv-${sv} -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
