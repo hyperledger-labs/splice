@@ -1576,11 +1576,6 @@ subcommand_whitelist[apply_sv]="Apply the sv-runbook Pulumi stack"
 function subcmd_apply_sv(){
     _needs_auth0_sv_management_api_creds
 
-    local -x TARGET_CLUSTER="${1-}"
-    if [ -z "$TARGET_CLUSTER" ]; then
-        _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
-    fi
-
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
@@ -1624,8 +1619,6 @@ function subcmd_ci_apply_sv() {
        _info "Bootstrapping SV from ${BOOTSTRAPPING_CONFIG}"
     fi
 
-    local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
-
     local -x CHARTS_VERSION="${1-}"
 
     _uses_pulumi_stack sv-runbook
@@ -1666,11 +1659,6 @@ subcommand_whitelist[apply_validator]="Apply the validator-runbook Pulumi stack"
 
 function subcmd_apply_validator(){
     _needs_auth0_sv_management_api_creds
-
-    local -x TARGET_CLUSTER="${1-}"
-    if [ -z "$TARGET_CLUSTER" ]; then
-        _error "Usage: $SCRIPTNAME apply_validator <target-domain-cluster> [<charts-version>]"
-    fi
 
     _production_gate
     _prompt_to_confirm
@@ -1714,8 +1702,6 @@ function subcmd_ci_apply_validator() {
     if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
        _info "Bootstrapping Validator from ${BOOTSTRAPPING_CONFIG}"
     fi
-
-    local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
     local -x CHARTS_VERSION="${1-}"
 
@@ -2327,8 +2313,6 @@ function subcmd_hard_domain_migration_prepare() {
     subcmd_pulumi canton-network up "$@"
   fi
 
-  export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
-
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
     subcmd_pulumi sv-runbook up "$@"
   fi
@@ -2380,8 +2364,6 @@ function subcmd_hard_domain_migration_migrate() {
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
     subcmd_pulumi canton-network up "$@"
   fi
-
-  export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
     subcmd_pulumi sv-runbook up "$@"

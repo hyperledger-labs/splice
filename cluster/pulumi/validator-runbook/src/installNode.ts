@@ -28,11 +28,7 @@ import {
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
-import {
-  CLUSTER_BASENAME,
-  TARGET_CLUSTER,
-  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-} from './utils';
+import { CLUSTER_BASENAME, VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE } from './utils';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -57,7 +53,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ? 'Using locally built charts by default'
       : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
-  console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
+  console.error(`CLUSTER_BASENAME: ${CLUSTER_BASENAME}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
 
   const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
@@ -73,10 +69,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = 'validatorsecret';
 
-  const loopback =
-    TARGET_CLUSTER === CLUSTER_BASENAME
-      ? installLoopback(xns, CLUSTER_BASENAME, defaultVersion)
-      : null;
+  const loopback = installLoopback(xns, CLUSTER_BASENAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
@@ -215,7 +208,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
 
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
+      TARGET_CLUSTER: CLUSTER_BASENAME,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `https://scan.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,

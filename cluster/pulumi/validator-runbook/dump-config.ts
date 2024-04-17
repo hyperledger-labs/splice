@@ -8,7 +8,6 @@ initDumpConfig();
 
 async function main() {
   process.env.GCP_CLUSTER_BASENAME = 'validatorrun';
-  process.env.TARGET_CLUSTER = 'validatorrun.network.com';
   process.env.ARTIFACTORY_USER = 'artie';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
 

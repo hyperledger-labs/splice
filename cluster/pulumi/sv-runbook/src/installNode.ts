@@ -41,7 +41,7 @@ import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installDecentralizedSynchronizerNode } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
-import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
+import { CLUSTER_BASENAME } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -83,7 +83,7 @@ export async function installNode(
       ? 'Using locally built charts by default'
       : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
-  console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
+  console.error(`CLUSTER_BASENAME: ${CLUSTER_BASENAME}`);
   console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
 
   const xns = exactNamespace(svNamespaceStr, true);
@@ -101,10 +101,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback =
-    TARGET_CLUSTER === CLUSTER_BASENAME
-      ? installLoopback(xns, CLUSTER_BASENAME, defaultVersion)
-      : null;
+  const loopback = installLoopback(xns, CLUSTER_BASENAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
@@ -303,7 +300,7 @@ async function installSvAndValidator(
   const valuesFromYamlFile = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
-      TARGET_CLUSTER: TARGET_CLUSTER,
+      TARGET_CLUSTER: CLUSTER_BASENAME,
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
@@ -388,7 +385,7 @@ async function installSvAndValidator(
 
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
+      TARGET_CLUSTER: CLUSTER_BASENAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
     }),
     metrics: {
@@ -413,7 +410,7 @@ async function installSvAndValidator(
 
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
+      TARGET_CLUSTER: CLUSTER_BASENAME,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
@@ -421,7 +418,7 @@ async function installSvAndValidator(
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
-        TARGET_CLUSTER: TARGET_CLUSTER,
+        TARGET_CLUSTER: CLUSTER_BASENAME,
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
       }
     ),

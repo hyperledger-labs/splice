@@ -16,7 +16,7 @@ import {
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
-import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
+import { CLUSTER_BASENAME } from './utils';
 
 type NodeKeyContent = { priv_key: { type: string; value: Output<string> | string } };
 type ValidatorKeyContent = {
@@ -82,7 +82,7 @@ export function installCometBftNode(
       const cometBftValues = loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
         {
-          TARGET_CLUSTER: TARGET_CLUSTER,
+          TARGET_CLUSTER: CLUSTER_BASENAME,
           MIGRATION_ID: migrationId.toString(),
           YOUR_SV_NAME: svName,
           YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',

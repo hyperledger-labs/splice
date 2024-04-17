@@ -8,7 +8,6 @@ initDumpConfig();
 
 async function main() {
   process.env.GCP_CLUSTER_BASENAME = 'svrun';
-  process.env.TARGET_CLUSTER = 'svrun.network.com';
   process.env.ARTIFACTORY_USER = 'artie';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
 

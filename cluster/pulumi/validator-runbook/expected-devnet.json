@@ -136,6 +136,26 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "validator",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "validatorrun"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+      }
+    },
+    "name": "loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
     "custom": false,
     "id": "organization/infra/infra.validatorrun",
     "inputs": {
@@ -246,7 +266,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "validatorrun.network.com.network.canton.global",
+        "clusterUrl": "validatorrun.network.canton.global",
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
