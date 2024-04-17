@@ -2,7 +2,12 @@
 
 # Support both "./lock-first-scratch.sh" and "source lock-first-scratch.sh / .lock-first-scratch.sh"
 # The latter puts you in the scratch directory, so it's slightly more convenient.
-script_is_not_sourced="(( SHLVL >= 2 ))"
+
+script_is_not_sourced=0
+if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
+    script_is_not_sourced=1
+fi
+
 if (( script_is_not_sourced )); then
   set -eou pipefail
 fi
@@ -22,16 +27,14 @@ for scratch in "${scratches[@]}"; do
   echo "Attempting to lock $scratch..."
   cd "$REPO_ROOT/cluster/deployment/$scratch"
   locked_scratch="$scratch"
-  if (( script_is_not_sourced )); then
-    direnv exec . cncluster lock && successful="true" && break
-  else
-    cncluster lock && successful="true" && break
-  fi
+  direnv exec . cncluster lock && successful="true" && break
 done
 
 if [ -z "$successful" ]; then
   echo "Failed to lock any scratch."
-  exit 1
+  if (( script_is_not_sourced )) ; then
+    exit 1
+  fi
 else
   echo "Successfully locked $locked_scratch."
   if (( script_is_not_sourced )) ; then
