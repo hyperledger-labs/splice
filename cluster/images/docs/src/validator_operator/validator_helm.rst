@@ -258,7 +258,7 @@ To configure `Auth0 <https://auth0.com>`_ as your validator's OIDC provider, per
     b. Choose "Single Page Web Applications", call it ``Wallet web UI``, and click Create.
     c. Determine the URL for your validator's wallet UI.
        If you're using the ingress configuration of this runbook, that would be ``https://wallet.validator.YOUR_HOSTNAME``.
-    d. In the Auth0 application settings, add the SV URL to the following:
+    d. In the Auth0 application settings, add the URL of the validator wallet to the following:
 
        - "Allowed Callback URLs"
        - "Allowed Logout URLs"
@@ -630,4 +630,3 @@ The following steps can be taken to restore a node from backups:
 
 **NOTE:** Currently, you have to manually re-onboard any users that were
 onboarded after the backup was taken.
-
