@@ -1,23 +1,30 @@
-apiVersion: batch/v1
-kind: CronJob
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: load-tester
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
-  schedule: "{{ .Values.schedule }}"
-  concurrencyPolicy: Replace
-  jobTemplate:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
     spec:
-      template:
-        spec:
-          restartPolicy: OnFailure
-          containers:
-            - name: load-tester
-              image: "{{ .Values.imageRepo }}/load-tester:{{ (.Values.cluster).imageTag }}"
-              imagePullPolicy: Always
-              env:
-                - name: EXTERNAL_CONFIG
-                  value: {{ .Values.config | quote }}
-                - name: K6_PROMETHEUS_RW_SERVER_URL
-                  value: "{{ .Values.prometheusRw }}"
-                - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
-                  value: "true"
+      containers:
+        - name: load-tester
+          image: "{{ .Values.imageRepo }}/load-tester:{{ (.Values.cluster).imageTag }}"
+          imagePullPolicy: Always
+          env:
+            - name: EXTERNAL_CONFIG
+              value: {{ .Values.config | quote }}
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: "{{ .Values.prometheusRw }}"
+            - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
+              value: "true"

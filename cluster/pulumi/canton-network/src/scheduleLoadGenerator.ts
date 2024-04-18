@@ -33,13 +33,6 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
       { dependsOn: [xns.ns] }
     );
 
-    // trigger the job every 24h
-    const date = new Date();
-    date.setMinutes(date.getMinutes() + 5);
-    const minute = date.getMinutes();
-    const hour = date.getHours();
-    const schedule = `${minute} ${hour} * * *`;
-
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
     const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
     const usersPassword = requireEnv('K6_USERS_PASSWORD');
@@ -85,14 +78,13 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
       'load-tester',
       'cn-load-tester',
       {
-        schedule,
         prometheusRw,
         config: JSON.stringify({
           isDevNet,
           usersPerValidator: 10,
           validators,
           test: {
-            duration: `${24 * 60 - 5}m`,
+            duration: `365d`,
             iterationsPerMinute: 60,
           },
         }),
