@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 103,
+  "id": 113,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -360,6 +360,87 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1.2,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.4
+              },
+              {
+                "color": "purple",
+                "value": 1.5
+              }
+            ]
+          },
+          "unit": "recpm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 19,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "text": {}
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "max by(namespace, report_publisher) (rate(cn_sv_status_report_number{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}[5m]) * 60)",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{report_publisher}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Reporting Frequency (current)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "Maximal minus minimal CometBFT height reported by the SV status reports seen from one SV's perspective",
       "fieldConfig": {
         "defaults": {
@@ -423,8 +504,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 9
+        "x": 0,
+        "y": 24
       },
       "id": 15,
       "options": {
@@ -525,7 +606,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 24
       },
       "id": 5,
       "options": {
@@ -563,7 +644,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 32
       },
       "id": 12,
       "panels": [],
@@ -635,7 +716,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 33
       },
       "id": 18,
       "options": {
@@ -731,7 +812,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 33
       },
       "id": 4,
       "options": {
@@ -814,7 +895,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -822,8 +904,7 @@
               }
             ]
           },
-          "unit": "none",
-          "unitScale": true
+          "unit": "none"
         },
         "overrides": []
       },
@@ -831,7 +912,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 41
       },
       "id": 13,
       "options": {
