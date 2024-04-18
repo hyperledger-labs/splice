@@ -15,8 +15,10 @@ import java.nio.file.{Path, Paths}
 import better.files.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.{BuildInfo, DarResources}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import monocle.macros.syntax.lens.*
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -44,6 +46,24 @@ class AppUpgradeIntegrationTest
     .addConfigTransform((_, config) => {
       // Makes the test a bit faster and easier to debug. See #11488
       CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+    })
+    .addConfigTransform((_, config) => {
+      config
+        .focus(_.validatorApps)
+        .modify(_.updatedWith(InstanceName.tryCreate("splitwellValidatorApp"))(_.map {
+          splitwellValidator =>
+            splitwellValidator
+              .focus(_.appInstances)
+              .modify(_.map {
+                case (n @ "splitwell", appInstance) =>
+                  n -> appInstance
+                    .focus(_.dars)
+                    .modify(_.map { darPath =>
+                      Paths.get(darPath.toString.replace("current", "0.1.1"))
+                    })
+                case x => x
+              })
+        }))
     })
 
   "A set of CN apps" should {
