@@ -1486,6 +1486,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
+            # TODO (#11584): remove this once there's a new base version.
+            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
+                export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
+            fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -1590,6 +1595,11 @@ jobs:
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
+            fi
+            # TODO (#11584): remove this once there's a new base version.
+            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
+                export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -1779,6 +1789,7 @@ jobs:
             # TODO (#11584): remove this once there's a new base version.
             if [[ << parameters.cluster >> == "ciupgrade" ]]; then
                 export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -4547,8 +4558,9 @@ workflows:
           parallelism: 1
           requires:
             - deploy_final_upgrade
+      # TODO (#10966): this step should be disabled when there's been a daml ugprade
       - preflight_sv_check:
-          name: "preflight_sv_check_final_upgrade"
+          name: "preflight_sv_check_before_sv_upgrade"
           <<: *main-branch-only
           context:
             - artifactory
@@ -4567,6 +4579,32 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - deploy_final_upgrade
+      - deploy_sv_runbook:
+          name: "upgrade_sv_runbook"
+          # by resetting the SV runbook, it's as if a new SV was onboarded,
+          # thus testing that SVs joining after an upgrade also work
+          reset_cluster: true
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciupgrade"
+          send_deployment_notification: false
+          requires:
+            - preflight_check_final_upgrade
+            - preflight_sv_check_before_sv_upgrade
+            - preflight_validator_final_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_after_sv_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - upgrade_sv_runbook
 
   deploy_ciupgrade_migration:
     when:

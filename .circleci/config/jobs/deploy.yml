@@ -96,6 +96,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
+            # TODO (#11584): remove this once there's a new base version.
+            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
+                export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
+            fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -200,6 +205,11 @@ jobs:
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
+            fi
+            # TODO (#11584): remove this once there's a new base version.
+            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
+                export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -389,6 +399,7 @@ jobs:
             # TODO (#11584): remove this once there's a new base version.
             if [[ << parameters.cluster >> == "ciupgrade" ]]; then
                 export ENABLE_CLOUD_SQL=false
+                export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
