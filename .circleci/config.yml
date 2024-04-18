@@ -4311,6 +4311,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          send_deployment_notification: false
           requires:
             - docker_images_push
       - deploy_sv_runbook:
@@ -4320,6 +4321,7 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
+          send_deployment_notification: false
           requires:
             - deploy_cluster
       - preflight_check:
@@ -4356,6 +4358,7 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
+          send_deployment_notification: false
           requires:
             - deploy_validator_to_recover_sv_amulets
       - preflight_check:
