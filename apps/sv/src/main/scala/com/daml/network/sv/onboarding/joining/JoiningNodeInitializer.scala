@@ -310,6 +310,7 @@ class JoiningNodeInitializer(
           // Finally, fully onboard the sequencer and mediator
           _ <-
             localSynchronizerNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
+          _ = dsoAutomationService.registerPostSequencerInitTriggers()
           _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
             decentralizedSynchronizer
           )

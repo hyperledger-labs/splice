@@ -227,14 +227,6 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new ReconcileSequencerLimitWithMemberTrafficTrigger(
-        triggerContext,
-        dsoStore,
-        localSynchronizerNode.map(_.sequencerAdminConnection),
-        config.trafficBalanceReconciliationDelay,
-      )
-    )
-    registerTrigger(
       new SvOnboardingPromoteParticipantToSubmitterTrigger(
         onboardingTriggerContext,
         dsoStore,
@@ -318,6 +310,17 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
+      )
+    )
+  }
+
+  def registerPostSequencerInitTriggers(): Unit = {
+    registerTrigger(
+      new ReconcileSequencerLimitWithMemberTrafficTrigger(
+        triggerContext,
+        dsoStore,
+        localSynchronizerNode.map(_.sequencerAdminConnection),
+        config.trafficBalanceReconciliationDelay,
       )
     )
   }
