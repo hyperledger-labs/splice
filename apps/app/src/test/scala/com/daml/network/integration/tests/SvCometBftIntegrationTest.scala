@@ -19,6 +19,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.sv.cometbft.{CometBftConnectionConfig, CometBftHttpRpcClient}
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.util.SvTestUtil
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.circe.Json
@@ -36,31 +37,63 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
-          config
-            .focus(_.cometBftConfig)
-            .replace(
-              Some(
-                CometBftConfig(
-                  enabled = true
+      .addConfigTransforms(
+        (_, config) =>
+          CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
+            config
+              .focus(_.cometBftConfig)
+              .replace(
+                Some(
+                  CometBftConfig(
+                    enabled = true
+                  )
                 )
               )
-            )
-            .focus(_.automation.enableCometbftReconciliation)
-            .replace(true)
-        }(config)
+              .focus(_.automation.enableCometbftReconciliation)
+              .replace(true)
+          }(config),
+        (_, config) =>
+          config.copy(
+            svApps = config.svApps +
+              (InstanceName.tryCreate("sv2Local") -> {
+                config.svApps(InstanceName.tryCreate("sv2"))
+              })
+          ),
       )
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
+      .withManualStart
 
   "all nodes become validators" in { implicit env =>
-    forAll(env.svs.local) { sv =>
+    startAllSync(sv1Backend, sv1ScanBackend, sv2Backend, sv3Backend, sv4Backend)
+    forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
       eventually(timeUntilSuccess = 2.minute) {
         withClue(s"CometBFT node for ${sv.name} becomes a validator") {
           cometBFTnodeIsUpToDateValidator(sv)
         }
       }
+    }
+  }
+
+  "sv2 can reonboard a different cometbft node" in { implicit env =>
+    def getValidatorAddresses() =
+      sv1Backend
+        .cometBftNodeDump()
+        .validators
+        .hcursor
+        .downField("validators")
+        .as[Seq[io.circe.Json]]
+        .value
+        .map(_.hcursor.downField("address").as[String].value)
+
+    val prevAddresses = getValidatorAddresses()
+    prevAddresses should have size 4
+    sv2Backend.stop()
+    sv2LocalBackend.startSync()
+    eventually() {
+      val newAddresses = getValidatorAddresses()
+      prevAddresses should not be newAddresses
+      newAddresses should have size 4
     }
   }
 

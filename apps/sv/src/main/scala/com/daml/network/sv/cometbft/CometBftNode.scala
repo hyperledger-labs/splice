@@ -55,6 +55,7 @@ class CometBftNode(
         owningSvNode,
         genesisSigner,
       )
+      localConfig <- getLocalNodeConfig()
       _ =
         if (currentKeysSetToGenesisKeys) {
           logger.info(
@@ -83,7 +84,7 @@ class CometBftNode(
                 change = Some(
                   SvNodeConfigChange.of(
                     SetConfig(
-                      SvNodeConfig(
+                      localConfig.copy(
                         governanceKeys = governanceKeysToKeep :+
                           GovernanceKey(
                             cometBftRequestSigner.PublicKeyBase64,
