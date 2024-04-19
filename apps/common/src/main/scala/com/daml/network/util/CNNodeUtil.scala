@@ -140,8 +140,14 @@ object CNNodeUtil {
       logger,
     )
 
-  lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6
-    new splice.fees.RatePerRound(damlDecimal(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+  val defaultInitialTickDuration = NonNegativeFiniteDuration.ofMinutes(10)
+
+  lazy val defaultHoldingFee = // ~= 1.9290123456790123E-5 ~= 1.9E-5
+    new splice.fees.RatePerRound(
+      damlDecimal(
+        1.0 / 360.0 / (24.0 * 60.0 * 60.0 / defaultInitialTickDuration.duration.toSeconds)
+      )
+    )
 
   // TODO (#6285) surely there's a better way to define Daml Numeric values in Scala
   def damlDecimal(x: Double): java.math.BigDecimal =

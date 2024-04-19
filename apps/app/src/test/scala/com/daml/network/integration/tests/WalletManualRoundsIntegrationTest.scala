@@ -103,7 +103,7 @@ class WalletManualRoundsIntegrationTest
           aliceWalletClient.list().amulets,
           walletUsdToAmulet(25),
           sv1ScanBackend,
-          Duration.ofDays(10),
+          Duration.ofHours(60),
           CantonTimestamp.now(),
         )
 
@@ -128,7 +128,10 @@ class WalletManualRoundsIntegrationTest
 
         clue("Check wallet after advancing to next round") {
           val expectedFee =
-            (walletUsdToAmulet(0.000004), walletUsdToAmulet(0.000005))
+            (
+              defaultHoldingFeeAmulet - walletUsdToAmulet(0.000001),
+              defaultHoldingFeeAmulet + walletUsdToAmulet(0.000001),
+            )
           eventually()(aliceWalletClient.list().amulets.head.round shouldBe startRound + 1)
           assertInRange(aliceWalletClient.list().amulets.head.accruedHoldingFee, expectedFee)
           assertInRange(aliceWalletClient.list().amulets.head.effectiveAmount, halfOriginalAmount)
@@ -165,7 +168,7 @@ class WalletManualRoundsIntegrationTest
         aliceWalletClient.list().amulets,
         lockedQty,
         sv1ScanBackend,
-        Duration.ofDays(10),
+        Duration.ofHours(60),
         CantonTimestamp.now(),
       )
 

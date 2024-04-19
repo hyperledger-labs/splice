@@ -373,7 +373,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           domainConnectionConfig.sequencerConnections.connections.size
         )
         .value
-      domainConnectionConfig.sequencerConnections.submissionRequestAmplification shouldBe CNThresholds
+      domainConnectionConfig.sequencerConnections.submissionRequestAmplification.factor shouldBe CNThresholds
         .sequencerSubmissionRequestAmplification(
           domainConnectionConfig.sequencerConnections.connections.size
         )

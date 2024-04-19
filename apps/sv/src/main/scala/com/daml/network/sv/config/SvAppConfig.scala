@@ -71,7 +71,7 @@ object SvOnboardingConfig {
       name: String,
       founderSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
-      initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
+      initialTickDuration: NonNegativeFiniteDuration = CNNodeUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,

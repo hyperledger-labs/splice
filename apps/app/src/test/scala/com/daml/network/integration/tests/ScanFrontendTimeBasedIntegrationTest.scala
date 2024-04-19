@@ -123,10 +123,11 @@ class ScanFrontendTimeBasedIntegrationTest
               s"${CNNodeUtil.defaultLockHolderFee.fee.doubleValue()} USD"
             )
 
-            find(id("round-tick-duration")).value.text should matchText(
-              // For some reason the `.toMinutes` method rounds down to 0
-              s"${defaultTickDuration.duration.toSeconds / 60.toDouble} Minutes"
-            )
+            find(id("round-tick-duration")).value.text should matchText {
+              // the `.toMinutes` method rounds down to 0
+              val minutes = BigDecimal(defaultTickDuration.duration.toSeconds) / 60
+              s"${minutes.bigDecimal.stripTrailingZeros.toPlainString} Minutes"
+            }
 
             findAll(className("transfer-fee-row")).toList
               .map(_.text)

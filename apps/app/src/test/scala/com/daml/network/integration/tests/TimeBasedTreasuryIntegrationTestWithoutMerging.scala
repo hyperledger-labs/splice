@@ -18,7 +18,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
@@ -172,7 +172,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(
         new Tuple2(
-          now.add(Duration.ofSeconds(160 * 4 - 10)).toInstant,
+          now
+            // wait 4 "advanceRoundsByOneTick" (tick + 10s) before changing config
+            .add(tickDurationWithBuffer multipliedBy 4 minusSeconds 10)
+            .toInstant,
           mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 3),
         )
       ).asJava,

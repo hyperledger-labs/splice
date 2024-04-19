@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.EnrichedDurations.*
 
 import java.time.Duration as JavaDuration
@@ -94,7 +93,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     initDsoWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
-    val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
+    val doubledTickDuration = defaultTickDuration * 2
 
     setFutureConfigSchedule(
       createConfigSchedule(
@@ -195,7 +194,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     initDsoWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
-    val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
+    val reducedTickDuration = defaultTickDuration * 0.5
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.activeSynchronizer
     setFutureConfigSchedule(
