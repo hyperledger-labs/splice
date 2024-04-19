@@ -592,9 +592,7 @@ jobs:
           name: Launches the deploy_ciupgrade workflow, disabling partial upgrade if there are Helm/Pulumi changes
           command: |
             source .envrc.vars
-            
             run_partial_upgrade=""
-            
             if build-tools/helm-change-vs-base; then
               echo "Proceeding with partial upgrade."
               run_partial_upgrade="true"
@@ -602,9 +600,7 @@ jobs:
               echo "Skipping cluster partial upgrade and preflights steps."
               run_partial_upgrade="false"
             fi
-            
             latest_base_version=$(build-tools/find_latest_base_version.sh)
-            
             curl --fail-with-body --request POST \
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
@@ -662,6 +658,7 @@ jobs:
           cmd_name: Backup nodes
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          no_output_timeout: "20m"
           cmd: |
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
