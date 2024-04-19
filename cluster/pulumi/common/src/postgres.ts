@@ -164,17 +164,14 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
       xns,
       name,
       'cn-postgres',
-      _.merge(
-        {
-          db: {
-            volumeSize: clusterSmallDisk ? '240Gi' : undefined,
-          },
-          persistence: {
-            secretName: this.secretName,
-          },
+      _.merge(values || {}, {
+        db: {
+          volumeSize: clusterSmallDisk ? '240Gi' : undefined,
         },
-        values || {}
-      ),
+        persistence: {
+          secretName: this.secretName,
+        },
+      }),
       defaultVersion,
       { dependsOn: [passwordSecret] }
     );

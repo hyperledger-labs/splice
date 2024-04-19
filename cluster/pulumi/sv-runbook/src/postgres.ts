@@ -23,7 +23,7 @@ export function installPostgres(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`
     );
     const volumeSizeOverride = determineVolumeSizeOverride(valuesFromFile.db?.volumeSize);
-    const values = _.merge({ db: { volumeSize: volumeSizeOverride } }, valuesFromFile || {});
+    const values = _.merge(valuesFromFile || {}, { db: { volumeSize: volumeSizeOverride } });
     return new CNPostgres(xns, name, secretName, values);
   }
 }

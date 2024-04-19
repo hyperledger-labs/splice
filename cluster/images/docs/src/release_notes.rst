@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Removed PVC size overrides in example `postgres-values-participant.yaml` and `postgres-values-sequencer.yaml` files. The Postgres instances used by the participant and sequencer should use the default size instead (1300Gi).
+
 0.1.4
 -----
 
