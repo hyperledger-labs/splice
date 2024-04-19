@@ -1,5 +1,7 @@
 package com.daml.network.validator.migration
 
+import cats.syntax.either.*
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.Dar
 import com.daml.network.util
@@ -34,6 +36,19 @@ final case class DomainMigrationDump(
       param("darsSize", _.dars.size),
       param("createdAt", _.createdAt),
     )
+
+  def toHttp: http.DomainMigrationDump = http.DomainMigrationDump(
+    participant = participant.toHttp,
+    acsSnapshot = Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
+    acsTimestamp = acsTimestamp.toString,
+    dars = dars.map { dar =>
+      val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
+      http.Dar(dar.hash.toHexString, content)
+    }.toVector,
+    migrationId = migrationId,
+    domainId = domainId.toProtoPrimitive,
+    createdAt = createdAt.toString,
+  )
 }
 
 object DomainMigrationDump {
@@ -73,4 +88,31 @@ object DomainMigrationDump {
   @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   implicit val domainMigrationCodec: Codec[DomainMigrationDump] =
     deriveCodec[DomainMigrationDump]
+
+  private val base64Decoder = Base64.getDecoder()
+
+  def fromHttp(response: http.DomainMigrationDump) = for {
+    participant <- NodeIdentitiesDump
+      .fromHttp(ParticipantId.tryFromProtoPrimitive, response.participant)
+      .leftMap(_ => "Failed to parse Participant Node Identities")
+    domainId = DomainId.tryFromString(response.domainId)
+    migrationId = response.migrationId
+    acsSnapshot = {
+      val decoded = base64Decoder.decode(response.acsSnapshot)
+      ByteString.copyFrom(decoded)
+    }
+    dars = response.dars.map { dar =>
+      val decoded = base64Decoder.decode(dar.content)
+      Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
+    }
+    createdAt = Instant.parse(response.createdAt),
+  } yield DomainMigrationDump(
+    domainId = domainId,
+    migrationId = migrationId,
+    participant = participant,
+    acsSnapshot = acsSnapshot,
+    acsTimestamp = Instant.parse(response.acsTimestamp),
+    dars = dars,
+    createdAt = createdAt,
+  )
 }

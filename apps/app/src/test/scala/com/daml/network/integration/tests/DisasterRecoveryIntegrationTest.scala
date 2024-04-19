@@ -2,12 +2,17 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
+import com.daml.network.config.{
+  CNNodeConfigTransforms,
+  CNParticipantClientConfig,
+  NetworkAppClientConfig,
+}
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
   CNNodeAppBackendReference,
   ScanAppBackendReference,
   SvAppBackendReference,
+  ValidatorAppBackendReference,
 }
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
@@ -25,6 +30,7 @@ import com.daml.network.sv.migration.{
   DomainMigrationDump,
   SynchronizerNodeIdentities,
 }
+import com.daml.network.validator.migration.{DomainMigrationDump as ValidatorDomainMigrationDump}
 import com.daml.network.util.{
   DomainMigrationUtil,
   ProcessTestUtil,
@@ -41,7 +47,9 @@ import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{
+  ClientConfig,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
@@ -76,7 +84,7 @@ class DisasterRecoveryIntegrationTest
         )
       )
       .flatten ++
-      Seq("sequencer_driver_disaster_recovery_new") ++
+      Seq("sequencer_driver_disaster_recovery_new", "participant_extra_disaster_recovery_new") ++
       super.usesDbs
   }
 
@@ -85,6 +93,7 @@ class DisasterRecoveryIntegrationTest
   // Runs against a temporary Canton instance.
   override lazy val resetRequiredTopologyState = false
 
+  // Any app with port starting with 28 or with name suffixed by 'Local' is an app started after the disaster
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -147,6 +156,34 @@ class DisasterRecoveryIntegrationTest
                     ),
                     domainMigrationId = 1L,
                   )
+            ) + (
+              InstanceName.tryCreate("aliceValidatorLocal") -> {
+                val aliceValidatorConf = conf
+                  .validatorApps(InstanceName.tryCreate("aliceValidator"))
+                aliceValidatorConf
+                  .copy(
+                    participantClient = CNParticipantClientConfig(
+                      ClientConfig(port = Port.tryCreate(28502)),
+                      aliceValidatorConf.participantClient.ledgerApi.copy(
+                        clientConfig =
+                          aliceValidatorConf.participantClient.ledgerApi.clientConfig.copy(
+                            port = Port.tryCreate(28501)
+                          )
+                      ),
+                    ),
+                    scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
+                    domains = ValidatorSynchronizerConfig(global =
+                      ValidatorDecentralizedSynchronizerConfig(
+                        alias = DomainAlias.tryCreate("global"),
+                        url = Some("http://localhost:28108"),
+                      )
+                    ),
+                    domainMigrationId = 1L,
+                    restoreFromMigrationDump = Some(
+                      migrationDumpFilePath("aliceValidator").path
+                    ),
+                  )
+              }
             ),
             walletAppClients = conf.walletAppClients + (
               InstanceName.tryCreate("sv1WalletLocal") ->
@@ -155,6 +192,11 @@ class DisasterRecoveryIntegrationTest
                   .copy(
                     adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:28103")
                   )
+            ) + (
+              InstanceName.tryCreate("aliceValidatorLocalWallet") ->
+                conf
+                  .walletAppClients(InstanceName.tryCreate("aliceWallet"))
+                  .copy(adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:28503"))
             ),
           ),
       )
@@ -162,9 +204,26 @@ class DisasterRecoveryIntegrationTest
         (CNNodeConfigTransforms
           .setSomeSvAppPortsPrefix(28, Seq("sv1Local", "sv2Local", "sv3Local", "sv4Local")) compose
           CNNodeConfigTransforms.setSomeScanAppPortsPrefix(28, Seq("sv1ScanLocal")) compose
-          CNNodeConfigTransforms.setSomeValidatorAppPortsPrefix(28, Seq("sv1ValidatorLocal")))(
+          CNNodeConfigTransforms
+            .setSomeValidatorAppPortsPrefix(28, Seq("sv1ValidatorLocal", "aliceValidatorLocal")))(
           conf
         )
+      )
+      .addConfigTransform((_, conf) =>
+        CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+          if (name == "aliceValidator") {
+            // update validator app config for the aliceValidator to remove the extra domain and update port
+            val newConfig = validatorConfig.copy(
+              domains = ValidatorSynchronizerConfig(global =
+                ValidatorDecentralizedSynchronizerConfig(
+                  alias = DomainAlias.tryCreate("global"),
+                  url = Some("http://localhost:27108"),
+                )
+              )
+            )
+            newConfig
+          } else validatorConfig
+        )(conf)
       )
       .withManualStart
 
@@ -207,6 +266,7 @@ class DisasterRecoveryIntegrationTest
     import env.executionContext
 
     val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+
     val retryProvider = new RetryProvider(
       loggerFactory,
       ProcessingTimeout(),
@@ -218,6 +278,11 @@ class DisasterRecoveryIntegrationTest
       (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
       s"participants-before-disaster-$cantonInstanceSuffix",
       sequencersMediators = false,
+      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsEnvMap = Map(
+        "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+        "EXTRA_PARTICIPANT_DB" -> s"participant_extra_disaster_recovery",
+      ),
     )() {
 
       withCantonSvNodes(
@@ -232,6 +297,7 @@ class DisasterRecoveryIntegrationTest
           sv3Backend,
           sv4Backend,
           sv1ValidatorBackend,
+          aliceValidatorBackend,
         )
 
         clue("Starting old apps") {
@@ -248,9 +314,25 @@ class DisasterRecoveryIntegrationTest
             // buffer to account for domain fee payments
             assertInRange(
               sv1WalletClient.balance().unlockedQty,
-              (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
+              (walletUsdToAmulet(1000.0), walletUsdToAmulet(2000.0)),
             )
             countTapsFromScan(sv1ScanBackend, walletUsdToAmulet(1337)) shouldBe 1
+          },
+        )
+
+        val validatorParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        actAndCheck(
+          "Tap coins for alice validator", {
+            aliceWalletClient.tap(1500.0)
+          },
+        )(
+          "alice wallet balance updated",
+          _ => {
+            checkWallet(
+              validatorParty,
+              aliceWalletClient,
+              Seq((walletUsdToAmulet(1000), walletUsdToAmulet(2000))),
+            )
           },
         )
 
@@ -262,6 +344,7 @@ class DisasterRecoveryIntegrationTest
 
         // Tap some more amulet and wait for SVs to see it (even though we're going to recover to a point before it)
         sv1WalletClient.tap(1338)
+        aliceWalletClient.tap(1400.0)
         val timestampAfterLostTap = Instant.now()
 
         logger.debug(
@@ -270,6 +353,8 @@ class DisasterRecoveryIntegrationTest
 
         // Tap yet more amulet without waiting for it to necessarily be ingested on all SVs
         sv1WalletClient.tap(1339)
+
+        aliceWalletClient.tap(1300)
 
         waitForSvParticipantsToCatchup(timestampAfterLostTap)
 
@@ -285,7 +370,7 @@ class DisasterRecoveryIntegrationTest
           )
         }
         withClueAndLog(
-          "More than one tap visible in the scan transaction history on the new domain"
+          "More than one tap visible in the scan transaction history on the old domain"
         ) {
           val taps = sv1ScanBackend
             .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
@@ -298,6 +383,13 @@ class DisasterRecoveryIntegrationTest
         // TODO(#11099): Once taking the migration dump does not need sequencers to be running, move this further down.
         withClueAndLog("Getting and writing disaster recovery dumps") {
           getAndWriteDumps(identities, timestampBeforeDisaster)
+        }
+
+        withClueAndLog("Getting and writing disaster recovery dumps for validator") {
+          val validatorDump =
+            aliceValidatorBackend.getValidatorDomainDataSnapshot(timestampBeforeDisaster.toString)
+
+          writeValidatorMigrationDumpFile(aliceValidatorBackend, validatorDump)
         }
 
         clue("Shutting down old apps") {
@@ -314,9 +406,16 @@ class DisasterRecoveryIntegrationTest
         overrideSequencerDriverDbSuffix = Some("disaster_recovery_new"),
         autoInit = false,
         portsRange = Some(28),
+        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsEnvMap = Map(
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_DB" -> "participant_extra_disaster_recovery_new",
+          "EXTRA_PARTICIPANT_ADMIN_API_PORT" -> "28502",
+          "EXTRA_PARTICIPANT_LEDGER_API_PORT" -> "28501",
+          "EXTRA_PARTICIPANT_AUTO_INIT" -> "false",
+        ),
       )(
       ) {
-
         Using.resources(
           createUpgradeNode(
             1,
@@ -369,7 +468,7 @@ class DisasterRecoveryIntegrationTest
                 newSynchronizerNode4,
               )
 
-            withClueAndLog("Starting new SV apps") {
+            withClueAndLog("Starting new apps") {
               startAllSync(
                 sv1LocalBackend,
                 sv2LocalBackend,
@@ -377,6 +476,7 @@ class DisasterRecoveryIntegrationTest
                 sv4LocalBackend,
                 sv1ScanLocalBackend,
                 sv1ValidatorLocalBackend,
+                aliceValidatorLocalBackend,
               )
             }
 
@@ -390,21 +490,28 @@ class DisasterRecoveryIntegrationTest
                 (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
               )
             }
-            // TODO(#10449): this won't work until the validator also supports disaster recovery
-            /* withClueAndLog("Only one tap visible in the wallet transaction history on the new domain") {
-            val balanceChanges = sv1WalletLocalClient.listTransactions(None, 100).collect {
-              case e: BalanceChangeTxLogEntry => e.amount
-            }
-            balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
-          } */
+
             withClueAndLog(
-              "Only one tap visible in the scan transaction history on the new domain"
+              "Right number of taps visible in the scan transaction history on the new domain"
             ) {
               val taps = sv1ScanLocalBackend
                 .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
                 .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
-              taps should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+              taps should contain theSameElementsAs Seq(
+                walletUsdToAmulet(1337),
+                walletUsdToAmulet(1500),
+              )
             }
+
+            withClueAndLog(
+              "Only one tap visible in the sv1 wallet transaction history on the new domain"
+            ) {
+              val balanceChanges = sv1WalletLocalClient.listTransactions(None, 100).collect {
+                case e: BalanceChangeTxLogEntry => e.amount
+              }
+              balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+            }
+
             withClueAndLog("New domain is functional") {
               sv1WalletLocalClient.tap(1337)
               assertInRange(
@@ -412,6 +519,33 @@ class DisasterRecoveryIntegrationTest
                 (walletUsdToAmulet(2000), walletUsdToAmulet(3000)),
               )
             }
+        }
+
+        withClueAndLog(
+          "Only one tap visible in the validator wallet transaction history on the new domain"
+        ) {
+          val balanceChanges = aliceValidatorWalletLocalClient.listTransactions(None, 100).collect {
+            case e: BalanceChangeTxLogEntry => e.amount
+          }
+          balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1500))
+        }
+
+        withClueAndLog("Old validator balance has been transferred") {
+          assertInRange(
+            aliceValidatorWalletLocalClient.balance().unlockedQty,
+            (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
+          )
+        }
+
+        withClueAndLog("New validator is functional") {
+          val validatorLocalParty =
+            onboardWalletUser(aliceValidatorWalletLocalClient, aliceValidatorLocalBackend)
+          aliceValidatorWalletLocalClient.tap(1600)
+          checkWallet(
+            validatorLocalParty,
+            aliceValidatorWalletLocalClient,
+            Seq((walletUsdToAmulet(3000), walletUsdToAmulet(3500))),
+          )
         }
       }
     }
@@ -429,16 +563,27 @@ class DisasterRecoveryIntegrationTest
     }
   }
 
+  private def writeValidatorMigrationDumpFile(
+      validator: ValidatorAppBackendReference,
+      dump: ValidatorDomainMigrationDump,
+  ): Unit = {
+    val participantIdDumpFile = participantIdentitiesFilePath(validator.name)
+    clearOrCreate(participantIdDumpFile)
+
+    participantIdDumpFile.write(dump.participant.toJson.spaces2)
+
+    val fullDumpFile = migrationDumpFilePath(validator.name)
+    clearOrCreate(fullDumpFile)
+    val dumpWithMigrationId = dump.copy(migrationId = 1)
+
+    fullDumpFile.write(dumpWithMigrationId.asJson.spaces2)
+  }
+
   private def writeMigrationDumpFile(
       sv: SvAppBackendReference,
       ids: SynchronizerNodeIdentities,
       dump: DomainDataSnapshot,
   ): Unit = {
-
-    def clearOrCreate(f: File) = {
-      if (f.exists) f.clear() else f.createFile()
-    }
-
     val participantIdDumpFile = participantIdentitiesFilePath(sv.name)
     clearOrCreate(participantIdDumpFile)
 
@@ -446,6 +591,7 @@ class DisasterRecoveryIntegrationTest
 
     val fullDumpFile = migrationDumpFilePath(sv.name)
     clearOrCreate(fullDumpFile)
+
     val fullDump = DomainMigrationDump(
       migrationId = 1,
       ids,
@@ -453,6 +599,10 @@ class DisasterRecoveryIntegrationTest
       createdAt = Instant.now(),
     )
     fullDumpFile.write(fullDump.asJson.spaces2)
+  }
+
+  private def clearOrCreate(f: File) = {
+    if (f.exists) f.clear() else f.createFile()
   }
 
   private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {

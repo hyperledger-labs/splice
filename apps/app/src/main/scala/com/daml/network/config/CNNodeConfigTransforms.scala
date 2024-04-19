@@ -107,6 +107,7 @@ object CNNodeConfigTransforms {
               )
             )
             .toMap,
+          svUser = c.svUser.map(u => s"$u-$suffix"),
         )
       ),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),

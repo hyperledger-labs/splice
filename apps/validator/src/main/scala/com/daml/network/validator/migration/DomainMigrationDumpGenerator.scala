@@ -58,4 +58,40 @@ class DomainMigrationDumpGenerator(
     }
   }
 
+  def getDomainDataSnapshot(
+      timestamp: Instant,
+      domain: DomainId,
+      migrationId: Long,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DomainMigrationDump] = {
+    for {
+      participantId <- participantConnection.getId()
+      parties <- participantConnection
+        .listPartyToParticipant(
+          filterStore = domain.filterString,
+          filterParticipant = participantId.toProtoPrimitive,
+        )
+        .map(_.map(_.mapping.partyId))
+      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump(domain)
+      acsSnapshot <- acsExporter.exportAcsAtTimestamp(
+        domain,
+        timestamp,
+        parties*
+      )
+      dars <- darExporter.exportAllDars()
+    } yield {
+      DomainMigrationDump(
+        domainId = domain,
+        migrationId = migrationId,
+        participant = nodeIdentities,
+        acsSnapshot = acsSnapshot,
+        acsTimestamp = timestamp,
+        dars = dars,
+        createdAt = Instant.now(),
+      )
+    }
+  }
+
 }

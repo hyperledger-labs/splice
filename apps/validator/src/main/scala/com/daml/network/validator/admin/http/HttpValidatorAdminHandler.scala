@@ -6,16 +6,18 @@ import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.validator.migration.DomainMigrationDumpGenerator
+import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorAdminHandler(
@@ -26,7 +28,7 @@ class HttpValidatorAdminHandler(
     walletManagerOpt: Option[UserWalletManager],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
-    decentralizedSynchronizerAlias: DomainAlias,
+    config: ValidatorAppBackendConfig,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -37,6 +39,11 @@ class HttpValidatorAdminHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
+  private val dumpGenerator = new DomainMigrationDumpGenerator(
+    participantAdminConnection,
+    retryProvider,
+    loggerFactory,
+  )
 
   def onboardUser(
       respond: v0.ValidatorAdminResource.OnboardUserResponse.type
@@ -93,6 +100,32 @@ class HttpValidatorAdminHandler(
     }
   }
 
+  override def getValidatorDomainDataSnapshot(
+      respond: v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.type
+  )(body: definitions.GetValidatorDomainDataSnapshotRequest)(
+      tuser: TracedUser
+  ): Future[v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.getValidatorDomainDataSnapshot") { _ => _ =>
+      for {
+        domainId <- getAmuletRulesDomain()(tracedContext)
+        res <- dumpGenerator
+          .getDomainDataSnapshot(
+            Instant.parse(body.timestamp),
+            domainId,
+            // TODO(#9731): get migration id from scan instead of configuring here
+            config.domainMigrationId,
+          )
+          .map { response =>
+            v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
+              definitions
+                .GetValidatorDomainDataSnapshotResponse(response.toHttp, response.migrationId)
+            )
+          }
+      } yield res
+    }
+  }
+
   override def getDecentralizedSynchronizerConnectionConfig(
       respond: v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.type
   )()(
@@ -102,7 +135,7 @@ class HttpValidatorAdminHandler(
     withSpan(s"$workflowId.getDecentralizedSynchronizerConnectionConfig") { _ => _ =>
       for {
         connectionConfig <- participantAdminConnection.getDomainConnectionConfig(
-          decentralizedSynchronizerAlias
+          config.domains.global.alias
         )
       } yield v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.OK(
         definitions.GetDecentralizedSynchronizerConnectionConfigResponse(

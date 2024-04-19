@@ -176,6 +176,7 @@ case class ValidatorAppBackendConfig(
     // Migrate the validator party from an existing participant with the same namespace.
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
     svValidator: Boolean = false,
+    svUser: Option[String] = None,
     domainMigrationDumpPath: Option[Path] = None,
     restoreFromMigrationDump: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here

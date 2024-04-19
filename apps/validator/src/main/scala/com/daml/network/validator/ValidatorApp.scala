@@ -64,6 +64,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -275,6 +276,11 @@ class ValidatorApp(
     } yield ()
 
   private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
+    if (config.svValidator)
+      throw Status.INVALID_ARGUMENT
+        .withDescription("SV Validator should not be configured with a dump file")
+        .asRuntimeException()
+
     val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
       case Failure(exception) =>
         throw Status.INVALID_ARGUMENT
@@ -500,6 +506,11 @@ class ValidatorApp(
   )(implicit traceContext: TraceContext): Future[ValidatorApp.State] =
     for {
       _ <- Future.successful(())
+      readOnlyLedgerConnection = ledgerClient
+        .readOnlyConnection(
+          this.getClass.getSimpleName,
+          loggerFactory,
+        )
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
         amuletAppParameters.loggingConfig.api,
@@ -568,11 +579,26 @@ class ValidatorApp(
         dsoParty = dsoParty,
         appManagerEnabled = config.appManager.isDefined,
       )
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationInfo = DomainMigrationInfo(
-        config.domainMigrationId,
-        None,
-      )
+      domainMigrationInfo <-
+        if (config.svValidator) {
+          appInitStep(s"Get domain migration info from ${config.svUser}") {
+            DomainMigrationInfo.loadFromUserMetadata(
+              readOnlyLedgerConnection,
+              config.svUser.getOrElse(throw new Exception("svUser is required for an sv Validator")),
+            )
+          }
+        } else {
+          val acsTimestamp =
+            readRestoreDump.map(dump => CantonTimestamp.assertFromInstant(dump.acsTimestamp))
+          Future.successful(
+            // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+            DomainMigrationInfo(
+              config.domainMigrationId,
+              acsTimestamp,
+            )
+          )
+        }
+
       store = ValidatorStore(
         key,
         storage,
@@ -694,7 +720,7 @@ class ValidatorApp(
           walletManagerOpt = walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           participantAdminConnection,
-          config.domains.global.alias,
+          config,
           retryProvider = retryProvider,
           loggerFactory,
         )

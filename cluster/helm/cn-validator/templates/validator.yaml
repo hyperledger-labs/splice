@@ -87,6 +87,7 @@ spec:
         {{ if .Values.svValidator }}
         - name: CN_APP_VALIDATOR_SV_VALIDATOR
           value: "true"
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: ADDITIONAL_CONFIG_TRUST_SINGLE_SCAN
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"

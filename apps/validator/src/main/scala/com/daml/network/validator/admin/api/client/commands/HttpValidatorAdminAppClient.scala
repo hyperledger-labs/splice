@@ -12,6 +12,8 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import java.time.Instant
+import com.daml.network.validator.migration.DomainMigrationDump
 
 object HttpValidatorAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -84,6 +86,35 @@ object HttpValidatorAdminAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.DumpParticipantIdentitiesResponse.OK(response) =>
         NodeIdentitiesDump.fromHttp(ParticipantId.tryFromProtoPrimitive, response)
+    }
+  }
+
+  case class GetValidatorDomainDataSnapshot(
+      timestamp: Instant
+  ) extends BaseCommand[
+        http.GetValidatorDomainDataSnapshotResponse,
+        DomainMigrationDump,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetValidatorDomainDataSnapshotResponse] =
+      client.getValidatorDomainDataSnapshot(
+        body = definitions
+          .GetValidatorDomainDataSnapshotRequest(
+            timestamp.toString
+          ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetValidatorDomainDataSnapshotResponse.OK(response) =>
+      DomainMigrationDump.fromHttp(response.dataSnapshot)
     }
   }
 

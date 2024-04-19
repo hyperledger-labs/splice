@@ -116,7 +116,7 @@ class ScanApp(
       participantId <- appInitStep("Get participant id") {
         participantAdminConnection.getParticipantId()
       }
-      migrationInfo <- appInitStep("Get domain migration info") {
+      migrationInfo <- appInitStep(s"Get domain migration info from ${config.svUser}") {
         DomainMigrationInfo.loadFromUserMetadata(
           appInitConnection,
           config.svUser,

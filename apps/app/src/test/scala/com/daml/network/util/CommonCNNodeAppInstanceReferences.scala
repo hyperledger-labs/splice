@@ -87,6 +87,12 @@ trait CommonCNNodeAppInstanceReferences {
     "aliceValidatorWallet"
   )
 
+  def aliceValidatorWalletLocalClient(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): WalletAppClientReference = wc(
+    "aliceValidatorLocalWallet"
+  )
+
   def aliceValidatorBackend(implicit
       env: CNNodeTestConsoleEnvironment
   ): ValidatorAppBackendReference = v(

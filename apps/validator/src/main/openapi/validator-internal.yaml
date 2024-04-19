@@ -115,6 +115,27 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetDecentralizedSynchronizerConnectionConfigResponse"
 
+  /v0/admin/domain/data-snapshot:
+    get:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "getValidatorDomainDataSnapshot"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetValidatorDomainDataSnapshotRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorDomainDataSnapshotResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
@@ -844,6 +865,70 @@ components:
             type: string
         transport_security:
           type: boolean
+
+    Dar:
+      type: object
+      required:
+        - hash
+        - content
+      properties:
+        hash:
+          type: string
+        content:
+          description: |
+            base64 encoded string of a dar package
+          type: string
+
+    GetValidatorDomainDataSnapshotRequest:
+      type: object
+      required:
+        - timestamp
+      properties:
+        timestamp:
+          type: string
+
+    DomainMigrationDump:
+      type: object
+      required:
+        - participant
+        - acs_snapshot
+        - acs_timestamp
+        - dars
+        - migrationId
+        - domainId
+        - createdAt
+      properties:
+        participant:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        acs_snapshot:
+          description: |
+            base64 encoded string of acs snapshot for the requested party id
+          type: string
+        acs_timestamp:
+          type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"
+        migrationId:
+          type: integer
+          format: int64
+        domainId:
+          type: string
+        createdAt:
+          type: string
+
+    GetValidatorDomainDataSnapshotResponse:
+      type: object
+      required:
+        - data_snapshot
+        - migrationId
+      properties:
+        data_snapshot:
+          $ref: "#/components/schemas/DomainMigrationDump"
+        migrationId:
+          type: integer
+          format: int64
 
     SequencerSubmissionRequestAmplification:
       type: object

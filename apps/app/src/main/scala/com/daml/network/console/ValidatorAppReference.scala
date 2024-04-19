@@ -28,6 +28,8 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
+import java.time.Instant
+import com.daml.network.validator.migration.DomainMigrationDump
 
 /** Console commands that can be executed either through client or backend reference.
   */
@@ -107,6 +109,19 @@ abstract class ValidatorAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.DumpParticipantIdentities()
+      )
+    }
+  }
+
+  @Help.Summary("Extract validator data snapshot")
+  def getValidatorDomainDataSnapshot(
+      timestamp: String
+  ): DomainMigrationDump = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.GetValidatorDomainDataSnapshot(
+          Instant.parse(timestamp)
+        )
       )
     }
   }
