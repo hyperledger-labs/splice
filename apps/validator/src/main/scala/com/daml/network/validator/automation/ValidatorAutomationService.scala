@@ -53,6 +53,7 @@ class ValidatorAutomationService(
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     svValidator: Boolean,
+    sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -174,6 +175,7 @@ class ValidatorAutomationService(
         scanConnection,
         decentralizedSynchronizerAlias,
         domainConnector,
+        sequencerSubmissionAmplificationPatience,
       )
     )
 

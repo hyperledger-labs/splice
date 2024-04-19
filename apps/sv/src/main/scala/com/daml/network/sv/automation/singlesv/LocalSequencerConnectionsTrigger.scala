@@ -10,7 +10,11 @@ import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.util.ShowUtil.*
@@ -88,7 +92,7 @@ class LocalSequencerConnectionsTrigger(
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
-            submissionRequestAmplification = PositiveInt.tryCreate(1),
+            submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
           )
           if (conf.sequencerConnections == newConnections) {
             logger.trace(

@@ -622,6 +622,7 @@ class ValidatorApp(
         retryProvider,
         config.ingestFromParticipantBegin,
         config.svValidator,
+        config.sequencerRequestAmplificationPatience,
         loggerFactory,
       )
       domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {
