@@ -54,8 +54,8 @@ import org.apache.pekko.actor.ActorSystem
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 final case class SequencerAuthenticationConfig(
-    nonceExpirationTime: config.NonNegativeFiniteDuration,
-    tokenExpirationTime: config.NonNegativeFiniteDuration,
+    nonceExpirationInterval: config.NonNegativeFiniteDuration,
+    maxTokenExpirationInterval: config.NonNegativeFiniteDuration,
 ) {
   // only authentication tokens are supported
   val check: AuthenticationCheck = AuthenticationCheck.AuthenticationToken
@@ -256,6 +256,7 @@ class SequencerRuntime(
     )
     // hook for registering enterprise administration service if in an appropriate environment
     additionalAdminServiceFactory(sequencer).foreach(register)
+    sequencer.adminServices.foreach(register)
   }
 
   def domainServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = Seq(

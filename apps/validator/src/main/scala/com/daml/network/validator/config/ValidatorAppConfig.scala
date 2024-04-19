@@ -184,6 +184,8 @@ case class ValidatorAppBackendConfig(
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(),
     ingestFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
+    sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(10),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

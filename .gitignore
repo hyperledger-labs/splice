@@ -2,6 +2,7 @@
 *.dar
 !daml/dars/*
 *.log
+*.clog
 .DS_Store
 node_modules/
 build
@@ -64,3 +65,5 @@ apps/splitwell/src/test/resources/splitwell-bundle*.tar.gz
 .tmp_ERRFILE
 .k9s/*
 !.k9s/plugins.yaml
+
+**/SingletonCookie

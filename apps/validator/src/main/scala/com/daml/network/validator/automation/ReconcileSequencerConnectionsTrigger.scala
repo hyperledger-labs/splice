@@ -12,7 +12,9 @@ import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
   SequencerConnections,
+  SubmissionRequestAmplification,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
@@ -26,6 +28,7 @@ class ReconcileSequencerConnectionsTrigger(
     scanConnection: BftScanConnection,
     decentralizedSynchronizerAlias: DomainAlias,
     domainConnector: DomainConnector,
+    patience: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -89,8 +92,10 @@ class ReconcileSequencerConnectionsTrigger(
                 sequencerConnections = SequencerConnections.tryMany(
                   nonEmptyConnections.forgetNE,
                   CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                  submissionRequestAmplification =
+                  submissionRequestAmplification = SubmissionRequestAmplification(
                     CNThresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
+                    patience,
+                  ),
                 )
               )
             )
