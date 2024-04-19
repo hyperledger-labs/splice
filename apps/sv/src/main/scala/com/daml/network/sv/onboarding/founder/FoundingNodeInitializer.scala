@@ -9,6 +9,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -76,6 +77,7 @@ class FoundingNodeInitializer(
     requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
+    upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: CNLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
@@ -188,6 +190,7 @@ class FoundingNodeInitializer(
         svStore,
         dsoStore,
         Some(localSynchronizerNode),
+        upgradesConfig,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
       withDsoStore = new WithDsoStore(dsoAutomation, decentralizedSynchronizer)

@@ -1,7 +1,7 @@
 package com.daml.network.validator
 
 import cats.data.EitherT
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
@@ -17,6 +17,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class ValidatorSvConnection private (
     config: NetworkAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -25,7 +26,7 @@ final class ValidatorSvConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config, "sv", retryProvider, loggerFactory) {
+) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */
@@ -41,6 +42,7 @@ final class ValidatorSvConnection private (
 object ValidatorSvConnection {
   def apply(
       config: NetworkAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
       retryConnectionOnInitialFailure: Boolean = true,
@@ -52,7 +54,7 @@ object ValidatorSvConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ValidatorSvConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new ValidatorSvConnection(config, retryProvider, loggerFactory),
+      new ValidatorSvConnection(config, upgradesConfig, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
 

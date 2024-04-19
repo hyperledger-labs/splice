@@ -160,6 +160,7 @@ class ValidatorApp(
               client.BftScanConnection(
                 ledgerClient,
                 config.scanClient,
+                amuletAppParameters.upgradesConfig,
                 clock,
                 retryProvider,
                 loggerFactory,
@@ -235,6 +236,7 @@ class ValidatorApp(
                           partyId =>
                             SingleScanConnection.withSingleScanConnection(
                               scanConfig,
+                              amuletAppParameters.upgradesConfig,
                               clock,
                               retryProvider,
                               loggerFactory,
@@ -407,16 +409,22 @@ class ValidatorApp(
       scanClientConfig match {
         case BftScanClientConfig.TrustSingle(url, _) =>
           val config = ScanAppClientConfig(NetworkAppClientConfig(url))
-          MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
-            con.checkActive().andThen(_ => con.close())
-          )
+          MinimalScanConnection(
+            config,
+            amuletAppParameters.upgradesConfig,
+            retryProvider,
+            loggerFactory,
+          ).flatMap(con => con.checkActive().andThen(_ => con.close()))
         case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
-              MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
-                con.checkActive().andThen(_ => con.close())
-              )
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
             }
             .map(_ => ())
       },
@@ -426,9 +434,12 @@ class ValidatorApp(
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig
   )(f: ValidatorSvConnection => Future[T])(implicit traceContext: TraceContext): Future[T] =
-    ValidatorSvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
-      f(con).andThen(_ => con.close())
-    )
+    ValidatorSvConnection(
+      svConfig,
+      amuletAppParameters.upgradesConfig,
+      retryProvider,
+      loggerFactory,
+    ).flatMap(con => f(con).andThen(_ => con.close()))
 
   private def requestOnboarding(
       svConfig: NetworkAppClientConfig,
@@ -516,6 +527,7 @@ class ValidatorApp(
         client.BftScanConnection(
           ledgerClient,
           config.scanClient,
+          amuletAppParameters.upgradesConfig,
           clock,
           retryProvider,
           loggerFactory,

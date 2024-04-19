@@ -2,10 +2,11 @@ package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,
@@ -194,6 +195,7 @@ object ScanConnection {
   def singleCached(
       amuletLedgerClient: CNLedgerClient,
       config: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -206,12 +208,20 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new CachedScanConnection(amuletLedgerClient, config, clock, retryProvider, loggerFactory),
+      new CachedScanConnection(
+        amuletLedgerClient,
+        config,
+        upgradesConfig,
+        clock,
+        retryProvider,
+        loggerFactory,
+      ),
       retryConnectionOnInitialFailure,
     )
 
   def singleUncached(
       config: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -224,7 +234,7 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[SingleScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new SingleScanConnection(config, clock, retryProvider, loggerFactory),
+      new SingleScanConnection(config, upgradesConfig, clock, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
 
@@ -305,6 +315,7 @@ object ScanConnection {
 // TODO(tech-debt) consider removing this if we stop doing early version checks
 class MinimalScanConnection(
     config: ScanAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -313,10 +324,17 @@ class MinimalScanConnection(
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, "scan", retryProvider, loggerFactory) {}
+) extends HttpAppConnection(
+      config.adminApi,
+      upgradesConfig,
+      "scan",
+      retryProvider,
+      loggerFactory,
+    ) {}
 object MinimalScanConnection {
   def apply(
       config: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
       retryConnectionOnInitialFailure: Boolean = true,
@@ -328,7 +346,7 @@ object MinimalScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[MinimalScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new MinimalScanConnection(config, retryProvider, loggerFactory),
+      new MinimalScanConnection(config, upgradesConfig, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
 }

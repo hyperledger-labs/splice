@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
@@ -488,6 +488,7 @@ object BftScanConnection {
   def apply(
       cnLedgerClient: CNLedgerClient,
       config: BftScanClientConfig,
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -498,7 +499,7 @@ object BftScanConnection {
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
-    val builder = buildScanConnection(clock, retryProvider, loggerFactory)
+    val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
     config match {
       case BftScanClientConfig.TrustSingle(url, amuletRulesCacheTimeToLive) =>
         // If this fails to connect, fail and let it retry
@@ -565,6 +566,7 @@ object BftScanConnection {
   }
 
   private def buildScanConnection(
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -579,11 +581,11 @@ object BftScanConnection {
       ScanConnection.singleUncached( // BFTScanConnection caches itself so that caches don't desync
         ScanAppClientConfig(
           NetworkAppClientConfig(
-            uri,
-            failOnVersionMismatch = false,
+            uri
           ),
           amuletRulesCacheTimeToLive,
         ),
+        upgradesConfig,
         clock,
         retryProvider,
         loggerFactory,

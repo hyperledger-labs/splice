@@ -46,6 +46,7 @@ case class SharedCNNodeAppParameters(
     override val logQueryCost: Option[QueryCostMonitoringConfig],
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
+    upgradesConfig: UpgradesConfig = UpgradesConfig(),
     // TODO(#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,

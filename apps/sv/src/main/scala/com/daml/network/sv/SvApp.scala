@@ -264,6 +264,7 @@ class SvApp(
           participantId,
           Seq.empty, // A joining SV does not initially upload any DARs, they will be vetted by PackageVettingTrigger instead
           config,
+          amuletAppParameters.upgradesConfig,
           cometBftNode,
           ledgerClient,
           participantAdminConnection,
@@ -310,6 +311,7 @@ class SvApp(
                 darFilesToBootstrapNetwork,
                 participantId,
                 config,
+                amuletAppParameters.upgradesConfig,
                 cometBftNode,
                 ledgerClient,
                 participantAdminConnection,
@@ -347,6 +349,7 @@ class SvApp(
               cometBftConfig,
               cometBftClient,
               config,
+              amuletAppParameters.upgradesConfig,
               None,
               ledgerClient,
               participantAdminConnection,

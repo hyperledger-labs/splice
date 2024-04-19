@@ -6,7 +6,8 @@ import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import com.daml.network.automation.AutomationServiceCompanion.{aTrigger, TriggerClass}
+import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
@@ -49,6 +50,7 @@ class SvDsoAutomationService(
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
     localSynchronizerNode: Option[LocalSynchronizerNode],
+    upgradesConfig: UpgradesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -306,6 +308,7 @@ class SvDsoAutomationService(
           dsoStore,
           connection,
           scan,
+          upgradesConfig,
         )
       )
     }

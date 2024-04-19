@@ -98,6 +98,7 @@ class ScanApp(
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
         ledgerClient,
+        amuletAppParameters.upgradesConfig,
         loggerFactory,
         retryProvider,
         ec,

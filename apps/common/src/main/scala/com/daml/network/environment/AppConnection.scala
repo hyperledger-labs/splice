@@ -10,7 +10,7 @@ import com.daml.network.admin.api.client.{
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -134,6 +134,7 @@ abstract class AppConnection(
   */
 abstract class HttpAppConnection(
     config: NetworkAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     override val serviceName: String,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
@@ -199,10 +200,10 @@ abstract class HttpAppConnection(
       if (versionInfo.version != myVersion && versionInfo.version != compatibleVersion) {
         val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
           s"Your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}"
-        if (config.failOnVersionMismatch)
+        if (upgradesConfig.failOnVersionMismatch)
           sys.error(errorMsg)
         else
-          logger.error(errorMsg)(TraceContext.empty)
+          logger.info(errorMsg)(TraceContext.empty)
       } else {
         logger.debug(
           s"Version verification passed for $serviceName, server is on the same version as mine, or a compatible one: ${versionInfo}"

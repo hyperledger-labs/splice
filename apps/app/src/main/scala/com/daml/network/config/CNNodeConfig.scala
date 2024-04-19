@@ -107,6 +107,7 @@ case class CNNodeConfig(
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
+        UpgradesConfig(),
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -148,6 +149,7 @@ case class CNNodeConfig(
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
+        UpgradesConfig(),
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -188,6 +190,7 @@ case class CNNodeConfig(
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
+        UpgradesConfig(),
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -228,6 +231,7 @@ case class CNNodeConfig(
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
+        UpgradesConfig(),
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -354,6 +358,8 @@ object CNNodeConfig {
     implicit val postgresCNDbConfigReader: ConfigReader[CNDbConfig.Postgres] =
       deriveReader[CNDbConfig.Postgres]
     implicit val cnDbConfigReader: ConfigReader[CNDbConfig] = deriveReader[CNDbConfig]
+
+    implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
@@ -603,6 +609,8 @@ object CNNodeConfig {
         pg.copy(config = DbConfig.hideConfidential(pg.config))
       )
     implicit val cnDbConfigWriter: ConfigWriter[CNDbConfig] = deriveWriter[CNDbConfig]
+
+    implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]

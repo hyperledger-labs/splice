@@ -12,15 +12,18 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
+
 import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.http.scaladsl.model.HttpResponse
 import org.apache.pekko.http.scaladsl.model.Uri
+
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.util.{Failure, Success}
 import ScanAggregator.*
+import com.daml.network.config.UpgradesConfig
 
 trait ScanAggregatesReader extends AutoCloseable {
   def readRoundAggregateFromDso(round: Long)(implicit
@@ -32,6 +35,7 @@ trait ScanAggregatesReader extends AutoCloseable {
 final case class ScanAggregatesReaderContext(
     clock: Clock,
     ledgerClient: CNLedgerClient,
+    upgradesConfig: UpgradesConfig,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     ec: ExecutionContextExecutor,
@@ -138,6 +142,7 @@ object ScanAggregatesReader {
         con <- ScanAggregatesConnection(
           context.ledgerClient,
           config,
+          context.upgradesConfig,
           context.clock,
           context.retryProvider,
           context.loggerFactory,

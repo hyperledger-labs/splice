@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -37,6 +37,7 @@ class PublishScanConfigTrigger(
     store: SvDsoStore,
     connection: CNLedgerConnection,
     scanConfig: SvScanConfig,
+    upgradesConfig: UpgradesConfig,
 )(implicit
     override val ec: ExecutionContextExecutor,
     override val tracer: Tracer,
@@ -68,6 +69,7 @@ class PublishScanConfigTrigger(
         ScanConnection
           .singleUncached(
             ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
+            upgradesConfig,
             context.clock,
             context.retryProvider,
             loggerFactory,

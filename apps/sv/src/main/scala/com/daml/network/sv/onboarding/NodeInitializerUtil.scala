@@ -1,5 +1,6 @@
 package com.daml.network.sv.onboarding
 
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   CNLedgerClient,
   ParticipantAdminConnection,
@@ -97,6 +98,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
       localSynchronizerNode: Option[LocalSynchronizerNode],
+      upgradesConfig: UpgradesConfig,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -114,6 +116,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       cometBftNode,
       localSynchronizerNode,
+      upgradesConfig,
       loggerFactory,
     )
 

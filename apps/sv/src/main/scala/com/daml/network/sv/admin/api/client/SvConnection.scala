@@ -1,6 +1,6 @@
 package com.daml.network.sv.admin.api.client
 
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
@@ -9,12 +9,13 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
-
 import com.google.protobuf.ByteString
+
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class SvConnection private (
     config: NetworkAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -23,7 +24,7 @@ final class SvConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config, "sv", retryProvider, loggerFactory) {
+) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */
@@ -87,6 +88,7 @@ final class SvConnection private (
 object SvConnection {
   def apply(
       config: NetworkAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
       retryConnectionOnInitialFailure: Boolean = true,
@@ -98,7 +100,7 @@ object SvConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[SvConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new SvConnection(config, retryProvider, loggerFactory),
+      new SvConnection(config, upgradesConfig, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
 }

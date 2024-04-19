@@ -89,6 +89,7 @@ class SplitwellApp(
       ScanConnection.singleCached(
         ledgerClient,
         config.scanClient,
+        amuletAppParameters.upgradesConfig,
         clock,
         retryProvider,
         loggerFactory,

@@ -1,5 +1,6 @@
 package com.daml.network.sv.onboarding.joining
 
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
@@ -20,6 +21,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class JoiningNodeDsoPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
     onboardingConfig: Option[SvOnboardingConfig],
+    upgradesConfig: UpgradesConfig,
     dsoParty: PartyId,
     dsoPartyHosting: DsoPartyHosting,
     retryProvider: RetryProvider,
@@ -48,6 +50,7 @@ class JoiningNodeDsoPartyHosting(
             "Onboard to DSO party hosting and decentralized namespace membership",
             SvConnection(
               sponsorSvConfig.adminApi,
+              upgradesConfig,
               retryProvider,
               loggerFactory,
             ).flatMap { svConnection =>

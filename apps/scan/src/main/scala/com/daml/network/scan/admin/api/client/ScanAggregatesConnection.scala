@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.api.client
 
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.scan.admin.api.client.{BftScanConnection, SingleScanConnection}
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -12,6 +13,7 @@ import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.http.scaladsl.model.HttpResponse
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContextExecutor
 import com.daml.network.scan.store.db.ScanAggregator
@@ -21,6 +23,7 @@ object ScanAggregatesConnection {
   def apply(
       cnLedgerClient: CNLedgerClient,
       config: BftScanConnection.BftScanClientConfig,
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -31,9 +34,8 @@ object ScanAggregatesConnection {
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanAggregatesConnection] = {
-    BftScanConnection(cnLedgerClient, config, clock, retryProvider, loggerFactory).map(bft =>
-      new ScanAggregatesConnection(bft, retryProvider, loggerFactory)
-    )
+    BftScanConnection(cnLedgerClient, config, upgradesConfig, clock, retryProvider, loggerFactory)
+      .map(bft => new ScanAggregatesConnection(bft, retryProvider, loggerFactory))
   }
 }
 

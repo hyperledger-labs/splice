@@ -2109,7 +2109,8 @@ jobs:
             - run:
                 name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
                 command: |
-                  base=$(build-tools/get-latest-main-commit)
+                  latest_release=$(cat "LATEST_RELEASE")
+                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
                   changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
                   if [ -n "$changed" ]; then
                     echo "Lock files changed ($changed), breaking"

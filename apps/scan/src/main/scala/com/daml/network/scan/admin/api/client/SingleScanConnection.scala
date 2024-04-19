@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -29,6 +30,7 @@ import com.digitalasset.canton.data.CantonTimestamp
   */
 class SingleScanConnection private[client] (
     private[client] val config: ScanAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     protected val clock: Clock,
     retryProvider: RetryProvider,
     outerLoggerFactory: NamedLoggerFactory,
@@ -40,6 +42,7 @@ class SingleScanConnection private[client] (
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(
       config.adminApi,
+      upgradesConfig,
       "scan",
       retryProvider,
       outerLoggerFactory.append("scan-connection", config.adminApi.url.toString),
@@ -363,6 +366,7 @@ class SingleScanConnection private[client] (
 object SingleScanConnection {
   def withSingleScanConnection[T](
       scanConfig: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -376,6 +380,7 @@ object SingleScanConnection {
     for {
       scanConnection <- ScanConnection.singleUncached(
         scanConfig,
+        upgradesConfig,
         clock,
         retryProvider,
         loggerFactory,
@@ -388,6 +393,7 @@ object SingleScanConnection {
 class CachedScanConnection private[client] (
     protected val amuletLedgerClient: CNLedgerClient,
     config: ScanAppClientConfig,
+    upgradesConfig: UpgradesConfig,
     clock: Clock,
     retryProvider: RetryProvider,
     outerLoggerFactory: NamedLoggerFactory,
@@ -397,7 +403,7 @@ class CachedScanConnection private[client] (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends SingleScanConnection(config, clock, retryProvider, outerLoggerFactory)
+) extends SingleScanConnection(config, upgradesConfig, clock, retryProvider, outerLoggerFactory)
     with CachingScanConnection {
 
   override protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =

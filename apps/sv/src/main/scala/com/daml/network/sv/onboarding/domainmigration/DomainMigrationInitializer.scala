@@ -2,6 +2,7 @@ package com.daml.network.sv.onboarding.domainmigration
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
+import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   CNLedgerClient,
   ParticipantAdminConnection,
@@ -53,6 +54,7 @@ class DomainMigrationInitializer(
     cometBftConfig: Option[CometBftConfig],
     cometBftClient: Option[CometBftClient],
     override protected val config: SvAppBackendConfig,
+    upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: CNLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
@@ -162,6 +164,7 @@ class DomainMigrationInitializer(
           retryProvider,
           newCometBftNode,
           Some(localSynchronizerNode),
+          upgradesConfig,
           loggerFactory,
         )
       _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(

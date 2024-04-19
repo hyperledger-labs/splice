@@ -6,13 +6,13 @@ import org.apache.pekko.stream.Materializer
 import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
+import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.automation.singlesv.SvPackageVettingTrigger
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -26,12 +26,12 @@ import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNod
   Onboarding,
 }
 import com.daml.network.sv.onboarding.{
-  SynchronizerNodeReconciler,
+  DsoPartyHosting,
   NodeInitializerUtil,
   SetupUtil,
-  DsoPartyHosting,
+  SynchronizerNodeReconciler,
 }
-import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
+import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
@@ -60,6 +60,7 @@ class JoiningNodeInitializer(
     participantId: ParticipantId,
     requiredDars: Seq[UploadablePackage],
     override protected val config: SvAppBackendConfig,
+    upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: CNLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
@@ -78,8 +79,9 @@ class JoiningNodeInitializer(
 ) extends NodeInitializerUtil {
 
   private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>
-    SvConnection(conf.svClient.adminApi, retryProvider, loggerFactory).map { connection =>
-      (conf, connection)
+    SvConnection(conf.svClient.adminApi, upgradesConfig, retryProvider, loggerFactory).map {
+      connection =>
+        (conf, connection)
     }
   }).getOrElse(
     sys.error(
@@ -173,6 +175,7 @@ class JoiningNodeInitializer(
         new JoiningNodeDsoPartyHosting(
           participantAdminConnection,
           joiningConfig,
+          upgradesConfig,
           dsoPartyId,
           dsoPartyHosting,
           retryProvider,
@@ -194,6 +197,7 @@ class JoiningNodeInitializer(
                 svStore,
                 dsoStore,
                 localSynchronizerNode,
+                upgradesConfig,
               )
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
@@ -602,7 +606,12 @@ class JoiningNodeInitializer(
                   Seq(svStore.key.dsoParty),
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for dsoParty")
-                dsoAutomation = newSvDsoAutomationService(svStore, dsoStore, localSynchronizerNode)
+                dsoAutomation = newSvDsoAutomationService(
+                  svStore,
+                  dsoStore,
+                  localSynchronizerNode,
+                  upgradesConfig,
+                )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
                 )
@@ -735,6 +744,7 @@ class JoiningNodeInitializer(
   private def getDsoPartyIdFromSponsor(sponsorConfig: NetworkAppClientConfig): Future[PartyId] =
     SvConnection(
       sponsorConfig,
+      upgradesConfig,
       retryProvider,
       loggerFactory,
     ).flatMap { svConnection =>
