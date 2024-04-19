@@ -13,6 +13,7 @@ import {
   disableCometBftStateSync,
   svCometBftKeysFromSecret,
   stableCometBftChainId,
+  clusterSmallDisk,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
@@ -122,6 +123,9 @@ export function installCometBftNode(
           metrics: {
             enable: true,
             labels: [{ key: 'active_migration', value: isActive }],
+          },
+          db: {
+            volumeSize: clusterSmallDisk ? '240Gi' : undefined,
           },
           extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
         }),

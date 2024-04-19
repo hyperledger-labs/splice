@@ -57,7 +57,6 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
-  const overrideDiskSize = clusterSmallDisk ? { volumeSize: '240Gi' } : {};
   const release = installCNHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -100,7 +99,7 @@ export function installCometBftNode(
         labels: isActiveDomain ? [{ key: 'active_migration', value: 'true' }] : [],
       },
       db: {
-        ...overrideDiskSize,
+        volumeSize: clusterSmallDisk ? '240Gi' : undefined,
       },
       extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
     },
