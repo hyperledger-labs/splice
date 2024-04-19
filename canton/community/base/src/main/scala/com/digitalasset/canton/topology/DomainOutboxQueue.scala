@@ -24,7 +24,7 @@ class DomainOutboxQueue(val loggerFactory: NamedLoggerFactory) extends NamedLogg
 
   private val unsentQueue =
     new scala.collection.mutable.Queue[Traced[GenericSignedTopologyTransactionX]]
-  private val inProcessQueue =
+  private val pendingQueue =
     new scala.collection.mutable.Queue[Traced[GenericSignedTopologyTransactionX]]
 
   /** To be called by the topology manager whenever new topology transactions have been validated.
@@ -36,8 +36,7 @@ class DomainOutboxQueue(val loggerFactory: NamedLoggerFactory) extends NamedLogg
     unsentQueue.enqueueAll(txs.map(Traced(_))).discard
   })
 
-  def numUnsentTransactions: Int = blocking(synchronized(unsentQueue.size))
-  def numInProcessTransactions: Int = blocking(synchronized(inProcessQueue.size))
+  def size(): Int = blocking(synchronized(unsentQueue.size))
 
   /** Marks up to `limit` transactions as pending and returns those transactions.
     * @param limit batch size
@@ -49,27 +48,27 @@ class DomainOutboxQueue(val loggerFactory: NamedLoggerFactory) extends NamedLogg
     val txs = unsentQueue.take(limit).toList
     logger.debug(s"dequeuing: $txs")
     require(
-      inProcessQueue.isEmpty,
-      s"tried to dequeue while pending wasn't empty: ${inProcessQueue.toSeq}",
+      pendingQueue.isEmpty,
+      s"tried to dequeue while pending wasn't empty: ${pendingQueue.toSeq}",
     )
-    inProcessQueue.enqueueAll(txs)
-    unsentQueue.dropInPlace(limit)
-    inProcessQueue.toSeq.map(_.value)
+    pendingQueue.enqueueAll(txs)
+    unsentQueue.remove(0, limit)
+    pendingQueue.toSeq.map(_.value)
   })
 
   /** Marks the currently pending transactions as unsent and adds them to the front of the queue in the same order.
     */
   def requeue()(implicit traceContext: TraceContext): Unit = blocking(synchronized {
-    logger.debug(s"requeuing $inProcessQueue")
-    unsentQueue.prependAll(inProcessQueue)
-    inProcessQueue.clear()
+    logger.debug(s"requeuing $pendingQueue")
+    unsentQueue.prependAll(pendingQueue)
+    pendingQueue.clear()
   })
 
   /** Clears the currently pending transactions.
     */
   def completeCycle()(implicit traceContext: TraceContext): Unit = blocking(synchronized {
-    logger.debug(s"completeCycle $inProcessQueue")
-    inProcessQueue.clear()
+    logger.debug(s"completeCycle $pendingQueue")
+    pendingQueue.clear()
   })
 
 }

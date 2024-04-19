@@ -46,11 +46,7 @@ import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.sequencing.{
-  SequencerConnectionValidation,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
+import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -944,7 +940,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               sequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
               PositiveInt.one,
-              SubmissionRequestAmplification.NoAmplification,
+              PositiveInt.one,
             ),
             // if we run bootstrap ourselves, we should have been able to reach the nodes
             // so we don't want the bootstrapping to fail spuriously here in the middle of

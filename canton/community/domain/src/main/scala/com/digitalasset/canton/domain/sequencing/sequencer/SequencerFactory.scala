@@ -95,7 +95,6 @@ class CommunityDatabaseSequencerFactory(
       domainSyncCryptoApi,
       metrics,
       loggerFactory,
-      nodeParameters.useUnifiedSequencer,
     )
 
     Future.successful(config.testingInterceptor.map(_(clock)(sequencer)(ec)).getOrElse(sequencer))

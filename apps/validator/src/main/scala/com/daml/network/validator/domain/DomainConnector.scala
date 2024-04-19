@@ -11,11 +11,7 @@ import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -86,10 +82,8 @@ class DomainConnector(
       SequencerConnections.tryMany(
         nonEmptyConnections.forgetNE,
         CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-        submissionRequestAmplification = SubmissionRequestAmplification(
+        submissionRequestAmplification =
           CNThresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
-          config.sequencerRequestAmplificationPatience,
-        ),
       )
   }
 

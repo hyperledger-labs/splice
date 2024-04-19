@@ -457,6 +457,26 @@ class TransferOutProcessingSteps(
       )
 
       requestId = RequestId(ts)
+      entry = PendingTransferOut(
+        requestId,
+        rc,
+        sc,
+        fullTree.tree.rootHash,
+        WithContractHash.fromContract(contract, fullTree.contractId),
+        fullTree.transferCounter,
+        contract.rawContractInstance.contractInstance.unversioned.template,
+        contract.rawContractInstance.contractInstance.unversioned.packageName,
+        transferringParticipant,
+        fullTree.submitterMetadata,
+        transferId,
+        fullTree.targetDomain,
+        fullTree.stakeholders,
+        hostedStks.toSet,
+        fullTree.targetTimeProof,
+        transferInExclusivity,
+        mediator,
+      )
+
       transferOutDecisionTime <- ProcessingSteps
         .getDecisionTime(sourceSnapshot.ipsSnapshot, ts)
         .leftMap(TransferParametersError(domainId.unwrap, _))
@@ -493,42 +513,16 @@ class TransferOutProcessingSteps(
         confirmingStakeholders,
         fullTree.tree.rootHash,
       )
-    } yield {
-      // We consider that we rejected if at least one of the responses is not "approve'
-      val locallyRejected = responseOpt.exists { response => !response.localVerdict.isApprove }
-
-      val entry = PendingTransferOut(
-        requestId,
-        rc,
-        sc,
-        fullTree.tree.rootHash,
-        WithContractHash.fromContract(contract, fullTree.contractId),
-        fullTree.transferCounter,
-        contract.rawContractInstance.contractInstance.unversioned.template,
-        contract.rawContractInstance.contractInstance.unversioned.packageName,
-        transferringParticipant,
-        fullTree.submitterMetadata,
-        transferId,
-        fullTree.targetDomain,
-        fullTree.stakeholders,
-        hostedStks.toSet,
-        fullTree.targetTimeProof,
-        transferInExclusivity,
-        mediator,
-        locallyRejected,
-      )
-
-      StorePendingDataAndSendResponseAndCreateTimeout(
+    } yield StorePendingDataAndSendResponseAndCreateTimeout(
+      entry,
+      responseOpt.map(_ -> Recipients.cc(mediator)).toList,
+      RejectionArgs(
         entry,
-        responseOpt.map(_ -> Recipients.cc(mediator)).toList,
-        RejectionArgs(
-          entry,
-          LocalRejectError.TimeRejects.LocalTimeout
-            .Reject()
-            .toLocalReject(sourceDomainProtocolVersion.v),
-        ),
-      )
-    }
+        LocalRejectError.TimeRejects.LocalTimeout
+          .Reject()
+          .toLocalReject(sourceDomainProtocolVersion.v),
+      ),
+    )
   }
 
   private[this] def getTransferInExclusivity(
@@ -572,7 +566,6 @@ class TransferOutProcessingSteps(
       _targetTimeProof,
       transferInExclusivity,
       _mediatorId,
-      locallyRejected,
     ) = pendingRequestData
 
     val pendingSubmissionData = pendingSubmissionMap.get(rootHash)
@@ -801,7 +794,6 @@ object TransferOutProcessingSteps {
       targetTimeProof: TimeProof,
       transferInExclusivity: Option[CantonTimestamp],
       mediator: MediatorsOfDomain,
-      override val locallyRejected: Boolean,
   ) extends PendingTransfer
       with PendingRequestData {
 

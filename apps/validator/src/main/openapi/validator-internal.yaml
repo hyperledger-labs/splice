@@ -827,7 +827,8 @@ components:
           type: integer
           format: int32
         submission_request_amplification:
-          $ref: "#/components/schemas/SequencerSubmissionRequestAmplification"
+          type: integer
+          format: int32
 
     SequencerAliasToConnections:
       type: object
@@ -844,14 +845,3 @@ components:
             type: string
         transport_security:
           type: boolean
-
-    SequencerSubmissionRequestAmplification:
-      type: object
-      required:
-        - factor
-        - patience_seconds
-      properties:
-        factor:
-          type: number
-        patience_seconds:
-          type: number

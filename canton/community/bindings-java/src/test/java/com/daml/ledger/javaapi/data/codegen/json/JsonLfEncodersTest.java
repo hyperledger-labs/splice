@@ -18,23 +18,25 @@ import java.time.Month;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.platform.runner.JUnitPlatform;
+import org.junit.runner.RunWith;
 
-import org.junit.Test;
-
+@RunWith(JUnitPlatform.class)
 public class JsonLfEncodersTest {
 
   @Test
-  public void testUnit() throws IOException {
+  void testUnit() throws IOException {
     assertEquals("{}", intoString(JsonLfEncoders.unit(Unit.getInstance())));
   }
 
   @Test
-  public void testBool() throws IOException {
+  void testBool() throws IOException {
     checkWriteAll(JsonLfEncoders::bool, Case.of(true, "true"), Case.of(false, "false"));
   }
 
   @Test
-  public void testInt64() throws IOException {
+  void testInt64() throws IOException {
     checkWriteAll(
         JsonLfEncoders::int64,
         Case.of(42L, "42"),
@@ -46,14 +48,14 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testInt64AsString() throws IOException {
+  void testInt64AsString() throws IOException {
     StringWriter sw = new StringWriter();
     JsonLfEncoders.int64(42L).encode(new JsonLfWriter(sw, opts().encodeInt64AsString(true)));
     assertEquals("\"42\"", sw.toString());
   }
 
   @Test
-  public void testNumeric() throws IOException {
+  void testNumeric() throws IOException {
     checkWriteAll(
         JsonLfEncoders::numeric,
         Case.of(dec("42"), "42"),
@@ -70,7 +72,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testNumericAsString() throws IOException {
+  void testNumericAsString() throws IOException {
     StringWriter sw = new StringWriter();
     JsonLfEncoders.numeric(new BigDecimal(0.5))
         .encode(new JsonLfWriter(sw, opts().encodeNumericAsString(true)));
@@ -78,7 +80,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testTimestamp() throws IOException {
+  void testTimestamp() throws IOException {
     checkWriteAll(
         JsonLfEncoders::timestamp,
         Case.of(
@@ -104,7 +106,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testDate() throws IOException {
+  void testDate() throws IOException {
     checkWriteAll(
         JsonLfEncoders::date,
         Case.of(date(2019, Month.JUNE, 18), "\"2019-06-18\""),
@@ -113,12 +115,12 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testParty() throws IOException {
+  void testParty() throws IOException {
     checkWriteAll(JsonLfEncoders::party, Case.of("Alice", "\"Alice\""));
   }
 
   @Test
-  public void testText() throws IOException {
+  void testText() throws IOException {
     checkWriteAll(
         JsonLfEncoders::text,
         Case.of("", "\"\""),
@@ -128,12 +130,12 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testContractId() throws IOException {
+  void testContractId() throws IOException {
     checkWriteAll(JsonLfEncoders::contractId, Case.of(new Tmpl.Cid("deadbeef"), "\"deadbeef\""));
   }
 
   @Test
-  public void testEnum() throws IOException {
+  void testEnum() throws IOException {
     checkWriteAll(
         JsonLfEncoders.enumeration(Suit::toDamlName),
         Case.of(Suit.HEARTS, "\"Hearts\""),
@@ -143,7 +145,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testList() throws IOException {
+  void testList() throws IOException {
     checkWriteAll(
         JsonLfEncoders.list(JsonLfEncoders::int64),
         Case.of(emptyList(), "[]"),
@@ -151,7 +153,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testListNested() throws IOException {
+  void testListNested() throws IOException {
     checkWriteAll(
         JsonLfEncoders.list(JsonLfEncoders.list(JsonLfEncoders::int64)),
         Case.of(emptyList(), "[]"),
@@ -166,7 +168,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testTextMap() throws IOException {
+  void testTextMap() throws IOException {
     checkWriteAll(
         JsonLfEncoders.textMap(JsonLfEncoders::int64),
         Case.of(emptyMap(), "{}"),
@@ -174,7 +176,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testGenMap() throws IOException {
+  void testGenMap() throws IOException {
     checkWriteAll(
         JsonLfEncoders.genMap(JsonLfEncoders::text, JsonLfEncoders::int64),
         Case.of(emptyMap(), "[]"),
@@ -182,7 +184,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testOptionalNonNested() throws IOException {
+  void testOptionalNonNested() throws IOException {
     checkWriteAll(
         JsonLfEncoders.optional(JsonLfEncoders::int64),
         Case.of(Optional.empty(), "null"),
@@ -190,7 +192,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testOptionalNested() throws IOException {
+  void testOptionalNested() throws IOException {
     checkWriteAll(
         JsonLfEncoders.optionalNested(JsonLfEncoders.optional(JsonLfEncoders::int64)),
         Case.of(Optional.empty(), "null"),
@@ -199,7 +201,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testOptionalNestedDeeper() throws IOException {
+  void testOptionalNestedDeeper() throws IOException {
     checkWriteAll(
         JsonLfEncoders.optionalNested(
             JsonLfEncoders.optionalNested(
@@ -212,7 +214,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testOptionalLists() throws IOException {
+  void testOptionalLists() throws IOException {
     checkWriteAll(
         JsonLfEncoders.optional(JsonLfEncoders.list(JsonLfEncoders.list(JsonLfEncoders::int64))),
         Case.of(Optional.empty(), "null"),
@@ -222,7 +224,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testVariant() throws IOException {
+  void testVariant() throws IOException {
     checkWriteAll(
         JsonLfEncoders.variant(
             v -> {
@@ -249,7 +251,7 @@ public class JsonLfEncodersTest {
   }
 
   @Test
-  public void testRecord() throws IOException {
+  void testRecord() throws IOException {
     checkWriteAll(
         r ->
             JsonLfEncoders.record(

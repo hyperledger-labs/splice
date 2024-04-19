@@ -63,6 +63,4 @@ case class SharedCNNodeAppParameters(
   override val useNewTrafficControl: Boolean =
     false // irrelevant for CN, as this is an impl. config for Canton nodes only
   override val exitOnFatalFailures: Boolean = true
-
-  override def useUnifiedSequencer: Boolean = false
 }

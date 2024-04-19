@@ -25,7 +25,6 @@ final case class PendingTransaction(
     override val requestSequencerCounter: SequencerCounter,
     transactionValidationResult: TransactionValidationResult,
     override val mediator: MediatorsOfDomain,
-    override val locallyRejected: Boolean,
 ) extends PendingRequestData {
 
   val requestId: RequestId = RequestId(requestTime)

@@ -41,12 +41,8 @@ class SequencerXSetupGroup(parent: ConsoleCommandGroup) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Download the genesis state for a sequencer. This method should be used when performing major upgrades."
-  )
-  @Help.Description(
-    """Download the a topology snapshot which includes all the history for major upgrades. The validFrom and validUntil are set the MinValue.ImmediateSuccessor.
-      |timestamp: If not specified, the max effective time of the latest topology transaction is used. Otherwise, the given timestamp is used.
-      |""".stripMargin
+    "Download the genesis state for a sequencer. We exclude the VettedPackages from this initial state. " +
+      "This method should be used when performing major upgrades."
   )
   def genesis_state_for_sequencer(
       timestamp: Option[CantonTimestamp] = None

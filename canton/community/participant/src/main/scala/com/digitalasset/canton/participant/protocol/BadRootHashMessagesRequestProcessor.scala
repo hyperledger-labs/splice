@@ -70,10 +70,12 @@ class BadRootHashMessagesRequestProcessor(
         _ <- sendResponses(
           requestId,
           Seq(signedRejection -> Recipients.cc(mediator)),
-        ).valueOr(error =>
-          // This is a best-effort response anyway, so we merely log the failure and continue
-          logger.warn(show"Failed to send best-effort rejection of malformed request: $error")
-        )
+        ).mapK(FutureUnlessShutdown.outcomeK)
+          .valueOr(
+            // This is a best-effort response anyway, so we merely log the failure and continue
+            error =>
+              logger.warn(show"Failed to send best-effort rejection of malformed request: $error")
+          )
         _ = ephemeral.recordOrderPublisher.tick(sequencerCounter, timestamp)
       } yield ()
     }

@@ -172,7 +172,10 @@ class GrpcSequencerAdministrationService(
       sequencerSnapshot <- sequencer.snapshot(referenceEffective.value)
 
       topologySnapshot <- EitherT.right[String](
-        topologyStore.findEssentialStateAtSequencedTime(SequencedTime(sequencerSnapshot.lastTs))
+        topologyStore.findEssentialStateAtSequencedTime(
+          SequencedTime(sequencerSnapshot.lastTs),
+          excludeMappings = Nil,
+        )
       )
     } yield (topologySnapshot, sequencerSnapshot))
       .fold[v30.OnboardingStateResponse](
@@ -224,7 +227,11 @@ class GrpcSequencerAdministrationService(
       }
 
       topologySnapshot <- EitherT.right[String](
-        topologyStore.findEssentialStateAtSequencedTime(SequencedTime(sequencedTimestamp))
+        topologyStore.findEssentialStateAtSequencedTime(
+          SequencedTime(sequencedTimestamp),
+          // we exclude vetted packages from the genesis state because we need to upload them again anyway
+          excludeMappings = Seq(TopologyMappingX.Code.VettedPackagesX),
+        )
       )
       // reset effective time and sequenced time if we are initializing the sequencer from the beginning
       genesisState: StoredTopologyTransactionsX[TopologyChangeOpX, TopologyMappingX] =

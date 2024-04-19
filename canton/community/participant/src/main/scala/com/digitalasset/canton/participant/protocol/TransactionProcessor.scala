@@ -42,7 +42,6 @@ import com.digitalasset.canton.participant.protocol.validation.{
 }
 import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
@@ -69,7 +68,7 @@ class TransactionProcessor(
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
-    packageResolver: PackageResolver,
+    enableContractUpgrading: Boolean,
 )(implicit val ec: ExecutionContext)
     extends ProtocolProcessor[
       TransactionProcessingSteps.SubmissionParam,
@@ -91,8 +90,9 @@ class TransactionProcessor(
           damle,
           confirmationRequestFactory.transactionTreeFactory,
           buildAuthenticator(crypto),
+          staticDomainParameters.protocolVersion,
           participantId,
-          packageResolver,
+          enableContractUpgrading,
           loggerFactory,
         ),
         staticDomainParameters,
@@ -101,7 +101,7 @@ class TransactionProcessor(
         metrics,
         buildAuthenticator(crypto),
         new AuthenticationValidator(),
-        new AuthorizationValidator(participantId),
+        new AuthorizationValidator(participantId, enableContractUpgrading),
         new InternalConsistencyChecker(
           staticDomainParameters.protocolVersion,
           loggerFactory,

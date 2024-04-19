@@ -17,7 +17,6 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.ServerServiceDefinition
 import org.apache.pekko.stream.*
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -60,6 +59,4 @@ class DriverBlockSequencerOps(
 
   override def close(): Unit =
     driver.close()
-
-  override def adminServices: Seq[ServerServiceDefinition] = driver.adminServices
 }

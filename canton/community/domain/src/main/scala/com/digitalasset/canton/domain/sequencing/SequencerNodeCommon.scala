@@ -173,8 +173,8 @@ trait SequencerNodeBootstrapCommon[
         storage,
         clock,
         SequencerAuthenticationConfig(
-          config.publicApi.nonceExpirationInterval,
-          config.publicApi.maxTokenExpirationInterval,
+          config.publicApi.nonceExpirationTime,
+          config.publicApi.tokenExpirationTime,
         ),
         createEnterpriseAdminService(_, domainLoggerFactory),
         staticMembersToRegister,

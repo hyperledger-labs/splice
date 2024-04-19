@@ -191,7 +191,9 @@ class TopologyTransactionProcessorX(
 
     val domainParamChanges = validated.flatMap(
       _.collectOf[TopologyChangeOpX.Replace, DomainParametersStateX]
-        .filter(tx => tx.rejectionReason.isEmpty && !tx.transaction.isProposal)
+        .filter(
+          _.rejectionReason.isEmpty
+        )
         .map(_.mapping)
     )
 

@@ -19,8 +19,6 @@ import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 
@@ -87,10 +85,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
-      sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
-        PositiveInt.tryCreate(2),
-        NonNegativeFiniteDuration.ofSeconds(10),
-      )
+      sequencerConnections.submissionRequestAmplification shouldBe PositiveInt.tryCreate(2)
     }
   }
 

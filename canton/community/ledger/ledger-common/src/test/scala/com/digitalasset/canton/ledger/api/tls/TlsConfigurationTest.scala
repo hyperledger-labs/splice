@@ -61,20 +61,17 @@ class TlsConfigurationTest extends AnyWordSpec with Matchers with BeforeAndAfter
         sslContext.foreach(_ shouldBe a[OpenSslServerContext])
       }
       "is 1.3" in {
-        getServerEnabledProtocols(Some(TlsVersion.V1_3)) should contain theSameElementsAs Seq(
-          "SSLv2Hello",
-          "TLSv1.3",
-        )
+        getServerEnabledProtocols(Some(TlsVersion.V1_3)) shouldBe Seq("SSLv2Hello", "TLSv1.3")
       }
       "is 1.2" in {
-        getServerEnabledProtocols(Some(TlsVersion.V1_2)) should contain theSameElementsAs Seq(
+        getServerEnabledProtocols(Some(TlsVersion.V1_2)) shouldBe Seq(
           "SSLv2Hello",
           "TLSv1.2",
           "TLSv1.3",
         )
       }
       "is default" in {
-        getServerEnabledProtocols(None) should contain theSameElementsAs Seq(
+        getServerEnabledProtocols(None) shouldBe Seq(
           "SSLv2Hello",
           "TLSv1.2",
           "TLSv1.3",

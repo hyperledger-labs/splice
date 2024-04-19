@@ -5,6 +5,7 @@ package com.digitalasset.canton.domain.sequencing.service
 
 import cats.data.EitherT
 import cats.syntax.option.*
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -44,6 +45,7 @@ import com.digitalasset.canton.topology.store.{
   TopologyStateForInitializationService,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.{ProtocolVersion, VersionedMessage}
 import com.digitalasset.canton.{
@@ -561,42 +563,54 @@ class GrpcSequencerServiceTest
         ),
       )
 
+      val domainManager: Member = DefaultTestIdentities.domainManager
+
       val batches = Seq(differentEnvelopes, sameEnvelope)
-      val badRequests = for {
-        batch <- batches
-        sender <- Seq(
-          participant,
+      val badRequests = batches.map(batch => mkSubmissionRequest(batch, participant))
+      val goodRequests = batches.map(batch =>
+        mkSubmissionRequest(
+          batch,
           DefaultTestIdentities.mediator,
-          DefaultTestIdentities.sequencerId,
-        )
-      } yield mkSubmissionRequest(batch, sender) -> sender
+        ) -> DefaultTestIdentities.mediator
+      ) ++ batches.map(batch =>
+        mkSubmissionRequest(
+          batch,
+          domainManager,
+        ) -> domainManager
+      )
       for {
-        _ <- MonadUtil.sequentialTraverse_(badRequests.zipWithIndex) {
-          case ((badRequest, sender), index) =>
-            withClue(s"bad request #$index") {
-              // create a fresh environment for each request such that the rate limiter does not complain
-              val participantEnv = new Environment(sender)
-              loggerFactory.assertLogs(
-                sendAndCheckError(badRequest) { case SendAsyncError.RequestRefused(message) =>
-                  message shouldBe "Batch contains multiple mediators as recipients."
-                }(participantEnv),
-                _.warningMessage should include(
-                  "refused: Batch contains multiple mediators as recipients."
-                ),
-              )
-            }
+        _ <- MonadUtil.sequentialTraverse_(badRequests.zipWithIndex) { case (badRequest, index) =>
+          withClue(s"bad request #$index") {
+            // create a fresh environment for each request such that the rate limiter does not complain
+            val participantEnv = new Environment(participant)
+            loggerFactory.assertLogs(
+              sendAndCheckError(badRequest) { case SendAsyncError.RequestRefused(message) =>
+                message shouldBe "Batch from participant contains multiple mediators as recipients."
+              }(participantEnv),
+              _.warningMessage should include(
+                "refused: Batch from participant contains multiple mediators as recipients."
+              ),
+            )
+          }
+        }
+        // We don't need log suppression for the good requests so we can run them in parallel
+        _ <- goodRequests.zipWithIndex.parTraverse_ { case ((goodRequest, sender), index) =>
+          withClue(s"good request #$index") {
+            val senderEnv = new Environment(sender)
+            sendAndCheckSucceed(goodRequest)(senderEnv)
+          }
         }
       } yield succeed
     }
 
-    "reject sending to multiple mediators" in multipleMediatorTestCase(
+    "reject sending to multiple mediators iff the sender is a participant" in multipleMediatorTestCase(
       RecipientsTree.leaf(NonEmpty.mk(Set, DefaultTestIdentities.mediator)),
       RecipientsTree.leaf(
         NonEmpty.mk(Set, MediatorId(UniqueIdentifier.tryCreate("another", "mediator")))
       ),
     )
 
-    "reject sending to multiple mediator groups" in multipleMediatorTestCase(
+    "reject sending to multiple mediator groups iff the sender is a participant" in multipleMediatorTestCase(
       RecipientsTree(
         NonEmpty.mk(
           Set,

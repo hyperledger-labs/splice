@@ -13,6 +13,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.error.BaseError
+import com.daml.nonempty.catsinstances.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.CantonRequireTypes.String73
@@ -23,6 +24,7 @@ import com.digitalasset.canton.crypto.{
   SyncCryptoClient,
 }
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.block.BlockUpdateGenerator.BlockChunk
 import com.digitalasset.canton.domain.block.LedgerBlockEvent.*
 import com.digitalasset.canton.domain.block.data.{
   BlockEphemeralState,
@@ -78,8 +80,6 @@ import scala.concurrent.{ExecutionContext, Future}
   * (and especially that events are always read in the same order).
   */
 trait BlockUpdateGenerator {
-  import BlockUpdateGenerator.*
-
   type InternalState
 
   def internalStateFor(state: BlockEphemeralState): InternalState
@@ -93,18 +93,12 @@ trait BlockUpdateGenerator {
   def processBlockChunk(state: InternalState, chunk: BlockChunk)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[(InternalState, OrderedBlockUpdate[UnsignedChunkEvents])]
-
-  def signChunkEvents(events: UnsignedChunkEvents)(implicit
-      ec: ExecutionContext
-  ): FutureUnlessShutdown[SignedChunkEvents]
+  ): FutureUnlessShutdown[(InternalState, OrderedBlockUpdate)]
 }
 
 object BlockUpdateGenerator {
 
-  type EventsForSubmissionRequest = Map[Member, SequencedEvent[ClosedEnvelope]]
-
-  type SignedEvents = Map[Member, OrdinarySerializedEvent]
+  type SignedEvents = NonEmpty[Map[Member, OrdinarySerializedEvent]]
 
   sealed trait BlockChunk extends Product with Serializable
   final case class NextChunk(
@@ -124,7 +118,6 @@ class BlockUpdateGeneratorImpl(
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
     protected val loggerFactory: NamedLoggerFactory,
-    unifiedSequencer: Boolean,
 )(implicit val closeContext: CloseContext)
     extends BlockUpdateGenerator
     with NamedLogging {
@@ -187,7 +180,7 @@ class BlockUpdateGeneratorImpl(
   override final def processBlockChunk(state: InternalState, chunk: BlockChunk)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[(InternalState, OrderedBlockUpdate[UnsignedChunkEvents])] = {
+  ): FutureUnlessShutdown[(InternalState, OrderedBlockUpdate)] = {
     chunk match {
       case EndOfBlock(height) =>
         val newState = state.copy(lastBlockTs = state.lastChunkTs)
@@ -207,7 +200,7 @@ class BlockUpdateGeneratorImpl(
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[(State, ChunkUpdate[UnsignedChunkEvents])] = {
+  ): FutureUnlessShutdown[(State, ChunkUpdate)] = {
     val (lastTs, revFixedTsChanges) =
       // With this logic, we assign to the initial non-Send events the same timestamp as for the last
       // block. This means that we will include these events in the ephemeral state of the previous block
@@ -316,7 +309,7 @@ class BlockUpdateGeneratorImpl(
       }
       result <- MonadUtil.foldLeftM(
         (
-          Seq.empty[UnsignedChunkEvents],
+          Seq.empty[SignedEvents],
           Map.empty[AggregationId, InFlightAggregationUpdate],
           stateWithNewMembers.ephemeral,
           Option.empty[CantonTimestamp],
@@ -520,7 +513,7 @@ class BlockUpdateGeneratorImpl(
       latestSequencerEventTimestamp: Option[CantonTimestamp],
   )(
       acc: (
-          Seq[UnsignedChunkEvents],
+          Seq[SignedEvents],
           InFlightAggregationUpdates,
           BlockUpdateEphemeralState,
           Option[CantonTimestamp],
@@ -530,7 +523,7 @@ class BlockUpdateGeneratorImpl(
       ec: ExecutionContext
   ): FutureUnlessShutdown[
     (
-        Seq[UnsignedChunkEvents],
+        Seq[SignedEvents],
         InFlightAggregationUpdates,
         BlockUpdateEphemeralState,
         Option[CantonTimestamp],
@@ -543,7 +536,7 @@ class BlockUpdateGeneratorImpl(
       sequencingSnapshot,
       signingSnapshotO,
     ) = sequencedSubmissionRequest
-    implicit val traceContext: TraceContext = sequencedSubmissionRequest.traceContext
+    implicit val traceContext = sequencedSubmissionRequest.traceContext
 
     ErrorUtil.requireState(
       sequencerEventTimestampSoFarO.isEmpty,
@@ -556,7 +549,7 @@ class BlockUpdateGeneratorImpl(
         sequencerEventTimestampO: Option[CantonTimestamp],
     ): FutureUnlessShutdown[
       (
-          Seq[UnsignedChunkEvents],
+          Seq[SignedEvents],
           InFlightAggregationUpdates,
           BlockUpdateEphemeralState,
           Option[CantonTimestamp],
@@ -602,23 +595,19 @@ class BlockUpdateGeneratorImpl(
                 sequencingSnapshot,
                 latestSequencerEventTimestamp,
               )
-            } yield {
-              val unsignedEvents = UnsignedChunkEvents(
-                signedSubmissionRequest.content.sender,
+              signedEvents <- signEvents(
                 deliverEventsNE,
                 signingSnapshot,
+                trafficUpdatedState,
                 sequencingTimestamp,
                 sequencingSnapshot,
-                trafficUpdatedState.trafficState.view.mapValues(_.toSequencedEventTrafficState),
-                traceContext,
               )
-              (
-                unsignedEvents +: reversedEvents,
-                newInFlightAggregationUpdates,
-                trafficUpdatedState,
-                sequencerEventTimestampO,
-              )
-            }
+            } yield (
+              signedEvents +: reversedEvents,
+              newInFlightAggregationUpdates,
+              trafficUpdatedState,
+              sequencerEventTimestampO,
+            )
         }
     }
 
@@ -827,7 +816,7 @@ class BlockUpdateGeneratorImpl(
         warnIfApproximate = st.headCounterAboveGenesis(sequencerId),
       )
       _ <- EitherT.cond[FutureUnlessShutdown](
-        SequencerValidations.checkToAtMostOneMediator(submissionRequest),
+        SequencerValidations.checkFromParticipantToAtMostOneMediator(submissionRequest),
         (), {
           SequencerError.MultipleMediatorRecipients
             .Error(submissionRequest, sequencingTimestamp)
@@ -1354,103 +1343,88 @@ class BlockUpdateGeneratorImpl(
       } yield participantsOfParty ++ mediatorsOfDomain ++ sequencersOfDomain ++ allRecipients
   }
 
-  override def signChunkEvents(unsignedEvents: UnsignedChunkEvents)(implicit
-      ec: ExecutionContext
-  ): FutureUnlessShutdown[SignedChunkEvents] = {
-    val UnsignedChunkEvents(
-      sender,
-      events,
-      signingSnapshot,
-      sequencingTimestamp,
-      sequencingSnapshot,
-      trafficStates,
-      submissionRequestTraceContext,
-    ) = unsignedEvents
-    implicit val traceContext: TraceContext = submissionRequestTraceContext
-    val signingTimestamp = signingSnapshot.ipsSnapshot.timestamp
-    val signedEventsF = maybeLowerTopologyTimestampBound match {
-      case Some(bound) if bound > signingTimestamp =>
-        // As the required topology snapshot timestamp is older than the lower topology timestamp bound, the timestamp
-        // of this sequencer's very first topology snapshot, tombstone the events. This enables subscriptions to signal to
-        // subscribers that this sequencer is not in a position to serve the events behind these sequencer counters.
-        // Comparing against the lower signing timestamp bound prevents tombstones in "steady-state" sequencing beyond
-        // "soon" after initial sequencer onboarding. See #13609
-        events.toSeq.parTraverse { case (member, event) =>
-          logger.info(
-            s"Sequencing tombstone for ${member.uid.id} at ${event.timestamp} and ${event.counter}. Sequencer signing key at $signingTimestamp not available before the bound $bound."
-          )
-          // sign tombstones using key valid at sequencing timestamp as event timestamp has no signing key and we
-          // are not sequencing the event anyway, but the tombstone
-          val err = DeliverError.create(
-            event.counter,
-            sequencingTimestamp, // use sequencing timestamp for tombstone
-            domainId,
-            MessageId(String73.tryCreate("tombstone")), // dummy message id
-            SequencerErrors.PersistTombstone(event.timestamp, event.counter),
-            protocolVersion,
-          )
-          for {
-            signedContent <- FutureUnlessShutdown.outcomeF(
-              SignedContent
-                .create(
-                  sequencingSnapshot.pureCrypto,
-                  sequencingSnapshot,
-                  err,
-                  Some(sequencingSnapshot.ipsSnapshot.timestamp),
-                  HashPurpose.SequencedEventSignature,
-                  protocolVersion,
-                )
-                .valueOr(syncCryptoError =>
-                  ErrorUtil.internalError(
-                    new RuntimeException(
-                      s"Error signing tombstone deliver error: $syncCryptoError"
-                    )
-                  )
-                )
-            )
-          } yield {
-            member -> OrdinarySequencedEvent(signedContent, None)(traceContext)
-          }
-        }
-      case _ =>
-        FutureUnlessShutdown.outcomeF(
-          events.toSeq
-            .parTraverse { case (member, event) =>
-              SignedContent
-                .create(
-                  signingSnapshot.pureCrypto,
-                  signingSnapshot,
-                  event,
-                  None,
-                  HashPurpose.SequencedEventSignature,
-                  protocolVersion,
-                )
-                .valueOr(syncCryptoError =>
-                  ErrorUtil.internalError(
-                    new RuntimeException(s"Error signing events: $syncCryptoError")
-                  )
-                )
-                .map { signedContent =>
-                  val memberIsSequencer = member match {
-                    case _: SequencerId => true
-                    case _ => false
-                  }
-                  // only include traffic state for the sender when unifiedSequencer is enabled
-                  // also do not get traffic states for sequencers
-                  val trafficStateO =
-                    Option.when((!unifiedSequencer || member == sender) && !memberIsSequencer) {
-                      trafficStates.getOrElse(
-                        member,
-                        ErrorUtil.invalidState(s"Member $member unknown by rate limiter."),
-                      )
-                    }
-                  member ->
-                    OrdinarySequencedEvent(signedContent, trafficStateO)(traceContext)
-                }
-            }
-        )
-    }
-    signedEventsF.map(signedEvents => SignedChunkEvents(signedEvents.toMap))
+  private def signEvents(
+      events: NonEmpty[Map[Member, SequencedEvent[ClosedEnvelope]]],
+      snapshot: SyncCryptoApi,
+      ephemeralState: BlockUpdateEphemeralState,
+      // sequencingTimestamp and sequencingSnapshot used for tombstones when snapshot does not include sequencer signing keys
+      sequencingTimestamp: CantonTimestamp,
+      sequencingSnapshot: SyncCryptoApi,
+  )(implicit
+      traceContext: TraceContext,
+      executionContext: ExecutionContext,
+  ): FutureUnlessShutdown[SignedEvents] = {
+    (if (maybeLowerTopologyTimestampBound.forall(snapshot.ipsSnapshot.timestamp >= _)) {
+       FutureUnlessShutdown.outcomeF(
+         events.toSeq.toNEF
+           .parTraverse { case (member, event) =>
+             SignedContent
+               .create(
+                 snapshot.pureCrypto,
+                 snapshot,
+                 event,
+                 None,
+                 HashPurpose.SequencedEventSignature,
+                 protocolVersion,
+               )
+               .valueOr(syncCryptoError =>
+                 ErrorUtil.internalError(
+                   new RuntimeException(s"Error signing events: $syncCryptoError")
+                 )
+               )
+               .map { signedContent =>
+                 member -> OrdinarySequencedEvent(
+                   signedContent,
+                   ephemeralState.trafficState.get(member).map(_.toSequencedEventTrafficState),
+                 )(traceContext)
+               }
+           }
+       )
+     } else {
+       // As the required topology snapshot timestamp is older than the lower topology timestamp bound, the timestamp
+       // of this sequencer's very first topology snapshot, tombstone events. This enables subscriptions to signal to
+       // subscribers that this sequencer is not in a position to serve the events behind these sequencer counters.
+       // Comparing against the lower signing timestamp bound prevents tombstones in "steady-state" sequencing beyond
+       // "soon" after initial sequencer onboarding. See #13609
+       events.toSeq.toNEF.parTraverse { case (member, event) =>
+         logger.info(
+           s"Sequencer signing key not available on behalf of ${member.uid.id} at ${event.timestamp} and ${event.counter}. Sequencing tombstone."
+         )
+         // sign tombstones using key valid at sequencing timestamp as event timestamp has no signing key and we
+         // are not sequencing the event anyway, but the tombstone
+         val err = DeliverError.create(
+           event.counter,
+           sequencingTimestamp, // use sequencing timestamp for tombstone
+           domainId,
+           MessageId(String73.tryCreate("tombstone")), // dummy message id
+           SequencerErrors.PersistTombstone(event.timestamp, event.counter),
+           protocolVersion,
+         )
+         for {
+           signedContent <- FutureUnlessShutdown.outcomeF(
+             SignedContent
+               .create(
+                 sequencingSnapshot.pureCrypto,
+                 sequencingSnapshot,
+                 err,
+                 Some(sequencingSnapshot.ipsSnapshot.timestamp),
+                 HashPurpose.SequencedEventSignature,
+                 protocolVersion,
+               )
+               .valueOr(syncCryptoError =>
+                 ErrorUtil.internalError(
+                   new RuntimeException(
+                     s"Error signing tombstone deliver error: $syncCryptoError"
+                   )
+                 )
+               )
+           )
+         } yield {
+           member -> OrdinarySequencedEvent(signedContent, None)(traceContext)
+         }
+       }
+     })
+      .map(_.fromNEF.toMap)
   }
 
   private def invalidSubmissionRequest(
@@ -1546,13 +1520,6 @@ class BlockUpdateGeneratorImpl(
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, SubmissionRequestOutcome, BlockUpdateEphemeralState] = {
     val newStateOF = for {
-      _ <- OptionT.when[FutureUnlessShutdown, Unit]({
-        request.sender match {
-          // Sequencers are not rate limited
-          case _: SequencerId => false
-          case _ => true
-        }
-      })(())
       parameters <- OptionT(
         sequencingSnapshot.ipsSnapshot.trafficControlParameters(protocolVersion)
       )
@@ -1572,10 +1539,6 @@ class BlockUpdateGeneratorImpl(
           )
           OptionT.none[FutureUnlessShutdown, Unit]
         } else OptionT.some[FutureUnlessShutdown](())
-      _ = logger.trace(
-        s"Consuming traffic cost for event with messageId ${request.messageId}" +
-          s" from sender $sender at $sequencingTimestamp"
-      )
       // Consume traffic for the sender
       newSenderTrafficState <- OptionT.liftF(
         rateLimitManager
@@ -1645,8 +1608,7 @@ class BlockUpdateGeneratorImpl(
 }
 
 object BlockUpdateGeneratorImpl {
-
-  import BlockUpdateGenerator.*
+  private type EventsForSubmissionRequest = Map[Member, SequencedEvent[ClosedEnvelope]]
 
   /** Describes the outcome of processing a submission request:
     *

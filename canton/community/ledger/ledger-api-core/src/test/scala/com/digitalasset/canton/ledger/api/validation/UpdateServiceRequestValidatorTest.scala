@@ -95,8 +95,20 @@ class UpdateServiceRequestValidatorTest
   private val txByIdReq =
     GetTransactionByIdRequest(transactionId, Seq(party))
 
+  private val transactionFilterValidator = new TransactionFilterValidator(upgradingEnabled = false)
+
   private val validator = new UpdateServiceRequestValidator(
-    new PartyValidator(PartyNameChecker.AllowAllParties)
+    new PartyValidator(PartyNameChecker.AllowAllParties),
+    transactionFilterValidator,
+  )
+
+  private val transactionFilterValidatorUpgradingEnabled = new TransactionFilterValidator(
+    upgradingEnabled = true
+  )
+
+  private val validatorUpgradingEnabled = new UpdateServiceRequestValidator(
+    new PartyValidator(PartyNameChecker.AllowAllParties),
+    transactionFilterValidatorUpgradingEnabled,
   )
 
   "TransactionRequestValidation" when {
@@ -315,25 +327,40 @@ class UpdateServiceRequestValidatorTest
         }
       }
 
-      "allow package-name scoped templates" in {
-        inside(validator.validate(txReqWithPackageNameScoping, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
-          hasExpectedFilters(
-            req,
-            expectedTemplates =
-              Set(Ref.TypeConRef(Ref.PackageRef.Name(packageName), templateQualifiedName)),
+      "when upgrading disabled" should {
+        "disallow usage of package-name-scoped templates" in {
+          requestMustFailWith(
+            request = validator.validate(txReqWithPackageNameScoping, ledgerEnd),
+            code = INVALID_ARGUMENT,
+            description =
+              "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: package-name scoping for requests is only possible when smart contract upgrading feature is enabled",
+            metadata = Map.empty,
           )
-          req.verbose shouldEqual verbose
         }
       }
 
-      "still allow populated packageIds in templateIds (for backwards compatibility)" in {
-        inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
-          hasExpectedFilters(req)
-          req.verbose shouldEqual verbose
+      "when upgrading enabled" should {
+        "allow package-name scoped templates" in {
+          inside(validatorUpgradingEnabled.validate(txReqWithPackageNameScoping, ledgerEnd)) {
+            case Right(req) =>
+              req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
+              req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+              hasExpectedFilters(
+                req,
+                expectedTemplates =
+                  Set(Ref.TypeConRef(Ref.PackageRef.Name(packageName), templateQualifiedName)),
+              )
+              req.verbose shouldEqual verbose
+          }
+        }
+
+        "still allow populated packageIds in templateIds (for backwards compatibility)" in {
+          inside(validatorUpgradingEnabled.validate(txReq, ledgerEnd)) { case Right(req) =>
+            req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
+            req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+            hasExpectedFilters(req)
+            req.verbose shouldEqual verbose
+          }
         }
       }
 
@@ -504,7 +531,8 @@ class UpdateServiceRequestValidatorTest
     "applying party name checks" should {
 
       val partyRestrictiveValidator = new UpdateServiceRequestValidator(
-        new PartyValidator(PartyNameChecker.AllowPartySet(Set(party)))
+        new PartyValidator(PartyNameChecker.AllowPartySet(Set(party))),
+        transactionFilterValidator,
       )
 
       val partyWithUnknowns = List("party", "Alice", "Bob")

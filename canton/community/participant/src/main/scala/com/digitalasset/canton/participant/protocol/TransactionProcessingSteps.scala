@@ -1008,7 +1008,6 @@ class TransactionProcessingSteps(
         val pendingTransaction =
           createPendingTransaction(
             requestId,
-            responses,
             transactionValidationResult,
             rc,
             sc,
@@ -1094,7 +1093,6 @@ class TransactionProcessingSteps(
       requestSequencerCounter,
       transactionValidationResult,
       _,
-      _locallyRejected,
     ) =
       pendingTransaction
     val submitterMetaO = transactionValidationResult.submitterMetadataO
@@ -1157,7 +1155,6 @@ class TransactionProcessingSteps(
 
   private[this] def createPendingTransaction(
       id: RequestId,
-      responses: Seq[ConfirmationResponse],
       transactionValidationResult: TransactionValidationResult,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1185,9 +1182,6 @@ class TransactionProcessingSteps(
       replayCheckResult,
     ) = transactionValidationResult
 
-    // We consider that we rejected if at least one of the responses is not "approve'
-    val locallyRejected = responses.exists { response => !response.localVerdict.isApprove }
-
     validation.PendingTransaction(
       transactionId,
       freshOwnTimelyTx,
@@ -1199,7 +1193,6 @@ class TransactionProcessingSteps(
       sc,
       transactionValidationResult,
       mediator,
-      locallyRejected,
     )
   }
 

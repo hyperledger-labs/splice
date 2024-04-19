@@ -71,7 +71,7 @@ object AuthorizationChecksErrors extends AuthorizationChecksErrorGroup {
   object AccessTokenExpired
       extends ErrorCode(
         id = "ACCESS_TOKEN_EXPIRED",
-        ErrorCategory.ContentionOnSharedResources,
+        ErrorCategory.AuthInterceptorInvalidAuthenticationCredentials,
       ) {
     final case class Reject(override val cause: String)(implicit
         loggingContext: ContextualizedErrorLogger

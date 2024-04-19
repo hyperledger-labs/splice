@@ -4,7 +4,7 @@
 package com.digitalasset.canton.domain.block
 
 import cats.data.Nested
-import cats.syntax.parallel.*
+import cats.syntax.functor.*
 import com.daml.error.BaseError
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
@@ -26,12 +26,7 @@ import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencer
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.error.SequencerBaseError
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.pekkostreams.dispatcher.Dispatcher
 import com.digitalasset.canton.pekkostreams.dispatcher.SubSource.RangeSource
@@ -83,13 +78,12 @@ trait BlockSequencerStateManagerBase extends FlagCloseableAsync {
     */
   def processBlock(
       bug: BlockUpdateGenerator
-  ): Flow[BlockEvents, Traced[OrderedBlockUpdate[SignedChunkEvents]], NotUsed]
+  ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed]
 
   /** Persists the [[com.digitalasset.canton.domain.block.BlockUpdate]]s and completes the waiting RPC calls
     * as necessary.
     */
-  def applyBlockUpdate
-      : Flow[Traced[BlockUpdate[SignedChunkEvents]], Traced[CantonTimestamp], NotUsed]
+  def applyBlockUpdate: Flow[Traced[BlockUpdate], Traced[CantonTimestamp], NotUsed]
 
   /** Wait for a member to be disabled on the underlying ledger */
   def waitForMemberToBeDisabled(member: Member): Future[Unit]
@@ -171,7 +165,7 @@ class BlockSequencerStateManager(
 
   override def processBlock(
       bug: BlockUpdateGenerator
-  ): Flow[BlockEvents, Traced[OrderedBlockUpdate[SignedChunkEvents]], NotUsed] = {
+  ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed] = {
     val head = getHeadState
     val bugState = {
       import TraceContext.Implicits.Empty.*
@@ -181,8 +175,6 @@ class BlockSequencerStateManager(
       .via(checkBlockHeight(head.block.height))
       .via(chunkBlock(bug))
       .via(processChunk(bug)(bugState))
-      .async
-      .via(signEvents(bug))
   }
 
   private def checkBlockHeight(
@@ -229,45 +221,27 @@ class BlockSequencerStateManager(
 
   private def processChunk(bug: BlockUpdateGenerator)(
       initialState: bug.InternalState
-  ): Flow[Traced[BlockChunk], Traced[OrderedBlockUpdate[UnsignedChunkEvents]], NotUsed] = {
-    implicit val traceContext: TraceContext = TraceContext.empty
+  ): Flow[Traced[BlockChunk], Traced[OrderedBlockUpdate], NotUsed] = {
+    implicit val traceContext = TraceContext.empty
     Flow[Traced[BlockChunk]].statefulMapAsyncUSAndDrain(initialState) { (state, tracedChunk) =>
       implicit val traceContext: TraceContext = tracedChunk.traceContext
       tracedChunk.traverse(blockChunk => Nested(bug.processBlockChunk(state, blockChunk))).value
     }
   }
 
-  private def signEvents(bug: BlockUpdateGenerator): Flow[
-    Traced[OrderedBlockUpdate[UnsignedChunkEvents]],
-    Traced[OrderedBlockUpdate[SignedChunkEvents]],
-    NotUsed,
-  ] = {
-    implicit val traceContext: TraceContext = TraceContext.empty
-    Flow[Traced[OrderedBlockUpdate[UnsignedChunkEvents]]]
-      .mapAsyncAndDrainUS(parallelism = chunkSigningParallelism)(
-        _.traverse {
-          case chunk: ChunkUpdate[UnsignedChunkEvents] =>
-            chunk.events.parTraverse(bug.signChunkEvents).map(signed => chunk.copy(events = signed))
-          case complete: CompleteBlockUpdate => FutureUnlessShutdown.pure(complete)
-        }
-      )
-  }
-
-  override def applyBlockUpdate
-      : Flow[Traced[BlockUpdate[SignedChunkEvents]], Traced[CantonTimestamp], NotUsed] = {
+  override def applyBlockUpdate: Flow[Traced[BlockUpdate], Traced[CantonTimestamp], NotUsed] = {
     implicit val traceContext = TraceContext.empty
-    Flow[Traced[BlockUpdate[SignedChunkEvents]]].statefulMapAsync(getHeadState) {
-      (priorHead, update) =>
-        implicit val traceContext = update.traceContext
-        val fut = update.value match {
-          case LocalBlockUpdate(local) =>
-            handleLocalEvent(priorHead, local)(TraceContext.todo)
-          case chunk: ChunkUpdate[SignedChunkEvents] =>
-            handleChunkUpdate(priorHead, chunk)(TraceContext.todo)
-          case complete: CompleteBlockUpdate =>
-            handleComplete(priorHead, complete.block)(TraceContext.todo)
-        }
-        fut.map(newHead => newHead -> Traced(newHead.block.lastTs))
+    Flow[Traced[BlockUpdate]].statefulMapAsync(getHeadState) { (priorHead, update) =>
+      implicit val traceContext = update.traceContext
+      val fut = update.value match {
+        case LocalBlockUpdate(local) =>
+          handleLocalEvent(priorHead, local)(TraceContext.todo)
+        case chunk: ChunkUpdate =>
+          handleChunkUpdate(priorHead, chunk)(TraceContext.todo)
+        case complete: CompleteBlockUpdate =>
+          handleComplete(priorHead, complete.block)(TraceContext.todo)
+      }
+      fut.map(newHead => newHead -> Traced(newHead.block.lastTs))
     }
   }
 
@@ -427,8 +401,8 @@ class BlockSequencerStateManager(
         }.discard
       )
 
-  private def handleChunkUpdate(priorHead: HeadState, update: ChunkUpdate[SignedChunkEvents])(
-      implicit batchTraceContext: TraceContext
+  private def handleChunkUpdate(priorHead: HeadState, update: ChunkUpdate)(implicit
+      batchTraceContext: TraceContext
   ): Future[HeadState] = {
     val priorState = priorHead.chunk
     val chunkNumber = priorState.chunkNumber + 1
@@ -437,7 +411,7 @@ class BlockSequencerStateManager(
       s"newMembers in chunk $chunkNumber should be assigned a timestamp after the timestamp of the previous chunk or block",
     )
     assert(
-      update.events.view.flatMap(_.timestamps).forall(_ > priorState.lastTs),
+      update.signedEvents.view.flatMap(_.values.map(_.timestamp)).forall(_ > priorState.lastTs),
       s"Events in chunk $chunkNumber have timestamp lower than in the previous chunk or block",
     )
     assert(
@@ -449,8 +423,8 @@ class BlockSequencerStateManager(
 
     def checkFirstSequencerCounters: Boolean = {
       val firstSequencerCounterByMember =
-        update.events
-          .map(_.counters)
+        update.signedEvents
+          .map(_.forgetNE.fmap(_.counter))
           .foldLeft(Map.empty[Member, SequencerCounter])(
             MapsUtil.mergeWith(_, _)((first, _) => first)
           )
@@ -466,7 +440,7 @@ class BlockSequencerStateManager(
     )
 
     val lastTs =
-      (update.events.view.flatMap(_.timestamps) ++
+      (update.signedEvents.view.flatMap(_.values.map(_.timestamp)) ++
         update.newMembers.values).maxOption.getOrElse(priorState.lastTs)
 
     val newState = ChunkState(
@@ -480,15 +454,15 @@ class BlockSequencerStateManager(
     for {
       _ <- store.partialBlockUpdate(
         newMembers = update.newMembers,
-        events = update.events.map(_.events),
+        events = update.signedEvents,
         acknowledgments = update.acknowledgements,
         membersDisabled = Seq.empty,
         inFlightAggregationUpdates = update.inFlightAggregationUpdates,
         update.state.trafficState,
       )
       _ <- MonadUtil.sequentialTraverse[(Member, SequencerCounter), Future, Unit](
-        update.events
-          .flatMap(_.events)
+        update.signedEvents
+          .flatMap(_.toSeq)
           .collect {
             case (member, tombstone) if tombstone.isTombstone => member -> tombstone.counter
           }
@@ -719,11 +693,6 @@ class BlockSequencerStateManager(
 }
 
 object BlockSequencerStateManager {
-
-  /** Arbitrary number of parallelism for signing the sequenced events across chunks of blocks.
-    * Within a chunk, the parallelism is unbounded because we use `parTraverse`.
-    */
-  val chunkSigningParallelism: Int = 10
 
   def apply(
       protocolVersion: ProtocolVersion,

@@ -25,7 +25,7 @@ parameters:
   # old files don't pollute your build.
   cache-version:
     type: string
-    default: "37"
+    default: "36"
   run-job:
     type: enum
     enum:

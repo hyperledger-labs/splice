@@ -5,7 +5,6 @@ package com.daml.ledger.javaapi.data.codegen;
 
 import com.daml.ledger.javaapi.data.Value;
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfDecoder;
-import com.daml.ledger.javaapi.data.codegen.json.JsonLfEncoder;
 import java.util.function.Function;
 
 /**
@@ -26,11 +25,8 @@ public final class Choice<Tpl, ArgType, ResType> {
   public final ValueDecoder<ArgType> argTypeDecoder;
   public final ValueDecoder<ResType> returnTypeDecoder;
 
-  public final JsonLfDecoder<ArgType> argJsonDecoder;
-  public final JsonLfDecoder<ResType> resultJsonDecoder;
-
-  public final Function<ArgType, JsonLfEncoder> argJsonEncoder;
-  public final Function<ResType, JsonLfEncoder> resultJsonEncoder;
+  final JsonLfDecoder<ArgType> argJsonDecoder;
+  final JsonLfDecoder<ResType> resultJsonDecoder;
 
   private Choice(
       final String name,
@@ -38,17 +34,13 @@ public final class Choice<Tpl, ArgType, ResType> {
       ValueDecoder<ArgType> argTypeDecoder,
       ValueDecoder<ResType> returnTypeDecoder,
       JsonLfDecoder<ArgType> argJsonDecoder,
-      JsonLfDecoder<ResType> resultJsonDecoder,
-      Function<ArgType, JsonLfEncoder> argJsonEncoder,
-      Function<ResType, JsonLfEncoder> resultJsonEncoder) {
+      JsonLfDecoder<ResType> resultJsonDecoder) {
     this.name = name;
     this.encodeArg = encodeArg;
     this.argTypeDecoder = argTypeDecoder;
     this.returnTypeDecoder = returnTypeDecoder;
     this.argJsonDecoder = argJsonDecoder;
     this.resultJsonDecoder = resultJsonDecoder;
-    this.argJsonEncoder = argJsonEncoder;
-    this.resultJsonEncoder = resultJsonEncoder;
   }
 
   /**
@@ -66,7 +58,7 @@ public final class Choice<Tpl, ArgType, ResType> {
       final Function<ArgType, Value> encodeArg,
       ValueDecoder<ArgType> argTypeDecoder,
       ValueDecoder<ResType> returnTypeDecoder) {
-    return create(name, encodeArg, argTypeDecoder, returnTypeDecoder, null, null, null, null);
+    return create(name, encodeArg, argTypeDecoder, returnTypeDecoder, null, null);
   }
 
   /**
@@ -74,8 +66,6 @@ public final class Choice<Tpl, ArgType, ResType> {
    * href="https://docs.daml.com/app-dev/bindings-java/codegen.html">the Java code generator</a>,
    * and <em>should not be referenced directly</em>. Applications should refer to the generated
    * {@code CHOICE_*} fields on templates or interfaces.
-   *
-   * <p>TODO(raphael-speyer-da): Delete this method altogether, once codegen uses the other one.
    *
    * @hidden
    */
@@ -86,42 +76,7 @@ public final class Choice<Tpl, ArgType, ResType> {
       ValueDecoder<ResType> returnTypeDecoder,
       JsonLfDecoder<ArgType> argJsonDecoder,
       JsonLfDecoder<ResType> resultJsonDecoder) {
-    return create(
-        name,
-        encodeArg,
-        argTypeDecoder,
-        returnTypeDecoder,
-        argJsonDecoder,
-        resultJsonDecoder,
-        null,
-        null);
-  }
-
-  /**
-   * <strong>INTERNAL API</strong>: this is meant for use by <a
-   * href="https://docs.daml.com/app-dev/bindings-java/codegen.html">the Java code generator</a>,
-   * and <em>should not be referenced directly</em>. Applications should refer to the generated
-   * {@code CHOICE_*} fields on templates or interfaces.
-   *
-   * @hidden
-   */
-  public static <Tpl, ArgType, ResType> Choice<Tpl, ArgType, ResType> create(
-      final String name,
-      final Function<ArgType, Value> encodeArg,
-      ValueDecoder<ArgType> argTypeDecoder,
-      ValueDecoder<ResType> returnTypeDecoder,
-      JsonLfDecoder<ArgType> argJsonDecoder,
-      JsonLfDecoder<ResType> resultJsonDecoder,
-      Function<ArgType, JsonLfEncoder> argJsonEncoder,
-      Function<ResType, JsonLfEncoder> resultJsonEncoder) {
     return new Choice<>(
-        name,
-        encodeArg,
-        argTypeDecoder,
-        returnTypeDecoder,
-        argJsonDecoder,
-        resultJsonDecoder,
-        argJsonEncoder,
-        resultJsonEncoder);
+        name, encodeArg, argTypeDecoder, returnTypeDecoder, argJsonDecoder, resultJsonDecoder);
   }
 }

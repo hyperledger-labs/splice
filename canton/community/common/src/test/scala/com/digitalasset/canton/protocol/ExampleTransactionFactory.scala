@@ -618,7 +618,6 @@ class ExampleTransactionFactory(
       ActionDescription.tryFromLfActionNode(
         LfTransactionUtil.lightWeight(node),
         seed,
-        packagePreference = Set.empty,
         protocolVersion,
       )
 

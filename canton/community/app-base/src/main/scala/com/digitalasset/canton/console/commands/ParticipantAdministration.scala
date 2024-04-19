@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.console.commands
 
-import cats.syntax.either.*
+import cats.implicits.toBifunctorOps
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
@@ -63,7 +63,6 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SequencerConnectionValidation,
   SequencerConnections,
-  SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -111,8 +110,7 @@ private[console] object ParticipantCommands {
         maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
         priority: Int = 0,
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
-        submissionRequestAmplification: SubmissionRequestAmplification =
-          SubmissionRequestAmplification.NoAmplification,
+        submissionRequestAmplification: PositiveInt = PositiveInt.one,
     ): DomainConnectionConfig = {
       DomainConnectionConfig(
         domainAlias,
@@ -466,9 +464,7 @@ class LocalParticipantTestingGroup(
       to: Option[Instant] = None,
       limit: PositiveInt = defaultLimit,
   ): Seq[PossiblyIgnoredProtocolEvent] =
-    state_inspection
-      .findMessages(domain, from, to, Some(limit.value))
-      .map(_.valueOr(e => throw new IllegalStateException(e.toString)))
+    state_inspection.findMessages(domain, from, to, Some(limit.value))
 
   @Help.Summary(
     "Return the sync crypto api provider, which provides access to all cryptographic methods",
@@ -1153,8 +1149,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           consoleEnvironment.commandTimeouts.bounded
         ),
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
-        submissionRequestAmplification: SubmissionRequestAmplification =
-          SubmissionRequestAmplification.NoAmplification,
+        submissionRequestAmplification: PositiveInt = PositiveInt.one,
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
     ): Unit = {
       val config = ParticipantCommands.domains.reference_to_config(

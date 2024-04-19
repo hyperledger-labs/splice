@@ -17,7 +17,7 @@ import scalaz.std.either.*
 import scalaz.std.list.*
 import scalaz.syntax.traverse.*
 
-object TransactionFilterValidator {
+class TransactionFilterValidator(upgradingEnabled: Boolean) {
 
   import FieldValidator.*
   import ValidationErrors.*
@@ -35,7 +35,8 @@ object TransactionFilterValidator {
           for {
             key <- requireParty(party)
             validatedFilters <- validateFilters(
-              filters
+              filters,
+              upgradingEnabled,
             )
           } yield key -> validatedFilters
         }
@@ -43,7 +44,10 @@ object TransactionFilterValidator {
     }
 
   // Allow using deprecated Protobuf fields for backwards compatibility
-  private def validateFilters(filters: Filters)(implicit
+  private def validateFilters(
+      filters: Filters,
+      upgradingEnabled: Boolean,
+  )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, domain.Filters] =
     filters.inclusive
@@ -51,7 +55,7 @@ object TransactionFilterValidator {
         inclusive =>
           for {
             validatedTemplates <-
-              inclusive.templateFilters.toList.traverse(validateTemplateFilter(_))
+              inclusive.templateFilters.toList.traverse(validateTemplateFilter(_, upgradingEnabled))
             validatedInterfaces <-
               inclusive.interfaceFilters.toList traverse validateInterfaceFilter
           } yield domain.Filters(
@@ -64,7 +68,10 @@ object TransactionFilterValidator {
           )
       }
 
-  private def validateTemplateFilter(filter: TemplateFilter)(implicit
+  private def validateTemplateFilter(
+      filter: TemplateFilter,
+      upgradingEnabled: Boolean,
+  )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, domain.TemplateFilter] =
     for {
@@ -72,7 +79,7 @@ object TransactionFilterValidator {
       validatedIds <- validateIdentifierWithPackageUpgrading(
         templateId,
         filter.includeCreatedEventBlob,
-      )
+      )(upgradingEnabled)
     } yield validatedIds
 
   private def validateInterfaceFilter(filter: InterfaceFilter)(implicit

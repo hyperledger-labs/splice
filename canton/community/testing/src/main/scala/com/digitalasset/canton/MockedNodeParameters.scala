@@ -52,7 +52,5 @@ object MockedNodeParameters {
     override def useNewTrafficControl: Boolean = false
 
     override def exitOnFatalFailures: Boolean = ???
-
-    override def useUnifiedSequencer: Boolean = false
   }
 }

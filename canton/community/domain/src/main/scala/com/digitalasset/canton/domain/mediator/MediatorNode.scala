@@ -96,13 +96,13 @@ abstract class MediatorNodeConfigCommon(
   * @param dontWarnOnDeprecatedPV if true, then this mediator will not emit a warning when connecting to a sequencer using a deprecated protocol version.
   */
 final case class MediatorNodeParameterConfig(
-    override val devVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    override val devVersionSupport: Boolean = true,
     override val dontWarnOnDeprecatedPV: Boolean = false,
     override val initialProtocolVersion: ProtocolVersion = ProtocolVersion.latest,
     override val batching: BatchingConfig = BatchingConfig(),
     override val caching: CachingConfigs = CachingConfigs(),
     override val useNewTrafficControl: Boolean = false,
-    override val useUnifiedSequencer: Boolean = false,
 ) extends ProtocolConfig
     with LocalNodeParametersConfig
 

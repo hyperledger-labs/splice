@@ -397,7 +397,7 @@ class TransactionConfirmationRequestFactoryTest
               example.keyResolver,
               mediator,
               newCryptoSnapshot,
-              new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+              new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
               contractInstanceOfId,
               Some(testKeySeed),
               maxSequencingTime,
@@ -414,8 +414,7 @@ class TransactionConfirmationRequestFactoryTest
       s"use different session key after key is revoked between two requests" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
         // we use the same store for two requests to simulate what would happen in a real scenario
-        val store =
-          new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig)
+        val store = new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache)
         val recipientGroup = RecipientGroup(
           NonEmpty(Set, submittingParticipant, observerParticipant1, observerParticipant2),
           newCryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme,
@@ -473,7 +472,7 @@ class TransactionConfirmationRequestFactoryTest
             singleFetch.keyResolver,
             mediator,
             emptyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
             contractInstanceOfId,
             Some(testKeySeed),
             maxSequencingTime,
@@ -509,7 +508,7 @@ class TransactionConfirmationRequestFactoryTest
             singleFetch.keyResolver,
             mediator,
             confirmationOnlyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
             contractInstanceOfId,
             Some(testKeySeed),
             maxSequencingTime,
@@ -542,7 +541,7 @@ class TransactionConfirmationRequestFactoryTest
             singleFetch.keyResolver,
             mediator,
             newCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
             contractInstanceOfId,
             Some(testKeySeed),
             maxSequencingTime,
@@ -572,7 +571,7 @@ class TransactionConfirmationRequestFactoryTest
             singleFetch.keyResolver,
             mediator,
             submitterOnlyCryptoSnapshot,
-            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+            new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
             contractInstanceOfId,
             Some(testKeySeed),
             maxSequencingTime,
@@ -609,7 +608,7 @@ class TransactionConfirmationRequestFactoryTest
                   singleFetch.keyResolver,
                   mediator,
                   noKeyCryptoSnapshot,
-                  new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
+                  new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCache),
                   contractInstanceOfId,
                   Some(testKeySeed),
                   maxSequencingTime,

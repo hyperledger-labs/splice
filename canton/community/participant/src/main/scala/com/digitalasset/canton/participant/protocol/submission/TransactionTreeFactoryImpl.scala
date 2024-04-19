@@ -474,11 +474,8 @@ abstract class TransactionTreeFactoryImpl(
   protected def createActionDescription(
       actionNode: LfActionNode,
       seed: Option[LfHash],
-      packagePreference: Set[LfPackageId],
   ): ActionDescription =
-    checked(
-      ActionDescription.tryFromLfActionNode(actionNode, seed, packagePreference, protocolVersion)
-    )
+    checked(ActionDescription.tryFromLfActionNode(actionNode, seed, protocolVersion))
 
   protected def createViewCommonData(
       rootView: TransactionViewDecomposition.NewView,

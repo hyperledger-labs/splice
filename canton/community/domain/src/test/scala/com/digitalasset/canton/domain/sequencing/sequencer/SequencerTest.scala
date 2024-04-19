@@ -101,7 +101,6 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
         crypto,
         metrics,
         loggerFactory,
-        unifiedSequencer = testedUseUnifiedSequencer,
       )(parallelExecutionContext, tracer, materializer)
 
     def readAsSeq(

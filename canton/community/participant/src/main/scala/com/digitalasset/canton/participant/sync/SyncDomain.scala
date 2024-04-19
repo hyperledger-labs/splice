@@ -64,7 +64,6 @@ import com.digitalasset.canton.participant.traffic.{
   ParticipantTrafficControlSubscriber,
   TrafficStateController,
 }
-import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
 import com.digitalasset.canton.platform.apiserver.execution.AuthorityResolver
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
@@ -165,9 +164,6 @@ class SyncDomain(
       loggerFactory,
     )
 
-  private val packageResolver: PackageResolver = pkgId =>
-    traceContext => packageService.getPackage(pkgId)(traceContext)
-
   private val damle =
     new DAMLe(
       pkgId => traceContext => packageService.getPackage(pkgId)(traceContext),
@@ -191,7 +187,7 @@ class SyncDomain(
     timeouts,
     loggerFactory,
     futureSupervisor,
-    packageResolver = packageResolver,
+    enableContractUpgrading = parameters.enableContractUpgrading,
   )
 
   private val transferOutProcessor: TransferOutProcessor = new TransferOutProcessor(

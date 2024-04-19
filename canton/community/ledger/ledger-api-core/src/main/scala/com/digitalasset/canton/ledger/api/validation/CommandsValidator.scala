@@ -34,6 +34,7 @@ import scala.collection.immutable
 final class CommandsValidator(
     validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions =
       ValidateUpgradingPackageResolutions.UpgradingDisabled,
+    upgradingEnabled: Boolean = false,
     validateDisclosedContracts: ValidateDisclosedContracts = new ValidateDisclosedContracts,
 ) {
 
@@ -143,7 +144,7 @@ final class CommandsValidator(
       case c: ProtoCreate =>
         for {
           templateId <- requirePresence(c.value.templateId, "template_id")
-          typeConRef <- validateTypeConRef(templateId)
+          typeConRef <- validateTypeConRef(templateId)(upgradingEnabled)
           createArguments <- requirePresence(c.value.createArguments, "create_arguments")
           recordId <- createArguments.recordId.traverse(validateIdentifier)
           validatedRecordField <- validateRecordFields(createArguments.fields)
@@ -155,7 +156,7 @@ final class CommandsValidator(
       case e: ProtoExercise =>
         for {
           templateId <- requirePresence(e.value.templateId, "template_id")
-          templateRef <- validateTypeConRef(templateId)
+          templateRef <- validateTypeConRef(templateId)(upgradingEnabled)
           contractId <- requireContractId(e.value.contractId, "contract_id")
           choice <- requireName(e.value.choice, "choice")
           value <- requirePresence(e.value.choiceArgument, "value")
@@ -170,7 +171,7 @@ final class CommandsValidator(
       case ek: ProtoExerciseByKey =>
         for {
           templateId <- requirePresence(ek.value.templateId, "template_id")
-          templateRef <- validateTypeConRef(templateId)
+          templateRef <- validateTypeConRef(templateId)(upgradingEnabled)
           contractKey <- requirePresence(ek.value.contractKey, "contract_key")
           validatedContractKey <- validateValue(contractKey)
           choice <- requireName(ek.value.choice, "choice")
@@ -186,7 +187,7 @@ final class CommandsValidator(
       case ce: ProtoCreateAndExercise =>
         for {
           templateId <- requirePresence(ce.value.templateId, "template_id")
-          templateRef <- validateTypeConRef(templateId)
+          templateRef <- validateTypeConRef(templateId)(upgradingEnabled)
           createArguments <- requirePresence(ce.value.createArguments, "create_arguments")
           recordId <- createArguments.recordId.traverse(validateIdentifier)
           validatedRecordField <- validateRecordFields(createArguments.fields)
@@ -263,8 +264,14 @@ final class CommandsValidator(
 }
 
 object CommandsValidator {
-  def apply(validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions) =
-    new CommandsValidator(validateUpgradingPackageResolutions)
+  def apply(
+      validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions,
+      upgradingEnabled: Boolean,
+  ) =
+    new CommandsValidator(
+      validateUpgradingPackageResolutions = validateUpgradingPackageResolutions,
+      upgradingEnabled = upgradingEnabled,
+    )
 
   /** Effective submitters of a command
     * @param actAs Guaranteed to be non-empty. Will contain exactly one element in most cases.

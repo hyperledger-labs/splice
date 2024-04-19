@@ -40,6 +40,7 @@ import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.messages.Verdict.Approve
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.protocol.*
@@ -57,8 +58,8 @@ import com.digitalasset.canton.{DiscardOps, LfPartyId, RequestCounter, Sequencer
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.UUID
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** The [[ProtocolProcessor]] combines [[ProcessingSteps]] specific to a particular kind of request
@@ -450,6 +451,7 @@ abstract class ProtocolProcessor[
           messageId = messageId,
           amplify = true,
         )
+        .mapK(FutureUnlessShutdown.outcomeK)
         .leftMap { err =>
           removePendingSubmission()
           embedSubmissionError(SequencerRequestError(err))
@@ -791,7 +793,7 @@ abstract class ProtocolProcessor[
                   mediator,
                   snapshot,
                   malformedPayloads,
-                )
+                ).mapK(FutureUnlessShutdown.outcomeK)
             }
 
           case Some(goodViewsWithSignatures) =>
@@ -1036,7 +1038,7 @@ abstract class ProtocolProcessor[
 
       pendingDataAndResponsesAndTimeoutEvent <-
         if (isCleanReplay(rc)) {
-          val pendingData = CleanReplayData(rc, sc, mediator, locallyRejected = false)
+          val pendingData = CleanReplayData(rc, sc, mediator)
           val responses = Seq.empty[(ConfirmationResponse, Recipients)]
           val timeoutEvent = Either.right(Option.empty[TimestampedEvent])
           EitherT.pure[FutureUnlessShutdown, steps.RequestError](
@@ -1065,7 +1067,6 @@ abstract class ProtocolProcessor[
               pendingRequestCounter,
               pendingSequencerCounter,
               _,
-              _locallyRejected,
             ) = pendingData
             _ = if (
               pendingRequestCounter != rc
@@ -1126,11 +1127,12 @@ abstract class ProtocolProcessor[
           )
           sendResponses(requestId, signedResponsesTo, Some(messageId))
             .leftMap(err => steps.embedRequestError(SequencerRequestError(err)))
+            .mapK(FutureUnlessShutdown.outcomeK)
         } else {
           logger.info(
             s"Phase 4: Finished validation for request=${requestId.unwrap} with nothing to approve."
           )
-          EitherTUtil.unitUS[steps.RequestError]
+          EitherT.rightT[FutureUnlessShutdown, steps.RequestError](())
         }
 
     } yield ()
@@ -1148,20 +1150,16 @@ abstract class ProtocolProcessor[
       mediatorGroup: MediatorsOfDomain,
       snapshot: DomainSnapshotSyncCryptoApi,
       malformedPayloads: Seq[MalformedPayload],
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, steps.RequestError, Unit] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, steps.RequestError, Unit] = {
 
     val requestId = RequestId(ts)
 
     if (isCleanReplay(rc)) {
       ephemeral.requestTracker.tick(sc, ts)
-      EitherTUtil.unitUS
+      EitherT.rightT(())
     } else {
       for {
-        _ <- EitherT
-          .right(ephemeral.requestJournal.insert(rc, ts))
-          .mapK(FutureUnlessShutdown.outcomeK)
+        _ <- EitherT.right(ephemeral.requestJournal.insert(rc, ts))
 
         _ = ephemeral.requestTracker.tick(sc, ts)
 
@@ -1171,20 +1169,16 @@ abstract class ProtocolProcessor[
           malformedPayloads,
         )
         recipients = Recipients.cc(mediatorGroup)
-        messages <- EitherT
-          .right(responses.parTraverse { response =>
-            signResponse(snapshot, response).map(_ -> recipients)
-          })
-          .mapK(FutureUnlessShutdown.outcomeK)
+        messages <- EitherT.right(responses.parTraverse { response =>
+          signResponse(snapshot, response).map(_ -> recipients)
+        })
 
         _ <- sendResponses(requestId, messages)
           .leftMap(err => steps.embedRequestError(SequencerRequestError(err)))
 
         _ = handleRequestData.complete(None)
 
-        _ <- EitherT.right[steps.RequestError](
-          FutureUnlessShutdown.outcomeF(terminateRequest(rc, sc, ts, ts))
-        )
+        _ <- EitherT.right[steps.RequestError](terminateRequest(rc, sc, ts, ts))
       } yield ()
     }
   }
@@ -1360,7 +1354,7 @@ abstract class ProtocolProcessor[
     ): Future[Boolean] = Future.successful {
       val invalidO = for {
         case WrappedPendingRequestData(pendingRequestData) <- Some(pendingRequestDataOrReplayData)
-        case PendingTransaction(txId, _, _, _, _, requestTime, _, _, _, _, _) <- Some(
+        case PendingTransaction(txId, _, _, _, _, requestTime, _, _, _, _) <- Some(
           pendingRequestData
         )
 
@@ -1451,13 +1445,10 @@ abstract class ProtocolProcessor[
         steps.requestType.PendingRequestData
       ],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, steps.ResultError, Unit] = {
-    val PendingRequestData(requestCounter, requestSequencerCounter, _, locallyRejected) =
+    val PendingRequestData(requestCounter, requestSequencerCounter, _) =
       pendingRequestDataOrReplayData
     val cleanReplay = isCleanReplay(requestCounter, pendingRequestDataOrReplayData)
     val pendingSubmissionDataO = pendingSubmissionDataForRequest(pendingRequestDataOrReplayData)
-
-    // TODO(i15395): handle this more gracefully
-    checkContradictoryMediatorApprove(locallyRejected, verdict)
 
     for {
       commitAndEvent <- pendingRequestDataOrReplayData match {
@@ -1487,7 +1478,11 @@ abstract class ProtocolProcessor[
             (commitSetOF, contractsToBeStored, eventO)
           }
         case _: CleanReplayData =>
-          val commitSetOF = Option.when(verdict.isApprove)(Future.successful(CommitSet.empty))
+          val commitSetOF = verdict match {
+            case _: Approve => Some(Future.successful(CommitSet.empty))
+            case _ => None
+          }
+
           val eventO = None
 
           EitherT.pure[FutureUnlessShutdown, steps.ResultError](
@@ -1562,19 +1557,6 @@ abstract class ProtocolProcessor[
         } yield pendingSubmissionDataO.foreach(steps.postProcessResult(verdict, _))
       }
     } yield ()
-  }
-
-  private def checkContradictoryMediatorApprove(
-      locallyRejected: Boolean,
-      verdict: Verdict,
-  )(implicit traceContext: TraceContext): Unit = {
-    if (
-      isApprovalContradictionCheckEnabled(
-        loggerFactory.name
-      ) && verdict.isApprove && locallyRejected
-    ) {
-      ErrorUtil.invalidState(s"Mediator approved a request that we have locally rejected")
-    }
   }
 
   private[this] def logResultWarnings(
@@ -1779,45 +1761,6 @@ abstract class ProtocolProcessor[
 }
 
 object ProtocolProcessor {
-  private val approvalContradictionCheckIsEnabled = new AtomicReference[Boolean](true)
-  private val testsAllowedToDisableApprovalContradictionCheck = Seq(
-    "LedgerAuthorizationReferenceXIntegrationTestDefault",
-    "LedgerAuthorizationBftOrderingXIntegrationTestDefault",
-    "PackageVettingIntegrationTestDefault",
-  )
-
-  private[protocol] def isApprovalContradictionCheckEnabled(loggerName: String): Boolean = {
-    val checkIsEnabled = approvalContradictionCheckIsEnabled.get()
-
-    // Ensure check is enabled except for tests allowed to disable it
-    checkIsEnabled || !testsAllowedToDisableApprovalContradictionCheck.exists(loggerName.startsWith)
-  }
-
-  @VisibleForTesting
-  def withApprovalContradictionCheckDisabled[A](
-      loggerFactory: NamedLoggerFactory
-  )(body: => A): A = {
-    // Limit disabling the checks to specific tests
-    require(
-      testsAllowedToDisableApprovalContradictionCheck.exists(loggerFactory.name.startsWith),
-      "The approval contradiction check can only be disabled for some specific tests",
-    )
-
-    val logger = loggerFactory.getLogger(this.getClass)
-
-    blocking {
-      synchronized {
-        logger.info("Disabling approval contradiction check")
-        approvalContradictionCheckIsEnabled.set(false)
-        try {
-          body
-        } finally {
-          approvalContradictionCheckIsEnabled.set(true)
-          logger.info("Re-enabling approval contradiction check")
-        }
-      }
-    }
-  }
 
   sealed trait PendingRequestDataOrReplayData[+A <: PendingRequestData]
       extends PendingRequestData
@@ -1833,8 +1776,6 @@ object ProtocolProcessor {
     override def isCleanReplay: Boolean = false
     override def mediator: MediatorsOfDomain = unwrap.mediator
 
-    override def locallyRejected: Boolean = unwrap.locallyRejected
-
     override def rootHashO: Option[RootHash] = unwrap.rootHashO
   }
 
@@ -1842,7 +1783,6 @@ object ProtocolProcessor {
       override val requestCounter: RequestCounter,
       override val requestSequencerCounter: SequencerCounter,
       override val mediator: MediatorsOfDomain,
-      override val locallyRejected: Boolean,
   ) extends PendingRequestDataOrReplayData[Nothing] {
     override def isCleanReplay: Boolean = true
 

@@ -71,7 +71,6 @@ object DatabaseSequencer {
       cryptoApi: DomainSyncCryptoClient,
       metrics: SequencerMetrics,
       loggerFactory: NamedLoggerFactory,
-      unifiedSequencer: Boolean,
   )(implicit
       ec: ExecutionContext,
       tracer: Tracer,
@@ -108,7 +107,6 @@ object DatabaseSequencer {
       cryptoApi,
       metrics,
       loggerFactory,
-      unifiedSequencer,
     )
   }
 }
@@ -132,7 +130,6 @@ class DatabaseSequencer(
     cryptoApi: DomainSyncCryptoClient,
     metrics: SequencerMetrics,
     loggerFactory: NamedLoggerFactory,
-    unifiedSequencer: Boolean,
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
       DomainTopologyManagerId(domainId),

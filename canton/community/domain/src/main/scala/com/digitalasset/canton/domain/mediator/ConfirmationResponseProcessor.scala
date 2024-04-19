@@ -202,7 +202,7 @@ private[mediator] class ConfirmationResponseProcessor(
       mediatorState
         .replace(responseAggregation, timeout)
         .semiflatMap { _ =>
-          sendResultIfDone(timeout, decisionTime).onShutdown(())
+          sendResultIfDone(timeout, decisionTime)
         }
         .getOrElse(())
     }
@@ -703,11 +703,13 @@ private[mediator] class ConfirmationResponseProcessor(
 
   /** This method is here to allow overriding the async send & determinism in tests
     */
-  protected def doNotAwait(requestId: RequestId, f: => FutureUnlessShutdown[Any])(implicit
+  protected def doNotAwait(requestId: RequestId, f: => Future[Any])(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    FutureUtil.doNotAwaitUnlessShutdown(
-      performUnlessClosingUSF("send-result-if-done")(f),
+    FutureUtil.doNotAwait(
+      performUnlessClosingF("send-result-if-done")(
+        f
+      ).onShutdown(()),
       s"send-result-if-done failed for request $requestId",
       level = Level.WARN,
     )
@@ -717,7 +719,7 @@ private[mediator] class ConfirmationResponseProcessor(
   private def sendResultIfDone(
       responseAggregation: ResponseAggregation[?],
       decisionTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] =
     responseAggregation.asFinalized(protocolVersion) match {
       case Some(finalizedResponse) =>
         logger.info(
@@ -731,6 +733,6 @@ private[mediator] class ConfirmationResponseProcessor(
         )
       case None =>
         /* no op */
-        FutureUnlessShutdown.unit
+        Future.unit
     }
 }

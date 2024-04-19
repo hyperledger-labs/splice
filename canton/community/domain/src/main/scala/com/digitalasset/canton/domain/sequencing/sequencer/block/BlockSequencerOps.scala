@@ -17,7 +17,6 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.ServerServiceDefinition
 import org.apache.pekko.stream.KillSwitch
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -67,6 +66,4 @@ trait BlockSequencerOps extends AutoCloseable {
   def health(implicit
       traceContext: TraceContext
   ): Future[SequencerDriverHealthStatus]
-
-  def adminServices: Seq[ServerServiceDefinition] = Seq.empty
 }

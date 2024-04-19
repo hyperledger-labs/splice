@@ -144,7 +144,7 @@ class StreamAuthorizationComponentSpec
       .failed
       .map { t =>
         // the client stream should be cancelled with error
-        t.getMessage should include("ACCESS_TOKEN_EXPIRED")
+        t.getMessage should include("UNAUTHENTICATED")
         // the server stream should be completed
         fixture.waitForServerPekkoStream shouldBe None
       }

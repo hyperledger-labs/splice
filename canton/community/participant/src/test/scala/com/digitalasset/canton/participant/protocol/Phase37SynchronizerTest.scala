@@ -38,7 +38,6 @@ class Phase37SynchronizerTest extends AnyWordSpec with BaseTest with HasExecutio
         RequestCounter(i),
         SequencerCounter(i),
         MediatorsOfDomain(MediatorGroupIndex.one),
-        locallyRejected = false,
       )
     )
 

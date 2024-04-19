@@ -148,9 +148,6 @@ object ProtoConverter {
   def parseCommandId(id: String): ParsingResult[Ref.CommandId] =
     parseString(id)(Ref.CommandId.fromString)
 
-  def parsePackageId(id: String): ParsingResult[Ref.PackageId] =
-    parseString(id)(Ref.PackageId.fromString)
-
   def parseTemplateIdO(id: String): ParsingResult[Option[LfTemplateId]] =
     OptionUtil.emptyStringAsNone(id).traverse(parseTemplateId)
 

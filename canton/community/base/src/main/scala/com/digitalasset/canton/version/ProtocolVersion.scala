@@ -240,17 +240,12 @@ object ProtocolVersion {
   final case class InvalidProtocolVersion(override val description: String) extends FailureReason
 
   // All stable protocol versions supported by this release
-  val stableAndSupported: NonEmpty[List[ProtocolVersion]] =
-    NonEmpty
-      .from(
-        BuildInfo.protocolVersions
-          .map(parseUnchecked)
-          .map(_.valueOr(sys.error))
-          .toList
-      )
-      .getOrElse(
-        sys.error("Release needs to support at least one protocol version")
-      )
+  // TODO(#15561) Switch to non-empty again
+  val stableAndSupported: List[ProtocolVersion] =
+    BuildInfo.protocolVersions
+      .map(parseUnchecked)
+      .map(_.valueOr(sys.error))
+      .toList
 
   private val deprecated: Seq[ProtocolVersion] = Seq()
   private val deleted: NonEmpty[Seq[ProtocolVersion]] =
@@ -264,20 +259,18 @@ object ProtocolVersion {
     )
 
   val unstable: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable]]] =
-    NonEmpty.mk(List, ProtocolVersion.v31, ProtocolVersion.dev)
+    NonEmpty.mk(List, ProtocolVersion.v30, ProtocolVersion.dev)
 
   val supported: NonEmpty[List[ProtocolVersion]] = (unstable ++ stableAndSupported).sorted
 
-  val latest: ProtocolVersion = stableAndSupported.max1
+  // TODO(i15561): change back to `stableAndSupported.max1` once there is a stable Daml 3 protocol version
+  val latest: ProtocolVersion = stableAndSupported.lastOption.getOrElse(unstable.head1)
 
   lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
     ProtocolVersion.unstable(Int.MaxValue)
 
-  lazy val v30: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
-    ProtocolVersion.stable(30)
-
-  lazy val v31: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
-    ProtocolVersion.unstable(31)
+  lazy val v30: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
+    ProtocolVersion.unstable(30)
 
   // Minimum stable protocol version introduced
   lazy val minimum: ProtocolVersion = v30

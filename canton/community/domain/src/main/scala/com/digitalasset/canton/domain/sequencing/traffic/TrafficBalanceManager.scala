@@ -140,7 +140,7 @@ class TrafficBalanceManager(
                 .map {
                   case balanceForMember @ BalancesForMember(existingBalances, _)
                       if existingBalances.values.maxOption.forall(_.serial < balance.serial) =>
-                    logger.trace(s"Updating with new balance: $balance")
+                    logger.debug(s"Updating with new balance: $balance")
                     balanceForMember.copy(
                       trafficBalances = existingBalances
                         // Limit how many balances we keep in memory
@@ -170,6 +170,7 @@ class TrafficBalanceManager(
         case balances if balances.trafficBalances.lastOption.forall({ case (_, cachedBalance) =>
               cachedBalance == balance
             }) =>
+          logger.debug(s"Persisting traffic balance $balance in the store")
           store
             .store(balance)
             .map(_ => balances)
@@ -200,7 +201,7 @@ class TrafficBalanceManager(
             store
               .pruneBelowExclusive(member, pruningTimestamp)
               .map { _ =>
-                logger.trace(
+                logger.debug(
                   s"Traffic balances for $member were pruned below $eligibleForPruningBefore"
                 )
               }
@@ -283,16 +284,16 @@ class TrafficBalanceManager(
   private def updateAndCompletePendingUpdates(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Unit = {
-    logger.trace(s"Updating lastUpdatedAt to $timestamp")
+    logger.debug(s"Updating lastUpdatedAt to $timestamp")
     val prev = lastUpdateAt.getAndSet(Some(timestamp))
 
     prev match {
       case previous if previous.forall(_ <= timestamp) =>
         blocking {
           pendingBalanceUpdates.synchronized {
-            logger.trace(s"Dequeueing pending balances up until $timestamp")
+            logger.debug(s"Dequeueing pending balances up until $timestamp")
             dequeueUntil(timestamp).foreach { update =>
-              logger.trace(s"Providing balance update at timestamp ${update.desired}")
+              logger.debug(s"Providing balance update at timestamp ${update.desired}")
               update.promise.completeWith(getBalanceAt(update.member, update.desired).value)
             }
           }
@@ -348,6 +349,9 @@ class TrafficBalanceManager(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TrafficBalanceManagerError, Option[TrafficBalance]] = {
     val lastUpdate = lastUpdateAt.get()
+    logger.debug(
+      s"Requesting balance for $member at $desired with lastSeen = $lastSeenO. Last update: $lastUpdate"
+    )
     val result = (lastUpdate, lastSeenO) match {
       // Desired timestamp is before or equal the timestamp just after last update, so the balance is correct and we can provide it immediately
       // This is correct because an update only becomes valid at the immediateSuccessor of its sequencing timestamp.
@@ -372,7 +376,7 @@ class TrafficBalanceManager(
         promiseO.map(promise => EitherT(promise.futureUS)).getOrElse(getBalanceAt(member, desired))
     }
     result.flatTap { balance =>
-      logger.trace(
+      logger.debug(
         s"Providing balance for $member at $desired with lastSeen = $lastSeenO. Last update: $lastUpdate. Balance is $balance"
       )
       EitherT.pure(())
@@ -399,7 +403,7 @@ class TrafficBalanceManager(
           )
           None
         } else {
-          logger.trace(
+          logger.debug(
             s"Balance for $member at $desired is not available yet. Waiting to observe an event at $lastSeen. Last update: $possiblyNewLastUpdate"
           )
           val promise = mkPromise[Either[TrafficBalanceManagerError, Option[TrafficBalance]]](
@@ -428,9 +432,11 @@ class TrafficBalanceManager(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
     val nextPruningAt = clock.now.plus(trafficConfig.pruningRetentionWindow.asJava)
+    logger.debug(s"Next traffic balance pruning scheduled at $nextPruningAt")
     val resultFUS = promise.futureUS
     val scheduledFUS = clock.scheduleAt(
       ts => {
+        logger.debug(s"Running scheduled traffic balance pruning at $ts")
         safeToPruneBeforeExclusive.get().foreach { safeToPruneTs =>
           val threshold = ts.minus(trafficConfig.pruningRetentionWindow.asJava).min(safeToPruneTs)
           logger.debug(s"Traffic balances older than $threshold are now eligible for pruning")

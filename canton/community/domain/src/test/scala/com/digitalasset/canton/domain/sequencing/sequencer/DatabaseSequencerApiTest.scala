@@ -45,7 +45,6 @@ abstract class DatabaseSequencerApiTest extends NonBftDomainSequencerApiTest {
       crypto,
       metrics,
       loggerFactory,
-      unifiedSequencer = testedUseUnifiedSequencer,
     )(executorService, tracer, materializer)
   }
 

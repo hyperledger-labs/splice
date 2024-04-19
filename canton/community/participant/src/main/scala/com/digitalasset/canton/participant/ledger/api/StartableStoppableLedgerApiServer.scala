@@ -352,6 +352,7 @@ class StartableStoppableLedgerApiServer(
         meteringReportKey = config.meteringReportKey,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
+        upgradingEnabled = config.cantonParameterConfig.enableContractUpgrading,
         authenticateContract = authenticateContract,
         dynParamGetter = config.syncService.dynamicDomainParameterGetter,
         disableUpgradeValidation = config.cantonParameterConfig.disableUpgradeValidation,

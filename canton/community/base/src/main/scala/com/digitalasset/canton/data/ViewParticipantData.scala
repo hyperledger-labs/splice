@@ -32,7 +32,6 @@ import com.digitalasset.canton.{
   LfFetchByKeyCommand,
   LfFetchCommand,
   LfLookupByKeyCommand,
-  LfPackageId,
   LfPartyId,
   ProtoDeserializationError,
   checked,
@@ -149,7 +148,7 @@ final case class ViewParticipantData private (
     }
   }
 
-  def rootAction: RootAction =
+  def rootAction(enableContractUpgrading: Boolean): RootAction =
     actionDescription match {
       case CreateActionDescription(contractId, _seed, _version) =>
         val createdContract = createdCore.headOption.getOrElse(
@@ -171,7 +170,6 @@ final case class ViewParticipantData private (
           ),
           metadata.signatories,
           failed = false,
-          packageIdPreference = Set.empty,
         )
 
       case ExerciseActionDescription(
@@ -179,7 +177,6 @@ final case class ViewParticipantData private (
             commandTemplateId,
             choice,
             interfaceId,
-            packagePreference,
             chosenValue,
             actors,
             byKey,
@@ -196,7 +193,7 @@ final case class ViewParticipantData private (
 
         // commandTemplateId is not populated prior to ProtocolVersion.v5
         val templateId = commandTemplateId match {
-          case Some(templateId) => templateId
+          case Some(templateId) if enableContractUpgrading => templateId
           case _ => inputContract.contract.contractInstance.unversioned.template
         }
 
@@ -223,7 +220,7 @@ final case class ViewParticipantData private (
             argument = chosenValue,
           )
         }
-        RootAction(cmd, actors, failed, packagePreference)
+        RootAction(cmd, actors, failed)
 
       case FetchActionDescription(inputContractId, actors, byKey, _version) =>
         val inputContract = coreInputs.getOrElse(
@@ -245,7 +242,7 @@ final case class ViewParticipantData private (
         } else {
           LfFetchCommand(templateId = templateId, coid = inputContractId)
         }
-        RootAction(cmd, actors, failed = false, packageIdPreference = Set.empty)
+        RootAction(cmd, actors, failed = false)
 
       case LookupByKeyActionDescription(key, _version) =>
         val keyResolution = resolvedKeys.getOrElse(
@@ -263,7 +260,6 @@ final case class ViewParticipantData private (
           LfLookupByKeyCommand(templateId = key.templateId, contractKey = key.key),
           maintainers,
           failed = false,
-          packageIdPreference = Set.empty,
         )
     }
 
@@ -481,12 +477,7 @@ object ViewParticipantData
     } yield viewParticipantData
   }
 
-  final case class RootAction(
-      command: LfCommand,
-      authorizers: Set[LfPartyId],
-      failed: Boolean,
-      packageIdPreference: Set[LfPackageId],
-  )
+  final case class RootAction(command: LfCommand, authorizers: Set[LfPartyId], failed: Boolean)
 
   /** Indicates an attempt to create an invalid [[ViewParticipantData]]. */
   final case class InvalidViewParticipantData(message: String) extends RuntimeException(message)

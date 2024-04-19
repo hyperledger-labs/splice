@@ -76,12 +76,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   config.monitoring.metrics.jvmMetrics
     .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
 
-  implicit val scheduler: ScheduledExecutorService =
-    Threading.singleThreadScheduledExecutor(
-      loggerFactory.threadName + "-env-sched",
-      noTracingLogger,
-    )
-
   // public for buildDocs task to be able to construct a fake participant and domain to document available metrics via reflection
 
   lazy val metricsRegistry: MetricsRegistry = new MetricsRegistry(
@@ -156,6 +150,12 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   installJavaUtilLoggingBridge()
   logger.debug(config.portDescription)
+
+  implicit val scheduler: ScheduledExecutorService =
+    Threading.singleThreadScheduledExecutor(
+      loggerFactory.threadName + "-env-sched",
+      noTracingLogger,
+    )
 
   private val numThreads = Threading.detectNumberOfThreads(noTracingLogger)
   implicit val executionContext: ExecutionContextIdlenessExecutorService =
@@ -368,7 +368,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
       }
     }
-    config.parameters.timeouts.processing.unbounded.await("reconnect-participants")(
+    config.parameters.timeouts.processing.unbounded.await("reconnect-particiapnts")(
       MonadUtil
         .parTraverseWithLimit_(config.parameters.getStartupParallelism(numThreads))(
           participants.running

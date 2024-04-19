@@ -109,7 +109,6 @@ class DriverBlockSequencerFactory[C](
       nodeParameters.loggingConfig.api.printer,
       metrics,
       domainLoggerFactory,
-      unifiedSequencer = nodeParameters.useUnifiedSequencer,
     )
 }
 

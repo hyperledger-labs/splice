@@ -387,7 +387,6 @@ class GrpcSequencerIntegrationTest
             None,
           )
           .value
-          .onShutdown(fail())
       } yield {
         response shouldBe Right(())
       }

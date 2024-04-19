@@ -51,8 +51,10 @@ object FlywayMigrationsSpec {
     resources.size should be >= minMigrationCount
 
     resources.collect {
-      // exclude migration for reference sequencer
-      case res if !res.getAbsolutePath.contains("/stable/reference/") =>
+      case res
+          if !res.getFilename.contains(
+            "V1_1__initial"
+          ) => // TODO(#16458) Remove exception for V1_1__initial.sql
         val fileName = res.getFilename
         val expectedDigest =
           getExpectedDigest(fileName, fileName.dropRight(4) + ".sha256", resourceScanner)

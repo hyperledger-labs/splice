@@ -178,7 +178,8 @@ private[mediator] object MediatorDeduplicationStore {
       storage: Storage,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-      batchAggregatorConfig: BatchAggregatorConfig = BatchAggregatorConfig(),
+      batchAggregatorConfig: BatchAggregatorConfig =
+        BatchAggregatorConfig(), // TODO(i9798): make this configurable
   )(implicit executionContext: ExecutionContext): MediatorDeduplicationStore = storage match {
     case _: MemoryStorage => new InMemoryMediatorDeduplicationStore(loggerFactory, timeouts)
     case dbStorage: DbStorage =>

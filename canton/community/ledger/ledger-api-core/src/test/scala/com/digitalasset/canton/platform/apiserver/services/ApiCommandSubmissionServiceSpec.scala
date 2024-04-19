@@ -131,7 +131,8 @@ class ApiCommandSubmissionServiceSpec
     new ApiCommandSubmissionService(
       commandSubmissionService = commandSubmissionService,
       commandsValidator = CommandsValidator(
-        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.UpgradingDisabled
+        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.UpgradingDisabled,
+        upgradingEnabled = false,
       ),
       writeService = null,
       currentLedgerTime = () => Instant.EPOCH,

@@ -489,10 +489,8 @@ class SequencerNodeBootstrapX(
           memberAuthServiceFactory = MemberAuthenticationServiceFactory(
             domainId,
             clock,
-            config.publicApi.nonceExpirationInterval.asJava,
-            config.publicApi.maxTokenExpirationInterval.asJava,
-            useExponentialRandomTokenExpiration =
-              config.publicApi.useExponentialRandomTokenExpiration,
+            config.publicApi.nonceExpirationTime.asJava,
+            config.publicApi.tokenExpirationTime.asJava,
             parameters.processingTimeouts,
             domainLoggerFactory,
             topologyProcessor,

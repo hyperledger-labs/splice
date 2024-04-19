@@ -15,6 +15,7 @@ import com.digitalasset.canton.config.{
   QueryCostMonitoringConfig,
   StorageConfig,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.{BlockOrderer, BlockOrdererFactory}
 import com.digitalasset.canton.domain.sequencing.sequencer.reference.store.ReferenceBlockOrderingStore
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
@@ -22,7 +23,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.resource.{CommunityDbMigrations, CommunityStorageFactory, Storage}
-import com.digitalasset.canton.time.{TimeProvider, TimeProviderClock}
+import com.digitalasset.canton.time.{Clock, TimeProvider}
 import com.digitalasset.canton.tracing.TraceContext
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.stream.Materializer
@@ -132,7 +133,16 @@ object CommunityReferenceBlockOrdererFactory {
       processingTimeout: ProcessingTimeout,
       lFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): Storage = {
-    val clock = new TimeProviderClock(timeProvider, lFactory)
+    val clock = new Clock {
+      override def now: CantonTimestamp =
+        CantonTimestamp.assertFromLong(timeProvider.nowInMicrosecondsSinceEpoch)
+
+      override protected def addToQueue(queue: Queued): Unit = ()
+
+      override protected def loggerFactory: NamedLoggerFactory = lFactory
+
+      override def close(): Unit = ()
+    }
     implicit val traceContext: TraceContext = TraceContext.empty
     implicit val closeContext: CloseContext = new CloseContext(closeable)
     val storageConfig = setMigrationsPath(config.storage)
@@ -178,10 +188,10 @@ object CommunityReferenceBlockOrdererFactory {
     config match {
       case h2: CommunityDbConfig.H2 =>
         h2.focus(_.parameters.migrationsPaths)
-          .replace(Seq("classpath:db/migration/canton/h2/stable/reference/"))
+          .replace(Seq("classpath:db/migration/canton/h2/dev/reference/"))
       case pg: CommunityDbConfig.Postgres =>
         pg.focus(_.parameters.migrationsPaths)
-          .replace(Seq("classpath:db/migration/canton/postgres/stable/reference/"))
+          .replace(Seq("classpath:db/migration/canton/postgres/dev/reference/"))
       case x => x
     }
 }

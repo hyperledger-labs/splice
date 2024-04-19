@@ -121,10 +121,7 @@ class HttpValidatorAdminHandler(
                 )
             }.toVector,
             connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
-            definitions.SequencerSubmissionRequestAmplification(
-              connectionConfig.sequencerConnections.submissionRequestAmplification.factor.value,
-              connectionConfig.sequencerConnections.submissionRequestAmplification.patience.duration.toSeconds,
-            ),
+            connectionConfig.sequencerConnections.submissionRequestAmplification.value,
           )
         )
       )

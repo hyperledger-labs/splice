@@ -263,14 +263,12 @@ class DefaultVerdictSenderTest
     )
 
     def sendApproval(): Future[Unit] = {
-      verdictSender
-        .sendResult(
-          requestId,
-          informeeMessage,
-          Verdict.Approve(testedProtocolVersion),
-          decisionTime,
-        )
-        .onShutdown(fail())
+      verdictSender.sendResult(
+        requestId,
+        informeeMessage,
+        Verdict.Approve(testedProtocolVersion),
+        decisionTime,
+      )
     }
 
     def sendReject(): Future[Unit] = {
