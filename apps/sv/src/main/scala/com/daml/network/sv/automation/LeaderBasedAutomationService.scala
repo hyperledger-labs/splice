@@ -52,9 +52,7 @@ class LeaderBasedAutomationService(
     registerTrigger(new GarbageCollectAmuletPriceVotesTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
-    if (config.automation.enableUnclaimedRewardExpiration) {
-      registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
-    }
+    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
     registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))

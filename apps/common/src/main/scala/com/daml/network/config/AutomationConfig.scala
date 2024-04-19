@@ -43,9 +43,6 @@ case class AutomationConfig(
       * and merges amulets.
       */
     enableAutomaticRewardsCollectionAndAmuletMerging: Boolean = true,
-    /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
-      */
-    enableUnclaimedRewardExpiration: Boolean = false,
     /** Only intended for testing. Disables the expiration of Amulet.
       */
     enableExpireAmulet: Boolean = false,
