@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.{AssignedContract, ContractWithState, DisclosedContracts}
 import com.daml.network.validator.store.ValidatorStore
@@ -91,6 +91,7 @@ class ReceiveFaucetCouponTrigger(
         readAs = Seq(validatorParty),
         license
           .exercise(_.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)),
+        priority = CommandPriority.High,
       )
       .noDedup
       .withDisclosedContracts(DisclosedContracts(unclaimedRound))
