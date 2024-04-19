@@ -104,7 +104,7 @@ class DomainMigrationInitializer(
         .asRuntimeException()
     val storeKey =
       SvStore.Key(migrationDump.nodeIdentities.svPartyId, migrationDump.nodeIdentities.dsoPartyId)
-    val dsoPartyHosting = newDsoPartyHosting(storeKey)
+    val dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
     for {
       _ <- migrateToNewSynchronizerNode(migrationDump)
       decentralizedSynchronizerId = migrationDump.nodeIdentities.domainId

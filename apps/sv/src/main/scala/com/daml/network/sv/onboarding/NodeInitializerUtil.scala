@@ -121,10 +121,10 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     )
 
   protected def newDsoPartyHosting(
-      storeKey: SvStore.Key
+      dsoParty: PartyId
   )(implicit ec: ExecutionContextExecutor) = new DsoPartyHosting(
     participantAdminConnection,
-    storeKey.dsoParty,
+    dsoParty,
     retryProvider,
     loggerFactory,
   )

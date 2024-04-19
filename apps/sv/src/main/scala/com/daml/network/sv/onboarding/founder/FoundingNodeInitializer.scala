@@ -161,7 +161,7 @@ class FoundingNodeInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      dsoPartyHosting = newDsoPartyHosting(storeKey)
+      dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.

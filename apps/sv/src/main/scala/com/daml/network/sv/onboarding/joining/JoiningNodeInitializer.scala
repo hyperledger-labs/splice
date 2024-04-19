@@ -132,7 +132,7 @@ class JoiningNodeInitializer(
           RetryFor.WaitingOnInitDependency,
         ),
       ).tupled
-      _ <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
+      decentralizedSynchronizerId <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -157,17 +157,13 @@ class JoiningNodeInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      decentralizedSynchronizer <- svStore.domains.waitForDomainConnection(
-        config.domains.global.alias
-      )
-      _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
-      dsoPartyHosting = newDsoPartyHosting(storeKey)
+      dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp
       dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
-        decentralizedSynchronizer,
+        decentralizedSynchronizerId,
         participantId,
       )
       withSvStore = new WithSvStore(
@@ -181,7 +177,7 @@ class JoiningNodeInitializer(
           retryProvider,
           loggerFactory,
         ),
-        decentralizedSynchronizer,
+        decentralizedSynchronizerId,
       )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
@@ -199,6 +195,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
               )
+            _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
               dsoAutomation,
@@ -233,7 +230,7 @@ class JoiningNodeInitializer(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
-      _ <- onboard(decentralizedSynchronizer, dsoAutomation, svAutomation)
+      _ <- onboard(decentralizedSynchronizerId, dsoAutomation, svAutomation)
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
         dsoAutomation,
         dsoStore,
@@ -241,7 +238,7 @@ class JoiningNodeInitializer(
       )
     } yield {
       (
-        decentralizedSynchronizer,
+        decentralizedSynchronizerId,
         dsoPartyHosting,
         svStore,
         svAutomation,
@@ -588,15 +585,24 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
-                _ <- requestOnboarding(
-                  svConnection,
-                  name,
-                  participantId,
-                  publicKey,
-                  privateKey_,
-                )
-                // Wait on the SV store because the DSO party is not yet onboarded.
-                _ <- waitForSvOnboardingConfirmedInSvStore()
+                _ <- svStore.lookupSvOnboardingConfirmed().flatMap {
+                  // We're already in the process of onboarding
+                  case Some(_) =>
+                    Future.unit
+                  case None =>
+                    for {
+                      _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+                      _ <- requestOnboarding(
+                        svConnection,
+                        name,
+                        participantId,
+                        publicKey,
+                        privateKey_,
+                      )
+                      // Wait on the SV store because the DSO party is not yet onboarded.
+                      _ <- waitForSvOnboardingConfirmedInSvStore()
+                    } yield ()
+                }
                 _ <- startHostingDsoPartyInParticipant()
                 // We need to wait for the ledger API server to see the party otherwise the
                 // grantUserRights call will fail.
@@ -781,7 +787,7 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[Unit] = for {
+  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[DomainId] = for {
     decentralizedSynchronizerId <- participantAdminConnection.getDomainId(
       config.domains.global.alias
     )
@@ -804,7 +810,7 @@ class JoiningNodeInitializer(
         logger.info("Reconnecting to global domain")
         participantAdminConnection.connectDomain(config.domains.global.alias)
       }
-  } yield ()
+  } yield decentralizedSynchronizerId
 }
 
 object JoiningNodeInitializer {}
