@@ -7,7 +7,7 @@ contactPoints:
       - uid: cn-ci
         type: slack
         settings:
-          recipient: C064MTNQT88
+          recipient: $SLACK_NOTIFICATION_CHANNEL
           token: $SLACK_ACCESS_TOKEN
           username: grafana
           # <string>

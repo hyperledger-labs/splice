@@ -322,6 +322,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   createGrafanaAlerting(namespaceName);
 }
 
+const slackAlertNotificationChannel = process.env.SLACK_ALERT_NOTIFICATION_CHANNEL || 'C064MTNQT88';
+
 function createGrafanaContactPoints(namespace: Input<string>) {
   new k8s.core.v1.Secret(
     'slack-alert-notification-channel',
@@ -334,10 +336,9 @@ function createGrafanaContactPoints(namespace: Input<string>) {
       },
       data: {
         'slackContactPoint.yaml': Buffer.from(
-          readFile('slack_contact_point.yaml').replaceAll(
-            '$SLACK_ACCESS_TOKEN',
-            requireEnv('SLACK_ACCESS_TOKEN')
-          )
+          readFile('slack_contact_point.yaml')
+            .replaceAll('$SLACK_ACCESS_TOKEN', requireEnv('SLACK_ACCESS_TOKEN'))
+            .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
         ).toString('base64'),
       },
     },
