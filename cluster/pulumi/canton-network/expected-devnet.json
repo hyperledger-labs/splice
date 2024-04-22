@@ -777,28 +777,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "secret": "dmFsaWRhdG9yc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-onboarding-validator",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-validator-onboarding-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
         }
       },
@@ -2286,16 +2264,6 @@
               "secretKeyRef": {
                 "key": "secret",
                 "name": "cn-app-validator-onboarding-validator1",
-                "optional": false
-              }
-            }
-          },
-          {
-            "expiresIn": "24h",
-            "secretFrom": {
-              "secretKeyRef": {
-                "key": "secret",
-                "name": "cn-app-validator-onboarding-validator",
                 "optional": false
               }
             }

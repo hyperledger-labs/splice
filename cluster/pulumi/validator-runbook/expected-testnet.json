@@ -139,28 +139,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-onboarding-validator",
-        "namespace": "validator"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator-validator-onboarding-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
@@ -298,13 +276,6 @@
         "migrateValidatorParty": false,
         "migration": {
           "id": "0"
-        },
-        "onboardingSecretFrom": {
-          "secretKeyRef": {
-            "key": "secret",
-            "name": "cn-app-validator-onboarding-validator",
-            "optional": false
-          }
         },
         "participantAddress": "participant",
         "participantIdentitiesDumpPeriodicBackup": {
