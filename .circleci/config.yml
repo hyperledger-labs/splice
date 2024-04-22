@@ -4570,27 +4570,6 @@ workflows:
           parallelism: 1
           requires:
             - deploy_final_upgrade
-      # TODO (#10966): this step should be disabled when there's been a daml ugprade
-      - preflight_sv_check:
-          name: "preflight_sv_check_before_sv_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - deploy_final_upgrade
-      - preflight_validator_check:
-          name: "preflight_validator_final_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - deploy_final_upgrade
       - deploy_sv_runbook:
           name: "upgrade_sv_runbook"
           # by resetting the SV runbook, it's as if a new SV was onboarded,
@@ -4607,6 +4586,20 @@ workflows:
             - preflight_check_final_upgrade
             - preflight_sv_check_before_sv_upgrade
             - preflight_validator_final_upgrade
+      - deploy_validator_runbook:
+          name: "upgrade_validator_runbook"
+          # by resetting the Validator runbook, it's as if a new Validator was onboarded,
+          # thus testing that Validators joining after an upgrade also work
+          reset_cluster: true
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - preflight_check_final_upgrade
+            - preflight_sv_check_before_sv_upgrade
+            - preflight_validator_final_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_upgrade"
           <<: *main-branch-only
@@ -4617,6 +4610,16 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - upgrade_sv_runbook
+      - preflight_validator_check:
+          name: "preflight_validator_runbook_after_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - upgrade_validator_runbook
 
   deploy_ciupgrade_migration:
     when:
