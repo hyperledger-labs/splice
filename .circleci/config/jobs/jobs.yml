@@ -610,6 +610,7 @@ jobs:
   backup_cluster:
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       include_sv:
         type: boolean
         default: true
@@ -668,10 +669,12 @@ jobs:
             cncluster backup_nodes $(cat tests-to-run.txt)
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
 
   restore_node:
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       namespace_name:
         type: string
       expected_migration_id:
@@ -709,6 +712,7 @@ jobs:
             esac
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
 
   test_DR:
     parameters:

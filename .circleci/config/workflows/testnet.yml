@@ -94,6 +94,7 @@ workflow:
             branches:
               only:
                 - deployment/testnet
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           context:
             - artifactory

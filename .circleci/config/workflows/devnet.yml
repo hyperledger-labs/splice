@@ -151,6 +151,7 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           use_published_artifacts: false
           requires:
@@ -165,6 +166,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           requires:
             - deploy_sv_runbook
@@ -188,6 +190,7 @@ workflow:
             branches:
               only:
                 - deployment/devnet
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           context:
             - artifactory
