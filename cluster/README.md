@@ -1680,7 +1680,7 @@ At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one
 ```
 export TOKEN=$(cncluster get_ui_credentials cantonNetwork sv-1)
 ```
-If the token saved in the secret is expired, run `cncluster preflight_get_auth0_tokens` to update the secret with fresh tokens.
+If the token saved in the secret is expired, run `cncluster preflight_refresh_auth0_credentials` to update the secret with fresh tokens.
 
 ## Configuring a New GCP Project
 
@@ -2015,6 +2015,60 @@ to Participant threshold you can set the following option. This is enabled by de
 ```
 export DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY=true
 ```
+
+### Correlate cometbft node address to the SV that runs the node
+When you are debugging cometbft logs, it can be useful to correlate the cometbft node address back to the SV
+that is running that node.
+For instance, if you find that blocks take a long time to advance in cometbft logs, and you want to relate this to an SV running cometbft nodes.
+
+To debug what is happening while a slowdown is occurring, poll the `consensus_state` endpoint 
+while blocks are advancing slowly (the `consensus_state` does not provide historical data). 
+
+You can access this endpoint by port forwarding the rpc port (26657) on the cometbft container in the respective cluster.
+The cometbft container is found in the `global-domain-x-cometbft` pod, where x is the migration ID.
+Use the following command to port forward to `sv-1`s global domain cometbft pod:
+
+```
+kubectl port-forward -n sv-1 $(kubectl get pod -n sv-1 -l app=global-domain-0-cometbft -o name) 26657:26657
+```
+
+Access the `consensus_state` endpoint, port forwarded through localhost:
+
+```
+curl http://localhost:26657/consensus_state | jq
+```
+
+The cometbft `consensus_state` endpoint provides the result state that the state machine has currently reached in the consensus protocol.
+It provides the `round_state`, which specifies the block `height/round/step` and its prevotes and precommits, as well
+as the address of the proposer.
+
+The example command below connects to `sv-1` and lists the SVs with their pub_key and cometbft addresses:
+
+```
+cncluster list_sv_cometbft_addresses sv-1
+```
+
+The output should look something like the example below:
+
+```
+[
+  {
+    "address": "9CF584AC1D1F0A8661F9BC7E072B99265AD393D6",
+    "pub_key": "12GfyR5a/2F1buayWs+zO82NebzvcbvvH3ZhTWRMaBQ=",
+    "sv": "SBI-Holdings",
+  },
+  {
+    "address": "DE36D23DE022948A11200ABB9EE07F049D17D903",
+    "pub_key": "2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo=",
+    "sv": "Digital-Asset-Eng-4",
+  },
+  ...
+]  
+```
+
+This output can be used to find the proposer address from the consensus_state endpoint and find the associated SV.
+
+### 
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
