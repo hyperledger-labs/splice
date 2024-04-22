@@ -114,7 +114,10 @@ class ExpireRewardCouponsTrigger(
         ),
       )
     )
-    val cmds = Seq(validatorRewardCmd, validatorFaucetCmd, appRewardCmd, svRewardCmd)
+    val cmds =
+      Seq(validatorRewardCmd, appRewardCmd, svRewardCmd) ++ Seq(validatorFaucetCmd).filter(_ =>
+        context.config.enableExpireValidatorFaucet
+      )
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>
