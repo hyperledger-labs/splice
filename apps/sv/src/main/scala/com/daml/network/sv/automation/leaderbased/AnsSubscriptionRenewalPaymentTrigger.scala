@@ -90,7 +90,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           }
         } yield result
       case None =>
-        throw Status.INTERNAL
+        throw Status.NOT_FOUND
           .withDescription(
             s"No associated ans entry context for reference ${subscriptionPayment.contract.payload.reference} was found."
           )

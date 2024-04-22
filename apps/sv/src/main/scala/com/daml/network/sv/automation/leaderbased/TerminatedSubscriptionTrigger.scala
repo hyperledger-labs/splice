@@ -10,6 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,12 +45,11 @@ class TerminatedSubscriptionTrigger(
       )
       _ <- ansEntryContextO match {
         case None =>
-          // TODO(#7934) Log an error here.
-          Future.successful(
-            TaskSuccess(
-              "Ignoring TerminatedSubscription as there is no corresponding AnsEntryContext"
+          throw Status.NOT_FOUND
+            .withDescription(
+              s"No associated ans entry context for reference ${task.contract.payload.reference} was found."
             )
-          )
+            .asRuntimeException()
         case Some(ansEntryContext) =>
           for {
             _ <- svTaskContext.connection
