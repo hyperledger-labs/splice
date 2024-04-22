@@ -127,7 +127,6 @@ canton.validator-apps.validator_backend_$index = {
     }
 
     sv-validator = \${?CN_APP_VALIDATOR_SV_VALIDATOR}
-    sv-user = \${?CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}
 }
 EOF
 }
