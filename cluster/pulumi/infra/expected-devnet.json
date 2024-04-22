@@ -1511,7 +1511,7 @@
           "enabled": false
         },
         "kubeScheduler": {
-          "enabled": true
+          "enabled": false
         },
         "prometheus": {
           "prometheusSpec": {

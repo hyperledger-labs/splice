@@ -137,7 +137,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         enabled: false,
       },
       kubeScheduler: {
-        enabled: true,
+        enabled: false,
       },
       kubeDns: {
         enabled: true,
