@@ -1364,23 +1364,6 @@
             "receivers": [
               {
                 "name": "null"
-              },
-              {
-                "name": "slack",
-                "slack_configs": [
-                  {
-                    "api_url": "https://slack.com/api/chat.postMessage",
-                    "channel": "C064MTNQT88",
-                    "http_config": {
-                      "authorization": {
-                        "credentials": "s3cr3t"
-                      }
-                    },
-                    "send_resolved": true,
-                    "text": "{{ template \"slack_message\" . }}",
-                    "title": "{{ template \"slack_title\" . }}"
-                  }
-                ]
               }
             ],
             "route": {

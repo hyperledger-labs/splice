@@ -164,23 +164,27 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             {
               name: 'null',
             },
-            {
-              name: 'slack',
-              slack_configs: [
-                {
-                  api_url: 'https://slack.com/api/chat.postMessage',
-                  channel: slackAlertNotificationChannel,
-                  send_resolved: true,
-                  http_config: {
-                    authorization: {
-                      credentials: requireEnv('SLACK_ACCESS_TOKEN'),
-                    },
+            ...(enableAlerts
+              ? [
+                  {
+                    name: 'slack',
+                    slack_configs: [
+                      {
+                        api_url: 'https://slack.com/api/chat.postMessage',
+                        channel: slackAlertNotificationChannel,
+                        send_resolved: true,
+                        http_config: {
+                          authorization: {
+                            credentials: requireEnv('SLACK_ACCESS_TOKEN'),
+                          },
+                        },
+                        title: '{{ template "slack_title" . }}',
+                        text: '{{ template "slack_message" . }}',
+                      },
+                    ],
                   },
-                  title: '{{ template "slack_title" . }}',
-                  text: '{{ template "slack_message" . }}',
-                },
-              ],
-            },
+                ]
+              : []),
           ],
         },
         alertmanagerSpec: {
