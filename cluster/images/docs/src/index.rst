@@ -42,8 +42,8 @@ Canton Network Documentation
    :caption: Supervalidator Operators
 
    sv_operator/sv_helm.rst
-   sv_operator/sv_restore.rst
    sv_operator/sv_upgrades.rst
+   sv_operator/sv_restore.rst
    sv_operator/sv_operations.rst
 
 

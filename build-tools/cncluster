@@ -2384,7 +2384,7 @@ function subcmd_disaster_recovery_test() {
 
   _cluster_reset
 
-  _info "Deploying original domain (not prepared for upgrade)"
+  _info "Deploying original domain"
   # TODO(#9531): Support validators in disaster recovery test
   export CN_INSTALL_VALIDATOR1="false"
   export CN_INSTALL_SPLITWELL="false"
@@ -2460,7 +2460,7 @@ function subcmd_disaster_recovery_test() {
   for sv in 1 2 3 4; do
     pod=$(kubectl get pod -n sv-${sv} -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
 
-    # Copy dump file to the pvc through the temporary pod
+    # Copy dump file to the pvc on the sv-app
     kubectl cp "dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
     rm "dump${sv}.json"
   done
