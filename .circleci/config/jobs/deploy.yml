@@ -230,6 +230,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       reset_cluster:
         type: boolean
         default: true
@@ -264,6 +265,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_multi
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
   deploy_cluster:

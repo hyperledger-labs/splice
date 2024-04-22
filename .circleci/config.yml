@@ -1620,6 +1620,7 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      <<: *channel-notify-parameter
       reset_cluster:
         type: boolean
         default: true
@@ -1654,6 +1655,7 @@ jobs:
             cncluster activate
             cncluster ci_apply_multi
       - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
   deploy_cluster:
@@ -3886,6 +3888,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - docker_images_push
             - wait_for_previous_pipeline
@@ -3895,6 +3898,7 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_cluster
       - deploy_validator_runbook:
@@ -3902,6 +3906,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_cluster
       - deploy_multivalidator:
@@ -3909,6 +3914,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_cluster
        # TODO(#10017): See if we want to re-enable them at some point
@@ -3938,6 +3944,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_sv_runbook
       - preflight_validator_check:
@@ -3947,6 +3954,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_validator_runbook
 
@@ -3983,6 +3991,7 @@ workflows:
               only:
                 - deployment/cilr
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           context:
             - artifactory
             - canton-network-vpn
@@ -4033,6 +4042,7 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
@@ -4047,6 +4057,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "cilr"
+          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - deploy_sv_runbook
 
