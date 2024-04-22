@@ -182,8 +182,6 @@ workflow:
           send_deployment_notification: false
           requires:
             - preflight_check_final_upgrade
-            - preflight_sv_check_before_sv_upgrade
-            - preflight_validator_final_upgrade
       - deploy_validator_runbook:
           name: "upgrade_validator_runbook"
           # by resetting the Validator runbook, it's as if a new Validator was onboarded,
@@ -196,8 +194,6 @@ workflow:
           cluster: "ciupgrade"
           requires:
             - preflight_check_final_upgrade
-            - preflight_sv_check_before_sv_upgrade
-            - preflight_validator_final_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_upgrade"
           <<: *main-branch-only
