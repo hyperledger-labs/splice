@@ -96,7 +96,10 @@ function istioPrometheusRemoteWriteVirtualService(
 }
 
 const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
+const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_DNS_NAME}`;
+const prometheusExternalUrl = `https://prometheus.${CLUSTER_DNS_NAME}`;
 const enableAlerts = process.env.GCP_CLUSTER_PROD_LIKE == 'true';
+const slackAlertNotificationChannel = process.env.SLACK_ALERT_NOTIFICATION_CHANNEL || 'C064MTNQT88';
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
@@ -143,7 +146,52 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         enabled: false,
       },
       alertmanager: {
-        enabled: false, // not required yet
+        enabled: true,
+        config: {
+          route: {
+            receiver: enableAlerts ? 'slack' : 'null',
+            group_by: ['namespace'],
+            continue: false,
+            routes: [
+              {
+                receiver: 'null',
+                matchers: ['alertname="Watchdog"'],
+                continue: false,
+              },
+            ],
+          },
+          receivers: [
+            {
+              name: 'null',
+            },
+            {
+              name: 'slack',
+              slack_configs: [
+                {
+                  api_url: 'https://slack.com/api/chat.postMessage',
+                  channel: slackAlertNotificationChannel,
+                  send_resolved: true,
+                  http_config: {
+                    authorization: {
+                      credentials: requireEnv('SLACK_ACCESS_TOKEN'),
+                    },
+                  },
+                  title: '{{ template "slack_title" . }}',
+                  text: '{{ template "slack_message" . }}',
+                },
+              ],
+            },
+          ],
+        },
+        alertmanagerSpec: {
+          externalUrl: alertManagerExternalUrl,
+        },
+        templateFiles: {
+          'template.tmpl': readAlertingManagerFile('slack-notification.tmpl').replaceAll(
+            '$CLUSTER_BASENAME',
+            CLUSTER_BASENAME
+          ),
+        },
       },
       coreDns: {
         enabled: false,
@@ -188,6 +236,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               },
             },
           },
+          externalUrl: prometheusExternalUrl,
         },
       },
       grafana: {
@@ -312,6 +361,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     );
   }
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
+  istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
   // that prevents running expensive queries when the dashboard just loads
   createGrafanaDashboards(namespaceName, clusterBasename == 'observability');
@@ -321,8 +371,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   }
   createGrafanaAlerting(namespaceName);
 }
-
-const slackAlertNotificationChannel = process.env.SLACK_ALERT_NOTIFICATION_CHANNEL || 'C064MTNQT88';
 
 function createGrafanaContactPoints(namespace: Input<string>) {
   new k8s.core.v1.Secret(
@@ -336,7 +384,7 @@ function createGrafanaContactPoints(namespace: Input<string>) {
       },
       data: {
         'slackContactPoint.yaml': Buffer.from(
-          readFile('slack_contact_point.yaml')
+          readGrafanaAlertingFile('slack_contact_point.yaml')
             .replaceAll('$SLACK_ACCESS_TOKEN', requireEnv('SLACK_ACCESS_TOKEN'))
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
         ).toString('base64'),
@@ -361,15 +409,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
       },
       data: {
         ...(enableAlerts
-          ? { 'notification_policies.yaml': readFile('notification_policies.yaml') }
+          ? { 'notification_policies.yaml': readGrafanaAlertingFile('notification_policies.yaml') }
           : {}),
         ...{
-          'load-tester_alerts.yaml': readFile('load-tester_alerts.yaml'),
-          'cometbft_alerts.yaml': readFile('cometbft_alerts.yaml'),
-          'automation_alerts.yaml': readFile('automation_alerts.yaml'),
-          'sv-status-report_alerts.yaml': readFile('sv-status-report_alerts.yaml'),
-          'deleted_alerts.yaml': readFile('deleted.yaml'),
-          'templates.yaml': readFile('templates.yaml')
+          'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
+          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml'),
+          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
+          'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+          'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
+          'templates.yaml': readGrafanaAlertingFile('templates.yaml')
             .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
             .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl),
         },
@@ -382,8 +430,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
   );
 }
 
-function readFile(file: string) {
+function readGrafanaAlertingFile(file: string) {
   return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`, 'utf-8');
+}
+
+function readAlertingManagerFile(file: string) {
+  return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
 }
 
 function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
