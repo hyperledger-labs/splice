@@ -24,6 +24,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** A trigger to export the SvStatus reports as metrics. */
@@ -54,36 +55,60 @@ class SvStatusReportMetricsExportTrigger(
       },
     )
 
+  private def closeAllOffboardedSvMetrics(
+      svIdsFromDsoRules: Set[SvStatusReportMetricsExportTrigger.SvId]
+  )(implicit tc: TraceContext): Unit = {
+
+    val svIdsToClose = perSvMetrics.keySet.toSet -- svIdsFromDsoRules
+    perSvMetrics.view.filterKeys(svIdsToClose.contains).foreach(_._2.close())
+    blocking {
+      synchronized {
+        perSvMetrics --= svIdsToClose: Unit
+      }
+    }
+    if (svIdsToClose.nonEmpty)
+      logger.info(s"closed SvStatusReport metrics of $svIdsToClose")
+  }
+
   override protected def completeTask(
       task: AssignedContract[
         SvStatusReport.ContractId,
         SvStatusReport,
       ]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future {
-      val report = task.payload
-      report.status.toScala match {
-        case None => TaskNoop
-        case Some(status) =>
-          val svId =
-            SvStatusReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
-          val metrics = getSvMetrics(svId)
-          metrics.reportNumber.updateValue(task.payload.number)
-          metrics.creationTime.updateValue(
-            CantonTimestamp.assertFromInstant(task.payload.status.get().createdAt).toMicros
-          )
-          metrics.mediatorSynchronizerTime.updateValue(
-            CantonTimestamp.assertFromInstant(status.mediatorSynchronizerTime).toMicros
-          )
-          metrics.participantSynchronizerTime.updateValue(
-            CantonTimestamp.assertFromInstant(status.participantSynchronizerTime).toMicros
-          )
-          metrics.cometBftHeight.updateValue(status.cometBftHeight)
-          metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
+  )(implicit tc: TraceContext): Future[TaskOutcome] = for {
+    dsoRules <- store.getDsoRules()
+    svIdsFromDsoRules = dsoRules.payload.svs.asScala.map { case (svParty, svInfo) =>
+      SvStatusReportMetricsExportTrigger.SvId(svParty, svInfo.name)
+    }.toSet
+    // Note: We rely on there always being other SVs that still update their status reports. This is a reasonable assumption:
+    // If no status reports go through the domain, we get alerts anyway so it doesn't matter much whether one SV is
+    // removed or not.
+    _ = closeAllOffboardedSvMetrics(svIdsFromDsoRules)
+    report = task.payload
+    svId = SvStatusReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
+  } yield {
+    report.status.toScala match {
+      case None => TaskNoop
+      case _ if !svIdsFromDsoRules.contains(svId) =>
+        TaskSuccess(s"$svId is off-boarded. Not updating SvStatusReport metrics")
+      case Some(status) =>
+        val metrics = getSvMetrics(svId)
+        metrics.reportNumber.updateValue(task.payload.number)
+        metrics.creationTime.updateValue(
+          CantonTimestamp.assertFromInstant(task.payload.status.get().createdAt).toMicros
+        )
+        metrics.mediatorSynchronizerTime.updateValue(
+          CantonTimestamp.assertFromInstant(status.mediatorSynchronizerTime).toMicros
+        )
+        metrics.participantSynchronizerTime.updateValue(
+          CantonTimestamp.assertFromInstant(status.participantSynchronizerTime).toMicros
+        )
+        metrics.cometBftHeight.updateValue(status.cometBftHeight)
+        metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
 
-          TaskSuccess(show"Updated SvStatusReport metrics")
-      }
+        TaskSuccess(show"Updated SvStatusReport metrics")
     }
+
   }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
