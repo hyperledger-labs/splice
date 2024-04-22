@@ -114,6 +114,7 @@ jobs:
           condition: << parameters.send_deployment_notification >>
           steps:
             - notify-cluster-deployment:
+                channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
 
   deploy_validator_runbook:
@@ -441,6 +442,7 @@ jobs:
           condition: << parameters.send_deployment_notification >>
           steps:
             - notify-cluster-deployment:
+                channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
@@ -457,9 +459,6 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
-      send_deployment_notification:
-        type: boolean
-        default: true
       cancel_workflow_on_failure:
         type: boolean
         default: false
@@ -512,11 +511,6 @@ jobs:
             fi
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-deployment:
-                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
