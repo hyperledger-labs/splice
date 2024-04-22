@@ -321,7 +321,7 @@ interface TransactionRewardProps {
 const ActivityRewardDisplay: React.FC<TransactionRewardProps> = ({ rewards }) => {
   const row = (type: string, label: string, amount: BigNumber) => [
     <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
-    <Typography key={`tx-reward-${type}-value`} className={`tx-reward-${type}`}>
+    <Typography key={`tx-reward-${type}-cc`} className={`tx-reward-${type}-cc`}>
       <AmountDisplay amount={amount} currency="AmuletUnit" />
     </Typography>,
   ];

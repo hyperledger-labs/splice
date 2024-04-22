@@ -297,7 +297,7 @@ object ScanTxLogParser {
               domainId = domainId,
               round = round,
               party = sender,
-              amount = validatorRewards,
+              amount = svRewards,
             )
           State(entry)
         } else {

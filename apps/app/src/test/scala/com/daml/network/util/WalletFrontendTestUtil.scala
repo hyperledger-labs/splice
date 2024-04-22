@@ -94,8 +94,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       appRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-app-value"))
-          .map(_.childElement(className("tx-amount-cc")))
+          .findChildElement(className("tx-reward-app-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
         currency = "CC",
@@ -103,8 +102,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       validatorRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-validator-value"))
-          .map(_.childElement(className("tx-amount-cc")))
+          .findChildElement(className("tx-reward-validator-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
         currency = "CC",
@@ -112,8 +110,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       svRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-sv-value"))
-          .map(_.childElement(className("tx-amount-cc")))
+          .findChildElement(className("tx-reward-sv-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
         currency = "CC",
