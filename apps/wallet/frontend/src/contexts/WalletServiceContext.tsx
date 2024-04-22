@@ -164,6 +164,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             return [balanceChange];
           } else if (item.transaction_type === 'transfer') {
             const amuletPrice = new BigNumber(item.amulet_price!);
+            const appRewardsUsed = new BigNumber(item.app_rewards_used);
+            const validatorRewardsUsed = new BigNumber(item.validator_rewards_used);
+            const svRewardsUsed = new BigNumber(item.sv_rewards_used);
             const transfer: Transfer = {
               transactionType: 'transfer',
               transactionSubtype: transaction_subtype,
@@ -175,6 +178,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               senderId: item.sender!.party,
               senderAmountCC: new BigNumber(item.sender!.amount),
               amuletPrice,
+              appRewardsUsed,
+              validatorRewardsUsed,
+              svRewardsUsed,
             };
             return [transfer];
           } else if (item.transaction_type === 'notification') {

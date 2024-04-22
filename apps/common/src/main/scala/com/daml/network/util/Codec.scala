@@ -48,7 +48,7 @@ object Codec {
     if (decimalFormatPattern.matcher(s).matches())
       Numeric.fromBigDecimal(decimalScale, new java.math.BigDecimal(s))
     else
-      Left(s"""Invalid Decimal string "$s, as it does not match "$decimalFormat""""")
+      Left(s"""Invalid Decimal string "$s", as it does not match "$decimalFormat"""")
   }
 
   def encode[Dec, Enc](d: Dec)(implicit instance: Codec[Dec, Enc]): Enc =

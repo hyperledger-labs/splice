@@ -136,7 +136,9 @@ class WalletFrontendIntegrationTest
               usdText should not be "..."
               errorMessage should be("Tap operation failed")
               find(className(errorDetailsElementClass)).value.text.trim should
-                include("Failed to decode: Invalid Decimal string \\\"NaN, as it does not match")
+                include(
+                  "Failed to decode: Invalid Decimal string \\\"NaN\\\", as it does not match"
+                )
 
               val cc = BigDecimal(ccText.split(" ").head)
               val usd = BigDecimal(usdText.split(" ").head)

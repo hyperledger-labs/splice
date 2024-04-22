@@ -8,7 +8,7 @@ import {
   RateDisplay,
   TitledTable,
 } from 'common-frontend';
-import { useGetDsoPartyId, useActivity } from 'common-frontend/scan-api';
+import { useActivity } from 'common-frontend/scan-api';
 import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
@@ -16,7 +16,6 @@ import Typography from '@mui/material/Typography';
 
 export const ActivityTable: React.FC = () => {
   const activityQuery = useActivity();
-  const dsoPartyIdQuery = useGetDsoPartyId();
   const hasNoActivities = (pagedActivities: ListActivityResponseItem[][]): boolean => {
     return (
       pagedActivities === undefined ||
@@ -24,8 +23,8 @@ export const ActivityTable: React.FC = () => {
       pagedActivities.every(p => p === undefined || p.length === 0)
     );
   };
-  const isLoading = activityQuery.isLoading || dsoPartyIdQuery.isLoading;
-  const isError = activityQuery.isError || dsoPartyIdQuery.isError;
+  const isLoading = activityQuery.isLoading;
+  const isError = activityQuery.isError;
 
   const pagedActivities = activityQuery.data ? activityQuery.data.pages : [];
   return (
@@ -45,6 +44,7 @@ export const ActivityTable: React.FC = () => {
               <TableCell>Sender</TableCell>
               <TableCell>Receiver</TableCell>
               <TableCell align="right">Transfer Amount</TableCell>
+              <TableCell align="right">Rewards Created</TableCell>
               <TableCell align="right">Total Fees Burnt</TableCell>
               <TableCell align="right">Price</TableCell>
             </TableRow>
@@ -55,7 +55,7 @@ export const ActivityTable: React.FC = () => {
               activities =>
                 activities &&
                 activities
-                  .flatMap(item => toActivities(item, dsoPartyIdQuery.data))
+                  .flatMap(item => toActivities(item))
                   .map(activity => (
                     <ActivityRow
                       key={activity.eventId + activity.activityType}
@@ -104,18 +104,21 @@ const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabl
 
 export default ActivityTable;
 
+type RewardsCollected = { app?: BigNumber; validator?: BigNumber; sv?: BigNumber };
+
 interface ActivityView {
   activityType: string;
   provider: string;
   sender: string;
-  receiver: string | 'Multiple';
+  receiver: string | 'Multiple' | 'None';
   feesBurnt: BigNumber;
   transferAmount: BigNumber;
+  rewardsCollected: RewardsCollected;
   amuletPrice: BigNumber;
   eventId: string;
 }
 
-function toActivities(item: ListActivityResponseItem, dsoPartyId: string): ActivityView[] {
+function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivity(item: ListActivityResponseItem): ActivityView {
     switch (item.activity_type) {
       case 'transfer':
@@ -124,8 +127,6 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
         return getActivityFromTap(item.tap!);
       case 'mint':
         return getActivityFromMint(item.mint!);
-      case 'sv_reward_collected':
-        return getActivityFromSvRewardCollected(item.sv_reward_collected!);
     }
   }
 
@@ -135,37 +136,40 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
       .plus(BigNumber(senderAmount.sender_change_fee));
   }
 
-  function isSelfTransfer(transfer: Transfer): boolean {
-    const receivers = transfer.receivers;
-    return (
-      receivers.length === 0 ||
-      (receivers.map(r => r.party).includes(transfer.sender.party) && receivers.length === 1)
-    );
-  }
-
   function getActivityFromTransfer(transfer: Transfer): ActivityView {
     let activityType;
-    let provider;
     let receiver;
     let feesBurnt;
-    let transferAmount;
+    let rewardsCollected: RewardsCollected = {};
 
     const receivers = transfer.receivers;
-    const selfTransfer = isSelfTransfer(transfer);
 
-    if (selfTransfer) {
-      activityType = 'Merge Fee Burn';
+    if (receivers.length === 0) {
+      // We assume that all transfers without receivers are caused by the wallet automation
+      // This might not be accurate, but it's less confusing than "Self-transfer"
+      activityType = 'Automation';
     } else {
       activityType = 'Transfer';
     }
-    if (selfTransfer) {
-      provider = dsoPartyId;
-    } else {
-      provider = transfer.provider;
+
+    const appRewards = BigNumber(transfer.sender.input_app_reward_amount || 0);
+    if (!appRewards.isZero()) {
+      rewardsCollected.app = appRewards;
     }
+    const validatorRewards = BigNumber(transfer.sender.input_validator_reward_amount || 0);
+    if (!validatorRewards.isZero()) {
+      rewardsCollected.validator = validatorRewards;
+    }
+    const svRewards = BigNumber(transfer.sender.input_sv_reward_amount || 0);
+    if (!svRewards.isZero()) {
+      rewardsCollected.sv = svRewards;
+    }
+
+    const provider = transfer.provider;
+
     const nrReceivers = receivers.length;
     if (nrReceivers === 0) {
-      receiver = dsoPartyId;
+      receiver = 'None';
     } else if (nrReceivers === 1) {
       receiver = receivers[0].party;
     } else {
@@ -177,13 +181,10 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
       .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
     feesBurnt = feesFromSender(senderAmount).plus(receiverFees);
 
-    if (selfTransfer) {
-      transferAmount = BigNumber(0);
-    } else {
-      transferAmount = receivers
-        .map(r => BigNumber(r.amount))
-        .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
-    }
+    const transferAmount = receivers
+      .map(r => BigNumber(r.amount))
+      .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
+
     return {
       activityType: activityType,
       provider: provider,
@@ -191,6 +192,7 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
       receiver: receiver,
       feesBurnt: feesBurnt,
       transferAmount: transferAmount,
+      rewardsCollected: rewardsCollected,
       amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
@@ -204,6 +206,7 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
       receiver: mint.amulet_owner,
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(mint.amulet_amount),
+      rewardsCollected: {},
       amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
@@ -217,19 +220,7 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
       receiver: tap.amulet_owner,
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(tap.amulet_amount),
-      amuletPrice: BigNumber(item.amulet_price),
-      eventId: item.event_id,
-    };
-  }
-
-  function getActivityFromSvRewardCollected(svr: AmuletAmount): ActivityView {
-    return {
-      activityType: 'SV Reward Collected',
-      provider: dsoPartyId,
-      sender: dsoPartyId,
-      receiver: svr.amulet_owner,
-      feesBurnt: BigNumber(0),
-      transferAmount: BigNumber(svr.amulet_amount),
+      rewardsCollected: {},
       amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
@@ -237,43 +228,7 @@ function toActivities(item: ListActivityResponseItem, dsoPartyId: string): Activ
 
   const activity = getActivity(item);
 
-  const activities = [activity];
-
-  if (item.transfer != null) {
-    const transfer = item.transfer!;
-    const appRewardAmount = BigNumber(transfer.sender.input_app_reward_amount ?? '0');
-    const selfTransfer = isSelfTransfer(transfer);
-    let receiver;
-    if (selfTransfer) {
-      receiver = activity.sender;
-    } else {
-      receiver = activity.receiver;
-    }
-    if (!appRewardAmount.isEqualTo(BigNumber(0))) {
-      activities.push({
-        ...activity,
-        activityType: 'App Reward Collected',
-        provider: dsoPartyId,
-        sender: dsoPartyId,
-        receiver: receiver,
-        transferAmount: appRewardAmount,
-        feesBurnt: BigNumber(0),
-      });
-    }
-    const validatorRewardAmount = BigNumber(transfer.sender.input_validator_reward_amount ?? '0');
-    if (!validatorRewardAmount.isEqualTo(BigNumber(0))) {
-      activities.push({
-        ...activity,
-        activityType: 'Validator Reward Collected',
-        provider: dsoPartyId,
-        sender: dsoPartyId,
-        receiver: receiver,
-        transferAmount: validatorRewardAmount,
-        feesBurnt: BigNumber(0),
-      });
-    }
-  }
-  return activities;
+  return [activity];
 }
 
 interface ActivityRowProps {
@@ -297,6 +252,8 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
       <TableCell>
         {(() => {
           switch (activity.receiver) {
+            case 'None':
+              return null;
             case 'Multiple':
               return (
                 <Typography className="receiver" data-selenium-text="Multiple" variant="body1">
@@ -309,10 +266,19 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         })()}
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay amountAmulet={activity.transferAmount} />
+        <ActivityAmountDisplay
+          amountAmulet={activity.transferAmount}
+          amuletPrice={activity.amuletPrice}
+        />
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay amountAmulet={activity.feesBurnt} />
+        <ActivityRewardDisplay rewards={activity.rewardsCollected} />
+      </TableCell>
+      <TableCell align="right">
+        <ActivityAmountDisplay
+          amountAmulet={activity.feesBurnt}
+          amuletPrice={activity.amuletPrice}
+        />
       </TableCell>
       <TableCell align="right">
         <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={activity.amuletPrice} />
@@ -323,14 +289,47 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
 
 interface TransactionAmountProps {
   amountAmulet: BigNumber;
+  amuletPrice: BigNumber;
 }
 
-const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountAmulet }) => {
+const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountAmulet, amuletPrice }) => {
+  if (amountAmulet.isZero()) {
+    return null;
+  } else {
+    return (
+      <Stack direction="column">
+        <Typography className="tx-amount-cc">
+          <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
+        </Typography>
+        <Typography variant="caption" className="tx-amount-usd">
+          <AmountDisplay
+            amount={amountAmulet}
+            currency="AmuletUnit"
+            convert="CCtoUSD"
+            amuletPrice={amuletPrice}
+          />
+        </Typography>
+      </Stack>
+    );
+  }
+};
+
+interface TransactionRewardProps {
+  rewards: RewardsCollected;
+}
+
+const ActivityRewardDisplay: React.FC<TransactionRewardProps> = ({ rewards }) => {
+  const row = (type: string, label: string, amount: BigNumber) => [
+    <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
+    <Typography key={`tx-reward-${type}-value`} className={`tx-reward-${type}`}>
+      <AmountDisplay amount={amount} currency="AmuletUnit" />
+    </Typography>,
+  ];
   return (
     <Stack direction="column">
-      <Typography className="tx-amount-cc">
-        <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
-      </Typography>
+      {rewards.app && row('app', 'App Rewards', rewards.app)}
+      {rewards.validator && row('validator', 'Validator Rewards', rewards.validator)}
+      {rewards.sv && row('sv', 'SV Rewards', rewards.sv)}
     </Stack>
   );
 };

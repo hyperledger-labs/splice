@@ -25,7 +25,7 @@ test('recent activity link from tab opens a tab', async () => {
 
   const rows = await within(table).findAllByRole('row');
   const firstRow = rows[1];
-  expect(within(firstRow).getByText('Merge Fee Burn')).toBeDefined();
+  expect(within(firstRow).getByText('Automation')).toBeDefined();
   expect(within(firstRow).getByText('0.03 CC')).toBeDefined();
   expect(within(firstRow).getByText('1 CC/USD')).toBeDefined();
 });

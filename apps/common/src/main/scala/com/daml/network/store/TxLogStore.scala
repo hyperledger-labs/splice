@@ -152,6 +152,17 @@ object TxLogStore {
         if (str.isEmpty) None else Some(DomainId.tryFromString(str))
       )(_.map(_.toProtoPrimitive).getOrElse(""))
 
+    protected implicit val `TypeMapper[String, Option[java.math.BigDecimal]]`
+        : scalapb.TypeMapper[String, Option[java.math.BigDecimal]] =
+      scalapb.TypeMapper[String, Option[java.math.BigDecimal]](str =>
+        if (str.isEmpty) None else Some(Codec.tryDecode(Codec.JavaBigDecimal)(str))
+      )(value => value.map(Codec.encode(_)(Codec.javaBigDecimalValue)).getOrElse(""))
+    protected implicit val `TypeMapper[String, Option[scala.math.BigDecimal]]`
+        : scalapb.TypeMapper[String, Option[scala.math.BigDecimal]] =
+      scalapb.TypeMapper[String, Option[scala.math.BigDecimal]](str =>
+        if (str.isEmpty) None else Some(Codec.tryDecode(Codec.BigDecimal)(str))
+      )(value => value.map(Codec.encode(_)(Codec.bigDecimalValue)).getOrElse(""))
+
     protected implicit val `TypeMapper[String, java.math.BigDecimal]`
         : scalapb.TypeMapper[String, java.math.BigDecimal] =
       scalapb.TypeMapper[String, java.math.BigDecimal](Codec.tryDecode(Codec.JavaBigDecimal))(

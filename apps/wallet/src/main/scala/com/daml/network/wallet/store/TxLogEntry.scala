@@ -17,7 +17,6 @@ import com.daml.network.http.v0.definitions.{
   GetTransferOfferStatusResponse,
 }
 import com.daml.network.store.StoreErrors
-import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.daml.network.util.{Codec, ExerciseNodeCompanion}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
@@ -172,6 +171,7 @@ object TxLogEntry extends StoreErrors {
         amuletPrice = Codec.encode(entry.amuletPrice),
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
+        svRewardsUsed = Codec.encode(entry.svRewardsUsed.getOrElse(BigDecimal(0))),
       )
     }
 
@@ -191,6 +191,7 @@ object TxLogEntry extends StoreErrors {
         amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
+        svRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.svRewardsUsed)
       } yield TransferTxLogEntry(
         eventId = item.eventId,
         subtype = Some(subtype),
@@ -202,6 +203,7 @@ object TxLogEntry extends StoreErrors {
         amuletPrice = amuletPrice,
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
+        svRewardsUsed = Some(svRewardsUsed),
       )
     }
 
@@ -466,8 +468,6 @@ object TxLogEntry extends StoreErrors {
 
     case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
     case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
-    case object SvRewardCollected
-        extends BalanceChangeTransactionSubtype(SvRewardCoupon_ArchiveAsBeneficiary)
     case object AppPaymentRejected
         extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
     case object AppPaymentExpired extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)
@@ -490,7 +490,6 @@ object TxLogEntry extends StoreErrors {
       Set[BalanceChangeTransactionSubtype](
         Tap,
         Mint,
-        SvRewardCollected,
         AppPaymentRejected,
         AppPaymentExpired,
         SubscriptionInitialPaymentRejected,
@@ -541,12 +540,6 @@ object TxLogEntry extends StoreErrors {
         amuletOperationConstructor: Option[String],
     ): Option[NotificationTransactionSubtype] =
       values.get((choiceName, amuletOperationConstructor))
-  }
-
-  def transferNonEmpty(transfer: TransferTxLogEntry): Boolean = {
-    transfer.receivers.nonEmpty ||
-    transfer.appRewardsUsed > BigDecimal(0) ||
-    transfer.validatorRewardsUsed > BigDecimal(0)
   }
 
 }

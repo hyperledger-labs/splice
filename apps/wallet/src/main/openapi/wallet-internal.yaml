@@ -843,6 +843,7 @@ components:
             - amulet_price
             - app_rewards_used
             - validator_rewards_used
+            - sv_rewards_used
           properties:
             provider:
               type: string
@@ -859,6 +860,8 @@ components:
             app_rewards_used:
               type: string
             validator_rewards_used:
+              type: string
+            sv_rewards_used:
               type: string
     BalanceChangeResponseItem:
       allOf:

@@ -38,6 +38,9 @@ export interface Transfer {
   senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
   date: Date;
   amuletPrice: BigNumber;
+  appRewardsUsed: BigNumber;
+  validatorRewardsUsed: BigNumber;
+  svRewardsUsed: BigNumber;
 }
 
 export interface BalanceChange {

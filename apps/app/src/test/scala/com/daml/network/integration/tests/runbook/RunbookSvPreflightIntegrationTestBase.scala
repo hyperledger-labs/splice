@@ -143,7 +143,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             _ => {
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
-              val svRewardEntries = txs.filter(_.subtype == "SV Reward Collected")
+              val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
               svRewardEntries should not be empty
               svRewardEntries
             },
@@ -164,7 +164,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             _ => {
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
-              val svRewardEntries = txs.filter(_.subtype == "SV Reward Collected")
+              val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
               svRewardEntries should not be empty
               svRewardEntries
             },
@@ -182,9 +182,9 @@ abstract class RunbookSvPreflightIntegrationTestBase
             // If more than one round has been claimed, there might be more than one entry with the same amount.
             forAtLeast(1, validatorEntries) { validatorEntry =>
               val ratio = BigDecimal("0.6667") / BigDecimal("0.3333") // ~2
-              svEntry.ccAmount should beWithin(
-                (validatorEntry.ccAmount - smallAmount) * ratio,
-                (validatorEntry.ccAmount + smallAmount) * ratio,
+              svEntry.svRewardsUsed should beWithin(
+                (validatorEntry.svRewardsUsed - smallAmount) * ratio,
+                (validatorEntry.svRewardsUsed + smallAmount) * ratio,
               )
             }
           }

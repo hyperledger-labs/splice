@@ -47,6 +47,7 @@ message TransferTxLogEntry {
   string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
   string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
   string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string sv_rewards_used = 11 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
 }
 
 /** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */

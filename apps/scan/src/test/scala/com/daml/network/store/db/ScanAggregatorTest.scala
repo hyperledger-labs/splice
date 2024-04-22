@@ -713,6 +713,7 @@ class ScanAggregatorTest
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,
           inputValidatorRewardAmount = 0,
+          inputSvRewardAmount = 0,
           balanceChanges = Map(
             party.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
               balanceChangeRoundZero.bigDecimal,
@@ -762,6 +763,7 @@ class ScanAggregatorTest
           inputAppRewardAmount = rewardAmount,
           inputAmuletAmount = 0,
           inputValidatorRewardAmount = 0,
+          inputSvRewardAmount = 0,
           balanceChanges = Map(),
           amuletPrice = amuletPrice,
         ),
@@ -790,6 +792,7 @@ class ScanAggregatorTest
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,
           inputValidatorRewardAmount = rewardAmount,
+          inputSvRewardAmount = 0,
           balanceChanges = Map(),
           amuletPrice = amuletPrice,
         ),

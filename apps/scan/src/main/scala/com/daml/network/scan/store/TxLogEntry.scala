@@ -30,10 +30,14 @@ object TxLogEntry extends StoreErrors {
     val OpenMiningRoundTxLogEntry = String3.tryCreate("omr")
     val AppRewardTxLogEntry = String3.tryCreate("are")
     val MintTxLogEntry = String3.tryCreate("min")
-    val SvRewardCollectedTxLogEntry = String3.tryCreate("src")
     val TapTxLogEntry = String3.tryCreate("tap")
     val TransferTxLogEntry = String3.tryCreate("tra")
     val ValidatorRewardTxLogEntry = String3.tryCreate("vre")
+    val SvRewardTxLogEntry = String3.tryCreate("sre")
+    // The following entry types correspond to entries that were removed from `scan_tx_log.proto`
+    // Those entries might still exist in databases, but we don't produce new ones and we don't read them.
+    // The values are only kept for documentation purposes.
+    val Unused_SvRewardCollectedTxLogEntry = String3.tryCreate("src")
   }
 
   def encode(entry: TxLogEntry): (String3, String) = {
@@ -46,10 +50,10 @@ object TxLogEntry extends StoreErrors {
       case _: OpenMiningRoundTxLogEntry => EntryType.OpenMiningRoundTxLogEntry
       case _: AppRewardTxLogEntry => EntryType.AppRewardTxLogEntry
       case _: MintTxLogEntry => EntryType.MintTxLogEntry
-      case _: SvRewardCollectedTxLogEntry => EntryType.SvRewardCollectedTxLogEntry
       case _: TapTxLogEntry => EntryType.TapTxLogEntry
       case _: TransferTxLogEntry => EntryType.TransferTxLogEntry
       case _: ValidatorRewardTxLogEntry => EntryType.ValidatorRewardTxLogEntry
+      case _: SvRewardTxLogEntry => EntryType.SvRewardTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -69,11 +73,11 @@ object TxLogEntry extends StoreErrors {
         case EntryType.OpenMiningRoundTxLogEntry => from[OpenMiningRoundTxLogEntry](json)
         case EntryType.AppRewardTxLogEntry => from[AppRewardTxLogEntry](json)
         case EntryType.MintTxLogEntry => from[MintTxLogEntry](json)
-        case EntryType.SvRewardCollectedTxLogEntry => from[SvRewardCollectedTxLogEntry](json)
         case EntryType.TapTxLogEntry => from[TapTxLogEntry](json)
         case EntryType.TransferTxLogEntry => from[TransferTxLogEntry](json)
         case EntryType.ValidatorRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
-        case _ => throw txDecodingFailed()
+        case EntryType.SvRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
+        case _ => throw txLogIsOfWrongType(entryType.str)
       }
     } catch {
       case _: RuntimeException => throw txDecodingFailed()
@@ -98,6 +102,7 @@ object TxLogEntry extends StoreErrors {
       inputAmuletAmount = Some(Codec.encode(data.inputAmuletAmount)),
       inputAppRewardAmount = Some(Codec.encode(data.inputAppRewardAmount)),
       inputValidatorRewardAmount = Some(Codec.encode(data.inputValidatorRewardAmount)),
+      inputSvRewardAmount = Some(Codec.encode(data.inputSvRewardAmount.getOrElse(BigDecimal(0)))),
       senderChangeAmount = Codec.encode(data.senderChangeAmount),
       senderChangeFee = Codec.encode(data.senderChangeFee),
       senderFee = Codec.encode(data.senderFee),
@@ -170,31 +175,12 @@ object TxLogEntry extends StoreErrors {
       amuletPrice = Codec.encode(entry.amuletPrice),
     )
 
-    private def toSvRewardCollectedResponseItem(entry: SvRewardCollectedTxLogEntry) =
-      httpDef.TransactionHistoryResponseItem(
-        transactionType = HttpTransactionType.SvRewardCollected,
-        eventId = entry.eventId,
-        offset = Some(entry.offset),
-        domainId = entry.domainId.toProtoPrimitive,
-        date = java.time.OffsetDateTime
-          .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
-        svRewardCollected = Some(
-          httpDef.AmuletAmount(
-            amuletOwner = entry.amuletOwner.toProtoPrimitive,
-            amuletAmount = Codec.encode(entry.amuletAmount),
-          )
-        ),
-        round = entry.round,
-        amuletPrice = Codec.encode(entry.amuletPrice),
-      )
-
     def toResponseItem(entry: TransactionTxLogEntry): httpDef.TransactionHistoryResponseItem =
       entry match {
         case entry: TransferTxLogEntry => toTransferResponseItem(entry)
         case entry: TapTxLogEntry => toTapResponseItem(entry)
-        case entry: SvRewardCollectedTxLogEntry => toSvRewardCollectedResponseItem(entry)
         case entry: MintTxLogEntry => toMintResponseItem(entry)
-        case _ => throw txLogIsOfWrongType()
+        case _ => throw txLogIsOfWrongType(entry.getClass.getSimpleName)
       }
   }
 
@@ -203,7 +189,6 @@ object TxLogEntry extends StoreErrors {
     case object Transfer extends TransactionType
     case object Mint extends TransactionType
     case object Tap extends TransactionType
-    case object SvRewardCollected extends TransactionType
   }
 
   def parseSenderAmount(
@@ -220,6 +205,7 @@ object TxLogEntry extends StoreErrors {
       inputAmuletAmount = res.summary.inputAmuletAmount,
       inputAppRewardAmount = res.summary.inputAppRewardAmount,
       inputValidatorRewardAmount = res.summary.inputValidatorRewardAmount,
+      inputSvRewardAmount = Some(res.summary.inputSvRewardAmount),
       senderChangeAmount = res.summary.senderChangeAmount,
       senderChangeFee = res.summary.senderChangeFee,
       senderFee = senderFee,

@@ -123,7 +123,7 @@ class WalletTxLogIntegrationTest
         ),
         ignore = {
           case balanceChange: BalanceChangeTxLogEntry =>
-            balanceChange.subtype.value == walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
+            balanceChange.subtype.value == walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
           case _ => false
         },
       )
@@ -1495,7 +1495,7 @@ class WalletTxLogIntegrationTest
           previousEventId,
           ignore = {
             case balanceChange: BalanceChangeTxLogEntry =>
-              balanceChange.subtype.value == walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
+              balanceChange.subtype.value == walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
             case _ => false
           },
         ),

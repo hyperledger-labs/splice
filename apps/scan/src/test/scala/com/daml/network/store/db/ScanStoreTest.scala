@@ -92,6 +92,7 @@ abstract class ScanStoreTest
               inputAppRewardAmount = 0,
               inputAmuletAmount = amuletAmount,
               inputValidatorRewardAmount = 0,
+              inputSvRewardAmount = 0,
               balanceChanges = Map(
                 user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
                   BigDecimal(amuletAmount).bigDecimal,
@@ -255,6 +256,7 @@ abstract class ScanStoreTest
               inputAppRewardAmount = 0,
               inputAmuletAmount = amuletAmount,
               inputValidatorRewardAmount = 0,
+              inputSvRewardAmount = 0,
               balanceChanges = Map(
                 user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
                   BigDecimal(keptAmuletAmount).bigDecimal,
@@ -409,6 +411,7 @@ abstract class ScanStoreTest
                   round = round.toLong,
                   inputAppRewardAmount = appAmount,
                   inputValidatorRewardAmount = validatorAmount,
+                  inputSvRewardAmount = 0,
                   inputAmuletAmount = 0,
                   balanceChanges = Map(),
                   amuletPrice = 0.0005,
@@ -458,6 +461,7 @@ abstract class ScanStoreTest
                 inputAppRewardAmount = amount,
                 inputAmuletAmount = 0,
                 inputValidatorRewardAmount = 0,
+                inputSvRewardAmount = 0,
                 balanceChanges = Map(),
                 amuletPrice = 0.0005,
               ),
@@ -473,6 +477,7 @@ abstract class ScanStoreTest
                 round = round.toLong,
                 inputAppRewardAmount = 0,
                 inputValidatorRewardAmount = amount,
+                inputSvRewardAmount = 0,
                 inputAmuletAmount = 0,
                 balanceChanges = Map(),
                 amuletPrice = 0.0005,
@@ -623,6 +628,7 @@ abstract class ScanStoreTest
               inputAppRewardAmount = amount,
               inputAmuletAmount = 0,
               inputValidatorRewardAmount = 0,
+              inputSvRewardAmount = 0,
               balanceChanges = Map(),
               amuletPrice = 0.0005,
             ),
@@ -641,6 +647,7 @@ abstract class ScanStoreTest
               inputAppRewardAmount = 0,
               inputValidatorRewardAmount = amount,
               inputAmuletAmount = 0,
+              inputSvRewardAmount = 0,
               balanceChanges = Map(),
               amuletPrice = 0.0005,
             ),
@@ -923,6 +930,7 @@ abstract class ScanStoreTest
                 zero,
                 zero,
                 zero,
+                Some(zero),
               )
             ),
             balanceChanges = Seq(),
@@ -944,8 +952,9 @@ abstract class ScanStoreTest
             ],
             tx: TransferTxLogEntry,
         ) = {
-          val senderParty = tx.sender.getOrElse(throw txMissingField()).party
-          val senderAmount = tx.sender.getOrElse(throw txMissingField()).inputAmuletAmount
+          val sender = tx.sender.getOrElse(throw txMissingField())
+          val senderParty = sender.party
+          val senderAmount = sender.inputAmuletAmount
           val receiverParty = tx.receivers(0).party
           val receiverAmount = tx.receivers(0).amount
           dummyDomain
@@ -963,9 +972,10 @@ abstract class ScanStoreTest
               ),
               exerciseResult = mkTransferResult(
                 round = round,
-                inputAppRewardAmount = 0,
+                inputAppRewardAmount = sender.inputAppRewardAmount.toDouble,
                 inputAmuletAmount = senderAmount.toDouble,
-                inputValidatorRewardAmount = 0,
+                inputValidatorRewardAmount = sender.inputValidatorRewardAmount.toDouble,
+                inputSvRewardAmount = sender.inputSvRewardAmount.fold(0.0)(_.toDouble),
                 balanceChanges = Map(),
                 amuletPrice = tx.amuletPrice.toDouble,
               ),
@@ -1143,6 +1153,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
+      inputSvRewardAmount: Double,
       inputAmuletAmount: Double,
       balanceChanges: Map[String, splice.amuletrules.BalanceChange],
       amuletPrice: Double,
@@ -1152,8 +1163,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
-        // TODO (#9173): also test for sv rewards once the scan store supports them
-        0.0,
+        inputSvRewardAmount,
         inputAmuletAmount,
         balanceChanges,
         amuletPrice,

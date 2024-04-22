@@ -133,7 +133,7 @@ object DsoTables extends AcsTables with NamedLogging {
             },
             votedAt = Some(result.completedAt.toString),
           )
-        case _ => throw txLogIsOfWrongType()
+        case _ => throw txLogIsOfWrongType(record.getClass.getSimpleName)
       }
     }
   }

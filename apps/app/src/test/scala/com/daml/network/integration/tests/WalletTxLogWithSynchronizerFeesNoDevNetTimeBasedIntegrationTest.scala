@@ -6,11 +6,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SynchronizerFeesTestUtil, SvTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
-import com.daml.network.wallet.store.{
-  BalanceChangeTxLogEntry,
-  TransferTxLogEntry,
-  TxLogEntry as walletLogEntry,
-}
+import com.daml.network.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
@@ -121,12 +117,13 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
               },
             ) ++ (1 to 3).flatMap { _ =>
               Seq[CheckTxHistoryFn](
-                { case logEntry: BalanceChangeTxLogEntry =>
-                  logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
-                  logEntry.receiver shouldBe sv1ValidatorBackend
+                { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
+                  logEntry.receivers shouldBe empty
+                  logEntry.sender.value.party shouldBe sv1ValidatorBackend
                     .getValidatorPartyId()
                     .toProtoPrimitive
-                  logEntry.amount should be > totalCostCc
+                  logEntry.sender.value.amount should be > totalCostCc
                 }
               )
             },

@@ -9,11 +9,11 @@ import com.daml.network.scan.store.{
   ExtraTrafficPurchaseTxLogEntry,
   MintTxLogEntry,
   OpenMiningRoundTxLogEntry,
-  SvRewardCollectedTxLogEntry,
   TapTxLogEntry,
   TransferTxLogEntry,
   TxLogEntry,
   ValidatorRewardTxLogEntry,
+  SvRewardTxLogEntry,
 }
 import com.daml.network.store.StoreErrors
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
@@ -113,6 +113,13 @@ object ScanTables extends AcsTables {
             rewardAmount = Some(vre.amount),
             rewardedParty = Some(vre.party),
           )
+        case sre: SvRewardTxLogEntry =>
+          ScanTxLogRowData(
+            entry = sre,
+            round = Some(sre.round),
+            rewardAmount = Some(sre.amount),
+            rewardedParty = Some(sre.party),
+          )
         case etp: ExtraTrafficPurchaseTxLogEntry =>
           ScanTxLogRowData(
             entry = etp,
@@ -140,11 +147,6 @@ object ScanTables extends AcsTables {
             round = Some(entry.round),
           )
         case entry: MintTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry,
-            round = Some(entry.round),
-          )
-        case entry: SvRewardCollectedTxLogEntry =>
           ScanTxLogRowData(
             entry = entry,
             round = Some(entry.round),

@@ -40,6 +40,8 @@ message SenderAmount {
   string sender_change_fee = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
   string sender_fee = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
   string holding_fees = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  // Added after initial release, so needs to be mapped to an Option in scala
+  string input_sv_reward_amount = 9 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
 }
 
 message ReceiverAmount {
@@ -156,18 +158,15 @@ message MintTxLogEntry {
   string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
-message SvRewardCollectedTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
+message SvRewardTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
   option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string offset = 2;
-  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
-  google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
-  string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
-  string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
-  int64 round = 7;
-  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
 message AppRewardTxLogEntry {

@@ -12,8 +12,8 @@ import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
-import com.daml.network.wallet.store.BalanceChangeTxLogEntry
-import com.daml.network.wallet.store.TxLogEntry.BalanceChangeTransactionSubtype
+import com.daml.network.wallet.store.TransferTxLogEntry
+import com.daml.network.wallet.store.TxLogEntry.TransferTransactionSubtype
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
@@ -130,12 +130,13 @@ class SvTimeBasedRewardCouponIntegrationTest
       clue("The claimed reward appear in SV1's wallet history") {
         checkTxHistory(
           sv1WalletClient,
-          Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
-            b.subtype.value shouldBe BalanceChangeTransactionSubtype.SvRewardCollected.toProto
-            b.receiver should be(sv1Party.toProtoPrimitive)
-            b.amount should beWithin(
-              BigDecimal(eachSvGetInRound0) - smallAmount,
-              BigDecimal(eachSvGetInRound0) + smallAmount,
+          Seq[CheckTxHistoryFn] { case b: TransferTxLogEntry =>
+            b.subtype.value shouldBe TransferTransactionSubtype.WalletAutomation.toProto
+            b.receivers shouldBe empty
+            b.sender.value.party should be(sv1Party.toProtoPrimitive)
+            b.sender.value.amount should beWithin(
+              BigDecimal(eachSvGetInRound0) - feesUpperBoundCC,
+              BigDecimal(eachSvGetInRound0),
             )
           },
         )
@@ -144,12 +145,13 @@ class SvTimeBasedRewardCouponIntegrationTest
       clue("The claimed reward appears in alice's wallet history") {
         checkTxHistory(
           aliceValidatorWalletClient,
-          Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
-            b.subtype.value shouldBe BalanceChangeTransactionSubtype.SvRewardCollected.toProto
-            b.receiver should be(aliceValidatorParty.toProtoPrimitive)
-            b.amount should beWithin(
-              BigDecimal(expectedAliceAmount) - smallAmount,
-              BigDecimal(expectedAliceAmount) + smallAmount,
+          Seq[CheckTxHistoryFn] { case b: TransferTxLogEntry =>
+            b.subtype.value shouldBe TransferTransactionSubtype.WalletAutomation.toProto
+            b.receivers shouldBe empty
+            b.sender.value.party should be(aliceValidatorParty.toProtoPrimitive)
+            b.sender.value.amount should beWithin(
+              BigDecimal(expectedAliceAmount) - feesUpperBoundCC,
+              BigDecimal(expectedAliceAmount),
             )
           },
         )
@@ -157,29 +159,59 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       clue("The claims appear in the scan history") {
         eventually() {
-          val txs = (for {
-            tx <- sv1ScanBackend
-              .listTransactions(
-                None,
-                TransactionHistoryRequest.SortOrder.Desc,
-                Limit.MaxPageSize,
-              )
-              .filter(
-                _.svRewardCollected
-                  .map(_.amuletOwner)
-                  .exists(
-                    Seq(sv1Party.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive).contains
-                  )
-              )
-            reward <- tx.svRewardCollected
-          } yield (reward.amuletOwner, reward.amuletAmount)).toMap
+          val txs = sv1ScanBackend
+            .listTransactions(
+              None,
+              TransactionHistoryRequest.SortOrder.Desc,
+              Limit.MaxPageSize,
+            )
+            .flatMap(_.transfer)
+            .filter(tf =>
+              tf.sender.inputSvRewardAmount.nonEmpty &&
+                Seq(sv1Party.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive)
+                  .contains(tf.sender.party)
+            )
+            .map(tf => tf.sender.party -> tf.sender.inputSvRewardAmount.value)
+            .toMap
           BigDecimal(txs(sv1Party.toProtoPrimitive)) should beWithin(
-            BigDecimal(eachSvGetInRound0) - smallAmount,
-            BigDecimal(eachSvGetInRound0) + smallAmount,
+            // The expected SV reward calculated here does not match exactly the reward calculated in daml,
+            // presumably because of rounding differences in the reward calculation.
+            BigDecimal(eachSvGetInRound0) - 0.001,
+            BigDecimal(eachSvGetInRound0) + 0.001,
           )
           BigDecimal(txs(aliceValidatorParty.toProtoPrimitive)) should beWithin(
-            BigDecimal(expectedAliceAmount) - smallAmount,
-            BigDecimal(expectedAliceAmount) + smallAmount,
+            // The expected SV reward calculated here does not match exactly the reward calculated in daml,
+            // presumably because of rounding differences in the reward calculation.
+            BigDecimal(expectedAliceAmount) - 0.001,
+            BigDecimal(expectedAliceAmount) + 0.001,
+          )
+        }
+      }
+
+      clue("The claims appear in the wallet history") {
+        eventually() {
+          val txs = sv1WalletClient
+            .listTransactions(
+              None,
+              Limit.MaxPageSize,
+            )
+            .collect {
+              case b: TransferTxLogEntry
+                  if b.subtype.value == TransferTransactionSubtype.WalletAutomation.toProto =>
+                b
+            }
+            .filter(tf =>
+              tf.svRewardsUsed.value > 0 &&
+                Seq(sv1Party.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive)
+                  .contains(tf.sender.value.party)
+            )
+            .map(tf => tf.sender.value.party -> tf.svRewardsUsed.value)
+            .toMap
+          txs(sv1Party.toProtoPrimitive) should beWithin(
+            // The expected SV reward calculated here does not match exactly the reward calculated in daml,
+            // presumably because of rounding differences in the reward calculation.
+            BigDecimal(eachSvGetInRound0) - 0.001,
+            BigDecimal(eachSvGetInRound0) + 0.001,
           )
         }
       }

@@ -78,17 +78,46 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       } yield s"${senderOrReceiver} ${providerId}",
       ccAmount = parseAmountText(
         transactionRow
+          .childElement(className("tx-row-cell-balance-change"))
           .childElement(className("tx-amount-cc"))
           .text,
         currency = "CC",
       ),
       usdAmount = parseAmountText(
         transactionRow
+          .childElement(className("tx-row-cell-balance-change"))
           .childElement(className("tx-amount-usd"))
           .text,
         currency = "USD",
       ),
       rate = transactionRow.childElement(className("tx-amount-rate")).text,
+      appRewardsUsed = parseAmountText(
+        transactionRow
+          .childElement(className("tx-row-cell-rewards"))
+          .findChildElement(className("tx-reward-app-value"))
+          .map(_.childElement(className("tx-amount-cc")))
+          .map(_.text)
+          .getOrElse("0 CC"),
+        currency = "CC",
+      ),
+      validatorRewardsUsed = parseAmountText(
+        transactionRow
+          .childElement(className("tx-row-cell-rewards"))
+          .findChildElement(className("tx-reward-validator-value"))
+          .map(_.childElement(className("tx-amount-cc")))
+          .map(_.text)
+          .getOrElse("0 CC"),
+        currency = "CC",
+      ),
+      svRewardsUsed = parseAmountText(
+        transactionRow
+          .childElement(className("tx-row-cell-rewards"))
+          .findChildElement(className("tx-reward-sv-value"))
+          .map(_.childElement(className("tx-amount-cc")))
+          .map(_.text)
+          .getOrElse("0 CC"),
+        currency = "CC",
+      ),
     )
   }
 
@@ -208,6 +237,9 @@ object WalletFrontendTestUtil {
       ccAmount: BigDecimal,
       usdAmount: BigDecimal,
       rate: String,
+      appRewardsUsed: BigDecimal,
+      validatorRewardsUsed: BigDecimal,
+      svRewardsUsed: BigDecimal,
   )
 
   val errorDisplayElementClass = "error-display-message"

@@ -43,6 +43,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 input_amulet_amount: '5.0000000000',
                 input_app_reward_amount: '0.0000000000',
                 input_validator_reward_amount: '0.0000000000',
+                input_sv_reward_amount: '0.0000000000',
                 sender_change_fee: '0.0300000000',
                 sender_change_amount: '3.8950000000',
                 sender_fee: '0.0000000000',

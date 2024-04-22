@@ -7,6 +7,7 @@ import {
   AccountBalanceWallet,
   ArrowCircleLeftOutlined,
   ArrowCircleRightOutlined,
+  ChangeCircleOutlined,
   ErrorOutlineOutlined,
   InfoOutlined,
 } from '@mui/icons-material';
@@ -14,10 +15,11 @@ import {
   Button,
   Icon,
   Stack,
-  Table,
   TableBody,
+  Table,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
 } from '@mui/material';
 import Typography from '@mui/material/Typography';
@@ -62,6 +64,16 @@ const TransactionHistory: React.FC = () => {
       ) : (
         <TableContainer>
           <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Type</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Sender or Receiver</TableCell>
+                <TableCell>Rewards Created</TableCell>
+                <TableCell>Balance Change</TableCell>
+              </TableRow>
+            </TableHead>
+
             <TableBody>
               {pagedTransactions.map(
                 transactions =>
@@ -104,16 +116,19 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
 }) => {
   return (
     <TableRow className={`tx-row tx-row-${transaction.transactionType}`}>
-      <TableCell>
+      <TableCell className="tx-row-cell-type">
         <TransactionIconAction transaction={transaction} primaryPartyId={primaryPartyId} />
       </TableCell>
-      <TableCell>
+      <TableCell className="tx-row-cell-date">
         <Typography>{formatISO(transaction.date)}</Typography>
       </TableCell>
-      <TableCell>
+      <TableCell className="tx-row-cell-receiver">
         <SenderReceiverInfo transaction={transaction} />
       </TableCell>
-      <TableCell>
+      <TableCell className="tx-row-cell-rewards">
+        <RewardCollectedInfo transaction={transaction} />
+      </TableCell>
+      <TableCell className="tx-row-cell-balance-change">
         <TransactionAmount transaction={transaction} primaryPartyId={primaryPartyId} />
       </TableCell>
     </TableRow>
@@ -137,7 +152,11 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       break;
     case 'transfer':
       const isUserTheSender = transaction.senderId === primaryPartyId;
-      if (isUserTheSender) {
+      const noReceivers = transaction.receivers.length === 0;
+      if (noReceivers) {
+        icon = <ChangeCircleOutlined fontSize="small" />;
+        text = 'Sent';
+      } else if (isUserTheSender) {
         icon = <ArrowCircleRightOutlined fontSize="small" />;
         text = 'Sent';
       } else {
@@ -347,6 +366,30 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
         <Typography variant="caption">via </Typography>
         <BftAnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
       </Stack>
+    </Stack>
+  );
+};
+
+const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
+  if (transaction.transactionType !== 'transfer') {
+    return <></>;
+  }
+
+  const appRewards = BigNumber(transaction.appRewardsUsed || 0);
+  const validatorRewards = BigNumber(transaction.validatorRewardsUsed || 0);
+  const svRewards = BigNumber(transaction.svRewardsUsed || 0);
+
+  const row = (type: string, label: string, amount: BigNumber) => [
+    <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
+    <Typography key={`tx-reward-${type}-value`} className={`tx-reward-${type}`}>
+      <AmountDisplay amount={amount} currency="AmuletUnit" />
+    </Typography>,
+  ];
+  return (
+    <Stack direction="column">
+      {!appRewards.isZero() && row('app', 'App Rewards', appRewards)}
+      {!validatorRewards.isZero() && row('validator', 'Validator Rewards', validatorRewards)}
+      {!svRewards.isZero() && row('sv', 'SV Rewards', svRewards)}
     </Stack>
   );
 };

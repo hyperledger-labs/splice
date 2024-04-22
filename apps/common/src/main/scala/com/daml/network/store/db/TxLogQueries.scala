@@ -95,7 +95,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   )(row: SelectFromTxLogTableResult)(implicit tag: ClassTag[TXER]): TXER = {
     config.decodeEntry(row.entryType, row.entryData) match {
       case e: TXER => e
-      case _ => throw txLogIsOfWrongType()
+      case _ => throw txLogIsOfWrongType(row.entryType.str)
     }
   }
 }

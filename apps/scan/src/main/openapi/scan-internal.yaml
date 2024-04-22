@@ -925,11 +925,10 @@ components:
           description: |
             Describes the type of activity that occurred.
             Determines if the data for the transaction should be read
-            from the `transfer`, `mint`, `tap` or `sv_reward_collected` property.
+            from the `transfer`, `mint`, or `tap` property.
           type: string
           enum:
             - "transfer"
-            - "sv_reward_collected"
             - "mint"
             - "devnet_tap"
         event_id:
@@ -969,10 +968,6 @@ components:
         tap:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
-          $ref: "#/components/schemas/AmuletAmount"
-        sv_reward_collected:
-          description: |
-            An SV collected an SvReward.
           $ref: "#/components/schemas/AmuletAmount"
     ListActivityRequest:
       type: object
@@ -1012,11 +1007,10 @@ components:
           description: |
             Describes the type of activity that occurred.
             Determines if the data for the activity should be read
-            from the `transfer`, `mint`, `tap` or `sv_reward_collected` property.
+            from the `transfer`, `mint`, or `tap` property.
           type: string
           enum:
             - "transfer"
-            - "sv_reward_collected"
             - "mint"
             - "devnet_tap"
         event_id:
@@ -1056,10 +1050,6 @@ components:
         tap:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
-          $ref: "#/components/schemas/AmuletAmount"
-        sv_reward_collected:
-          description: |
-            An SV collected an SvReward.
           $ref: "#/components/schemas/AmuletAmount"
     Transfer:
       description: |
@@ -1149,6 +1139,10 @@ components:
         input_validator_reward_amount:
           description: |
             Total amount of validator rewards input into this transfer.
+          type: string
+        input_sv_reward_amount:
+          description: |
+            Total amount of sv rewards input into this transfer.
           type: string
         sender_change_fee:
           description: |

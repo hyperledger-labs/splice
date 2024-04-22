@@ -11,8 +11,8 @@ trait StoreErrors {
     Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
   }
 
-  def txLogIsOfWrongType() = {
-    Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
+  def txLogIsOfWrongType(name: String) = {
+    Status.INTERNAL.withDescription(s"Unexpected log entry type $name").asRuntimeException()
   }
 
   def offsetExpectedError() = {

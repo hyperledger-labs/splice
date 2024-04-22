@@ -39,7 +39,6 @@ import java.time.{OffsetDateTime, ZoneOffset}
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   DevnetTap,
   Mint,
-  SvRewardCollected,
   Transfer,
 }
 import com.daml.network.scan.dso.DsoAnsResolver
@@ -603,14 +602,11 @@ class HttpScanHandler(
                 ActivityType.Mint
               case Transfer =>
                 ActivityType.Transfer
-              case SvRewardCollected =>
-                ActivityType.SvRewardCollected
             },
             eventId = txItem.eventId,
             offset = txItem.offset,
             domainId = txItem.domainId,
             date = txItem.date,
-            svRewardCollected = txItem.svRewardCollected,
             mint = txItem.mint,
             tap = txItem.tap,
             transfer = txItem.transfer,

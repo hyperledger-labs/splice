@@ -13,7 +13,7 @@ import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
 import com.daml.network.util.TransactionTreeExtensions.*
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -21,7 +21,6 @@ import io.grpc.Status
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
@@ -233,17 +232,6 @@ object ScanTxLogParser {
             amuletPrice = acsum.amuletPrice,
             round = acsum.round.number,
           )
-        case TransactionType.SvRewardCollected =>
-          SvRewardCollectedTxLogEntry(
-            offset = tx.getOffset,
-            eventId = event.getEventId,
-            domainId = domainId,
-            date = Some(tx.getEffectiveAt),
-            amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
-            amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = acsum.amuletPrice,
-            round = acsum.round.number,
-          )
         case unexpected =>
           throw new Exception(
             s"unexpected activityType: $unexpected in fromAmuletCreateSummary"
@@ -269,6 +257,7 @@ object ScanTxLogParser {
     ): State = {
       val appRewards = summary.inputAppRewardAmount
       val validatorRewards = summary.inputValidatorRewardAmount
+      val svRewards = summary.inputSvRewardAmount
 
       val appRewardEntry =
         if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
@@ -300,7 +289,22 @@ object ScanTxLogParser {
           State.empty
         }
 
-      appRewardEntry.appended(validatorRewardEntry)
+      val svRewardEntry =
+        if (svRewards.compareTo(BigDecimal(0.0)) > 0) {
+          val entry =
+            SvRewardTxLogEntry(
+              eventId = rootEventId.getOrElse(event.getEventId()),
+              domainId = domainId,
+              round = round,
+              party = sender,
+              amount = validatorRewards,
+            )
+          State(entry)
+        } else {
+          State.empty
+        }
+
+      appRewardEntry.appended(validatorRewardEntry).appended(svRewardEntry)
     }
 
     def fromTransfer(
@@ -309,7 +313,7 @@ object ScanTxLogParser {
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
-    )(implicit elc: ErrorLoggingContext): State = {
+    ): State = {
       val sender = Codec
         .decode(Codec.Party)(node.argument.value.transfer.sender)
         .getOrElse(
@@ -354,41 +358,9 @@ object ScanTxLogParser {
         transferTxLogEntry(tx, event, domainId, node)
       )
 
-      val stateWithoutSvRewards = rewardEntries
+      rewardEntries
         .appended(balanceChangeEntry)
         .appended(activityEntry)
-
-      // Workaround:
-      // We want to have separate logs between the transfer and the SV reward collection.
-      // So we need to extract a separate event id for pagination of `listTransactions` to work.
-      // Note that this lumps together all the rewards from different SV operators and rounds together.
-      // This is a current limitation that might be revisited later.
-      val archiveSvRewardEventIdOpt = event.getChildEventIds.asScala
-        .find { eventId =>
-          tx.getEventsById.get(eventId) match {
-            case SvRewardCoupon_ArchiveAsBeneficiary(_) => true
-            case _ => false
-          }
-        }
-
-      archiveSvRewardEventIdOpt match {
-        case Some(archiveSvRewardEventId) =>
-          val svRewardEntry = State(
-            SvRewardCollectedTxLogEntry(
-              offset = tx.getOffset,
-              eventId = archiveSvRewardEventId,
-              domainId = domainId,
-              date = Some(tx.getEffectiveAt),
-              amuletOwner = sender,
-              amuletAmount = node.result.value.summary.inputSvRewardAmount,
-              amuletPrice = node.result.value.summary.amuletPrice,
-              round = round.number, // Of the collection, not the round the coupon is received.
-            )
-          )
-          stateWithoutSvRewards.appended(svRewardEntry)
-        case None =>
-          stateWithoutSvRewards
-      }
     }
 
     def transferTxLogEntry(
