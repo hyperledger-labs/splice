@@ -25,4 +25,7 @@ INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when 
 # TODO(#10887) Figure out where this is coming from
 Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Authentication token refresh failed with grpc error
 
+# Canton GenericStepsError(SequencerTimeoutError) errors
+Failed to submit submission due to GenericStepsError.*SequencerTimeoutError
+
 # Make sure to have a trailing newline
