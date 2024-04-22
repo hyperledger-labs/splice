@@ -59,3 +59,9 @@
       name: "cn-app-{{ $keyName }}-ledger-api-auth"
       optional: false
 {{- end -}}
+{{- define "cn-util-lib.additional-env-vars" -}}
+{{- range $var := . }}
+- name: {{ $var.name }}
+  value: {{ $var.value }}
+{{- end }}
+{{- end }}

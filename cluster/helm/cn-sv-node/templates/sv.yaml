@@ -248,6 +248,7 @@ spec:
             {{- end }}
             - name: FAIL_ON_APP_VERSION_MISMATCH
               value: {{ .Values.failOnAppVersionMismatch | quote }}
+            {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
           ports:
             - name: sv-api
               containerPort: 5014

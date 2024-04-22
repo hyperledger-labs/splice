@@ -45,6 +45,7 @@ spec:
               type = explicit
               name = "{{ .Values.nodeIdentifier }}"
             }
+        {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         imagePullPolicy: Always
         ports:
         - containerPort: 5007

@@ -53,6 +53,7 @@ spec:
               type = explicit
               name = "{{ .Values.nodeIdentifier }}"
             }
+        {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         ports:
         - containerPort: 5002
           name: lg-adm-api

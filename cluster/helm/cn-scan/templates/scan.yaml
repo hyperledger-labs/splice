@@ -67,6 +67,7 @@ spec:
           value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
+        {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         imagePullPolicy: Always
         ports:
         - containerPort: 5012

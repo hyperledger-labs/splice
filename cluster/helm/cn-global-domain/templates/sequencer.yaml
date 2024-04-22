@@ -78,6 +78,7 @@ spec:
             - name: SEQUENCER_TOKEN_EXPIRATION_TIME
               value: "{{ . }}"
             {{- end }}
+            {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008
