@@ -3211,7 +3211,7 @@ jobs:
             fi
             if [[ << parameters.restore_identity_from_sv_runbook >> == true ]]; then
               echo "restoring identity from sv runbook"
-              token=$(cncluster get_ui_credentials svRunbook sv)
+              token=$(cncluster get_ui_credentials sv)
               id=$(curl -s "https://wallet.sv.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/participant/identities" -H "authorization: Bearer ${token}")
               echo "$id" > id.json
               export PARTICIPANT_IDENTITIES_FILE=$(readlink -f id.json)
