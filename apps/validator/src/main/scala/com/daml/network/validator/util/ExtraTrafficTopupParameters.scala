@@ -3,6 +3,7 @@ package com.daml.network.validator.util
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.SynchronizerFeesConfig
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -18,7 +19,12 @@ import scala.math.BigDecimal.RoundingMode
 case class ExtraTrafficTopupParameters(
     topupAmount: Long,
     minTopupInterval: NonNegativeFiniteDuration,
-)
+) extends PrettyPrinting {
+  override def pretty: Pretty[ExtraTrafficTopupParameters.this.type] = prettyOfClass(
+    param("topupAmount", _.topupAmount),
+    param("minTopupInterval", _.minTopupInterval),
+  )
+}
 
 object ExtraTrafficTopupParameters {
   def apply(

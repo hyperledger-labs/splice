@@ -4,7 +4,7 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{SynchronizerFeesTestUtil, SvTestUtil, WalletTestUtil}
+import com.daml.network.util.{SvTestUtil, SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
@@ -70,7 +70,7 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
       val now = env.environment.clock.now
       val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
-      val (_, totalCostCc) = computeSynchronizerFees(trafficAmount, now)
+      val (_, totalCostCc) = computeSynchronizerFees(trafficAmount)
 
       actAndCheck(
         "Purchase extra traffic for SV1", {

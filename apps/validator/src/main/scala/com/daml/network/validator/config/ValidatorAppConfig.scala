@@ -111,7 +111,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
       * Note that this will be ignored if the validator is not configured to do topups
       * i.e. the target throughput is set to zero (its default value). See: trafficReservedForTopupsO.
       */
-    trafficReservedForTopups: NonNegativeLong = NonNegativeNumeric.tryCreate(100_000L),
+    trafficReservedForTopups: NonNegativeLong = NonNegativeNumeric.tryCreate(200_000L),
 
     /** The validator's ledger client compares its remaining traffic balance against the reserved amount
       * on every command submission. This setting controls how long the traffic balance is cached before

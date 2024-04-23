@@ -29,7 +29,6 @@ import java.time.Instant
 import java.util.Optional
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
@@ -224,15 +223,14 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
     )
   }
 
-  def computeSynchronizerFees(trafficAmount: Long, ts: CantonTimestamp)(implicit
+  def computeSynchronizerFees(trafficAmount: Long)(implicit
       env: CNNodeTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
-    val trafficPriceUsd =
+    val ts = env.environment.clock.now
+    val extraTrafficPrice =
       sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees.extraTrafficPrice
-    val totalCostUsd = BigDecimal(trafficAmount) / 1e6 * trafficPriceUsd
     val amuletPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.amuletPrice
-    val totalCostCc = totalCostUsd / amuletPrice
-    (totalCostUsd, totalCostCc)
+    CNNodeUtil.synchronizerFees(trafficAmount, extraTrafficPrice, amuletPrice)
   }
 
   def getTrafficState(

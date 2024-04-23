@@ -746,6 +746,7 @@ object TreasuryService {
     override def pretty: Pretty[AmuletOperationBatch.this.type] = prettyOfClass(
       paramIfDefined("mergeOperationOpt", _.mergeOperationOpt),
       paramIfNonEmpty("nonMergeOperations", _.nonMergeOperations),
+      param("priority", _.priority),
     )
 
     lazy val numTapOperations: Int = nonMergeOperations.count(_.isCO_Tap)
@@ -762,9 +763,9 @@ object TreasuryService {
     def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
 
     def priority: CommandPriority = {
-      if (
-        mergeOperationOpt.isEmpty && nonMergeOperations.forall(_.priority == CommandPriority.High)
-      ) CommandPriority.High
+      val allOperations = nonMergeOperations ++ mergeOperationOpt.toList
+      if (allOperations.nonEmpty && allOperations.forall(_.priority == CommandPriority.High))
+        CommandPriority.High
       else CommandPriority.Low
     }
 

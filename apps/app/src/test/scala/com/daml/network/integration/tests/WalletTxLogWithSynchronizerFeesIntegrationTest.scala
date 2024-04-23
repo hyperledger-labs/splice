@@ -36,7 +36,7 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
       val now = env.environment.clock.now
       val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
-      val (_, totalCostCc) = computeSynchronizerFees(trafficAmount, now)
+      val (_, totalCostCc) = computeSynchronizerFees(trafficAmount)
 
       actAndCheck(
         "Fail to purchase extra traffic for SV1", {

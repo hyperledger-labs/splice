@@ -441,4 +441,24 @@ object CNNodeUtil {
     val amuletPriceN = Numeric.assertFromBigDecimal(scale, amuletPrice)
     com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, amuletPriceN))
   }
+
+  def synchronizerFees(
+      topupAmount: Long,
+      extraTrafficPrice: BigDecimal,
+      amuletPrice: BigDecimal,
+  ): (BigDecimal, BigDecimal) = {
+
+    def tryCompute() = for {
+      scale <- Numeric.Scale.fromInt(10)
+      extraTrafficPriceN <- Numeric.fromBigDecimal(scale, extraTrafficPrice)
+      amuletPriceN <- Numeric.fromBigDecimal(scale, amuletPrice)
+      topupAmountN <- Numeric.fromLong(scale, topupAmount)
+      bytesInMB <- Numeric.fromLong(scale, 1_000_000L)
+      topupAmountMB <- Numeric.divide(scale, topupAmountN, bytesInMB)
+      trafficCostUsd <- Numeric.multiply(scale, extraTrafficPriceN, topupAmountMB)
+      trafficCostCc <- Numeric.divide(scale, trafficCostUsd, amuletPriceN)
+    } yield (BigDecimal(trafficCostUsd), BigDecimal(trafficCostCc))
+
+    com.daml.lf.data.assertRight(tryCompute())
+  }
 }

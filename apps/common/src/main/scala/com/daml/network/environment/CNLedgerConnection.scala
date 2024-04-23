@@ -61,6 +61,7 @@ import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 
 /** BaseLedgerConnection is a read-only ledger connection, typically used during initialization when we don't
   * want to allow command submissions yet.
@@ -603,6 +604,8 @@ class CNLedgerConnection(
 
   private[this] def timeouts = retryProvider.timeouts
 
+  def trafficBalanceService: Option[TrafficBalanceService] = trafficBalanceServiceO.get()
+
   private def callCallbacksOnCompletion[T, U](
       result: Future[T]
   )(getOffsetAndResult: T => (Option[String], U)): Future[U] = {
@@ -655,8 +658,7 @@ class CNLedgerConnection(
   private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
       implicit tc: TraceContext
   ): Future[Unit] = {
-    trafficBalanceServiceO
-      .get()
+    trafficBalanceService
       .fold(Future.unit)(trafficBalanceService => {
         trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
           case None => Future.unit
@@ -1207,7 +1209,11 @@ object CNLedgerConnection {
   }
 }
 
-sealed trait CommandPriority { def name: String }
+sealed trait CommandPriority extends PrettyPrinting {
+  override def pretty: Pretty[CommandPriority.this.type] = prettyOfString(_.name)
+  def name: String
+}
+
 object CommandPriority {
   case object High extends CommandPriority { val name = "High" }
   case object Low extends CommandPriority { val name = "Low" }

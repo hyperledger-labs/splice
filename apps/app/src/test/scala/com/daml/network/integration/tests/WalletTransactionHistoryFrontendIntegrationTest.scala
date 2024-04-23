@@ -177,7 +177,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
         browseToSv1Wallet(sv1WalletUser)
         val trafficAmount = 10_000_000L
-        val (_, trafficCostCc) = computeSynchronizerFees(trafficAmount, env.environment.clock.now)
+        val (_, trafficCostCc) = computeSynchronizerFees(trafficAmount)
         actAndCheck(
           "SV1 purchases extra traffic",
           buyMemberTraffic(sv1ValidatorBackend, trafficAmount, env.environment.clock.now),
