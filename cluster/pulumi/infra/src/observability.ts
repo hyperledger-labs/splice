@@ -99,6 +99,7 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_DNS_NAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_DNS_NAME}`;
 const enableAlerts = process.env.GCP_CLUSTER_PROD_LIKE == 'true';
+const disablePrometheusAlerts = process.env.DISABLE_PROMETHEUS_ALERT == 'true';
 const slackAlertNotificationChannel = process.env.SLACK_ALERT_NOTIFICATION_CHANNEL || 'C064MTNQT88';
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
@@ -149,7 +150,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         enabled: true,
         config: {
           route: {
-            receiver: enableAlerts ? 'slack' : 'null',
+            receiver: enableAlerts && !disablePrometheusAlerts ? 'slack' : 'null',
             group_by: ['namespace'],
             continue: false,
             routes: [
@@ -164,7 +165,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             {
               name: 'null',
             },
-            ...(enableAlerts
+            ...(enableAlerts && !disablePrometheusAlerts
               ? [
                   {
                     name: 'slack',
