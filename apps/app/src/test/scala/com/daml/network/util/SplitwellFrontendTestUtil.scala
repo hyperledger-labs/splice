@@ -47,8 +47,8 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with AnsTestUtil {
   def createGroupAndInviteLink(groupName: String)(implicit
       webDriver: WebDriverType
   ): String = {
-    createGroup(groupName)
     eventually() {
+      createGroup(groupName)
       val createInviteElements = findAll(className("create-invite-link"))
       withClue(s"Create invite elements not found $createInviteElements") {
         val createInviteButton = createInviteElements
