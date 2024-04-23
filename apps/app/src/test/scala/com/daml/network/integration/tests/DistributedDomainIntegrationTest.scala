@@ -1,21 +1,25 @@
 package com.daml.network.integration.tests
 
+import cats.syntax.parallel.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.util.FutureInstances.*
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest
@@ -160,5 +164,65 @@ class DistributedDomainIntegrationTest
 
   "SVs can be onboarded a second time" in { implicit env =>
     initDso()
+  }
+
+  "SVs can pause and unpause the domain via SV app API calls" in { implicit env =>
+    implicit val ec: ExecutionContext = env.executionContext
+    initDso()
+    val decentralizedSynchronizerId =
+      sv1Backend.participantClient.domains.id_of(decentralizedSynchronizer)
+    eventuallySucceeds() {
+      sv1Backend.participantClientWithAdminToken.topology.domain_parameters
+        .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+        .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+    }
+
+    bracket(
+      (), {
+        clue(
+          s"un-pause decentralized synchronizer to not crash other tests"
+        ) {
+          Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+            Future {
+              sv.unpauseDecentralizedSynchronizer()
+            }
+          }.futureValue
+        }
+      },
+    ) {
+      actAndCheck(
+        "SVs can pause the decentralizedSynchronizer",
+        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+          Future {
+            sv.pauseDecentralizedSynchronizer()
+          }
+        }.futureValue,
+      )(
+        "decentralizedSynchronizer is paused",
+        _ =>
+          forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
+            sv.participantClientWithAdminToken.topology.domain_parameters
+              .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+              .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+          },
+      )
+
+      actAndCheck(
+        "SVs can unpause the decentralizedSynchronizer",
+        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+          Future {
+            sv.unpauseDecentralizedSynchronizer()
+          }
+        }.futureValue,
+      )(
+        "decentralizedSynchronizer is un-paused",
+        _ =>
+          forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
+            sv.participantClientWithAdminToken.topology.domain_parameters
+              .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+              .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+          },
+      )
+    }
   }
 }
