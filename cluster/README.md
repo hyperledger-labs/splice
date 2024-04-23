@@ -540,7 +540,7 @@ Given approval, a manual deployment of `main` can be done as follows:
 3. Add a parameter named `run-job`, with one of the following values:
    * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.
    * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
-   * `deploy-cidaily-testnet` - Reset the state of `CIDaily TestNet` and deploy a new code set.
+   * `deploy-cidaily` - Reset the state of `CIDaily` AND `CIDaily TestNet` and deploy a new code set.
 4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `CIDaily TestNet`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
 5. If you want to keep the existing deployment intact and only deploy missing resources,
    add an additional boolean parameter named `reset-before-deploy` and set it to `false.
