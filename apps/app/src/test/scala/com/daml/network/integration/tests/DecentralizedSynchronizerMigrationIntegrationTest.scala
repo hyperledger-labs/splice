@@ -42,6 +42,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellDomains, SplitwellSynchronizerConfig}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
+import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
@@ -686,6 +687,20 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             }
 
             checkMigrateDomainOnNodes(majorityUpgradeNodes, testDsoParty)
+
+            clue("SvNamespaceMembershipTrigger is running") {
+              loggerFactory.assertEventuallyLogsSeq_(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+                logs =>
+                  forAtLeast(1, logs) {
+                    _.loggerName should include("SvNamespaceMembershipTrigger")
+                  }
+              )
+            }
+
+            // Pause the triggers because they'll otherwise try to fight the manual modification of the decentralized namespace.
+            Seq(sv2LocalBackend, sv3LocalBackend, sv4LocalBackend).foreach { sv =>
+              sv.dsoAutomation.trigger[SvNamespaceMembershipTrigger].pause().futureValue
+            }
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {

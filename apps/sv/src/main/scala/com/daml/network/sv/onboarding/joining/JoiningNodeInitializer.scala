@@ -200,7 +200,7 @@ class JoiningNodeInitializer(
             _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
               dsoAutomation,
               dsoStore,
-              withSvStore,
+              Some(withSvStore),
             )
           } yield dsoAutomation
         } else {
@@ -230,12 +230,7 @@ class JoiningNodeInitializer(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
-      _ <- onboard(decentralizedSynchronizerId, dsoAutomation, svAutomation)
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-        dsoAutomation,
-        dsoStore,
-        withSvStore,
-      )
+      _ <- onboard(decentralizedSynchronizerId, dsoAutomation, svAutomation, Some(withSvStore))
     } yield {
       (
         decentralizedSynchronizerId,
@@ -252,6 +247,7 @@ class JoiningNodeInitializer(
       decentralizedSynchronizer: DomainId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
+      withSvStore: Option[WithSvStore],
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
@@ -320,6 +316,11 @@ class JoiningNodeInitializer(
           Onboarded,
           config.domainMigrationId,
         )
+      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+        dsoAutomationService,
+        dsoStore,
+        withSvStore,
+      )
     } yield {
       ()
     }
@@ -328,25 +329,41 @@ class JoiningNodeInitializer(
   private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
-      withSvStore: WithSvStore,
+      withSvStore: Option[WithSvStore],
   ) =
-    retryProvider
-      .ensureThatB(
-        RetryFor.WaitingOnInitDependency,
-        "dso_onboard",
-        show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
-        isOnboarded(dsoStore), {
-          for {
-            (joiningConfig, svConnection) <- svConnection
-            _ <- withSvStore.startOnboardingWithDsoPartyHosted(
-              dsoAutomation,
-              svConnection,
-              joiningConfig,
-            )
-          } yield ()
-        },
-        logger,
-      )
+    (withSvStore match {
+      case None =>
+        retryProvider.waitUntil(
+          RetryFor.WaitingOnInitDependency,
+          "dso_onboard",
+          show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
+          isOnboarded(dsoStore).map { onboarded =>
+            if (!onboarded)
+              throw Status.FAILED_PRECONDITION
+                .withDescription("SV is not yet onboarded")
+                .asRuntimeException
+          },
+          logger,
+        )
+      case Some(store) =>
+        retryProvider
+          .ensureThatB(
+            RetryFor.WaitingOnInitDependency,
+            "dso_onboard",
+            show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
+            isOnboarded(dsoStore), {
+              for {
+                (joiningConfig, svConnection) <- svConnection
+                _ <- store.startOnboardingWithDsoPartyHosted(
+                  dsoAutomation,
+                  svConnection,
+                  joiningConfig,
+                )
+              } yield ()
+            },
+            logger,
+          )
+    })
       .andThen(_ => {
         logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
         dsoAutomation.registerSvNamespaceMembershipTrigger()
@@ -450,7 +467,7 @@ class JoiningNodeInitializer(
   /** Private class to share svStore, dsoPartyHosting, and global domain-id
     * across utility methods.
     */
-  private class WithSvStore(
+  class WithSvStore(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       dsoPartyHosting: JoiningNodeDsoPartyHosting,
       domainId: DomainId,

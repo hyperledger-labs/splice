@@ -10,6 +10,9 @@ Upcoming
 * Updated the scan UI to show recent activity in a way that is more consistent and matches the actual activity on the ledger.
   Note that all transfers recorded in the past will show as having no sv rewards.
   This limitation can be removed with a future update.
+* Fix a bug where the namespace triggers did not get started on SV’s
+  with ``migrating: true`` which prevented new SVs from being
+  onboarded after domain migrations.
 
 0.1.4
 -----

@@ -171,6 +171,7 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
+        None,
       )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
