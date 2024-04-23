@@ -1,11 +1,13 @@
 import * as k8s from '@pulumi/kubernetes';
 
-import { btoa, ExactNamespace } from './utils';
+import { btoa, envFlag, ExactNamespace } from './utils';
 
 export type ExpectedValidatorOnboarding = { name: string; expiresIn: string; secret: string };
 
 export const validatorOnboardingSecretName = (name: string): string =>
   `cn-app-validator-onboarding-${name}`;
+
+export const preApproveValidatorRunbook = envFlag('PREAPPROVE_VALIDATOR_RUNBOOK');
 
 export function installValidatorOnboardingSecret(
   xns: ExactNamespace,

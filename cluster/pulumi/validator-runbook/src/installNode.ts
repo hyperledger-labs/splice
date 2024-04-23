@@ -26,6 +26,7 @@ import {
   nonSvValidatorTopupConfig,
   defaultVersion,
   participantBootstrapDumpSecretName,
+  preApproveValidatorRunbook,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -74,6 +75,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
+  const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
+
   const loopback = installLoopback(xns, CLUSTER_BASENAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
@@ -88,6 +91,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const validator = await installValidator({
     xns,
+    onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -224,10 +228,8 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
-    // get a new secret from sv-1 instead of the configured one
-    // this works because validator-runbook is only deployed on devnet-like clusters
-    onboardingSecretFrom: undefined,
   };
+
   const validatorValues: ChartValues = {
     ...validatorValuesFromYamlFiles,
     migration: {
@@ -253,10 +255,19 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       : undefined,
   };
 
+  const validatorValuesWithOnboardingOverride = onboardingSecret
+    ? validatorValues
+    : {
+        ...validatorValues,
+        // Get a new secret from sv-1 instead of the configured one.
+        // This works only when validator-runbook is deployed on devnet-like clusters.
+        onboardingSecretFrom: undefined,
+      };
+
   const validatorValuesWithSpecifiedAud: ChartValues = {
-    ...validatorValues,
+    ...validatorValuesWithOnboardingOverride,
     auth: {
-      ...validatorValues.auth,
+      ...validatorValuesWithOnboardingOverride.auth,
       audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
       ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },

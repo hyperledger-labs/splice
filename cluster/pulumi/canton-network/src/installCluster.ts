@@ -13,6 +13,8 @@ import {
   nonSvValidatorTopupConfig,
   svOnboardingPollingInterval,
   defaultVersion,
+  ExpectedValidatorOnboarding,
+  preApproveValidatorRunbook,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -85,6 +87,15 @@ const validator1Onboarding = {
   expiresIn: '24h',
 };
 
+const standaloneValidatorOnboarding: ExpectedValidatorOnboarding | undefined =
+  preApproveValidatorRunbook
+    ? {
+        name: 'validator',
+        secret: 'validatorsecret',
+        expiresIn: '24h',
+      }
+    : undefined;
+
 let periodicBackupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
@@ -146,7 +157,9 @@ export async function installCluster(
 
     auth0Client,
     approvedSvIdentities: approveSvRunbook ? svRunbookApprovedSvIdentities : [],
-    expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
+    expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding].concat(
+      standaloneValidatorOnboarding ? [standaloneValidatorOnboarding] : []
+    ),
     isDevNet,
     periodicBackupConfig,
     identitiesBackupLocation,
