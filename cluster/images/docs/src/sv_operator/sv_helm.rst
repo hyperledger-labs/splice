@@ -7,12 +7,9 @@ This section describes deploying a Super Validator (SV) node in kubernetes using
 charts.  The Helm charts deploy a complete node and connect it to a
 target cluster.
 
-Digital Asset currently operates two Canton Network clusters: `TestNet` and `DevNet`. Both upgrade weekly. `DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled. Please use `DevNet` unless you have a specific reason not to.
-
-Note that there is not yet data retention from release to release in either
-`DevNet` or `TestNet`. This will change as the models and API's
-stabilize, but for now, each release should be a full release from
-scratch. No data should be retained when an environment is updated.
+We currently operate two Canton Network clusters: `TestNet` and `DevNet`. Both usually upgrade weekly.
+`DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled.
+Please use `DevNet` unless you have a specific reason not to.
 
 Requirements
 ------------
@@ -513,12 +510,6 @@ To install the Helm charts needed to start an SV node connected to the
 cluster, you will need to meet a few preconditions. The first is that
 there needs to be an environment variable defined to refer to the
 version of the Helm charts necessary to connect to this environment:
-
-Note that because of the lack of data retention from release to release
-in either `DevNet` or `TestNet`, every release should be installed
-from scratch into a completely clean environment. Data should not be
-retained, and there is no current support for helm chart upgrades or
-similar.
 
 |chart_version_set|
 
