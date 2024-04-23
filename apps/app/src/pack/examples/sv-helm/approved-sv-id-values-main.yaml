@@ -11,3 +11,7 @@ approvedSvIdentities:
   - name: Digital-Asset-1
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcGfwLnDE3vQuWcHE7CfVABigVK5nPeAjqFf66pIlXpqeoklu4KMnDE4Zse465NcWUgfMnjmmSw53hKRxuR6RFg==
     rewardWeightBps: 140000
+  - name: SV-Nodeops-Limited
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQfazgfYYYuXXuUmujEUnLYsQfWnb8CEKsddv7Gt0SqG2v9Tx9/LyzteOdPOSXtb5XODumthhfpFh0MLnU8w+eQ==
+    rewardWeightBps: 100000
+

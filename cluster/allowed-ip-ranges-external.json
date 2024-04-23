@@ -109,11 +109,17 @@
     }
   },
   "mainnet": {
+    "infra": {},
     "svs": {
       "Orb-1-LP": ["54.94.148.61/32"],
       "Liberty-City-Ventures": ["3.127.60.187/32"],
       "Global-Synchronizer-Foundation": ["52.28.183.68/32"],
-      "Digital-Asset": ["34.72.131.19/32"]
-    }
+      "Digital-Asset": ["34.72.131.19/32"],
+      "SV-Nodeops-Limited": [
+        "35.73.216.156/32",
+        "43.206.88.14/32"
+      ]
+    },
+    "validators": {}
   }
 }
