@@ -1168,9 +1168,9 @@ function subcmd_preflight_refresh_auth0_credentials() {
 
 ###
 
-subcommand_whitelist[get_ui_credentials]='Get UI auth0 credentials for a given admin user'
+subcommand_whitelist[get_token]='Get an auth0 token for a given admin user'
 
-function subcmd_get_ui_credentials() {
+function subcmd_get_token() {
 
   if [ "$#" -ne 1 ]; then
      _error "Usage: $0 <node>"
@@ -2388,19 +2388,23 @@ function subcmd_disaster_recovery_test() {
   local version=""
   version=$(get-snapshot-version)
 
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' EXIT
+
+
   _cluster_reset
 
   _info "Deploying original domain"
-  # TODO(#9531): Support validators in disaster recovery test
-  export CN_INSTALL_VALIDATOR1="false"
+  # We test that splitwell can onboard after the DR, so don't deploy it just yet
   export CN_INSTALL_SPLITWELL="false"
   _cluster_apply "$version"
 
   _info "Getting identity dumps"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_token sv-${sv})
     id=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
-    echo "$id" > id-${sv}.json
+    echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
   _info "Scaling down cometbft"
@@ -2412,7 +2416,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Finding agreed upon timestamp"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_token sv-${sv})
     done=0
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
@@ -2432,17 +2436,16 @@ function subcmd_disaster_recovery_test() {
             done=1
         fi
     done
-    date --date "$acs_time" "+%s" >> acs_times
+    date --date "$acs_time" "+%s" >> "$tmpdir/acs_times"
   done
 
-  earliest=$(sort -n acs_times | head -1)
+  earliest=$(sort -n "$tmpdir/acs_times" | head -1)
   dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "+%Y-%m-%dT%R:%S.%NZ")
   _info "Decided on timestamp for dumps: $dump_timestamp"
-  rm acs_times
 
   _info "Getting data dumps"
   for sv in 1 2 3 4; do
-    token=$(subcmd_get_ui_credentials sv-${sv})
+    token=$(subcmd_get_token sv-${sv})
     data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
@@ -2453,9 +2456,9 @@ function subcmd_disaster_recovery_test() {
             _error "ACS dump not available, but is expected to be available from all SV apps for timestamp $dump_timestamp"
         fi
     fi
-    id=$(cat id-${sv}.json)
+    id=$(cat "$tmpdir/id-${sv}.json")
     dump=$(echo "{\"migration_id\": 1} $id $data" | jq -s add)
-    echo "$dump" > dump${sv}.json
+    echo "$dump" > "$tmpdir/dump${sv}.json"
   done
 
   _info "Scaling down sequencers and mediators"
@@ -2467,9 +2470,14 @@ function subcmd_disaster_recovery_test() {
     pod=$(kubectl get pod -n sv-${sv} -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
 
     # Copy dump file to the pvc on the sv-app
-    kubectl cp "dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
-    rm "dump${sv}.json"
+    kubectl cp "$tmpdir/dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
   done
+
+  token=$(subcmd_get_token validator1)
+  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
+  echo "$dump" > "$tmpdir/dump-validator1.json"
+  pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
+  kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
 
   _info "Deploying new domain"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
@@ -2481,8 +2489,7 @@ function subcmd_disaster_recovery_test() {
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   _cluster_apply "$version"
 
-  _info "Installing Splitwell & validator1"
-  export CN_INSTALL_VALIDATOR1="true"
+  _info "Installing Splitwell"
   export CN_INSTALL_SPLITWELL="true"
   _cluster_apply "$version"
 }
@@ -2521,7 +2528,7 @@ subcommand_whitelist[list_sv_cometbft_addresses]='List the sv cometbft addresses
 
 function subcmd_list_sv_cometbft_addresses() {
   sv=$1
-  token=$(subcmd_get_ui_credentials "${sv}")
+  token=$(subcmd_get_token "${sv}")
   pubkey_sv=$(mktemp)
   pubkey_address=$(mktemp)
   curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/dso | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"

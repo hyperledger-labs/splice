@@ -1678,7 +1678,7 @@ which prints a compatible token as part of its startup.
 For some UIs, we cache tokens in a secret in k8s, and have a utility `cncluster` command for easily retrieving them.
 At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one of them, run for example:
 ```
-export TOKEN=$(cncluster get_ui_credentials sv-1)
+export TOKEN=$(cncluster get_token sv-1)
 ```
 If the token saved in the secret is expired, run `cncluster preflight_refresh_auth0_credentials` to update the secret with fresh tokens.
 
@@ -2021,8 +2021,8 @@ When you are debugging cometbft logs, it can be useful to correlate the cometbft
 that is running that node.
 For instance, if you find that blocks take a long time to advance in cometbft logs, and you want to relate this to an SV running cometbft nodes.
 
-To debug what is happening while a slowdown is occurring, poll the `consensus_state` endpoint 
-while blocks are advancing slowly (the `consensus_state` does not provide historical data). 
+To debug what is happening while a slowdown is occurring, poll the `consensus_state` endpoint
+while blocks are advancing slowly (the `consensus_state` does not provide historical data).
 
 You can access this endpoint by port forwarding the rpc port (26657) on the cometbft container in the respective cluster.
 The cometbft container is found in the `global-domain-x-cometbft` pod, where x is the migration ID.
@@ -2063,12 +2063,12 @@ The output should look something like the example below:
     "sv": "Digital-Asset-Eng-4",
   },
   ...
-]  
+]
 ```
 
 This output can be used to find the proposer address from the consensus_state endpoint and find the associated SV.
 
-### 
+###
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

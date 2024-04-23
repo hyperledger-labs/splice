@@ -13,6 +13,7 @@ Upcoming
 * Fix a bug where the namespace triggers did not get started on SV’s
   with ``migrating: true`` which prevented new SVs from being
   onboarded after domain migrations.
+* Updated SV and validator runbooks with network-wide disaster recovery instructions.
 
 0.1.4
 -----
