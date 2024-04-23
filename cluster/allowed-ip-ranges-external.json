@@ -52,7 +52,12 @@
       ],
       "Canton Network Registry App": ["34.65.140.146/32"],
       "Daml Hub DevNet Validator": ["35.193.111.3/32"],
-      "Digital Asset Wallet Validator": ["34.70.233.135/32"]
+      "Digital Asset Wallet Validator": ["34.70.233.135/32"],
+      "Tradeweb": [
+        "54.197.110.228/32",
+        "23.23.157.199/32",
+        "3.214.156.145/32"
+      ]
     }
   },
   "testnet": {
