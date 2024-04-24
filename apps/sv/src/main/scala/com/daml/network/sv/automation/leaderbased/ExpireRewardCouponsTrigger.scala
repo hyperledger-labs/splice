@@ -51,13 +51,13 @@ class ExpireRewardCouponsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      numCmds <- expireRewardCouponsForRound(
+      numCoupons <- expireRewardCouponsForRound(
         expiredRewardsTask,
         dsoRules,
         amuletRules,
       )
     } yield TaskSuccess(
-      show"Expired ${numCmds} old reward coupons for closed round ${expiredRewardsTask}"
+      show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
     )
   }
 
@@ -68,55 +68,63 @@ class ExpireRewardCouponsTrigger(
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
-    val validatorRewardCmd = dsoRules.exercise(
-      _.exerciseDsoRules_ClaimExpiredRewards(
-        amuletRules.contractId,
-        new AmuletRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRoundCid,
-          expiredRewardsTask.validatorCoupons.asJava,
-          Seq.empty.asJava,
-          Seq.empty.asJava,
-          None.toJava,
-        ),
+    val validatorRewardCmd = Seq(
+      dsoRules.exercise(
+        _.exerciseDsoRules_ClaimExpiredRewards(
+          amuletRules.contractId,
+          new AmuletRules_ClaimExpiredRewards(
+            expiredRewardsTask.closedRoundCid,
+            expiredRewardsTask.validatorCoupons.asJava,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            None.toJava,
+          ),
+        )
       )
-    )
-    val validatorFaucetCmd = dsoRules.exercise(
-      _.exerciseDsoRules_ClaimExpiredRewards(
-        amuletRules.contractId,
-        new AmuletRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRoundCid,
-          Seq.empty.asJava,
-          Seq.empty.asJava,
-          Seq.empty.asJava,
-          Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
-        ),
+    ).filter(_ => expiredRewardsTask.validatorCoupons.nonEmpty)
+    val validatorFaucetCmd = Seq(
+      dsoRules.exercise(
+        _.exerciseDsoRules_ClaimExpiredRewards(
+          amuletRules.contractId,
+          new AmuletRules_ClaimExpiredRewards(
+            expiredRewardsTask.closedRoundCid,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
+          ),
+        )
       )
-    )
-    val appRewardCmd = dsoRules.exercise(
-      _.exerciseDsoRules_ClaimExpiredRewards(
-        amuletRules.contractId,
-        new AmuletRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRoundCid,
-          Seq.empty.asJava,
-          expiredRewardsTask.appCoupons.asJava,
-          Seq.empty.asJava,
-          None.toJava,
-        ),
+    ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
+    val appRewardCmd = Seq(
+      dsoRules.exercise(
+        _.exerciseDsoRules_ClaimExpiredRewards(
+          amuletRules.contractId,
+          new AmuletRules_ClaimExpiredRewards(
+            expiredRewardsTask.closedRoundCid,
+            Seq.empty.asJava,
+            expiredRewardsTask.appCoupons.asJava,
+            Seq.empty.asJava,
+            None.toJava,
+          ),
+        )
       )
-    )
-    val svRewardCmd = dsoRules.exercise(
-      _.exerciseDsoRules_ClaimExpiredRewards(
-        amuletRules.contractId,
-        new AmuletRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRoundCid,
-          Seq.empty.asJava,
-          Seq.empty.asJava,
-          expiredRewardsTask.svRewardCoupons.asJava,
-          None.toJava,
-        ),
+    ).filter(_ => expiredRewardsTask.appCoupons.nonEmpty)
+    val svRewardCmd = Seq(
+      dsoRules.exercise(
+        _.exerciseDsoRules_ClaimExpiredRewards(
+          amuletRules.contractId,
+          new AmuletRules_ClaimExpiredRewards(
+            expiredRewardsTask.closedRoundCid,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            expiredRewardsTask.svRewardCoupons.asJava,
+            None.toJava,
+          ),
+        )
       )
-    )
-    val cmds = Seq(validatorRewardCmd, appRewardCmd, svRewardCmd, validatorFaucetCmd)
+    ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)
+    val cmds = Seq(validatorRewardCmd, appRewardCmd, svRewardCmd, validatorFaucetCmd).flatten
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>
@@ -130,6 +138,6 @@ class ExpireRewardCouponsTrigger(
             .yieldResult()
         )
       )
-    } yield cmds.size
+    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size
   }
 }
