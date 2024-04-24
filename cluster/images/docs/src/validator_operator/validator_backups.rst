@@ -31,12 +31,11 @@ Backups of postgres instances
 +++++++++++++++++++++++++++++
 
 To backup a validator node, please make sure that all Postgres instances are
-backed up at least every 4 hours. We will provide guidelines on retention of
-older backups at a later point in time. While most backups can be taken
-independently, there is one strict ordering requirement between them: **The
-backup of the apps postgres instance must be taken at a point in time strictly
-earlier than that of the participant**. Please make sure the apps instance backup
-is completed before starting the participant one.
+backed up at least every 4 hours. Note that there is a strict order requirement
+between the backups: **the backup of the apps postgres instance must be taken at
+a point in time strictly earlier than that of the participant**.
+Please make sure the apps instance backup is completed before starting the participant one.
+We will provide guidelines on retention of older backups at a later point in time.
 
 If you are running your own Postgres instances in the cluster, backups can be
 taken either using tools like pgdump, or through snapshots of the underlying
