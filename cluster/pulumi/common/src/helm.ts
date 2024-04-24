@@ -1,4 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as inputs from '@pulumi/kubernetes/types/input';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
@@ -210,7 +211,7 @@ function versionString(version: CnChartVersion, nsLogicalName: string, chartPath
   }
 }
 
-function repositoryOpts(version: CnChartVersion) {
+export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
   if (version.type === 'local') {
     return undefined;
   } else {

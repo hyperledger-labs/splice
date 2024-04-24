@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { defaultVersion, repositoryOpts } from 'cn-pulumi-common/src';
 import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 
 import { chartPath, loadIPRanges } from '../../common';
@@ -268,7 +269,9 @@ function configureGateway(
       name: 'cluster-gateway',
       namespace: ingressNs.metadata.name,
       // We always install the local chart for this
-      chart: chartPath('cn-istio-gateway', { type: 'local' }),
+      chart: chartPath('cn-istio-gateway', defaultVersion),
+      version: defaultVersion.type == 'remote' ? defaultVersion.version : undefined,
+      repositoryOpts: repositoryOpts(defaultVersion),
       values: {
         cluster: {
           hostname: `${clusterBasename}.network.canton.global`,
