@@ -3,19 +3,46 @@ package com.daml.network.integration.tests.runbook
 import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.util.{Auth0Util, K8sUtil}
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.typesafe.scalalogging.Logger
 import monocle.macros.syntax.lens.*
-import org.scalatest.OptionValues.*
 
+import scala.concurrent.duration.*
 import java.io.IOException
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.net.{HttpURLConnection, URI}
 
-trait PreflightIntegrationTestUtil extends DomainMigrationIntegrationTestUtil {
+trait PreflightIntegrationTestUtil
+    extends CNNodeTestCommon
+    with DomainMigrationIntegrationTestUtil {
 
   // We cache this because we only need it for one test case in each suite
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var validatorOnboardingSecret: Option[String] = None
+
+  // Give more time to the checks in cluster preflights, to account for slower domains
+  private val preflightTimeUntilSuccess: FiniteDuration = 40.seconds
+
+  override def eventually[T](
+      timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,
+      maxPollInterval: FiniteDuration = 5.seconds,
+      retryOnTestFailuresOnly: Boolean = true,
+  )(testCode: => T): T =
+    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly)(testCode)
+
+  override def eventuallySucceeds[T](
+      timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T): T = super.eventuallySucceeds(timeUntilSuccess, maxPollInterval)(testCode)
+
+  override def actAndCheck[T, U](
+      timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(
+      action: String,
+      actionExpr: => T,
+  )(check: String, checkFun: T => U): (T, U) =
+    super.actAndCheck(timeUntilSuccess, maxPollInterval)(action, actionExpr)(check, checkFun)
 
   protected def getAuth0ClientCredential(
       clientId: String,

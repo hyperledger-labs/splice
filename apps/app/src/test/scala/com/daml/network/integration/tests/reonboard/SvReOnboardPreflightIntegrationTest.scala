@@ -4,7 +4,10 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.integration.tests.runbook.SvUiIntegrationTestUtil
+import com.daml.network.integration.tests.runbook.{
+  SvUiIntegrationTestUtil,
+  PreflightIntegrationTestUtil,
+}
 import com.daml.network.sv.util.AnsUtil.entryNameSuffix
 import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -15,6 +18,7 @@ class SvReOnboardPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("validator", "sv")
     with SvUiIntegrationTestUtil
     with SvFrontendTestUtil
+    with PreflightIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil {
 

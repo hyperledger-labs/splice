@@ -12,6 +12,7 @@ import scala.concurrent.duration.DurationInt
   */
 class DsoPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    with PreflightIntegrationTestUtil
     with SvUiIntegrationTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
