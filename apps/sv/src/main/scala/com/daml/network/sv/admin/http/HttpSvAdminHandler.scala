@@ -274,7 +274,7 @@ class HttpSvAdminHandler(
       for {
         voteResults <- dsoStore.listVoteRequestResults(
           body.actionName,
-          body.executed,
+          body.accepted,
           body.requester,
           body.effectiveFrom,
           body.effectiveTo,

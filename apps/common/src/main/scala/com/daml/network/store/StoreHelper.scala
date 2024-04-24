@@ -8,19 +8,14 @@ import java.time.Instant
 sealed trait VoteRequestOutcome {
   val effectiveAt: Option[Instant]
 }
-case class Executed(effectiveAt: Option[Instant]) extends VoteRequestOutcome
-case class NotExecuted(effectiveAt: Option[Instant]) extends VoteRequestOutcome
+case class Accepted(effectiveAt: Option[Instant]) extends VoteRequestOutcome
 case class Rejected(effectiveAt: Option[Instant]) extends VoteRequestOutcome
 
 object VoteRequestOutcome {
   def parse(outcome: VRO): VoteRequestOutcome = {
     outcome match {
       case request: VRO_Accepted =>
-        if (request.effectiveAt.isBefore(Instant.now())) {
-          Executed(Some(request.effectiveAt))
-        } else {
-          NotExecuted(Some(request.effectiveAt))
-        }
+        Accepted(Some(request.effectiveAt))
       case _ => Rejected(None)
     }
   }

@@ -706,7 +706,7 @@ components:
       properties:
         actionName:
           type: string
-        executed:
+        accepted:
           type: boolean
         requester:
           type: string

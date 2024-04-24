@@ -4,7 +4,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.VoteRequest
 import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
-import com.daml.network.store.{Executed, StoreErrors, VoteRequestOutcome}
+import com.daml.network.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.sv.store.{ErrorTxLogEntry, TxLogEntry, VoteRequestTxLogEntry}
 import com.daml.network.util.Contract
@@ -90,14 +90,14 @@ object DsoTables extends AcsTables with NamedLogging {
   case class DsoTxLogRowData(
       entry: TxLogEntry,
       actionName: Option[String],
-      executed: Option[Boolean],
+      accepted: Option[Boolean],
       requester: Option[String],
       effectiveAt: Option[String],
       votedAt: Option[String],
   ) extends TxLogRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "action_name" -> actionName.map(lengthLimited),
-      "executed" -> executed,
+      "accepted" -> accepted,
       "requester_name" -> requester.map(lengthLimited),
       "effective_at" -> effectiveAt.map(lengthLimited),
       "voted_at" -> votedAt.map(lengthLimited),
@@ -112,7 +112,7 @@ object DsoTables extends AcsTables with NamedLogging {
           DsoTxLogRowData(
             entry = err,
             actionName = None,
-            executed = None,
+            accepted = None,
             requester = None,
             effectiveAt = None,
             votedAt = None,
@@ -122,8 +122,8 @@ object DsoTables extends AcsTables with NamedLogging {
           DsoTxLogRowData(
             entry = vr,
             actionName = Some(TxLogEntry.mapActionName(result.request.action)),
-            executed = Some(VoteRequestOutcome.parse(result.outcome) match {
-              case _: Executed => true
+            accepted = Some(VoteRequestOutcome.parse(result.outcome) match {
+              case _: Accepted => true
               case _ => false
             }),
             requester = Some(result.request.requester),

@@ -213,7 +213,7 @@ const ListVoteRequests: React.FC = () => {
           tableType={'Planned'}
           openModalWithVoteResult={openModalWithVoteResult}
           validityColumnName={'Effective At'}
-          executed={false}
+          accepted
           effectiveFrom={now}
         />
       </TabPanel>
@@ -223,7 +223,7 @@ const ListVoteRequests: React.FC = () => {
           tableBodyId={'sv-vote-results-executed-table-body'}
           tableType={'Executed'}
           openModalWithVoteResult={openModalWithVoteResult}
-          executed
+          accepted
         />
       </TabPanel>
       <TabPanel value={value} index={4}>
@@ -232,8 +232,8 @@ const ListVoteRequests: React.FC = () => {
           tableBodyId={'sv-vote-results-rejected-table-body'}
           tableType={'Rejected'}
           openModalWithVoteResult={openModalWithVoteResult}
-          validityColumnName={'Not Executed At'}
-          executed={false}
+          validityColumnName={'Rejected At'}
+          accepted={false}
         />
       </TabPanel>
       <Modal

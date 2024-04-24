@@ -17,7 +17,6 @@ import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/mat
 import TableCell from '@mui/material/TableCell';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
-import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
@@ -252,11 +251,7 @@ const DsoViewPrettyJSON = () => {
         <GeneralInformationView />
       </TabPanel>
       <TabPanel value={value} index={1}>
-        <JSONPretty
-          id="dso-rules-information"
-          style={{ fontSize: '10pt' }}
-          data={DsoRules.encode(dsoInfoData?.dsoRules.payload!)}
-        />
+        <JSONPretty id="dso-rules-information" style={{ fontSize: '10pt' }} data={dsoInfoData} />
       </TabPanel>
       <TabPanel value={value} index={2}>
         <JSONPretty

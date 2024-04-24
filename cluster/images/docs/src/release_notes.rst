@@ -6,6 +6,7 @@ Release Notes
 Upcoming
 --------
 
+* Fixed the SV UI to show node status information in the DSO info tab and display AmuletConfigChange vote requests that were executed.
 * Removed PVC size overrides in example `postgres-values-participant.yaml` and `postgres-values-sequencer.yaml` files. The Postgres instances used by the participant and sequencer should use the default size instead (1300Gi).
 * Updated the scan UI to show recent activity in a way that is more consistent and matches the actual activity on the ledger.
   Note that all transfers recorded in the past will show as having no sv rewards.

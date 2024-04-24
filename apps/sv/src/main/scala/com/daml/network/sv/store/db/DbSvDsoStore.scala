@@ -1196,7 +1196,7 @@ class DbSvDsoStore(
 
   override def listVoteRequestResults(
       actionName: Option[String],
-      executed: Option[Boolean],
+      accepted: Option[Boolean],
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
@@ -1210,8 +1210,8 @@ class DbSvDsoStore(
         sql"""and action_name like ${lengthLimited(s"%${lengthLimited(actionName)}%")}"""
       case None => sql""""""
     }
-    val executedCondition = executed match {
-      case Some(executed) => sql"""and executed = ${executed}"""
+    val executedCondition = accepted match {
+      case Some(accepted) => sql"""and accepted = ${accepted}"""
       case None => sql""""""
     }
     val effectivenessCondition = (effectiveFrom, effectiveTo) match {

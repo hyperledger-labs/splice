@@ -89,7 +89,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   def listVoteRequestResults(
       actionName: Option[String],
-      executed: Option[Boolean],
+      accepted: Option[Boolean],
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],

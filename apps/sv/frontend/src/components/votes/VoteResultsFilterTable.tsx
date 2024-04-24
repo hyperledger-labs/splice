@@ -33,7 +33,7 @@ interface ListVoteResultsTableProps {
   tableBodyId: string;
   tableType: VoteRequestResultTableType;
   openModalWithVoteResult: (action: ActionRequiringConfirmation) => void;
-  executed: boolean;
+  accepted: boolean;
   effectiveFrom?: string;
   effectiveTo?: string;
   validityColumnName?: string;
@@ -44,7 +44,7 @@ type VoteRequestResultRow = {
   actionName: string;
   requester: string;
   expiresAt: Date;
-  votedAt: Date;
+  effectiveAt: Date;
   idx: number;
   action: ActionRequiringConfirmation;
   expired: boolean;
@@ -52,7 +52,7 @@ type VoteRequestResultRow = {
 };
 
 type VoteResultQueryOptions = {
-  executed?: boolean;
+  accepted?: boolean;
   effectiveTo?: string;
   effectiveFrom?: string;
   actionName?: string;
@@ -66,13 +66,13 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   tableBodyId,
   tableType,
   openModalWithVoteResult,
-  executed,
+  accepted,
   effectiveFrom,
   effectiveTo,
   validityColumnName,
 }) => {
   const [queryOptions, setQueryOptions] = useState<VoteResultQueryOptions>({
-    executed: executed,
+    accepted: accepted,
     effectiveTo: effectiveTo,
     effectiveFrom: effectiveFrom,
   });
@@ -87,25 +87,25 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     );
     setRows(rows);
     setQueryOptions({
-      executed: executed,
+      accepted: accepted,
       effectiveTo: effectiveTo,
       effectiveFrom: effectiveFrom,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voteResultsQuery.data, effectiveTo, effectiveFrom, executed]);
+  }, [voteResultsQuery.data, effectiveTo, effectiveFrom, accepted]);
 
   const onFilterChange = (filterModel: GridFilterModel) => {
     if (filterModel.items.length > 0) {
       if (filterModel.items[0].field === 'actionName') {
         setQueryOptions({
-          executed: executed,
+          accepted: accepted,
           effectiveTo: effectiveTo,
           effectiveFrom: effectiveFrom,
           actionName: filterModel.items[0].value,
         });
       } else if (filterModel.items[0].field === 'requester') {
         setQueryOptions({
-          executed: executed,
+          accepted: accepted,
           effectiveTo: effectiveTo,
           effectiveFrom: effectiveFrom,
           requester: filterModel.items[0].value,
@@ -140,7 +140,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
         );
       },
     },
-    { field: 'executed', headerName: 'Executed', width: 120, filterable: false },
+    { field: 'accepted', headerName: 'Accepted', width: 120, filterable: false },
     { field: 'expired', headerName: 'Expired', width: 120, filterable: false },
     {
       field: 'requester',
@@ -157,7 +157,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       },
     },
     {
-      field: 'expiresAt',
+      field: 'effectiveAt',
       headerName: validityColumnName ? validityColumnName : 'Executed At',
       width: 200,
       type: 'date',
@@ -166,8 +166,8 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       },
     },
     {
-      field: 'votedAt',
-      headerName: 'Voted At',
+      field: 'expiresAt',
+      headerName: 'Expired At',
       width: 200,
       type: 'date',
       renderCell: (params: GridRenderCellParams) => {
@@ -234,12 +234,15 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
         })
       : [];
     return parsedVoteResults
-      ? parsedVoteResults.map((result, index) => ({
+      ? parsedVoteResults.map((result: DsoRules_CloseVoteRequestResult, index) => ({
           id: index,
           actionName: getAction(result.request.action, false),
           requester: result.request.requester,
           expiresAt: new Date(result.request.voteBefore),
-          votedAt: new Date(result.completedAt),
+          effectiveAt: new Date(
+            (result.outcome.tag === 'VRO_Accepted' && result.outcome.value.effectiveAt) ||
+              result.completedAt
+          ),
           idx: index,
           action: result.request.action,
           expired: result.outcome.tag === 'VRO_Expired',
@@ -251,7 +254,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   function getQueryOptionsFromDateFilter(item: GridFilterItem): VoteResultQueryOptions {
     if (item.operator.includes('after')) {
       return {
-        executed: executed,
+        accepted: accepted,
         effectiveTo: effectiveTo ? effectiveTo : undefined,
         effectiveFrom: effectiveFrom
           ? dayjs(effectiveFrom).isBefore(dayjs(item.value))
@@ -261,7 +264,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       };
     } else if (item.operator.includes('before')) {
       return {
-        executed: executed,
+        accepted: accepted,
         effectiveTo: effectiveTo
           ? dayjs(effectiveTo).isAfter(dayjs(item.value))
             ? dayjs(item.value).format('YYYY-MM-DDTHH:mm:ss[Z]')
@@ -271,7 +274,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       };
     } else {
       return {
-        executed: executed,
+        accepted: accepted,
         effectiveTo: effectiveTo ? effectiveTo : undefined,
         effectiveFrom: effectiveFrom ? effectiveFrom : undefined,
       };
@@ -290,7 +293,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
         initialState={{
           pagination: { paginationModel: { pageSize: 5 } },
           columns: {
-            columnVisibilityModel: { votedAt: false, executed: false },
+            columnVisibilityModel: { votedAt: false, accepted: false },
           },
         }}
         pageSizeOptions={[5, 10, 25]}

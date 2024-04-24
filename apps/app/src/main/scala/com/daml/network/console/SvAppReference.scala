@@ -193,7 +193,7 @@ abstract class SvAppReference(
   @Help.Summary("List vote results")
   def listVoteRequestResults(
       actionName: Option[String],
-      executed: Option[Boolean],
+      accepted: Option[Boolean],
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
@@ -203,7 +203,7 @@ abstract class SvAppReference(
       httpCommand(
         HttpSvAdminAppClient.ListVoteRequestResults(
           actionName,
-          executed,
+          accepted,
           requester,
           effectiveFrom,
           effectiveTo,

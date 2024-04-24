@@ -278,7 +278,7 @@ object HttpSvAdminAppClient {
 
   case class ListVoteRequestResults(
       actionName: Option[String],
-      executed: Option[Boolean],
+      accepted: Option[Boolean],
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
@@ -294,7 +294,7 @@ object HttpSvAdminAppClient {
       client.listVoteRequestResults(
         body = definitions.ListVoteResultsRequest(
           actionName,
-          executed,
+          accepted,
           requester,
           effectiveFrom,
           effectiveTo,

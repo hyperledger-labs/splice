@@ -55,8 +55,10 @@ describe('SV user can', () => {
     expect(screen.queryByText('nextScheduledSynchronizerUpgrade')).toBeNull();
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
   });
+});
 
-  test('AddFutureAmuletConfigSchedule defaults to the current amulet configuration', async () => {
+describe('An AddFutureAmuletConfigSchedule request', () => {
+  test('defaults to the current amulet configuration', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -72,5 +74,21 @@ describe('SV user can', () => {
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
     expect(await screen.findByDisplayValue('4815162342')).toBeDefined();
+  });
+
+  test('is displayed in executed section when its effective date is in the past', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
+
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    expect(await screen.findByText('Governance')).toBeDefined();
+
+    expect(await screen.findByText('Executed')).toBeDefined();
+    await user.click(screen.getByText('Executed'));
+
+    expect(await screen.findByText('CRARC_AddFutureAmuletConfigSchedule')).toBeDefined();
   });
 });

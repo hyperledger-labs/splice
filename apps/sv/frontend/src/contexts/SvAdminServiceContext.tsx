@@ -54,7 +54,7 @@ export interface SvAdminClient {
     requester?: string,
     effectiveFrom?: string,
     effectiveTo?: string,
-    executed?: boolean
+    accepted?: boolean
   ) => Promise<ListDsoRulesVoteResultsResponse>;
   lookupDsoRulesVoteRequest: (
     voteRequestContractId: string
@@ -135,11 +135,11 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         requester?: string,
         effectiveFrom?: string,
         effectiveTo?: string,
-        executed?: boolean
+        accepted?: boolean
       ): Promise<ListDsoRulesVoteResultsResponse> => {
         const request: ListVoteResultsRequest = {
           actionName: actionName,
-          executed: executed,
+          accepted: accepted,
           requester: requester,
           effectiveFrom: effectiveFrom,
           effectiveTo: effectiveTo,
