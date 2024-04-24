@@ -13,16 +13,12 @@ import {
   loadYamlFromFile,
   svKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
+  ApprovedSvIdentity,
+  daSupportApprovedIdentities,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
-import {
-  ApprovedSvIdentity,
-  InstalledSv,
-  SequencerPruningConfig,
-  SvOnboarding,
-  installSvNode,
-} from './sv';
+import { InstalledSv, SequencerPruningConfig, SvOnboarding, installSvNode } from './sv';
 import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 
 interface DsoArgs {
@@ -127,13 +123,13 @@ export class Dso extends pulumi.ComponentResource {
       };
     }, {});
 
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(keys).map(
-      ([onboardingName, keys]) => ({
+    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(keys)
+      .map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
         name: onboardingName,
         publicKey: keys.publicKey,
         rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
-      })
-    );
+      }))
+      .concat(daSupportApprovedIdentities);
 
     const founderCometBftConf = { ...founderConf.cometBft, nodeName: founderConf.nodeName };
     const peerCometBftConfs = restSvConfs.map(conf => ({

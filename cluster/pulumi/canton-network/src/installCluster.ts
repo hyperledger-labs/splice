@@ -15,13 +15,13 @@ import {
   defaultVersion,
   ExpectedValidatorOnboarding,
   preApproveValidatorRunbook,
+  ApprovedSvIdentity,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { Dso } from './dso';
 import { installSplitwell } from './splitwell';
-import { ApprovedSvIdentity } from './sv';
 import svConfigs from './svConfigs';
 import { installValidator1 } from './validator1';
 

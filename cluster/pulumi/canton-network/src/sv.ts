@@ -33,6 +33,7 @@ import {
   SvIdKey,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
+  ApprovedSvIdentity,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -88,12 +89,6 @@ export type SvOnboarding =
       sponsorRelease: pulumi.Resource;
       sponsorApiUrl: string;
     };
-
-export type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string | pulumi.Output<string>;
-  rewardWeightBps: number;
-};
 
 export type SequencerPruningConfig = {
   enabled: boolean;

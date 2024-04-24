@@ -34,6 +34,8 @@ import {
   svOnboardingPollingInterval,
   defaultVersion,
   disableCantonAutoInit,
+  ApprovedSvIdentity,
+  daSupportApprovedIdentities,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -55,11 +57,6 @@ if (singleSv) {
 type BootstrapCliConfig = {
   cluster: string;
   date: string;
-};
-
-type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string;
 };
 
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
@@ -295,7 +292,7 @@ async function installSvAndValidator(
 
   const approvedSvIdentities = singleSv
     ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
-    : allApprovedSvIdentities;
+    : allApprovedSvIdentities.concat(daSupportApprovedIdentities);
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,

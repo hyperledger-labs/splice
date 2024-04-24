@@ -15,6 +15,27 @@ export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 export const CHARTS_VERSION = process.env.CHARTS_VERSION;
 
+export const approveDaSupportSvNode = envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
+
+const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
+
+export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
+  ? [
+      {
+        name: 'Digital-Asset-Support-SV',
+        publicKey:
+          'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAED20NyAmxCu7clk65HyRQlqXO0GrPeDqVhNWPNyPvOjLwnwwyVXiwBB5yVJTldOi6AJKZM8bowIcLSwoccIiPKA==',
+        rewardWeightBps: 10000, // dummy weight
+      },
+    ]
+  : [];
+
+export type ApprovedSvIdentity = {
+  name: string;
+  publicKey: string | pulumi.Output<string>;
+  rewardWeightBps: number;
+};
+
 /// Environment variables
 
 export function requireEnv(name: string, msg = ''): string {
@@ -181,13 +202,13 @@ export function loadIPRanges(): string[] {
   );
 
   if (isDevNet) {
-    return extractIpRanges(externalIPRangesJson.devnet).concat(
-      extractIpRanges(internalIPRangesJson.devnet)
-    );
+    return extractIpRanges(externalIPRangesJson.devnet)
+      .concat(extractIpRanges(internalIPRangesJson.devnet))
+      .concat(daSupportNodeIpRanges);
   } else {
-    return extractIpRanges(externalIPRangesJson.testnet).concat(
-      extractIpRanges(internalIPRangesJson.testnet)
-    );
+    return extractIpRanges(externalIPRangesJson.testnet)
+      .concat(extractIpRanges(internalIPRangesJson.testnet))
+      .concat(daSupportNodeIpRanges);
   }
 }
 
