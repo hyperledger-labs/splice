@@ -18,7 +18,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
@@ -196,30 +196,61 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     }
   }
 
-  protected def isOnboarded(
+  protected def isOnboardedInDsoRules(
       svcStore: SvDsoStore
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = for {
     dsoRules <- svcStore.lookupDsoRules()
     isInDsoRulesMembers = dsoRules.exists(
       _.payload.svs.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
     )
-    isMemberOfDecentralizedNamespace <-
-      if (isInDsoRulesMembers) {
-        participantAdminConnection
-          .getDecentralizedNamespaceDefinition(
-            dsoRules
-              .map(_.domain)
-              .getOrElse(
-                throw Status.NOT_FOUND
-                  .withDescription("Domain not found in DsoRules")
-                  .asRuntimeException()
-              ),
-            svcStore.key.dsoParty.uid.namespace,
-          )
-          .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
-      } else {
-        Future.successful(false)
+  } yield isInDsoRulesMembers
+
+  protected def checkIsInDecentralizedNamespaceAndStartTrigger(
+      dsoAutomation: SvDsoAutomationService,
+      dsoStore: SvDsoStore,
+      domainId: DomainId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    retryProvider
+      .ensureThatB(
+        RetryFor.WaitingOnInitDependency,
+        "dso_onboard_namespace",
+        s"the namespace of ${dsoStore.key.svParty} is part of the decentralized namespace",
+        isOnboardedInDecentralizedNamespace(dsoStore), {
+          for {
+            _ <- participantAdminConnection
+              .ensureDecentralizedNamespaceDefinitionProposalAccepted(
+                domainId,
+                dsoStore.key.dsoParty.uid.namespace,
+                dsoStore.key.svParty.uid.namespace,
+                dsoStore.key.svParty.uid.namespace.fingerprint,
+                RetryFor.WaitingOnInitDependency,
+              )
+          } yield ()
+        },
+        logger,
+      )
+      .map { _ =>
+        logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
+        dsoAutomation.registerSvNamespaceMembershipTrigger()
       }
-  } yield isInDsoRulesMembers && isMemberOfDecentralizedNamespace
+
+  private def isOnboardedInDecentralizedNamespace(
+      svcStore: SvDsoStore
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = for {
+    dsoRules <- svcStore.lookupDsoRules()
+    isMemberOfDecentralizedNamespace <-
+      participantAdminConnection
+        .getDecentralizedNamespaceDefinition(
+          dsoRules
+            .map(_.domain)
+            .getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription("Domain not found in DsoRules")
+                .asRuntimeException()
+            ),
+          svcStore.key.dsoParty.uid.namespace,
+        )
+        .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
+  } yield isMemberOfDecentralizedNamespace
 
 }

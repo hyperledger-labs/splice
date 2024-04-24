@@ -212,7 +212,7 @@ class FoundingNodeInitializer(
       // Only start the triggers once DsoRules and AmuletRules have been bootstrapped
       _ = dsoAutomation.registerPostOnboardingTriggers()
       _ = dsoAutomation.registerPostSequencerInitTriggers()
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore)
+      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore, domainId)
       // The previous foundCollective step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
       // for example if the founding SV node restarted after bootstrapping the DsoRules.
@@ -234,20 +234,24 @@ class FoundingNodeInitializer(
   private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
+      domainId: DomainId,
   )(implicit traceContext: TraceContext) =
     retryProvider
       .ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "dso_onboard",
-        show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
-        isOnboarded(dsoStore),
+        show"the DsoRules list the SV party ${dsoStore.key.svParty}",
+        isOnboardedInDsoRules(dsoStore),
         Future.successful({}),
         logger,
       )
-      .andThen(_ => {
-        logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
-        dsoAutomation.registerSvNamespaceMembershipTrigger()
-      })
+      .flatMap { _ =>
+        checkIsInDecentralizedNamespaceAndStartTrigger(
+          dsoAutomation,
+          dsoStore,
+          domainId,
+        )
+      }
 
   private def setupDsoParty(
       domain: DomainId,
