@@ -15,6 +15,7 @@ Upcoming
   with ``migrating: true`` which prevented new SVs from being
   onboarded after domain migrations.
 * Updated SV and validator runbooks with network-wide disaster recovery instructions.
+* introduced a `vpns` section in the IP whitelists json file, replacing the `infra.vpn` one.
 
 0.1.4
 -----
