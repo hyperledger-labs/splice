@@ -20,8 +20,10 @@ trait PreflightIntegrationTestUtil
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var validatorOnboardingSecret: Option[String] = None
 
-  // Give more time to the checks in cluster preflights, to account for slower domains
-  private val preflightTimeUntilSuccess: FiniteDuration = 40.seconds
+  // Give more time to the checks in cluster preflights on devnet only, to account for slower domains
+  private def preflightTimeUntilSuccess: FiniteDuration = {
+    sys.env.get("PREFLIGHT_DEFAULT_TIMEOUT_SECONDS").getOrElse("20").toInt.seconds
+  }
 
   override def eventually[T](
       timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,
