@@ -9,6 +9,24 @@ recover, e.g. due to misconfiguration or bugs. In such cases, we will need to
 restore a component, a full validator node, or even the whole network, from
 backups or from dumps from components that are still operational.
 
+Backup of Node Identities
++++++++++++++++++++++++++
+
+Once your validator node is up and onboarded, please make sure to backup the node identities of your node. **Note that this information
+is highly sensitive, and contains the private keys of your participant,** so make sure to store it in
+a secure location, such as a Secret Manager. On the other hand, it is crucial for maintaining your identity (and thus, e.g.
+access to your Canton Coin holdings), so must be backed up outside of the cluster.
+
+Your identites may be fetched from your node through the following endpoint:
+
+.. code-block:: bash
+
+    curl 'https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/participant/identities' -H 'authorization: Bearer <token>'
+
+where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app,
+as obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
+
+
 Backups of postgres instances
 +++++++++++++++++++++++++++++
 
