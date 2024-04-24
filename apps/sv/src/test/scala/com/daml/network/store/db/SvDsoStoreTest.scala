@@ -54,7 +54,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
 import com.daml.network.sv.history.DsoRulesCloseVoteRequest
 import com.daml.network.sv.store.db.DbSvDsoStore
-import com.daml.network.sv.store.SvDsoStore.IdleAnsSubscription
+import com.daml.network.sv.store.SvDsoStore.{IdleAnsSubscription, RoundCounterpartyBatch}
 import com.daml.network.sv.store.{SvStore, SvDsoStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
@@ -469,17 +469,31 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsGroupedByCounterparty(
-            roundNumber = 3,
-            roundDomain = dummyDomain,
+            domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result.map(_.toSet).toSet should be(
-            Set(
-              provider1InRound.map(_.contractId).toSet,
-              provider2InRound.map(_.contractId).toSet,
-            )
-          )
+          result should have size 4
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 3
+            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 3
+            cids.toSet shouldBe provider2InRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 2
+            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 2
+            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet
+          }
         }
       }
 
@@ -507,17 +521,31 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorRewardCouponsGroupedByCounterparty(
-            roundNumber = 3,
-            roundDomain = dummyDomain,
+            domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result.map(_.toSet).toSet should be(
-            Set(
-              provider1InRound.map(_.contractId).toSet,
-              provider2InRound.map(_.contractId).toSet,
-            )
-          )
+          result should have size 4
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 3
+            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 3
+            cids.toSet shouldBe provider2InRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 2
+            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 2
+            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet
+          }
         }
       }
 
@@ -547,20 +575,122 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorFaucetCouponsGroupedByCounterparty(
-            roundNumber = 3,
-            roundDomain = dummyDomain,
+            domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result.map(_.toSet).toSet should be(
-            Set(
-              validator1InRound.map(_.contractId).toSet,
-              validator2InRound.map(_.contractId).toSet,
-            )
-          )
+          result should have size 4
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 2
+            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 2
+            cids.toSet shouldBe validator2OutOfRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(1)
+            round shouldBe 3
+            cids.toSet shouldBe validator1InRound.map(_.contractId).toSet
+          }
+          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
+            user shouldBe userParty(2)
+            round shouldBe 3
+            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet
+          }
         }
       }
 
+    }
+
+    "getExpiredRewards" in {
+      val closedRound = closedMiningRound(dsoParty, 2)
+      val validatorFaucet1NotClosed =
+        (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 3))
+      val validatorFaucet2NotClosed =
+        (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 3))
+      val validatorFaucet1Closed = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 2))
+      val validatorFaucet2Closed = (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 2))
+
+      val validator1NotClosed = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
+      val validator2NotClosed = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
+      val validator1Closed = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
+      val validator2Closed = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(2)))
+
+      val app1NotClosed = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(1)))
+      val app2NotClosed = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(2)))
+      val app1Closed = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(1)))
+      val app2Closed = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(2)))
+
+      val sv1NotClosed =
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(1), userParty(1), 1000))
+      val sv2NotClosed =
+        (1 to 3).map(_ => svRewardCoupon(round = 3, userParty(2), userParty(2), 1000))
+      val sv1Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(1), userParty(1), 1000))
+      val sv2Closed = (1 to 3).map(_ => svRewardCoupon(round = 2, userParty(2), userParty(2), 1000))
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(closedRound)(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(
+          validatorFaucet1NotClosed ++ validatorFaucet2NotClosed ++ validatorFaucet1Closed ++ validatorFaucet2Closed
+        )(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        _ <- MonadUtil.sequentialTraverse(
+          validator1NotClosed ++ validator2NotClosed ++ validator1Closed ++ validator2Closed
+        )(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        _ <- MonadUtil.sequentialTraverse(
+          app1NotClosed ++ app2NotClosed ++ app1Closed ++ app2Closed
+        )(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        _ <- MonadUtil.sequentialTraverse(sv1NotClosed ++ sv2NotClosed ++ sv1Closed ++ sv2Closed)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.getExpiredRewards(
+          domain = dummyDomain,
+          enableExpireValidatorFaucet = true,
+          totalCouponsLimit = PageLimit.tryCreate(1000),
+        )
+        resultWithoutFaucet <- store.getExpiredRewards(
+          domain = dummyDomain,
+          enableExpireValidatorFaucet = false,
+          totalCouponsLimit = PageLimit.tryCreate(1000),
+        )
+      } yield {
+        result should have size 8
+        forAll(result)(_.closedRoundNumber shouldBe 2)
+        forExactly(2, result) { batch =>
+          batch.validatorCoupons should have size 3
+          batch.appCoupons should have size 0
+          batch.svRewardCoupons should have size 0
+          batch.validatorFaucets should have size 0
+        }
+        forExactly(2, result) { batch =>
+          batch.validatorCoupons should have size 0
+          batch.appCoupons should have size 3
+          batch.svRewardCoupons should have size 0
+          batch.validatorFaucets should have size 0
+        }
+        forExactly(2, result) { batch =>
+          batch.validatorCoupons should have size 0
+          batch.appCoupons should have size 0
+          batch.svRewardCoupons should have size 3
+          batch.validatorFaucets should have size 0
+        }
+        forExactly(2, result) { batch =>
+          batch.validatorCoupons should have size 0
+          batch.appCoupons should have size 0
+          batch.svRewardCoupons should have size 0
+          batch.validatorFaucets should have size 3
+        }
+        resultWithoutFaucet should have size 6
+        forAll(resultWithoutFaucet)(_.validatorFaucets should have size 0)
+      }
     }
 
     "listArchivableClosedMiningRounds" should {

@@ -43,7 +43,7 @@ import com.daml.network.sv.store.{
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
-
+import SvDsoStore.RoundCounterpartyBatch
 import scala.jdk.CollectionConverters.*
 import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
@@ -355,64 +355,59 @@ class DbSvDsoStore(
   }
 
   override def listAppRewardCouponsGroupedByCounterparty(
-      roundNumber: Long,
-      roundDomain: DomainId,
+      domain: DomainId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] =
+  ): Future[Seq[RoundCounterpartyBatch[AppRewardCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
       AppRewardCoupon.COMPANION,
-      roundNumber,
-      roundDomain,
+      domain,
       totalCouponsLimit,
     )
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
-      roundNumber: Long,
-      roundDomain: DomainId,
+      domain: DomainId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] =
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[RoundCounterpartyBatch[ValidatorRewardCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
       ValidatorRewardCoupon.COMPANION,
-      roundNumber,
-      roundDomain,
+      domain,
       totalCouponsLimit,
     )
 
   override def listValidatorFaucetCouponsGroupedByCounterparty(
-      roundNumber: Long,
-      roundDomain: DomainId,
+      domain: DomainId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorFaucetCoupon.ContractId]]] =
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[RoundCounterpartyBatch[ValidatorFaucetCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
       ValidatorFaucetCoupon.COMPANION,
-      roundNumber,
-      roundDomain,
+      domain,
       totalCouponsLimit,
     )
 
   override def listSvRewardCouponsGroupedByCounterparty(
-      roundNumber: Long,
-      roundDomain: DomainId,
+      domain: DomainId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[Seq[SvRewardCoupon.ContractId]]] =
+  )(implicit tc: TraceContext): Future[Seq[RoundCounterpartyBatch[SvRewardCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
       SvRewardCoupon.COMPANION,
-      roundNumber,
-      roundDomain,
+      domain,
       totalCouponsLimit,
     )
 
   private def listCouponsGroupedByCounterparty[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
-      roundNumber: Long,
-      roundDomain: DomainId,
+      domain: DomainId,
       totalCouponsLimit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Seq[Seq[TCId]]] = {
+  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[TCId]]] = {
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByCounterparty"
     waitUntilAcsIngested {
@@ -420,22 +415,27 @@ class DbSvDsoStore(
         result <- storage
           .query(
             sql"""
-                select reward_party, array_agg(contract_id)
+                select reward_party, reward_round, array_agg(contract_id)
                 from dso_acs_store
                 where store_id = $storeId
                   and migration_id = $domainMigrationId
                   and template_id_qualified_name = ${QualifiedName(templateId)}
-                  and assigned_domain = $roundDomain
-                  and reward_round = $roundNumber
+                  and assigned_domain = $domain
                   and reward_party is not null -- otherwise index is not used
-                group by reward_party
+                  and reward_round is not null -- otherwise index is not used
+                group by reward_round, reward_party
+                order by reward_round asc
                 limit ${sqlLimit(totalCouponsLimit)}
-               """.as[(PartyId, Array[ContractId[ValidatorRewardCoupon]])],
+               """.as[(PartyId, Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
-      } yield applyLimit(opName, totalCouponsLimit, result).map(
-        _._2.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq
-      )
+      } yield applyLimit(opName, totalCouponsLimit, result).map { case (party, round, batch) =>
+        RoundCounterpartyBatch(
+          party,
+          round,
+          batch.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq,
+        )
+      }
     }
   }
 
@@ -1272,6 +1272,37 @@ class DbSvDsoStore(
           .value
       } yield row.map(contractWithStateFromRow(AnsEntryContext.COMPANION)(_))
     }
+
+  override def listClosedRounds(
+      roundNumbers: Set[Long],
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
+  ] = {
+    if (roundNumbers.isEmpty)
+      Future.successful(Seq.empty)
+    else {
+      val roundNumbersClause = inClause(roundNumbers)
+      waitUntilAcsIngested {
+        for {
+          result <- storage
+            .query(
+              selectFromAcsTable(
+                DsoTables.acsTableName,
+                storeId,
+                domainMigrationId,
+                where = (sql"""template_id_qualified_name = ${QualifiedName(
+                    ClosedMiningRound.TEMPLATE_ID
+                  )} AND assigned_domain = $domainId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
+                orderLimit = sql"""limit ${sqlLimit(limit)}""",
+              ),
+              "listClosedRounds",
+            )
+        } yield result.map(contractFromRow(ClosedMiningRound.COMPANION)(_))
+      }
+    }
+  }
 
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext

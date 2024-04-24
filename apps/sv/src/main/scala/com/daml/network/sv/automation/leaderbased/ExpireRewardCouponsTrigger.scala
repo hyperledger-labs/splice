@@ -34,8 +34,10 @@ class ExpireRewardCouponsTrigger(
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[ExpiredRewardCouponsBatch]] =
-    store.getExpiredRewardsForOldestClosedMiningRound()
+  ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
+    dsoRules <- store.getDsoRules()
+    batches <- store.getExpiredRewards(dsoRules.domain, context.config.enableExpireValidatorFaucet)
+  } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
       tc: TraceContext
@@ -114,10 +116,7 @@ class ExpireRewardCouponsTrigger(
         ),
       )
     )
-    val cmds =
-      Seq(validatorRewardCmd, appRewardCmd, svRewardCmd) ++ Seq(validatorFaucetCmd).filter(_ =>
-        context.config.enableExpireValidatorFaucet
-      )
+    val cmds = Seq(validatorRewardCmd, appRewardCmd, svRewardCmd, validatorFaucetCmd)
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>
