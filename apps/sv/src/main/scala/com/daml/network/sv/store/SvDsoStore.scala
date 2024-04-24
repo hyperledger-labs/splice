@@ -1588,6 +1588,7 @@ case class ExpiredRewardCouponsBatch(
       param("closedRoundNumber", _.closedRoundNumber),
       customParam(inst => s"validatorCoupons: ${inst.validatorCoupons}"),
       customParam(inst => s"appCoupons: ${inst.appCoupons}"),
+      customParam(inst => s"svRewardCoupons: ${inst.svRewardCoupons}"),
       customParam(inst => s"validatorFaucetCoupons: ${inst.validatorFaucets}"),
     )
 }
