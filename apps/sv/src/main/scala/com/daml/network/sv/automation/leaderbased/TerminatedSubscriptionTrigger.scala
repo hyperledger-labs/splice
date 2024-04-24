@@ -32,6 +32,7 @@ class TerminatedSubscriptionTrigger(
     ]] {
 
   private val dsoParty = svTaskContext.dsoStore.key.dsoParty
+  private val svParty = svTaskContext.dsoStore.key.svParty
 
   override def completeTaskAsLeader(
       task: AssignedContract[
@@ -43,6 +44,7 @@ class TerminatedSubscriptionTrigger(
       ansEntryContextO <- svTaskContext.dsoStore.lookupAnsEntryContext(
         task.contract.payload.reference
       )
+      dsoRules <- svTaskContext.dsoStore.getDsoRules()
       _ <- ansEntryContextO match {
         case None =>
           throw Status.NOT_FOUND
@@ -54,22 +56,21 @@ class TerminatedSubscriptionTrigger(
           for {
             _ <- svTaskContext.connection
               .submit(
+                Seq(svParty),
                 Seq(dsoParty),
-                Seq.empty,
-                ansEntryContext.exercise(
-                  _.exerciseAnsEntryContext_Terminate(
-                    dsoParty.toProtoPrimitive,
-                    task.contract.contractId,
+                dsoRules.exercise(
+                  _.exerciseDsoRules_TerminateSubscription(
+                    ansEntryContext.contractId,
+                    task.contractId,
                   )
                 ),
               )
-              .withDomainId(task.domain)
               .noDedup
               .yieldUnit()
           } yield ()
       }
     } yield TaskSuccess(
-      "Archived AnsEntrytContext because corresponding subscription got terminated"
+      "Archived AnsEntryContext because corresponding subscription got terminated"
     )
   }
 }

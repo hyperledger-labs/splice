@@ -45,6 +45,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
+      // TODO(#11927): make AnsIntegrationTest use simpleTopology4Svs
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
