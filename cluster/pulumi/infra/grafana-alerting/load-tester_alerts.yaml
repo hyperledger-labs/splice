@@ -107,8 +107,12 @@ groups:
               refId: D
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: OK
         for: 1m
         annotations:
+          description: ""
+          runbook_url: ""
           summary: The k6 load tester experienced HTTP request failures at a rate past the acceptable threshold
+        labels:
+          "": ""
         isPaused: false
