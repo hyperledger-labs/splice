@@ -224,7 +224,7 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
           ...acc,
           {
             fee: toPercentFmt(current._2),
-            range: `${BigNumber(current._1)} - ${BigNumber(nextStep._1)} CC`,
+            range: `${BigNumber(current._1)} - ${BigNumber(nextStep._1)} USD`,
             last: false,
           },
         ];
@@ -233,7 +233,7 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
           ...acc,
           {
             fee: toPercentFmt(current._2),
-            range: `> ${BigNumber(current._1)} CC`,
+            range: `> ${BigNumber(current._1)} USD`,
             last: true,
           },
         ];
@@ -242,7 +242,7 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
     [
       {
         fee: toPercentFmt(transferFees.initialRate),
-        range: `< ${BigNumber(transferFees.steps[0]._1)} CC`,
+        range: `< ${BigNumber(transferFees.steps[0]._1)} USD`,
         last: false,
       },
     ]
