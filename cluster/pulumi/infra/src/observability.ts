@@ -13,7 +13,6 @@ import {
 } from 'cn-pulumi-common';
 import { REPO_ROOT } from 'cn-pulumi-common';
 
-import { clusterBasename } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
@@ -369,7 +368,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
   // that prevents running expensive queries when the dashboard just loads
-  createGrafanaDashboards(namespaceName, clusterBasename == 'observability');
+  createGrafanaDashboards(namespaceName);
   // enable the slack alerts only for "prod" clusters
   if (enableAlerts) {
     createGrafanaContactPoints(namespaceName);

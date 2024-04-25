@@ -4,13 +4,7 @@ import * as path from 'path';
 import { Input } from '@pulumi/pulumi';
 import { REPO_ROOT } from 'cn-pulumi-common';
 
-const dashboardsPath = process.env.GRAFANA_DASHBOARDS;
-
-export function createGrafanaDashboards(namespace: Input<string>, filtered: boolean): void {
-  const prefix = filtered ? 'filtered-' : '';
-  createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}platform`, 'platform');
-  createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}participant`, 'participant');
-  createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}canton`, 'canton');
+export function createGrafanaDashboards(namespace: Input<string>): void {
   createdNestedConfigMapForFolder(
     namespace,
     `${REPO_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
