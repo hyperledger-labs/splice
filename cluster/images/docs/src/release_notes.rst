@@ -3,8 +3,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.5
+-----
 
 * Fixed the SV UI to show node status information in the DSO info tab and display AmuletConfigChange vote requests that were executed.
 * Removed PVC size overrides in example `postgres-values-participant.yaml` and `postgres-values-sequencer.yaml` files. The Postgres instances used by the participant and sequencer should use the default size instead (1300Gi).
@@ -15,7 +15,7 @@ Upcoming
   with ``migrating: true`` which prevented new SVs from being
   onboarded after domain migrations.
 * Updated SV and validator runbooks with network-wide disaster recovery instructions.
-* introduced a `vpns` section in the IP whitelists json file, replacing the `infra.vpn` one.
+* Introduced a `vpns` section in the IP whitelists json file, replacing the `infra.vpn` one.
 
 0.1.4
 -----
