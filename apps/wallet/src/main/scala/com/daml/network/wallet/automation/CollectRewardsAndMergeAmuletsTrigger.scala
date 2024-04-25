@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcom
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryFor}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -31,6 +31,24 @@ class CollectRewardsAndMergeAmuletsTrigger(
   override def isRewardOperationTrigger: Boolean = true
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+    // Retry because we want to avoid missing rewards.
+    // We add the retry here instead of using a PeriodicTaskTrigger because
+    // PeriodicTaskTrigger does not allow defining whether work was performed
+    // that skips the polling interval. So if we have more rewards than we can
+    // get in one polling interval,
+    // it would wait until the next polling interval before trying to collect
+    // them which risks missing some.
+    context.retryProvider.retry(
+      RetryFor.Automation,
+      "collect_rewards_and_merge_amulets",
+      "Collect rewards and merge amulets",
+      collectRewardsAndMergeAmulets(),
+      logger,
+    )
+
+  private def collectRewardsAndMergeAmulets()(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] =
     for {
       activeDomain <- scanConnection.getAmuletRulesDomain()(traceContext)
       trafficBalance <- connection.trafficBalanceService
