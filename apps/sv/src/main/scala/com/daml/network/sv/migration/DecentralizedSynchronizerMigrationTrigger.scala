@@ -13,6 +13,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.transaction.DomainParametersStateX
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
 import java.time.Instant
@@ -30,6 +31,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     protected val dumpPath: Path,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
 

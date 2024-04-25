@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+0.1.6
+-----
+
+Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators should directly upgrade from 0.1.4 to 0.1.6.
+
+* Fix a bug (triggered by some changes in 0.1.5) in where automation could submit too many commands in parallel overloading the synchronizer.
+
 0.1.5
 -----
 

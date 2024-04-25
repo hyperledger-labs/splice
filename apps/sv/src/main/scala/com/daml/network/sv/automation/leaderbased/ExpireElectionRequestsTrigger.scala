@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.splice.dsorules.ElectionRequest
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,6 +19,7 @@ class ExpireElectionRequestsTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Contract[
       ElectionRequest.ContractId,

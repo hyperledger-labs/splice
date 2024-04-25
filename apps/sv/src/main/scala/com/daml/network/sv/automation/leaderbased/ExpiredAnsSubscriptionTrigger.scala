@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionIdleState_ExpireSubscription
 import com.daml.network.store.PageLimit
 import com.daml.network.sv.store.SvDsoStore
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,6 +19,7 @@ class ExpiredAnsSubscriptionTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[SvDsoStore.IdleAnsSubscription]
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleAnsSubscription]] {

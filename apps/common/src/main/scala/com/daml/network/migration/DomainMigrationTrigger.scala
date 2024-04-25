@@ -13,6 +13,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Codec
 import io.circe.syntax.EncoderOps
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
 import java.time.Instant
@@ -20,6 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 abstract class DomainMigrationTrigger[T: Codec](implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[DomainMigrationTrigger.Task] {
   protected val participantAdminConnection: ParticipantAdminConnection

@@ -6,6 +6,7 @@ import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import MultiDomainAcsStore.ContractState
@@ -25,6 +26,7 @@ abstract class MultiDomainExpiredContractTrigger[
     companion: C,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
     companionClass: MultiDomainAcsStore.ContractCompanion[C, TCid, T],
 ) extends ScheduledTaskTrigger[AssignedContract[TCid, T]] {

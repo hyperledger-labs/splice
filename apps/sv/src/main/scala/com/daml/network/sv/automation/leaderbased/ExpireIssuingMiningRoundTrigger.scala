@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -21,6 +22,7 @@ class ExpireIssuingMiningRoundTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
       splice.round.IssuingMiningRound.ContractId,

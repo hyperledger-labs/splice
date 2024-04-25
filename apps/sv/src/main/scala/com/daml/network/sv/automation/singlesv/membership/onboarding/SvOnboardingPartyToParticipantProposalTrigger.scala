@@ -17,6 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,6 +33,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[SvOnboardingPartyToParticipantProposalTrigger.Task] {
 

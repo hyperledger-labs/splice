@@ -8,6 +8,7 @@ import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,6 +18,7 @@ class ExpireBuyTrafficRequestsTrigger(
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
       trafficRequestCodegen.BuyTrafficRequest.ContractId,

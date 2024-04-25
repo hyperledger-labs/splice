@@ -1,10 +1,10 @@
 package com.daml.network.automation
 
-import cats.syntax.parallel.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -15,6 +15,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends TaskbasedTrigger[T]
     with PollingTrigger {
@@ -35,7 +36,9 @@ abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
       tasks <- retrieveTasks()
       // TODO(M3-83): review our triggers for whether the task retrieval for time-based triggers performs sufficiently well
       // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
-      tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
+      tasksSucceeded <- Source(tasks)
+        .mapAsyncUnordered(context.config.parallelism)(processTaskWithRetry)
+        .runWith(Sink.seq)
     } yield tasksSucceeded.exists(succeeded => succeeded)
 
   override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {

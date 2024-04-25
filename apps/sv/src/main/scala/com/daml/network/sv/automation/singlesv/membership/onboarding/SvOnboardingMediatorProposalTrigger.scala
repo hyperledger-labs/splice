@@ -16,6 +16,7 @@ import com.digitalasset.canton.topology.{DomainId, MediatorId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
@@ -36,6 +37,7 @@ class SvOnboardingMediatorProposalTrigger(
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
 

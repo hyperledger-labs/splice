@@ -14,6 +14,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -23,6 +24,7 @@ class MergeUnclaimedRewardsTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MergeUnclaimedRewardsTask]
     with SvTaskBasedTrigger[MergeUnclaimedRewardsTask] {

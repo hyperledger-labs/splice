@@ -19,6 +19,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -31,6 +32,7 @@ class ReceiveSvRewardCouponTrigger(
     extraBeneficiaries: Map[PartyId, BigDecimal],
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ReceiveSvRewardCouponTrigger.Task] {
 

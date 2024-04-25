@@ -13,6 +13,7 @@ import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -31,6 +32,7 @@ class SvOffboardingSequencerTrigger(
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[SequencerId] {
 

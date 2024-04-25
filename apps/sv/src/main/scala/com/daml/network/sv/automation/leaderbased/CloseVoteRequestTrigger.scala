@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.splice.dsorules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -13,6 +14,7 @@ class CloseVoteRequestTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
       VoteRequest.ContractId,

@@ -11,6 +11,7 @@ import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -20,6 +21,7 @@ class OffboardUsersTrigger(
     connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[OffboardUsersTrigger.UserToOffboard] {
 

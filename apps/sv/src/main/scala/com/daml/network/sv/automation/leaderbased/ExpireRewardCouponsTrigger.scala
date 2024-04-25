@@ -17,6 +17,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -27,6 +28,7 @@ class ExpireRewardCouponsTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ExpiredRewardCouponsBatch]
     with SvTaskBasedTrigger[ExpiredRewardCouponsBatch] {

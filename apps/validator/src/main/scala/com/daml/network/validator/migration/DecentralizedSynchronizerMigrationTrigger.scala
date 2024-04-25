@@ -9,6 +9,7 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
 import java.time.Instant
@@ -22,6 +23,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     scanConnection: ScanConnection,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
 

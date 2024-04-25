@@ -13,6 +13,7 @@ import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -22,6 +23,7 @@ class ExpireAppPaymentRequestsTrigger(
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
       paymentCodegen.AppPaymentRequest.ContractId,

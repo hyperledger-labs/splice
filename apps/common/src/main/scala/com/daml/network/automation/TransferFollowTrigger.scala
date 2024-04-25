@@ -12,6 +12,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,6 +27,7 @@ class TransferFollowTrigger(
     retrieve: TraceContext => Future[Seq[LubTask]],
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
       LubTask

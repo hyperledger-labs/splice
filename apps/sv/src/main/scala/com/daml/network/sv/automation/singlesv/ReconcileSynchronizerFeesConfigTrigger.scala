@@ -17,6 +17,7 @@ import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,6 +29,7 @@ class ReconcileSynchronizerFeesConfigTrigger(
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Task] {
 

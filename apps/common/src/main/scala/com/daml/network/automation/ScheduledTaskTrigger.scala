@@ -4,12 +4,14 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A trigger for scheduling tasks that only become ready after some future date. */
 abstract class ScheduledTaskTrigger[T: Pretty](implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ScheduledTaskTrigger.ReadyTask[T]] {
 

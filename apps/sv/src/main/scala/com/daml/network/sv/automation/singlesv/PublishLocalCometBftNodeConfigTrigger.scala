@@ -19,6 +19,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUti
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,6 +33,7 @@ class PublishLocalCometBftNodeConfigTrigger(
     cometBftNode: CometBftNode,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
       PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask

@@ -14,6 +14,7 @@ import com.daml.network.sv.util.MemberIdUtil
 import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -32,6 +33,7 @@ class SvOffboardingMediatorTrigger(
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
+    mat: Materializer,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MediatorId] {
 
