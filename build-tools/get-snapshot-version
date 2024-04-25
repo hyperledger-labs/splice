@@ -49,6 +49,7 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
         # TODO(#11038): eventually, latest_main, latest_base and latest_release should all be merged
         latest_release=$(cat "${REPO_ROOT}/LATEST_RELEASE")
         sha=$(git rev-parse heads/origin/release-line-"${latest_release}")
+        show_commit_message_sha="$sha"
         CNCLUSTER_STATIC_DIRTY_VERSION=""
         CI=1
         export CI_IGNORE_DIRTY_REPO=1
@@ -69,8 +70,8 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
 fi
 
 prefix=$(git show "$sha":VERSION)
-
-git_commit_message=$(git log -1 --pretty=format:%B)
+show_commit_message_sha="${show_commit_message_sha:-$sha}"
+git_commit_message=$(git log -1 --pretty=format:%B "$show_commit_message_sha")
 if [[ $git_commit_message == *"[release]"* ]]; then
     # release commit - no suffixes
     echo "$prefix"
