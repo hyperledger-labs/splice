@@ -2532,9 +2532,9 @@ function subcmd_list_sv_cometbft_addresses() {
   pubkey_sv=$(mktemp)
   pubkey_address=$(mktemp)
   curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/dso | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
-  curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/admin/domain/cometbft/debug -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}]' > "$pubkey_address"
+  curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/admin/domain/cometbft/debug -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
 
-  jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ]' "$pubkey_address" "$pubkey_sv"
+  jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
 }
 
 ################################
