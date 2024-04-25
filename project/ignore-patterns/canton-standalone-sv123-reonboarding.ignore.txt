@@ -1,4 +1,4 @@
-# TODO(#10286) Remove this if we can import without connecting to the domain
+# This does party migration
 ACS_COMMITMENT_MISMATCH
 
 # We've seen this happen due to txs submitted during offboarding of SV4. It can likely happen to other participants than the
