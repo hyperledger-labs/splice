@@ -264,10 +264,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "key.json": "ZG5zLXNlY3JldA=="
-        }
+        "key.json": "ZG5zLXNlY3JldA=="
       },
       "kind": "Secret",
       "metadata": {

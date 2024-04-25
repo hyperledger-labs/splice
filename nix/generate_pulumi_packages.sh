@@ -11,12 +11,13 @@ plugins=(
   "auth0=3.1.0"
   "command=0.9.2"
   "kubernetes-cert-manager=0.0.5"
-  # latest update
   "gcp=6.67.0"
-  "kubernetes=4.5.4"
-  # currently used
   "kubernetes=4.7.1"
+  # currently used
+  "kubernetes=4.11.0"
   "random=4.14.0"
+  "gcp=7.2.1"
+  "auth0=3.3.2"
 )
 
 function genSrc() {

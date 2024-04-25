@@ -206,10 +206,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"adminUser\": \"grafana-keys-admin-user\"\n                , \"adminPassword\": \"grafana-keys-admin-password\"}"
-      }
+      "secretData": "{\"adminUser\": \"grafana-keys-admin-user\"\n                , \"adminPassword\": \"grafana-keys-admin-password\"}"
     },
     "name": "grafana-keys-secretversion",
     "provider": "",
@@ -263,10 +260,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"publicKey\": \"sv-id-public-key\", \"privateKey\": \"sv-id-private-key\"}"
-      }
+      "secretData": "{\"publicKey\": \"sv-id-public-key\", \"privateKey\": \"sv-id-private-key\"}"
     },
     "name": "sv-id-secretversion",
     "provider": "",
@@ -298,10 +292,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv1-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv1-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv1-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv1-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv1-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv1-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv1-cometbft-keys-secretversion",
     "provider": "",
@@ -333,10 +324,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv10-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv10-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv10-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv10-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv10-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv10-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv10-cometbft-keys-secretversion",
     "provider": "",
@@ -368,10 +356,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv11-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv11-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv11-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv11-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv11-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv11-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv11-cometbft-keys-secretversion",
     "provider": "",
@@ -403,10 +388,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv12-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv12-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv12-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv12-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv12-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv12-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv12-cometbft-keys-secretversion",
     "provider": "",
@@ -438,10 +420,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv13-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv13-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv13-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv13-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv13-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv13-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv13-cometbft-keys-secretversion",
     "provider": "",
@@ -473,10 +452,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv14-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv14-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv14-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv14-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv14-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv14-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv14-cometbft-keys-secretversion",
     "provider": "",
@@ -508,10 +484,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv15-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv15-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv15-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv15-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv15-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv15-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv15-cometbft-keys-secretversion",
     "provider": "",
@@ -543,10 +516,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv16-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv16-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv16-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv16-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv16-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv16-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv16-cometbft-keys-secretversion",
     "provider": "",
@@ -578,10 +548,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv2-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv2-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv2-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv2-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv2-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv2-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv2-cometbft-keys-secretversion",
     "provider": "",
@@ -613,10 +580,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"publicKey\": \"sv2-id-public-key\", \"privateKey\": \"sv2-id-private-key\"}"
-      }
+      "secretData": "{\"publicKey\": \"sv2-id-public-key\", \"privateKey\": \"sv2-id-private-key\"}"
     },
     "name": "sv2-id-secretversion",
     "provider": "",
@@ -648,10 +612,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv3-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv3-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv3-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv3-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv3-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv3-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv3-cometbft-keys-secretversion",
     "provider": "",
@@ -683,10 +644,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"publicKey\": \"sv3-id-public-key\", \"privateKey\": \"sv3-id-private-key\"}"
-      }
+      "secretData": "{\"publicKey\": \"sv3-id-public-key\", \"privateKey\": \"sv3-id-private-key\"}"
     },
     "name": "sv3-id-secretversion",
     "provider": "",
@@ -718,10 +676,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv4-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv4-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv4-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv4-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv4-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv4-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv4-cometbft-keys-secretversion",
     "provider": "",
@@ -753,10 +708,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"publicKey\": \"sv4-id-public-key\", \"privateKey\": \"sv4-id-private-key\"}"
-      }
+      "secretData": "{\"publicKey\": \"sv4-id-public-key\", \"privateKey\": \"sv4-id-private-key\"}"
     },
     "name": "sv4-id-secretversion",
     "provider": "",
@@ -788,10 +740,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv5-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv5-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv5-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv5-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv5-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv5-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv5-cometbft-keys-secretversion",
     "provider": "",
@@ -823,10 +772,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv6-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv6-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv6-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv6-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv6-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv6-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv6-cometbft-keys-secretversion",
     "provider": "",
@@ -858,10 +804,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv7-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv7-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv7-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv7-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv7-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv7-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv7-cometbft-keys-secretversion",
     "provider": "",
@@ -893,10 +836,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv8-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv8-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv8-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv8-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv8-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv8-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv8-cometbft-keys-secretversion",
     "provider": "",
@@ -928,10 +868,7 @@
     "id": "",
     "inputs": {
       "secret": "undefined_id",
-      "secretData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "{\"nodePrivateKey\": \"sv9-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv9-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv9-cometbft-keys-validator-public-key\"}"
-      }
+      "secretData": "{\"nodePrivateKey\": \"sv9-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv9-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv9-cometbft-keys-validator-public-key\"}"
     },
     "name": "sv9-cometbft-keys-secretversion",
     "provider": "",

@@ -10,14 +10,11 @@
         "namespace": "sv"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://ledger_api.example.com",
-          "client-id": "sv-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
-        }
+        "audience": "https://ledger_api.example.com",
+        "client-id": "sv-client-id",
+        "client-secret": "***",
+        "ledger-api-user": "sv-client-id@clients",
+        "url": "https://auth0Domain/.well-known/openid-configuration"
       }
     },
     "name": "auth0-secret-sv-sv",
@@ -35,14 +32,11 @@
         "namespace": "sv"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://ledger_api.example.com",
-          "client-id": "validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
-        }
+        "audience": "https://ledger_api.example.com",
+        "client-id": "validator-client-id",
+        "client-secret": "***",
+        "ledger-api-user": "validator-client-id@clients",
+        "url": "https://auth0Domain/.well-known/openid-configuration"
       }
     },
     "name": "auth0-secret-sv-validator",
@@ -60,11 +54,8 @@
         "namespace": "sv"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "cns-client-id",
-          "url": "https://auth0Domain"
-        }
+        "client-id": "cns-client-id",
+        "url": "https://auth0Domain"
       }
     },
     "name": "auth0-ui-secret-sv-cns",
@@ -82,11 +73,8 @@
         "namespace": "sv"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "sv-client-id",
-          "url": "https://auth0Domain"
-        }
+        "client-id": "sv-client-id",
+        "url": "https://auth0Domain"
       }
     },
     "name": "auth0-ui-secret-sv-sv",
@@ -104,11 +92,8 @@
         "namespace": "sv"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "wallet-client-id",
-          "url": "https://auth0Domain"
-        }
+        "client-id": "wallet-client-id",
+        "url": "https://auth0Domain"
       }
     },
     "name": "auth0-ui-secret-sv-wallet",
@@ -149,10 +134,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
+        "postgresPassword": ""
       },
       "kind": "Secret",
       "metadata": {
@@ -171,11 +153,8 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
-          "public": "c3YtaWQtcHVibGljLWtleQ=="
-        }
+        "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
+        "public": "c3YtaWQtcHVibGljLWtleQ=="
       },
       "kind": "Secret",
       "metadata": {
@@ -194,10 +173,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
+        "postgresPassword": ""
       },
       "kind": "Secret",
       "metadata": {
@@ -216,10 +192,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
+        "postgresPassword": ""
       },
       "kind": "Secret",
       "metadata": {
@@ -238,10 +211,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
+        "postgresPassword": ""
       },
       "kind": "Secret",
       "metadata": {
@@ -260,11 +230,8 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
-          "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
-        }
+        "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
+        "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
       },
       "kind": "Secret",
       "metadata": {

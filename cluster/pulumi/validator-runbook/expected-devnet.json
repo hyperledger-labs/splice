@@ -10,14 +10,11 @@
         "namespace": "validator"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://ledger_api.example.com",
-          "client-id": "validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
-        }
+        "audience": "https://ledger_api.example.com",
+        "client-id": "validator-client-id",
+        "client-secret": "***",
+        "ledger-api-user": "validator-client-id@clients",
+        "url": "https://auth0Domain/.well-known/openid-configuration"
       }
     },
     "name": "auth0-secret-validator-validator",
@@ -35,11 +32,8 @@
         "namespace": "validator"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "cns-client-id",
-          "url": "https://auth0Domain"
-        }
+        "client-id": "cns-client-id",
+        "url": "https://auth0Domain"
       }
     },
     "name": "auth0-ui-secret-validator-cns",
@@ -57,11 +51,8 @@
         "namespace": "validator"
       },
       "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "wallet-client-id",
-          "url": "https://auth0Domain"
-        }
+        "client-id": "wallet-client-id",
+        "url": "https://auth0Domain"
       }
     },
     "name": "auth0-ui-secret-validator-wallet",
@@ -97,10 +88,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
+        "postgresPassword": ""
       },
       "kind": "Secret",
       "metadata": {

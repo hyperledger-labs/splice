@@ -16,8 +16,12 @@
         sha256 = "4bdff1a687c8ddf0aa19d09011f4f6b18615cf221e5510e2c3b880aa25781a91";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.5.4-linux-amd64.tar.gz";
-        sha256 = "3153e1daadac72b93e4c922f04b751235ae7b76bf4b08235489b09be5f4c07e4";
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-linux-amd64.tar.gz";
+        sha256 = "2c5f29ac9bc058bb9377b906e7630947add587b69040c63af5a8fd4ff95c9e52";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-linux-amd64.tar.gz";
+        sha256 = "1b8f5e6a2691c9b58fff4b8c434731b7aa7c13e46e9ba217705353a9532254b2";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.7.1-linux-amd64.tar.gz";
@@ -46,8 +50,12 @@
         sha256 = "9244994c49c2cfa0509ea84b2cdbc679c4db1e24f91f46906fcc906924ec605c";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.5.4-darwin-amd64.tar.gz";
-        sha256 = "29a4dd95334d34aef8ef5a3ff55de0b73bc4e61a1f9910fb6accb7681d1a44d6";
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-darwin-amd64.tar.gz";
+        sha256 = "08ee93595be215736c834d75012704713738b6a1452cc21813a84612c950e424";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-darwin-amd64.tar.gz";
+        sha256 = "3966f34f1c01e295fca8d1ad30c492d09b876085128009fa25e96aa858d93e68";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.7.1-darwin-amd64.tar.gz";
@@ -76,8 +84,12 @@
         sha256 = "91f2a6c29c9731273366788d348a4325cc70621a3c929e941663383c5278b793";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.5.4-linux-arm64.tar.gz";
-        sha256 = "3ea7081a2f7b1d76eb8f794e046cf6f1f448bb1b6fb835117c43066be2db012d";
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-linux-arm64.tar.gz";
+        sha256 = "4cddd536e4e28caba68919ba2d051442595ef0c0c139a7779108b579bf596901";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-linux-arm64.tar.gz";
+        sha256 = "9fa4a9f3e93e839da31e23f26c738184675b2bc8fad7d364e6f476ed033f3108";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.7.1-linux-arm64.tar.gz";
@@ -106,8 +118,12 @@
         sha256 = "05a931c00b72f087bcfe8dc35ba6c3c6c0e929e7caf83fcae925f4c9d9d5d174";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.5.4-darwin-arm64.tar.gz";
-        sha256 = "2104c795b8e2b423dd99bd495dff8005a22c25e6e7407a93257fa006f481f082";
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-darwin-arm64.tar.gz";
+        sha256 = "4bb52f6d510772d53e0ed88153bd237703610cb1ff7b4e40558c493c45405991";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-darwin-arm64.tar.gz";
+        sha256 = "7ce1f19d8724231e026787e0cc9d7839c640252ecd5246187270291b3ef3ee9c";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.7.1-darwin-arm64.tar.gz";

@@ -7,8 +7,6 @@
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "@pulumi/auth0": "3.1.0",
-    "@pulumi/pulumi": "3.95.0",
     "cn-pulumi-common": "1.0.0",
     "@pulumi/random": "4.14.0"
   },
