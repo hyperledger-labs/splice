@@ -1130,7 +1130,7 @@ function subcmd_sbt_for_preflight() {
     _needs_auth0_management_api_creds
 
     (cd "${REPO_ROOT}" && \
-         DOMAIN_URL=https://sequencer-0.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global \
+         DOMAIN_URL=https://sequencer-0.sv-1.${GCP_CLUSTER_BASENAME}.network.canton.global \
          MIGRATION_ID=0 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \
@@ -2403,7 +2403,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting identity dumps"
   for sv in 1 2 3 4; do
     token=$(subcmd_get_token sv-${sv})
-    id=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
+    id=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
     echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
@@ -2421,7 +2421,7 @@ function subcmd_disaster_recovery_test() {
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
         _info "Attempting to get ACS from time $acs_time"
-        data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$acs_time"'"}' -X GET -H "Content-Type: application/json")
+        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$acs_time"'"}' -X GET -H "Content-Type: application/json")
         snapshot=$(echo "$data" | jq .data_snapshot)
         if [ "$snapshot" == "null" ]; then
             error=$(echo "$data" | jq -r .error)
@@ -2446,7 +2446,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting data dumps"
   for sv in 1 2 3 4; do
     token=$(subcmd_get_token sv-${sv})
-    data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
+    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
         error=$(echo "$data" | jq -r .error)
@@ -2531,8 +2531,8 @@ function subcmd_list_sv_cometbft_addresses() {
   token=$(subcmd_get_token "${sv}")
   pubkey_sv=$(mktemp)
   pubkey_address=$(mktemp)
-  curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/dso | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
-  curl -sSLf https://sv."$sv".svc."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/admin/domain/cometbft/debug -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
+  curl -sSLf https://sv."$sv"."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/dso | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
+  curl -sSLf https://sv."$sv"."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/admin/domain/cometbft/debug -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
 
   jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
 }

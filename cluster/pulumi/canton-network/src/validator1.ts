@@ -119,7 +119,6 @@ function installIngress(
   installCNHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-      hostPrefix: '',
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,

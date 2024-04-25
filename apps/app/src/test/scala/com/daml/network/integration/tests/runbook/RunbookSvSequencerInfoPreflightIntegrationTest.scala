@@ -33,6 +33,6 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
     sequencer.migrationId shouldBe migrationId
-    sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+    sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
   }
 }

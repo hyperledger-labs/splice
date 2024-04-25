@@ -45,7 +45,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   val svPassword = sys.env(s"SV_WEB_UI_PASSWORD")
 
   "SV can login to the SV UI" in { _ =>
-    val svUiUrl = s"https://sv.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    val svUiUrl = s"https://sv.$svUrlPrefix.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -58,7 +58,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   }
 
   "SV can login to the CNS UI" in { _ =>
-    val ansUrl = s"https://cns.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val ansUrl = s"https://cns.$svUrlPrefix.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -74,7 +74,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   }
 
   "SV can login to the wallet UI" in { _ =>
-    val walletUrl = s"https://wallet.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    val walletUrl = s"https://wallet.$svUrlPrefix.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -87,7 +87,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   }
 
   "The Scan UI is working" in { _ =>
-    val scanUrl = s"https://scan.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val scanUrl = s"https://scan.$svUrlPrefix.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl

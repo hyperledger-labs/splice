@@ -4,7 +4,7 @@ const config = {
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/scan',
+      url: 'https://scan.sv-1.TARGET_CLUSTER.network.canton.global/api/scan',
     },
   },
 };

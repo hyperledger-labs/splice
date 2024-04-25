@@ -9,7 +9,7 @@ node:
   # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
   identifier: "global-domain-MIGRATION_ID-cometbft"
   # Replace both instances of MIGRATION_ID (also part of port number!) with the current migration ID of the global synchronizer.
-  externalAddress: "global-domain-MIGRATION_ID-cometbft.sv.svc.YOUR_HOSTNAME:26MIGRATION_ID56"
+  externalAddress: "global-domain-MIGRATION_ID-cometbft.sv.YOUR_HOSTNAME:26MIGRATION_ID56"
   keysSecret: "cometbft-keys"
 
 genesis:
@@ -23,7 +23,7 @@ stateSync:
   # enable: false
 
   # Note that the port number is significant in the list of rpcServers
-  rpcServers: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+  rpcServers: "https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

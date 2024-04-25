@@ -1403,7 +1403,7 @@ By default, Pulumi will be using the charts and images as built locally and push
 It also supports deploying a version based on externally released artifacts, the ones customers use
 by specifying their version in the `<artifactory charts version>` argument.
 
-Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.svc.<CLUSTER_BASENAME>.network.canton.global`, where CLUSTER_BASENAME depends on the scratchnet you deployed to (`scratcha` for `scratchneta` and so on)
+Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.<CLUSTER_BASENAME>.network.canton.global`, where CLUSTER_BASENAME depends on the scratchnet you deployed to (`scratcha` for `scratchneta` and so on)
 
 To bring the deployment down, run:
 
@@ -1548,7 +1548,7 @@ In addition to inquiring about the status of partners on [Slack](https://daholdi
 here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.sv_node_states | .[] | .payload.state.synchronizerNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+curl https://sv.sv-1.dev.network.canton.global/api/sv/v0/dso | jq '.sv_node_states | .[] | .payload.state.synchronizerNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
 ```
 
 This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
@@ -1579,8 +1579,8 @@ To login to the following UIs use our test credentials from [our list of passwor
 
 | Endpoints                                                  | Description                                                                                            |
 |------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `https://sv.sv-1.svc.<CLUSTER>.network.canton.global/`     | Admin user interface for Sv Operator to find information about the collective and perform admin tasks. |
-| `https://wallet.sv-1.svc.<CLUSTER>.network.canton.global/` | User interface for the validators to transfer money and manage applications.                           |
+| `https://sv.sv-1.<CLUSTER>.network.canton.global/`     | Admin user interface for Sv Operator to find information about the collective and perform admin tasks. |
+| `https://wallet.sv-1.<CLUSTER>.network.canton.global/` | User interface for the validators to transfer money and manage applications.                           |
 
 
 ## Interacting with Canton Network APIs
@@ -1645,7 +1645,7 @@ You can also access sequencer and mediator:
 Just use `curl`! For example, here is how to get the current SVs (as per the `DsoRules`) from SV1 on DevNet:
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs'
+curl https://sv.sv-1.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs'
 ```
 
 ### App APIs with authentication
@@ -1668,7 +1668,7 @@ prepare a validator onboarding via SV1's SV API:
 
 ```
 export TOKEN="What you got from Auth0"
-curl -sSL --fail-with-body "https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+curl -sSL --fail-with-body "https://sv.sv-1.dev.network.canton.global/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
 ```
 
 For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,

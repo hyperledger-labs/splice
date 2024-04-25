@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "wallet.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "wallet.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -36,7 +36,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

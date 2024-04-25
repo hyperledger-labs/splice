@@ -79,7 +79,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * Domain -> Synchronizer
   * Global Domain (whenever it refers to the more generic concept) -> Decentralized Synchronizer
   * Note that for technical reasons the URLs for networks still include the term "svc" for now;
-    e.g., ``https://wallet.sv.svc.YOUR_HOSTNAME``.
+    e.g., ``https://wallet.sv.YOUR_HOSTNAME``.
 
 * Added an option to disable the Validator apps' wallet. This can be done by setting ``enableWallet`` to ``false`` in the ``validator-values.yaml`` file.
 
@@ -348,20 +348,20 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Renamed ``directory`` to ``CNS`` across the system
 
-  * Renamed ingress rule from ``https://directory.sv.svc.<YOUR_HOSTNAME>*`` to ``https://cns.sv.svc.<YOUR_HOSTNAME>*``.  Please note that this is now a requirement for this UI to continue working properly.
+  * Renamed ingress rule from ``https://directory.sv.<YOUR_HOSTNAME>*`` to ``https://cns.sv.<YOUR_HOSTNAME>*``.  Please note that this is now a requirement for this UI to continue working properly.
 
 2023-12-11
 ----------
 
 * Deployment:
 
-  * The `https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*` ingress rule is no longer required for validators and super-validators
+  * The `https://directory.sv.<YOUR_HOSTNAME>/api/json-api/*` ingress rule is no longer required for validators and super-validators
 
   * The helm charts now allow configuring the secret in which the postgres password is stored. Default is ``postgres-secrets``.
 
 * Documentation:
 
-  * Added an ingress rule for `https://directory.sv.svc.<YOUR_HOSTNAME>/api/validator`, which was accidentally omitted from the instructions.
+  * Added an ingress rule for `https://directory.sv.<YOUR_HOSTNAME>/api/validator`, which was accidentally omitted from the instructions.
 
 
 2023-12-04
@@ -413,11 +413,11 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Deployment updates:
 
-  * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
+  * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
   * The requirement for URL rewriting in the rules for Scan and SV apps has been removed:
-    ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` and ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` no longer requires rewriting
+    ``https://scan.sv.<YOUR_HOSTNAME>/api/scan`` and ``https://sv.sv.<YOUR_HOSTNAME>/api/sv`` no longer requires rewriting
     (and also has been modified from `/api/v0/scan` to `/api/scan` and from `/api/v0/sv` to `/api/sv`).
-    For example, ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
+    For example, ``https://scan.sv.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
     ``http://validator-app:5012/api/scan/foobar``.
     Note that URL rewriting is now required only in the ingress rule of the JSON API used by the directory frontend. This rule will be completely removed in the future.
   * Note that the readiness and liveness endpoints of Validator, Scan and SV apps have all been moved to
@@ -425,7 +425,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
     The corresponding Helm charts have been updated to reflect this change.
 
   * The URL configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
-    ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.
+    ``https://scan.sv-1.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.
   * The `isDevNet` flag has been removed from the `cn-cometbft` helm chart in order to eliminate its potential for accidental misconfiguration.
     Instead, the chart now relies on the value of `genesis.chainId` in `cometbft-values.yaml` to determine whether it is a TestNet or DevNet deployment.
   * The CNS UI now uses the validator API to manage user entries, instead of the JSON Ledger API. In order to authenticate to the validator-app correctly, the chart now uses the `auth.audience` value to specify JWT audience, instead of `auth.ledgerApiAudience`
@@ -442,7 +442,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 * Deployment updates:
 
   * CometBFT state sync i.e. snapshot based syncing of CometBFT nodes is now enabled by default. This allows CometBFT nodes to catchup much quicker during initialization.
-    `cometbft-values.yaml` is configured by default to fetch the snapshots from ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`` which is the URL
+    `cometbft-values.yaml` is configured by default to fetch the snapshots from ``https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`` which is the URL
     for the CometBFT RPC API of the Canton-Foundation SV. In order to disable state sync, set `stateSync.enable` to `false` in `cometbft-values.yaml`.
     Further details can be found in :ref:`Configuring CometBft state sync <helm-cometbft-state-sync>`.
   * Added ``useSequencerConnectionsFromScan``.
@@ -465,9 +465,9 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
   * Add documentation for :ref:`Kubernetes-Based Deployment of a Validator node <k8s_validator>`
   * The requirement for url rewriting in one of the rules has been removed:
-    ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` no longer requires rewriting
+    ``https://wallet.sv.<YOUR_HOSTNAME>/api/validator`` no longer requires rewriting
     (and also has been modified from `/api/v0/validator` to `/api/validator`).
-    For example, ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
+    For example, ``https://wallet.sv.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
     ``http://validator-app:5003/api/validator/foobar``. In the future, the other rewrite requirements
     will also be removed.
   * Renamed ``SV_WALLET_USER_ID`` placeholder in ``validator-values.yaml`` to ``OPERATOR_WALLET_USER_ID`` to better reflect that this value is the operator's user in the deployment for both SVs and standalone validator nodes
@@ -514,7 +514,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Deployment updates
 
-  * The URL of the global domain has changed to `http://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:5008`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
+  * The URL of the global domain has changed to `http://sequencer.sv-1.<TARGET_CLUSTER>.network.canton.global:5008`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
 
 * Frontend updates
 
@@ -718,7 +718,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 ----------
 
 * The URL to scan in ``validator-values.yaml`` has changed to
-  ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/scan``. The
+  ``https://scan.sv-1.TARGET_CLUSTER.network.canton.global/api/v0/scan``. The
   ``scanPort`` field has been removed.
 * The ``svSponsorAddress`` from ``validator-values.yaml`` has been removed. The validator associated
   with an SV node is onboarded automatically through its SV node.
@@ -850,8 +850,8 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
 * Bugfixes
 
-  * Fixed the SV onboarding URL in the Helm runbook. It must be ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``
-    rather than ``https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
+  * Fixed the SV onboarding URL in the Helm runbook. It must be ``https://sv.sv-1.TARGET_CLUSTER.network.canton.global/api/v0/sv``
+    rather than ``https://sv-1.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
   * Fixed an issue in last week’s release where the public/private SV keys were required in both the K8s secret and in ``sv-values.yaml``.
     Now they only need to be specified through the secret.
   * Fixed how the first round for which a new SV is eligible to receive SV rewards is determined.
@@ -874,9 +874,9 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
   * ``joinWithKeyOnboarding.keyName`` in ``sv-values.yaml`` has been renamed to ``onboardingName``.
   * ``svSponsorPort`` in ``validator-values.yaml`` has been removed. The port is now included in ``svSponsorAddress``. The default sponsor address has
-    been changed to ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
+    been changed to ``https://sv.sv-1.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
   * ``sponsorApiPort`` in ``sv-values.yaml`` has been removed. The port is now included in ``sponsorApiUrl``. The default sponsor address has
-    been changed to ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
+    been changed to ``https://sv.sv-1.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
   * The SV private and public key are now stored in k8s secrets.
   * Kubernetes `liveness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe>`_ and `readiness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes>`_ probes are configured to probe the `GRPC Health Checking Protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ of the participant node.
   * The instructions for generating your SV keys now also work on MacOS.

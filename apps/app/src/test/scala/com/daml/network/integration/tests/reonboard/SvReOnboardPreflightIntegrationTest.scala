@@ -34,7 +34,7 @@ class SvReOnboardPreflightIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  private val svWalletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private val svWalletUrl = s"https://wallet.sv.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private val svUsername = s"admin@sv-dev.com"
 
   private val validatorWalletUrl =

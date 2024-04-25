@@ -168,9 +168,9 @@ and allow you to obtain client identifiers for the web UIs your SV node will be 
 Currently, these are the SV web UI, the Wallet web UI and the CNS web UI.
 You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
-``https://sv.sv.svc.YOUR_HOSTNAME`` (for the SV web UI) ,
-``https://wallet.sv.svc.YOUR_HOSTNAME`` (for the Wallet web UI) and
-``https://cns.sv.svc.YOUR_HOSTNAME`` (for the CNS web UI).
+``https://sv.sv.YOUR_HOSTNAME`` (for the SV web UI) ,
+``https://wallet.sv.YOUR_HOSTNAME`` (for the Wallet web UI) and
+``https://cns.sv.YOUR_HOSTNAME`` (for the CNS web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
 In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -251,7 +251,7 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
     b. Choose "Single Page Web Applications", call it ``SV web UI``, and click Create.
     c. Determine the URL for your validator's SV UI.
-       If you're using the ingress configuration of this runbook, that would be ``https://sv.sv.svc.YOUR_HOSTNAME``.
+       If you're using the ingress configuration of this runbook, that would be ``https://sv.sv.YOUR_HOSTNAME``.
     d. In the Auth0 application settings, add the SV URL to the following:
 
        - "Allowed Callback URLs"
@@ -265,14 +265,14 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
 
    - In step b, use ``Wallet web UI`` as the name of your application.
    - In steps c and d, use the URL for your SV's *wallet* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_HOSTNAME``.
+     If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.YOUR_HOSTNAME``.
 
 7. Create an Auth0 Application for the CNS web UI.
    Repeat all steps described in step 5, with following modifications:
 
    - In step b, use ``CNS web UI`` as the name of your application.
    - In steps c and d, use the URL for your SV's *CNS* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://cns.sv.svc.YOUR_HOSTNAME``.
+     If you're using the ingress configuration of this runbook, that would be ``https://cns.sv.YOUR_HOSTNAME``.
 
 8. (Optional) Similarly to the ledger API above, the default audience is set to ``https://canton.network.global``.
     If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
@@ -432,7 +432,7 @@ if:
 - the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
   the height of the latest block is greater than or equal to the configured interval between snapshots
 
-The snapshots are fetched from the founding SV node which exposes its CometBft RPC API at `https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`.
+The snapshots are fetched from the founding SV node which exposes its CometBft RPC API at `https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`.
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
@@ -693,17 +693,17 @@ This file contains other clusters' egress IPs that require access to your super 
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace.
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace.
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace.
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace.
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
-* ``global-domain-<MIGRATION_ID>-cometbft.sv.svc.<YOUR_HOSTNAME>:26<MIGRATION_ID>56`` should be routed to port 26656 of service ``global-domain-<MIGRATION_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
+* ``https://wallet.sv.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace.
+* ``https://wallet.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
+* ``https://sv.sv.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace.
+* ``https://sv.sv.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace.
+* ``https://scan.sv.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace.
+* ``https://scan.sv.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
+* ``global-domain-<MIGRATION_ID>-cometbft.sv.<YOUR_HOSTNAME>:26<MIGRATION_ID>56`` should be routed to port 26656 of service ``global-domain-<MIGRATION_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
-* ``https://cns.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
-* ``https://cns.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
-* ``https://sequencer-<MIGRATION_ID>.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
+* ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
+* ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
+* ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
@@ -718,7 +718,7 @@ To check whether the sequencer is accessible, we can use the command below with 
 
     grpcurl <sequencer host>:<sequencer port> grpc.health.v1.Health/Check
 
-If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-MIGRATION_ID.sv.svc.YOUR_HOSTNAME:443``
+If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME:443``
 Please replace ``YOUR_HOSTNAME`` with your host name and ``MIGRATION_ID`` with the migration ID of the synchronizer that the sequencer is part of.
 
 If you see the response below, it means the sequencer is up and accessible through the URL.
@@ -779,7 +779,7 @@ definition:
        namespace: cluster-ingress
     spec:
         dnsNames:
-        - '*.sv.svc.YOUR_HOSTNAME'
+        - '*.sv.YOUR_HOSTNAME'
         issuerRef:
             name: letsencrypt-production
         secretName: cn-net-tls
@@ -835,11 +835,11 @@ This list is useful for an SV that wishes to limit egress to only allow the mini
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
-Sponsor SV             sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                           HTTPS     sv-app
-Sponsor SV Sequencer   sequencer-<M>.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                HTTPS     participant-<M>
-Sponsor SV Scan        scan.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                         HTTPS     validator-app
+Sponsor SV             sv.sv-1.<TARGET_CLUSTER>.network.canton.global:443                                               HTTPS     sv-app
+Sponsor SV Sequencer   sequencer-<M>.sv-1.<TARGET_CLUSTER>.network.canton.global:443                                    HTTPS     participant-<M>
+Sponsor SV Scan        scan.sv-1.<TARGET_CLUSTER>.network.canton.global:443                                             HTTPS     validator-app
 CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
-CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     global-domain-<M>-cometbft
+CometBft JSON RPC      sv.sv-1.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc      HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
 At present, we designate the founding SV as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
@@ -850,7 +850,7 @@ Logging into the wallet UI
 --------------------------
 
 After you deploy your ingress, open your browser at
-https://wallet.sv.svc.YOUR_HOSTNAME and login using the
+https://wallet.sv.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to see your balance
 increase as mining rounds advance every 2.5 minutes and you will see
@@ -867,7 +867,7 @@ Logging into the CNS UI
 -----------------------------
 
 You can open your browser at
-https://cns.sv.svc.YOUR_HOSTNAME and login using the
+https://cns.sv.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
 Canton Name Service.
@@ -881,7 +881,7 @@ Canton Name Service.
 Logging into the SV UI
 ----------------------
 
-Open your browser at https://sv.sv.svc.YOUR_HOSTNAME to login to the SV Operations user interface.
+Open your browser at https://sv.sv.YOUR_HOSTNAME to login to the SV Operations user interface.
 You can use the credentials of the ``validatorWalletUser`` to login. These are the same credentials you used for the wallet login above. Note that only Super validators will be able to login.
 Once logged in one should see a page with some SV collective information.
 
@@ -903,7 +903,7 @@ Observing the Canton Coin Scan UI
 ---------------------------------
 
 The Canton Coin Scan app is a public-facing application that provides summary information regarding Canton Coin activity on the network.
-A copy of it is hosted by each Super Validator. Open your browser at https://scan.sv.svc.YOUR_HOSTNAME to see your instance of it.
+A copy of it is hosted by each Super Validator. Open your browser at https://scan.sv.YOUR_HOSTNAME to see your instance of it.
 
 Note that after spinning up the application, it may take several minutes before data is available (as it waits to see a mining round opening and closing).
 In the top-right corner of the screen, see the message starting with "The content on this page is computed as of round:".
@@ -934,7 +934,7 @@ Your identites may be fetched from your node through the following endpoint:
 
 .. code-block:: bash
 
-    curl 'https://sv.sv.svc.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump' -H 'authorization: Bearer <token>'
+    curl 'https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump' -H 'authorization: Bearer <token>'
 
 where `<token>` is an OAuth2 Bearer Token obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
 

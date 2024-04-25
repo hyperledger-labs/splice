@@ -70,7 +70,6 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostPrefix": "",
           "hostname": "validatorrun.network.canton.global",
           "svNamespace": "validator"
         },
@@ -279,8 +278,8 @@
           "host": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-1.svc.validatorrun.network.canton.global",
-        "svSponsorAddress": "https://sv.sv-1.svc.validatorrun.network.canton.global",
+        "scanAddress": "https://scan.sv-1.validatorrun.network.canton.global",
+        "svSponsorAddress": "https://sv.sv-1.validatorrun.network.canton.global",
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

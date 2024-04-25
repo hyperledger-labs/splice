@@ -374,7 +374,7 @@ Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/s
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
-  ``https://sv.sv-1.svc.|cn_cluster|.network.canton.global``.
+  ``https://sv.sv-1.|cn_cluster|.network.canton.global``.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 

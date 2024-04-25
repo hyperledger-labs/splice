@@ -286,7 +286,7 @@
           ]
         },
         "node": {
-          "externalAddress": "global-domain-0-cometbft.sv.svc.svrun.network.canton.global:26056",
+          "externalAddress": "global-domain-0-cometbft.sv.svrun.network.canton.global:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
@@ -294,7 +294,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-1.svc.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-1.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
@@ -595,7 +595,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.svrun.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svrun.network.canton.global",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -604,7 +604,7 @@
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.svc.svrun.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv.svrun.network.canton.global"
         },
         "extraBeneficiaries": [
           {
@@ -615,7 +615,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.canton.global"
+          "sponsorApiUrl": "https://sv.sv-1.svrun.network.canton.global"
         },
         "metrics": {
           "enable": true
@@ -631,7 +631,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
-          "publicUrl": "https://scan.sv.svc.svrun.network.canton.global"
+          "publicUrl": "https://scan.sv.svrun.network.canton.global"
         }
       }
     },
@@ -864,7 +864,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.svrun.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svrun.network.canton.global",
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {

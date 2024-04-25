@@ -9,7 +9,7 @@ metadata:
   namespace: {{ $releaseNamespace }}
 spec:
   hosts:
-    - "sequencer-{{ $migrationId }}.{{ $cluster.svNamespace }}.{{ $cluster.hostPrefix }}{{ $cluster.hostname }}"
+    - "sequencer-{{ $migrationId }}.{{ $cluster.svNamespace }}.{{ $cluster.hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

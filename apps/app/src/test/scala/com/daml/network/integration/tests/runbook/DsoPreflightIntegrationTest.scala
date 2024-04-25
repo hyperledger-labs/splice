@@ -36,7 +36,7 @@ class DsoPreflightIntegrationTest
   "The Web UIs of SVs 1-4 are reachable and working as expected" in { env =>
     // we put many checks in one test case to reduce testing time (logging in is slow)
     for (i <- (1 to 4)) {
-      val svUiUrl = s"https://sv.sv-$i.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
+      val svUiUrl = s"https://sv.sv-$i.${sys.env("NETWORK_APPS_ADDRESS")}/";
       // hardcoded to save on four environment variables; we don't expect this to change often
       val svUsername = s"admin@sv$i-dev.com";
       // our current practice is to use the same password for all SVs

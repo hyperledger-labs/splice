@@ -41,7 +41,7 @@ class SvOffboardPreflightIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   private val svRunbookName = "DA-Helm-Test-Node"
-  private val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private val walletUrl = s"https://wallet.sv.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private val svUsername = s"admin@sv-dev.com"
   private val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 

@@ -25,7 +25,7 @@ To start the validator node, first start the validator participant using the Can
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Before starting the splitwell backend, some setup is required:
 
@@ -58,7 +58,7 @@ As when setting up a self-hosted validator, you need a super validator to provid
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 ...and then start the splitwell validator with this configuration file and the onboarding config you just obtained.
 Replace ``$MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
@@ -132,7 +132,7 @@ Next, in a separate terminal, start the participant again using the same command
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Once the console opened, connect it to the domain you started earlier ::
 
@@ -149,7 +149,7 @@ Save the configuration you got from your sponsoring SV under ``validator-onboard
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next start up the validator. Replace ``$MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 

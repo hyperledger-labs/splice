@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "splitwell.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "splitwell.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

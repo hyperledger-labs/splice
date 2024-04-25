@@ -151,7 +151,6 @@ function installIngress(xns: ExactNamespace) {
   installCNHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-      hostPrefix: '',
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,

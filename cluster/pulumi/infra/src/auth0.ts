@@ -78,7 +78,7 @@ function cnAuth0(clusterBasename: string) {
       `SV${sv} UI`,
       `Used for the Wallet, ANS and SV UIs for SV${sv}`,
       ['wallet', 'cns', 'sv'],
-      `sv-${sv}.svc`,
+      `sv-${sv}`,
       clusterBasename,
       provider
     );
@@ -183,7 +183,7 @@ function svRunbookAuth0(clusterBasename: string) {
     'Wallet UI',
     'Used for the Wallet UI for the SV runbook',
     ['wallet'],
-    'sv.svc',
+    'sv',
     clusterBasename,
     provider
   );
@@ -192,7 +192,7 @@ function svRunbookAuth0(clusterBasename: string) {
     'ANS UI',
     'Used for the ANS UI for the SV runbook',
     ['cns'],
-    'sv.svc',
+    'sv',
     clusterBasename,
     provider
   );
@@ -201,7 +201,7 @@ function svRunbookAuth0(clusterBasename: string) {
     'SV UI',
     'Used for the SV UI for the SV runbook',
     ['sv'],
-    'sv.svc',
+    'sv',
     clusterBasename,
     provider
   );

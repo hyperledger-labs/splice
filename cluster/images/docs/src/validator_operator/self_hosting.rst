@@ -68,7 +68,7 @@ Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on you
 
 .. parsed-literal::
 
-  DOMAIN_URL=https://sequencer.sv-MIGRATION_ID.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf
+  DOMAIN_URL=https://sequencer.sv-MIGRATION_ID.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf
 
 Next, open a second terminal and navigate to the extracted bundle's root directory.
 In order to become a validator, you need the sponsorship of a current supervalidator.
@@ -85,7 +85,7 @@ SV. This file should be saved under ``validator-onboarding.conf`` in the directo
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next, start a postgres docker container that will be used by the CN apps:
 
@@ -357,7 +357,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant-secure.conf
+    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant-secure.conf
 
 9. Now start the validator again:
 
@@ -369,7 +369,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
          .. parsed-literal::
 
-             curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+             curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
     b. start Canton Network:
 

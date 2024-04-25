@@ -526,7 +526,6 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
-          "hostPrefix": "",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-mocknet",
@@ -1143,7 +1142,6 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
-          "hostPrefix": "svc.",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-mocknet",
@@ -1651,7 +1649,7 @@
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-1.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [
           {
@@ -1734,7 +1732,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
-          "publicUrl": "https://scan.sv-1.svc.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-1.mock.network.canton.global"
         }
       }
     },
@@ -1763,7 +1761,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.mock.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enableWallet": true,
@@ -1860,7 +1858,6 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
-          "hostPrefix": "",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-mocknet",

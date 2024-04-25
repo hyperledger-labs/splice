@@ -324,7 +324,7 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-1.${CLUSTER_BASENAME}.network.canton.global`;
 
   const validator = await installValidatorApp({
     xns,
@@ -476,11 +476,11 @@ function installSvApp(
         sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
         mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.nodeName}.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
-      publicUrl: `https://scan.${config.nodeName}.svc.${clusterUrl}`,
+      publicUrl: `https://scan.${config.nodeName}.${clusterUrl}`,
       internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({

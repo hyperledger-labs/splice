@@ -112,7 +112,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     'cn-cluster-ingress-runbook',
     {
       cluster: {
-        hostPrefix: '',
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: RUNBOOK_NAMESPACE,
       },
@@ -219,13 +218,13 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       TARGET_CLUSTER: CLUSTER_BASENAME,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      TRUSTED_SCAN_URL: `https://scan.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
+      TRUSTED_SCAN_URL: `https://scan.sv-1.${CLUSTER_BASENAME}.network.canton.global`,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
-        SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        SPONSOR_SV_URL: `https://sv.sv-1.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
   };

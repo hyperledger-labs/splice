@@ -73,7 +73,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     validator: { url: 'http://localhost:5003/api/validator' },
     wallet: { uiUrl: 'http://localhost:3000' },
     splitwell: { url: 'http://localhost:5113' },
-    scan: { url: clusterProtocol + '://' + 'scan.sv-1.svc.' + clusterAddress + '/api/scan' },
+    scan: { url: clusterProtocol + '://' + 'scan.sv-1.' + clusterAddress + '/api/scan' },
   },
   scan: {
     scan: { url: 'http://localhost:5012/api/scan' },

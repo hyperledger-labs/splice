@@ -1,9 +1,9 @@
 joinWithKeyOnboarding:
-  sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global"
+  sponsorApiUrl: "https://sv.sv-1.TARGET_CLUSTER.network.canton.global"
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
-decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-1.svc.TARGET_CLUSTER.network.canton.global"
+decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-1.TARGET_CLUSTER.network.canton.global"
 auth:
   # The default value of audience is ``https://canton.network.global``.
   # If you want to configure a custom audience for SV app backend, uncomment this line and replace OIDC_AUTHORITY_SV_AUDIENCE with the audience of your choice.
@@ -31,7 +31,7 @@ participantAddress: "participant-MIGRATION_ID"
 domain:
   sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
   mediatorAddress: "global-domain-MIGRATION_ID-mediator"
-  sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.svc.YOUR_HOSTNAME"
+  sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
   sequencerAvailabilityDelay: "60 seconds"
   sequencerPruningConfig:
     enabled: true
@@ -42,7 +42,7 @@ domain:
 # Make sure your cluster's ingress is correctly configured for Scan and can be accessed through the provided URL.
 # internalUrl should point to the same scan instance but must be accessible from the SV app. You can usually just leave the default value here.
 scan:
-  publicUrl: "https://scan.sv.svc.YOUR_HOSTNAME"
+  publicUrl: "https://scan.sv.YOUR_HOSTNAME"
   internalUrl: "http://scan-app.sv:5012"
 
 persistence:
