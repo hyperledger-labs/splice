@@ -2682,6 +2682,7 @@ jobs:
           cmd_name: Restoring node
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          no_output_timeout: "20m"
           cmd: |
             cncluster activate
             cncluster restore_node --force << parameters.namespace_name >>
