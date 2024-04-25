@@ -266,7 +266,7 @@ object ScanApp {
       Lifecycle.close(
         AsyncCloseable(
           "http binding",
-          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
           timeouts.shutdownNetwork,
         ),
         automation,
