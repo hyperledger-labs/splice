@@ -107,7 +107,7 @@ groups:
               refId: D
               type: threshold
         noDataState: OK
-        execErrState: OK
+        execErrState: Error
         for: 1m
         annotations:
           description: ""

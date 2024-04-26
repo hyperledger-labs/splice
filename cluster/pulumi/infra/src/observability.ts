@@ -98,7 +98,8 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_DNS_NAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_DNS_NAME}`;
 const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
-const disablePrometheusAlerts = config.envFlag('DISABLE_PROMETHEUS_ALERT');
+const disablePrometheusAlerts = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
+const shouldIgnoreDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
 const slackAlertNotificationChannel =
   config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 
@@ -436,7 +437,14 @@ function createGrafanaAlerting(namespace: Input<string>) {
 }
 
 function readGrafanaAlertingFile(file: string) {
-  return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`, 'utf-8');
+  const fileContent = fs.readFileSync(
+    `${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    'utf-8'
+  );
+  // Ignore data source error if the cluster is reset periodically
+  return shouldIgnoreDataSourceError
+    ? fileContent.replace(/execErrState: .+/g, 'execErrState: OK')
+    : fileContent.replace(/execErrState: .+/g, 'execErrState: Error');
 }
 
 function readAlertingManagerFile(file: string) {
