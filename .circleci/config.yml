@@ -4412,6 +4412,15 @@ workflows:
             - slack-context
           workflow_names: "deploy_ciupgrade deploy_ciupgrade_migration"
           wait_type: "wait_workflow"
+      - reset_cluster:
+          # note that this reset is executed on the latest version to properly cleanup previous deploy_ciupgrade runs
+          name: reset_cluster
+          <<: *main-branch-only
+          cluster: "ciupgrade"
+          context:
+            - canton-network-vpn
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           name: "deploy_cluster_for_upgrade"
           <<: *main-branch-only
@@ -4419,12 +4428,13 @@ workflows:
             - artifactory
             - slack-context
           cluster: "ciupgrade"
+          reset_cluster: false # done in reset_cluster job
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
           requires:
-            - wait_for_previous_pipeline
+            - reset_cluster
       - preflight_check:
           name: "preflight_check_initial"
           <<: *main-branch-only
@@ -4437,7 +4447,7 @@ workflows:
           wait_for_sv: false
           parallelism: 1
           requires:
-            - wait_for_previous_pipeline
+            - reset_cluster
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
