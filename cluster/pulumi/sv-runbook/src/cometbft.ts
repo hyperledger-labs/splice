@@ -14,8 +14,9 @@ import {
   svCometBftKeysFromSecret,
   stableCometBftChainId,
   clusterSmallDisk,
+  config,
+  cometbftRetainBlocks,
 } from 'cn-pulumi-common';
-import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
 import { CLUSTER_BASENAME } from './utils';
 
@@ -127,7 +128,7 @@ export function installCometBftNode(
           db: {
             volumeSize: clusterSmallDisk ? '240Gi' : undefined,
           },
-          extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
+          extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
         }),
         version,
         dependencies

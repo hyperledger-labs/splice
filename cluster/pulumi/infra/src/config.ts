@@ -1,9 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
+import { config } from 'cn-pulumi-common';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');
 export const clusterDnsName = `${clusterBasename}.network.canton.global`;
-export const gcpDnsProject = process.env.GCP_DNS_PROJECT;
-
-if (gcpDnsProject === undefined) {
-  throw new Error('GCP_DNS_PROJECT environment variable is undefined');
-}
+export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');

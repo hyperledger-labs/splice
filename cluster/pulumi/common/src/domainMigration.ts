@@ -1,3 +1,4 @@
+import { config } from './config';
 import { CnChartVersion, defaultVersion } from './helm';
 
 export class DecentralizedSynchronizerMigrationConfig {
@@ -29,18 +30,19 @@ export class DecentralizedSynchronizerMigrationConfig {
   static fromEnv(): DecentralizedSynchronizerMigrationConfig {
     return new DecentralizedSynchronizerMigrationConfig(
       new MigrationInfo(
-        processMigrationId(process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID) || DefaultMigrationId,
+        processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID')) ||
+          DefaultMigrationId,
         defaultVersion
       ),
       MigrationInfo.fromEnv(
-        process.env.GLOBAL_DOMAIN_LEGACY_MIGRATION_ID,
-        process.env.GLOBAL_DOMAIN_LEGACY_VERSION
+        config.optionalEnv('GLOBAL_DOMAIN_LEGACY_MIGRATION_ID'),
+        config.optionalEnv('GLOBAL_DOMAIN_LEGACY_VERSION')
       ),
       MigrationInfo.fromEnv(
-        process.env.GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID,
-        process.env.GLOBAL_DOMAIN_UPGRADE_VERSION
+        config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID'),
+        config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_VERSION')
       ),
-      processMigrationId(process.env.GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID)
+      processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID'))
     );
   }
 

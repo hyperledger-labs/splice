@@ -4,10 +4,9 @@ import {
   BackupConfig,
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
-  envFlag,
+  config,
   DecentralizedSynchronizerMigrationConfig,
   isDevNet,
-  requireEnv,
   sequencerPruningConfig,
   svValidatorTopupConfig,
   nonSvValidatorTopupConfig,
@@ -32,7 +31,7 @@ console.error(`Launching with isDevNet: ${isDevNet}`);
 // This flag determines whether to add a approved SV entry of 'DA-Helm-Test-Node'
 // An 'DA-Helm-Test-Node' entry is already added to `approved-sv-id-values-dev.yaml` so it is added by default for devnet deployment.
 // This flag is only relevant to non-devnet deployment.
-const approveSvRunbook = envFlag('APPROVE_SV_RUNBOOK');
+const approveSvRunbook = config.envFlag('APPROVE_SV_RUNBOOK');
 if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }
@@ -41,11 +40,12 @@ if (approveSvRunbook) {
 // By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
 // but not on k8s-deployed postgres (where we optimize for faster deployment).
 // One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
-const splitPostgresInstances = envFlag('SPLIT_POSTGRES_INSTANCES') || envFlag('ENABLE_CLOUD_SQL');
+const splitPostgresInstances =
+  config.envFlag('SPLIT_POSTGRES_INSTANCES') || config.envFlag('ENABLE_CLOUD_SQL');
 
-const enableChaosMesh = envFlag('ENABLE_CHAOS_MESH');
+const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
-const disableOnboardingParticipantPromotionDelay = envFlag(
+const disableOnboardingParticipantPromotionDelay = config.envFlag(
   'DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
   false
 );
@@ -55,16 +55,16 @@ type BootstrapCliConfig = {
   date: string;
 };
 
-const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
-  ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
+const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPING_CONFIG')
+  ? JSON.parse(config.requireEnv('BOOTSTRAPPING_CONFIG'))
   : undefined;
 
 const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
   DecentralizedSynchronizerMigrationConfig.fromEnv();
 
-const mustInstallValidator1 = envFlag('CN_INSTALL_VALIDATOR1', true);
+const mustInstallValidator1 = config.envFlag('CN_INSTALL_VALIDATOR1', true);
 
-const mustInstallSplitwell = envFlag('CN_INSTALL_SPLITWELL', true);
+const mustInstallSplitwell = config.envFlag('CN_INSTALL_SPLITWELL', true);
 
 const svRunbookApprovedSvIdentities: ApprovedSvIdentity[] = [
   {
@@ -106,7 +106,7 @@ function getDsoSize(): number {
   }
 
   const maxDsoSize = svConfigs.length;
-  const dsoSize = +requireEnv(
+  const dsoSize = +config.requireEnv(
     'DSO_SIZE',
     `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxDsoSize})`
   );

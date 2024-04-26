@@ -234,6 +234,16 @@
     "type": "cn:gcp:ImportedSecret"
   },
   {
+    "custom": false,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {

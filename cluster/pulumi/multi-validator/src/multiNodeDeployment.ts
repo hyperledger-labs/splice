@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { numNodesPerInstance, requireEnv } from 'cn-pulumi-common';
+import { config, numNodesPerInstance } from 'cn-pulumi-common';
 import { ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 import _ from 'lodash';
 
@@ -68,7 +68,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   name: args.imageName,
                   image: `us-central1-docker.pkg.dev/da-cn-shared/cn-images/${
                     args.imageName
-                  }:${requireEnv('IMAGE_TAG')}`,
+                  }:${config.requireEnv('IMAGE_TAG')}`,
                   imagePullPolicy: 'Always',
                   ...args.container,
                   ports: args.container.ports.concat({

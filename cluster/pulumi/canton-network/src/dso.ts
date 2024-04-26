@@ -15,6 +15,7 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ApprovedSvIdentity,
   daSupportApprovedIdentities,
+  config,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
@@ -152,7 +153,7 @@ export class Dso extends pulumi.ComponentResource {
         : {
             type: 'found-collective',
             foundingSvRewardWeightBps,
-            roundZeroDuration: process.env.ROUND_ZERO_DURATION,
+            roundZeroDuration: config.optionalEnv('ROUND_ZERO_DURATION'),
             initialTickDurationS,
             initialHoldingFee,
           },

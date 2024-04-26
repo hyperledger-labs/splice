@@ -19,6 +19,7 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
   }
 }
 
+/*eslint no-process-env: "off"*/
 export function initDumpConfig(): void {
   process.env.GCP_CLUSTER_BASENAME = 'mock';
   process.env.CNCLUSTER_FIXED_TOKENS = '0';

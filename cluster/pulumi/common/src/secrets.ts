@@ -4,8 +4,9 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersi
 
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
+import { config } from './config';
 import { CnInput } from './helm';
-import { btoa, ExactNamespace, requireEnv } from './utils';
+import { btoa, ExactNamespace } from './utils';
 
 export type SvIdKey = {
   publicKey: string;
@@ -50,8 +51,8 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
 
 export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   const artifactory = 'digitalasset-canton-network-docker.jfrog.io';
-  const username = requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
-  const password = requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+  const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+  const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   const k8sProvider = new k8s.Provider('k8s-imgpull-' + ns, { enableServerSideApply: true });
   const secret = new k8s.core.v1.Secret(ns + '-docker-reg-cred', {
     metadata: {

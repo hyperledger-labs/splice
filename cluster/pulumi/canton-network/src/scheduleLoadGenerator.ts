@@ -3,18 +3,17 @@ import {
   Auth0Client,
   CLUSTER_BASENAME,
   defaultVersion,
-  envFlag,
+  config,
   exactNamespace,
   generatePortSequence,
   installCNHelmChart,
   isDevNet,
   numInstances,
   numNodesPerInstance,
-  requireEnv,
 } from 'cn-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
-  if (envFlag('K6_ENABLE_LOAD_GENERATOR')) {
+  if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
     const clusterHostname = `${CLUSTER_BASENAME}.network.canton.global`;
@@ -35,7 +34,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
 
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
     const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
-    const usersPassword = requireEnv('K6_USERS_PASSWORD');
+    const usersPassword = config.requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint
     const prometheusRw =
@@ -49,12 +48,12 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
         oauthClientId,
         usersPassword,
         managementApi: {
-          clientId: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
-          clientSecret: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
+          clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
+          clientSecret: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
         },
         admin: {
-          email: process.env['K6_VALIDATOR_ADMIN_USERNAME'] || 'admin@validator1.com',
-          password: requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
+          email: config.optionalEnv('K6_VALIDATOR_ADMIN_USERNAME') || 'admin@validator1.com',
+          password: config.requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
         },
       },
     };

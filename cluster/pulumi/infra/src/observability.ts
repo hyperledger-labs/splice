@@ -9,9 +9,9 @@ import {
   CLUSTER_DNS_NAME,
   GrafanaKeys,
   publicPrometheusRemoteWrite,
-  requireEnv,
+  REPO_ROOT,
+  config,
 } from 'cn-pulumi-common';
-import { REPO_ROOT } from 'cn-pulumi-common';
 
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
@@ -97,9 +97,10 @@ function istioPrometheusRemoteWriteVirtualService(
 const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_DNS_NAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_DNS_NAME}`;
-const enableAlerts = process.env.GCP_CLUSTER_PROD_LIKE == 'true';
-const disablePrometheusAlerts = process.env.DISABLE_PROMETHEUS_ALERT == 'true';
-const slackAlertNotificationChannel = process.env.SLACK_ALERT_NOTIFICATION_CHANNEL || 'C064MTNQT88';
+const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
+const disablePrometheusAlerts = config.envFlag('DISABLE_PROMETHEUS_ALERT');
+const slackAlertNotificationChannel =
+  config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
@@ -175,7 +176,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                         send_resolved: true,
                         http_config: {
                           authorization: {
-                            credentials: requireEnv('SLACK_ACCESS_TOKEN'),
+                            credentials: config.requireEnv('SLACK_ACCESS_TOKEN'),
                           },
                         },
                         title: '{{ template "slack_title" . }}',
@@ -389,7 +390,7 @@ function createGrafanaContactPoints(namespace: Input<string>) {
       data: {
         'slackContactPoint.yaml': Buffer.from(
           readGrafanaAlertingFile('slack_contact_point.yaml')
-            .replaceAll('$SLACK_ACCESS_TOKEN', requireEnv('SLACK_ACCESS_TOKEN'))
+            .replaceAll('$SLACK_ACCESS_TOKEN', config.requireEnv('SLACK_ACCESS_TOKEN'))
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
         ).toString('base64'),
       },

@@ -12,6 +12,7 @@ import {
   defaultVersion,
   CnChartVersion,
   stableCometBftChainId,
+  config,
 } from 'cn-pulumi-common';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svConfigs';
@@ -101,7 +102,7 @@ export function installCometBftNode(
       db: {
         volumeSize: clusterSmallDisk ? '240Gi' : undefined,
       },
-      extraLogLevelFlags: process.env.COMETBFT_EXTRA_LOG_LEVEL_FLAGS,
+      extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
     },
     version,
     {

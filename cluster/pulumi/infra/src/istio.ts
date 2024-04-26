@@ -1,9 +1,8 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { defaultVersion, repositoryOpts } from 'cn-pulumi-common/src';
 import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 
-import { chartPath, loadIPRanges } from '../../common';
+import { defaultVersion, ExactNamespace, installCNHelmChart, loadIPRanges } from '../../common';
 import { clusterBasename } from './config';
 
 export const istioVersion = {
@@ -259,35 +258,31 @@ function configureGatewayService(
 }
 
 function configureGateway(
-  ingressNs: k8s.core.v1.Namespace,
+  ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc?: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
-  return new k8s.helm.v3.Release(
+  return installCNHelmChart(
+    ingressNs,
     'cluster-gateway',
+    'cn-istio-gateway',
     {
-      name: 'cluster-gateway',
-      namespace: ingressNs.metadata.name,
-      // We always install the local chart for this
-      chart: chartPath('cn-istio-gateway', defaultVersion),
-      version: defaultVersion.type == 'remote' ? defaultVersion.version : undefined,
-      repositoryOpts: repositoryOpts(defaultVersion),
-      values: {
-        cluster: {
-          hostname: `${clusterBasename}.network.canton.global`,
-          basename: clusterBasename,
-        },
-        enablePublicGateway: !!publicGwSvc,
+      cluster: {
+        hostname: `${clusterBasename}.network.canton.global`,
+        basename: clusterBasename,
       },
+      enablePublicGateway: !!publicGwSvc,
     },
+    defaultVersion,
     {
       dependsOn: [gwSvc].concat(publicGwSvc ? [publicGwSvc] : []),
-    }
+    },
+    false
   );
 }
 
 export function configureIstio(
-  ingressNs: k8s.core.v1.Namespace,
+  ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
   publicIngressIp?: pulumi.Output<string>
 ): k8s.helm.v3.Release {
@@ -298,10 +293,10 @@ export function configureIstio(
     },
   });
   const base = configureIstioBase(istioSystemNs);
-  const istiod = configureIstiod(ingressNs, base);
-  const gwSvc = configureInternalGatewayService(ingressNs, ingressIp, istiod);
+  const istiod = configureIstiod(ingressNs.ns, base);
+  const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const publicGwSvc = publicIngressIp
-    ? configurePublicGatewayService(ingressNs, publicIngressIp, istiod)
+    ? configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod)
     : undefined;
   const gw = configureGateway(ingressNs, gwSvc, publicGwSvc);
   return gw;

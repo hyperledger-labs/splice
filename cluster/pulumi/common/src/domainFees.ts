@@ -1,3 +1,5 @@
+import { config } from './config';
+
 export type SynchronizerFeesConfig = {
   extraTrafficPrice: number;
   minTopupAmount: number;
@@ -18,7 +20,7 @@ const domainFeesDefaults: SynchronizerFeesConfig = {
 };
 
 function parseNumFromEnv(envVar: string, otherwise: number): number {
-  const val = parseFloat(process.env[envVar] || '');
+  const val = parseFloat(config.optionalEnv(envVar) || '');
   return isNaN(val) ? otherwise : val;
 }
 

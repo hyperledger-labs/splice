@@ -1,6 +1,8 @@
 // Shared constants for multivalidator stuff across pulumi projects
+import { config } from './config';
+
 export const numNodesPerInstance = 10;
-export const numInstances = +(process.env.MULTIVALIDATOR_SIZE || '0');
+export const numInstances = +(config.optionalEnv('MULTIVALIDATOR_SIZE') || '0');
 
 export function generatePortSequence(
   basePort: number,

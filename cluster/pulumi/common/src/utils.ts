@@ -4,18 +4,18 @@ import * as fs from 'fs';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
-export const config = new pulumi.Config();
+import { config } from './config';
 
-export const HELM_CHART_TIMEOUT_SEC = Number(process.env.HELM_CHART_TIMEOUT_SEC) || 480;
+/// Environment variables
+export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
 
-export const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
-export const CLUSTER_BASENAME = requireEnv('GCP_CLUSTER_BASENAME');
-export const GCP_PROJECT = requireEnv('CLOUDSDK_CORE_PROJECT');
+export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
+export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
+export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
-export const CHARTS_VERSION = process.env.CHARTS_VERSION;
 
-export const approveDaSupportSvNode = envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
+export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
 
 const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
 
@@ -36,61 +36,20 @@ export type ApprovedSvIdentity = {
   rewardWeightBps: number;
 };
 
-/// Environment variables
+export const isDevNet = config.envFlag('IS_DEVNET', true);
+export const clusterSmallDisk = config.envFlag('CLUSTER_SMALL_DISK', false);
+export const publicPrometheusRemoteWrite = config.envFlag('PUBLIC_PROMETHEUS_REMOTE_WRITE', false);
 
-export function requireEnv(name: string, msg = ''): string {
-  const value = process.env[name];
-
-  if (!value) {
-    console.error(
-      `FATAL: Environment variable ${name} is undefined. Shutting down.` +
-        (msg != '' ? `(should define: ${msg})` : '')
-    );
-    process.exit(1);
-  } else {
-    return value;
-  }
-}
-
-export function envFlag(flagName: string, defaultFlag = false): boolean {
-  const varVal = process.env[flagName];
-
-  let flag = defaultFlag;
-
-  if (varVal) {
-    const val = varVal.toLowerCase();
-
-    if (val === 't' || val === 'true' || val === 'y' || val === 'yes' || val === '1') {
-      flag = true;
-    } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
-      flag = false;
-    } else {
-      console.error(
-        `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
-      );
-      process.exit(1);
-    }
-  }
-
-  console.error(`Environment Flag ${flagName} = ${flag} (${varVal})`);
-
-  return flag;
-}
-
-export const isDevNet = envFlag('IS_DEVNET', true);
-export const clusterSmallDisk = envFlag('CLUSTER_SMALL_DISK', false);
-export const publicPrometheusRemoteWrite = envFlag('PUBLIC_PROMETHEUS_REMOTE_WRITE', false);
-
-const enableSequencerPruning = envFlag('ENABLE_SEQUENCER_PRUNING', false);
+const enableSequencerPruning = config.envFlag('ENABLE_SEQUENCER_PRUNING', false);
 export const sequencerPruningConfig = enableSequencerPruning
   ? {
       enabled: true,
-      pruningInterval: requireEnv('SEQUENCER_PRUNING_INTERVAL', ''),
-      retentionPeriod: requireEnv('SEQUENCER_RETENTION_PERIOD', ''),
+      pruningInterval: config.requireEnv('SEQUENCER_PRUNING_INTERVAL', ''),
+      retentionPeriod: config.requireEnv('SEQUENCER_RETENTION_PERIOD', ''),
     }
   : { enabled: false };
 
-const lowResourceSequencer = envFlag('SEQUENCER_LOW_RESOURCES', false);
+const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
 export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
   lowResourceSequencer
     ? {
@@ -106,15 +65,16 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
         },
       }
     : {};
-export const sequencerTokenExpirationTime: string | undefined =
-  process.env.SEQUENCER_TOKEN_EXPIRATION_TIME;
+export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
+  'SEQUENCER_TOKEN_EXPIRATION_TIME'
+);
 
-export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_INTERVAL'];
+export const svOnboardingPollingInterval = config.optionalEnv('SV_ONBOARDING_POLLING_INTERVAL');
 
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
 
-export const disableCantonAutoInit = envFlag('DISABLE_CANTON_AUTO_INIT', false);
+export const disableCantonAutoInit = config.envFlag('DISABLE_CANTON_AUTO_INIT', false);
 
 /// Kubernetes Namespace
 
@@ -179,7 +139,7 @@ export function loadJsonFromFile(path: PathLike): any {
   }
 }
 
-const _fixedTokens = envFlag('CNCLUSTER_FIXED_TOKENS', false);
+const _fixedTokens = config.envFlag('CNCLUSTER_FIXED_TOKENS', false);
 
 export function fixedTokens(): boolean {
   return _fixedTokens;
@@ -195,10 +155,10 @@ function extractIpRanges(x: IpRangesDict): string[] {
 
 export function loadIPRanges(): string[] {
   const externalIPRangesJson = loadJsonFromFile(
-    process.env.REPO_ROOT + '/cluster/allowed-ip-ranges-external.json'
+    REPO_ROOT + '/cluster/allowed-ip-ranges-external.json'
   );
   const internalIPRangesJson = loadJsonFromFile(
-    process.env.REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
+    REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
   );
 
   if (isDevNet) {

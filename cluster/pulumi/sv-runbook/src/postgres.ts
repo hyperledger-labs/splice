@@ -1,14 +1,14 @@
 import * as _ from 'lodash';
 import {
   clusterSmallDisk,
-  envFlag,
   ExactNamespace,
   loadYamlFromFile,
   REPO_ROOT,
+  config,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 
-const cloudSqlEnabled = envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
+const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
 
 export function installPostgres(
   xns: ExactNamespace,

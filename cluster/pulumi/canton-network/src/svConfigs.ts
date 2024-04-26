@@ -1,7 +1,11 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Output } from '@pulumi/pulumi';
-import { isDevNet, SvCometBftKeys, svCometBftKeysFromSecret } from 'cn-pulumi-common';
-import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
+import {
+  cometbftRetainBlocks,
+  isDevNet,
+  SvCometBftKeys,
+  svCometBftKeysFromSecret,
+} from 'cn-pulumi-common';
 
 export interface StaticSvConfig {
   nodeName: string;

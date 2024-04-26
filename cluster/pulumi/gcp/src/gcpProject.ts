@@ -1,5 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import { config } from 'cn-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 import { ServiceAccount } from './serviceAccount';
@@ -31,7 +32,7 @@ class GcpProject extends pulumi.ComponentResource {
 
     const { gcpProjectId } = args;
     const sharedProjectId = 'da-cn-shared';
-    const sharedProjectRegion = process.env.CLOUDSDK_COMPUTE_REGION || 'us-central1';
+    const sharedProjectRegion = config.optionalEnv('CLOUDSDK_COMPUTE_REGION') || 'us-central1';
 
     // Enable required services
 

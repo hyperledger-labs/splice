@@ -1,4 +1,5 @@
-import { envFlag } from 'cn-pulumi-common';
+// ensure the config is loaded and the ENV is overriden
+import { config } from 'cn-pulumi-common';
 
 import { configureAuth0 } from './auth0';
 import { clusterBasename } from './config';
@@ -10,7 +11,7 @@ import { configureStorage } from './storage';
 const network = configureNetwork(clusterBasename);
 
 export const ingressIp = network.ingressIp.address;
-export const ingressNs = network.ingressNs.metadata.name;
+export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
 configureIstio(network.ingressNs, ingressIp, network.publicIngressIp?.address);
@@ -22,7 +23,7 @@ configureObservability(observabilityDependsOn);
 configureStorage();
 
 let configuredAuth0;
-if (envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
+if (config.envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
   configuredAuth0 = configureAuth0(clusterBasename);
 }
 

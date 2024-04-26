@@ -1,6 +1,6 @@
 import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, requireEnv } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, config } from 'cn-pulumi-common';
 
 function newUiApp(
   resourceName: string,
@@ -44,8 +44,8 @@ function newUiApp(
 
 function cnAuth0(clusterBasename: string) {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
-  const auth0MgtClientId = requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
+  const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
 
   const provider = new auth0.Provider('dev', {
     domain: auth0Domain,
@@ -169,8 +169,8 @@ function cnAuth0(clusterBasename: string) {
 
 function svRunbookAuth0(clusterBasename: string) {
   const auth0Domain = 'canton-network-sv-test.us.auth0.com';
-  const auth0MgtClientId = requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
+  const auth0MgtClientId = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
 
   const provider = new auth0.Provider('sv', {
     domain: auth0Domain,
@@ -237,7 +237,7 @@ function svRunbookAuth0(clusterBasename: string) {
         fixedTokenCacheName: 'auth0-fixed-token-cache-sv-test',
 
         auth0Domain: 'canton-network-sv-test.us.auth0.com',
-        auth0MgtClientId: requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
+        auth0MgtClientId: config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
         auth0MgtClientSecret: '',
       };
     });
@@ -245,8 +245,8 @@ function svRunbookAuth0(clusterBasename: string) {
 
 function validatorRunbookAuth0(clusterBasename: string) {
   const auth0Domain = 'canton-network-validator-test.us.auth0.com';
-  const auth0MgtClientId = requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
+  const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
 
   const provider = new auth0.Provider('validator', {
     domain: auth0Domain,
@@ -298,7 +298,7 @@ function validatorRunbookAuth0(clusterBasename: string) {
       fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',
 
       auth0Domain: 'canton-network-validator-test.us.auth0.com',
-      auth0MgtClientId: requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID'),
+      auth0MgtClientId: config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID'),
       auth0MgtClientSecret: '',
     };
   });

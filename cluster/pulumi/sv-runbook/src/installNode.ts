@@ -5,7 +5,7 @@ import {
   BackupConfig,
   ChartValues,
   cnsUiSecret,
-  envFlag,
+  config,
   exactNamespace,
   ExactNamespace,
   fixedTokens,
@@ -49,7 +49,7 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
-const singleSv = envFlag('SINGLE_SV') || !isDevNet;
+const singleSv = config.envFlag('SINGLE_SV') || !isDevNet;
 if (singleSv) {
   console.error('Launching with a single SV');
 }
@@ -59,11 +59,11 @@ type BootstrapCliConfig = {
   date: string;
 };
 
-const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
-  ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
+const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPING_CONFIG')
+  ? JSON.parse(config.requireEnv('BOOTSTRAPPING_CONFIG'))
   : undefined;
 
-const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
+const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 const DEFAULT_AUDIENCE = 'https://canton.network.global';

@@ -1,20 +1,20 @@
-import { envFlag, isDevNet, requireEnv } from 'cn-pulumi-common';
+import { config, isDevNet } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import fetch from 'node-fetch';
 
-export const CLUSTER_BASENAME = requireEnv(
+export const CLUSTER_BASENAME = config.requireEnv(
   'GCP_CLUSTER_BASENAME',
   'The cluster in which this chart is being installed'
 );
 export const SV_NAME = 'DA-Helm-Test-Node';
 export const SV_NAMESPACE = 'sv';
 
-export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = envFlag(
+export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = config.envFlag(
   'DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
   false
 );
 
-export const SV_BENEFICIARY_VALIDATOR1 = envFlag('SV_BENEFICIARY_VALIDATOR1', true);
+export const SV_BENEFICIARY_VALIDATOR1 = config.envFlag('SV_BENEFICIARY_VALIDATOR1', true);
 
 export async function getValidator1PartyId(): Promise<string> {
   return retry('getValidator1PartyId', 1000, 100, async () => {

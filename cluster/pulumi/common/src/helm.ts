@@ -5,8 +5,8 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
+import { config } from './config';
 import {
-  CHARTS_VERSION,
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_DNS_NAME,
@@ -17,7 +17,6 @@ import {
   loadJsonFromFile,
   loadYamlFromFile,
   REPO_ROOT,
-  requireEnv,
 } from './utils';
 
 // The default type of dependsOn is an unworkable abonimation.
@@ -30,16 +29,25 @@ export type CNCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'depend
 export type CnInput<T> = T | pulumi.OutputInstance<T>;
 
 export type CnChartVersion = { type: 'local' } | { type: 'remote'; version: string };
+const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
 
 export const defaultVersion: CnChartVersion =
   CHARTS_VERSION && CHARTS_VERSION !== 'local'
     ? { type: 'remote', version: CHARTS_VERSION }
     : { type: 'local' };
 
-const imageTagsFile: string | undefined = process.env['IMAGE_VERSIONS_FILE'];
+const imageTagsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
 const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } } =
   imageTagsFile && loadJsonFromFile(imageTagsFile);
-const imageTagOverride: string | undefined = process.env['IMAGE_TAG'];
+const imageTagOverride: string | undefined = config.optionalEnv('IMAGE_TAG');
+
+if (defaultVersion.type === 'remote') {
+  void pulumi.log.info(
+    `Using default version ${JSON.stringify(defaultVersion)}, with image overrides ${JSON.stringify(
+      jsonImageVersions
+    )} and image tag ${imageTagOverride} for CHARTS_VERSION ${CHARTS_VERSION}`
+  );
+}
 
 function getVersionOverrideFromVersionsFile(
   nsLogicalName: string,
@@ -59,10 +67,11 @@ export function installCNHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions
+  opts?: CNCustomResourceOptions,
+  includeNamespaceInName = true
 ): Release {
   const release = new k8s.helm.v3.Release(
-    `${nsLogicalName}-${name}`,
+    includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
     {
       name,
       namespace: nsMetadataName,
@@ -83,7 +92,8 @@ export function installCNHelmChart(
   chartName: string,
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions
+  opts?: CNCustomResourceOptions,
+  includeNamespaceInName = true
 ): Release {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
@@ -92,7 +102,8 @@ export function installCNHelmChart(
     chartName,
     values,
     version,
-    opts
+    opts,
+    includeNamespaceInName
   );
 }
 
@@ -215,8 +226,8 @@ export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.Reposito
   if (version.type === 'local') {
     return undefined;
   } else {
-    const username = requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
-    const password = requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+    const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+    const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
     return {
       repo: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
       username: username,

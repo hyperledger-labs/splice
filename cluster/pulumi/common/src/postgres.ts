@@ -4,22 +4,15 @@ import * as random from '@pulumi/random';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 
-import {
-  ChartValues,
-  clusterSmallDisk,
-  CNCustomResourceOptions,
-  defaultVersion,
-  envFlag,
-  ExactNamespace,
-  installCNHelmChart,
-  installPostgresPasswordSecret,
-  sanitizedForHelm,
-} from '.';
+import { config } from './config';
+import { CNCustomResourceOptions, defaultVersion, installCNHelmChart } from './helm';
+import { installPostgresPasswordSecret } from './secrets';
+import { ChartValues, clusterSmallDisk, ExactNamespace, sanitizedForHelm } from './utils';
 
-const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
-const protectCloudSql = !envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
+const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
+const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
 
-const cluster = process.env['GCP_CLUSTER_BASENAME'] || 'GCP_CLUSTER_BASENAME not set';
+const cluster = config.requireEnv('GCP_CLUSTER_BASENAME');
 
 const project = gcp.organizations.getProjectOutput({});
 

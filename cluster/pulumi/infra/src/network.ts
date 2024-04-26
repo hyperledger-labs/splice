@@ -2,7 +2,16 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { btoa, GCP_PROJECT, publicPrometheusRemoteWrite, requireEnv } from 'cn-pulumi-common';
+import {
+  btoa,
+  config,
+  exactNamespace,
+  ExactNamespace,
+  GCP_PROJECT,
+  publicPrometheusRemoteWrite,
+} from 'cn-pulumi-common';
+
+import { gcpDnsProject } from './config';
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -22,7 +31,7 @@ function clusterDnsEntries(
       name: dnsName + '.',
       ttl: 60,
       type: 'A',
-      project: process.env.GCP_DNS_PROJECT,
+      project: gcpDnsProject,
       managedZone: 'canton-global',
       rrdatas: [ingressIp.address],
     }),
@@ -30,7 +39,7 @@ function clusterDnsEntries(
       name: `*.${dnsName}.`,
       ttl: 60,
       type: 'A',
-      project: process.env.GCP_DNS_PROJECT,
+      project: gcpDnsProject,
       managedZone: 'canton-global',
       rrdatas: [ingressIp.address],
     }),
@@ -41,7 +50,7 @@ function clusterDnsEntries(
             name: `public.${dnsName}.`,
             ttl: 60,
             type: 'A',
-            project: process.env.GCP_DNS_PROJECT,
+            project: gcpDnsProject,
             managedZone: 'canton-global',
             rrdatas: [publicIngressIp.address],
           }),
@@ -113,7 +122,7 @@ function clusterCertificate(
     }
   );
 
-  const gcpSecretName = requireEnv('DNS01_SA_KEY_SECRET');
+  const gcpSecretName = config.requireEnv('DNS01_SA_KEY_SECRET');
 
   gcp.secretmanager.SecretVersion.get(
     'dns01-sa-key-secret',
@@ -232,7 +241,7 @@ class CantonNetwork extends pulumi.ComponentResource {
   ingressIp: gcp.compute.Address;
   publicIngressIp: gcp.compute.Address | undefined;
   egressIp: gcp.compute.Address;
-  ingressNs: k8s.core.v1.Namespace;
+  ingressNs: ExactNamespace;
 
   constructor(clusterName: string, opts: pulumi.ComponentResourceOptions | undefined = undefined) {
     super('canton:gcp:CantonNetwork', clusterName, {}, opts);
@@ -251,15 +260,11 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp, publicIngressIp);
 
-    const ingressNs = new k8s.core.v1.Namespace('cluster-ingress', {
-      metadata: {
-        name: 'cluster-ingress',
-      },
-    });
+    const ingressNs = exactNamespace('cluster-ingress');
 
     natGateway(clusterName, egressIp, { parent: this });
 
-    clusterCertificate(clusterName, dnsName, ingressNs, certManagerDeployment, dnsEntries);
+    clusterCertificate(clusterName, dnsName, ingressNs.ns, certManagerDeployment, dnsEntries);
 
     this.ingressIp = ingressIp;
     this.publicIngressIp = publicIngressIp;

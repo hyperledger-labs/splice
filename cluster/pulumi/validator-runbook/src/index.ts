@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, Auth0Fetch, infraStack, requireEnv } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, Auth0Fetch, infraStack, config } from 'cn-pulumi-common';
 
 import { installNode } from './installNode';
 
@@ -15,7 +15,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
 async function main() {
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
   const auth0FetchOutput = auth0ClusterCfg.validatorRunbook.apply(cfg => {
-    cfg.auth0MgtClientSecret = requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
+    cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
     return new Auth0Fetch(cfg);
   });
 

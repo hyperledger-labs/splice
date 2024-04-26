@@ -1,5 +1,5 @@
-import { envFlag } from './utils';
+import { config } from './config';
 
 export function failOnAppVersionMismatch(): boolean {
-  return envFlag('FAIL_ON_APP_VERSION_MISMATCH', true);
+  return config.envFlag('FAIL_ON_APP_VERSION_MISMATCH', true);
 }

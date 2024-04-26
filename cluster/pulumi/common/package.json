@@ -13,6 +13,8 @@
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "node-fetch": "^2.6.1",
+    "dotenv": "^16.4.5",
+    "dotenv-expand": "^11.0.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   },
