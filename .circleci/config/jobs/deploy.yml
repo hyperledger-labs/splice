@@ -292,6 +292,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      skip_infra:
+        type: boolean
+        default: false
       update_deployment_branch:
         type: boolean
         default: true
@@ -418,7 +421,12 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            cncluster ci_apply
+            
+            if [[ << parameters.skip_infra >> == true ]]; then
+              cncluster ci_apply --skip-infra
+            else
+              cncluster ci_apply
+            fi
       - when:
           condition: << parameters.update_deployment_branch >>
           steps:

@@ -120,13 +120,30 @@ function _infra_up() {
 
 function _cluster_apply() {
     IMAGE_TAG=$1
+    shift
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-infra)
+                skipInfra="yes"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+        esac
+    done
 
     if [ -n "${IMAGE_TAG:-}" ]; then
         local -x IMAGE_TAG=${IMAGE_TAG}
     fi
 
-    _info "Applying Pulumi Infra Stack"
-    _infra_up
+    if [ -z "${skipInfra:-}" ]; then
+      _info "Applying Pulumi Infra Stack"
+      _infra_up
+    else
+        _info "Skipping infra deployment"
+    fi
 
     _info "Applying Pulumi Stack"
 
@@ -938,7 +955,7 @@ function subcmd_ci_apply() {
 
     _info "Applying CI deployment: ${source_image_tag}"
 
-    _cluster_apply "${source_image_tag}"
+    _cluster_apply "${source_image_tag}" "$@"
 }
 
 ###
