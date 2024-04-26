@@ -84,6 +84,10 @@ parameters:
   run-partial-upgrade:
     type: boolean
     default: true
+  # Controls whether to run daml upgrades in `deploy_ciupgrade`
+  run-daml-upgrade:
+    type: boolean
+    default: true
   # The base version to be used as part of a `deploy_ciupgrade` job
   base-version:
     type: string

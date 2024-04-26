@@ -1545,17 +1545,6 @@ class SvFrontendIntegrationTest
       .getOrElse(0)
   }
 
-  def clickVoteRequestSubmitButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
-    clue("wait for the submit button to become clickable") {
-      eventually(5.seconds)(
-        find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true
-      )
-    }
-    clue("click the submit button") {
-      click on "create-voterequest-submit-button"
-    }
-  }
-
   private def svAmuletPriceShouldMatch(
       rows: Seq[Element],
       svParty: PartyId,

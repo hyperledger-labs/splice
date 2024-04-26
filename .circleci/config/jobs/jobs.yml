@@ -592,20 +592,66 @@ jobs:
           name: Launches the deploy_ciupgrade workflow, disabling partial upgrade if there are Helm/Pulumi changes
           command: |
             source .envrc.vars
+            
             run_partial_upgrade=""
-            if build-tools/helm-change-vs-base; then
+            if build-tools/changes-vs-base "$REPO_ROOT/cluster"; then
               echo "Proceeding with partial upgrade."
               run_partial_upgrade="true"
             else
               echo "Skipping cluster partial upgrade and preflights steps."
               run_partial_upgrade="false"
             fi
+            
+            run_daml_upgrade=""
+            if build-tools/changes-vs-base "$REPO_ROOT/daml/dars.lock"; then
+              echo "Skipping cluster daml upgrade."
+              run_daml_upgrade="false"
+            else
+              echo "Proceeding with daml upgrade."
+              run_daml_upgrade="true"
+            fi
+            
             latest_base_version=$(build-tools/find_latest_base_version.sh)
             curl --fail-with-body --request POST \
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade, \"base-version\": \"$latest_base_version\"}}"
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade, \"run-daml-upgrade\": $run_daml_upgrade, \"base-version\": \"$latest_base_version\"}}"
+
+  wait_for_daml_upgrade:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      run:
+        type: boolean
+        default: false
+      cluster:
+        type: string
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn # VPN is required to get the effective date from SV-1
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Wait for vote to be effective
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          cmd: |
+            if [[ << parameters.run >> == true ]]; then
+              cncluster activate
+              cncluster wait_for_daml_upgrade
+            fi
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
 
   backup_cluster:
     parameters:

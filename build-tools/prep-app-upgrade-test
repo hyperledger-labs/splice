@@ -5,9 +5,10 @@ set -eou pipefail
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 
+# TODO (#11992): we should not assume the version is always 0.1.0
 _info "Re-versioning local Daml models from 0.1.0 to 0.1.1"
 find "daml" -name "daml.yaml" -exec sed -i 's/0.1.0/0.1.1/g' {} \;
-find . -name "*0.1.0.dar" -exec rm {} \;
+find . -name "*0.1.0.dar" -not -path "./daml/dars/*" -exec rm {} \;
 
 base_version=$(get-snapshot-version latest_release)
 

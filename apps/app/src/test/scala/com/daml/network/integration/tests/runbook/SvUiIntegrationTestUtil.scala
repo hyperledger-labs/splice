@@ -133,12 +133,28 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
 
   }
 
-  def withWebUiSv[A](i: Int)(implicit f: WebDriverType => A): A = {
+  def withWebUiSv[A](i: Int)(f: WebDriverType => A): A = {
     val svUiUrl = s"https://sv.sv-$i.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svUsername = s"admin@sv$i-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
 
-    withFrontEnd(s"sv$i") { implicit webDriver =>
+    withWebUiSv(s"sv$i", svUiUrl, svUsername, svPassword)(f)
+  }
+
+  def withWebUiSvRunbook[A](f: WebDriverType => A): A = {
+    val svUiUrl = s"https://sv.sv.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val svUsername = s"admin@sv-dev.com";
+    val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
+    withWebUiSv("sv", svUiUrl, svUsername, svPassword)(f)
+  }
+
+  private def withWebUiSv[A](
+      svFrontend: String,
+      svUiUrl: String,
+      svUsername: String,
+      svPassword: String,
+  )(f: WebDriverType => A): A = {
+    withFrontEnd(svFrontend) { implicit webDriver =>
       clue(s"Logging in to SV UI at: ${svUiUrl}") {
         completeAuth0LoginWithAuthorization(
           svUiUrl,
@@ -149,5 +165,6 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       }
       f(webDriver)
     }
+
   }
 }

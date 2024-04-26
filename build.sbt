@@ -55,7 +55,7 @@ val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks
 /*
  * Root project
  */
-lazy val root = (project in file("."))
+lazy val root: Project = (project in file("."))
   .aggregate(
     `apps-common`,
     `apps-common-sv`,
@@ -1271,6 +1271,8 @@ lazy val `apps-app` =
       assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
       assembly / mainClass := Some("com.daml.network.CNNodeApp"),
       assembly / assemblyJarName := s"cn-node-${version.value}.jar",
+      // include historic dars in the jar
+      Compile / unmanagedResourceDirectories += { file(file(".").absolutePath) / "daml/dars" },
     )
 
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
@@ -1320,6 +1322,7 @@ printTests := {
     isPreflightIntegrationTest(
       name
     ) && name.contains("SvReOnboard")
+  def isDamlCiupgradeVote(name: String): Boolean = name contains "DamlCIUpgradeVote"
   def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
 
@@ -1338,6 +1341,11 @@ printTests := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "Daml ciupgrade vote",
+      "test-daml-ciupgrade-vote.log",
+      (t: String) => isDamlCiupgradeVote(t),
+    ),
     (
       "Global domain upgrade cluster preflight",
       "test-full-class-names-global-domain-upgrade-preflight.log",

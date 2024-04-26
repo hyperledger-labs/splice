@@ -178,8 +178,85 @@ workflow:
           parallelism: 1
           requires:
             - deploy_final_upgrade
+      - preflight_check:
+          name: "preflight_daml_upgrade"
+          <<: *main-branch-only
+          run: << pipeline.parameters.run-daml-upgrade >>
+          test_names_file: "test-daml-ciupgrade-vote.log"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - preflight_check_final_upgrade
+      # the deployment of both SV runbook and validator runbook should be finished
+      # before the daml upgrade vote is effective
       - deploy_sv_runbook:
-          name: "upgrade_sv_runbook"
+          name: "upgrade_sv_runbook_after_daml_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciupgrade"
+          send_deployment_notification: false
+          requires:
+            - preflight_daml_upgrade
+      - deploy_validator_runbook:
+          name: "upgrade_validator_runbook_after_daml_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - preflight_daml_upgrade
+      - wait_for_daml_upgrade:
+          name: "wait_for_daml_upgrade"
+          <<: *main-branch-only
+          context:
+            - canton-network-vpn
+          run: << pipeline.parameters.run-daml-upgrade >>
+          cluster: "ciupgrade"
+          requires:
+            - preflight_daml_upgrade
+      - preflight_check:
+          name: "preflight_after_daml_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - wait_for_daml_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_after_sv_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - wait_for_daml_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_runbook_after_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - wait_for_daml_upgrade
+      - deploy_sv_runbook:
+          name: "redeploy_sv_runbook_after_daml_upgrade"
           # by resetting the SV runbook, it's as if a new SV was onboarded,
           # thus testing that SVs joining after an upgrade also work
           reset_cluster: true
@@ -191,9 +268,11 @@ workflow:
           cluster: "ciupgrade"
           send_deployment_notification: false
           requires:
-            - preflight_check_final_upgrade
+            - wait_for_daml_upgrade
+            - preflight_sv_check_after_sv_upgrade
+            - preflight_validator_runbook_after_upgrade
       - deploy_validator_runbook:
-          name: "upgrade_validator_runbook"
+          name: "redeploy_validator_runbook_after_daml_upgrade"
           # by resetting the Validator runbook, it's as if a new Validator was onboarded,
           # thus testing that Validators joining after an upgrade also work
           reset_cluster: true
@@ -203,9 +282,11 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           requires:
-            - preflight_check_final_upgrade
+            - wait_for_daml_upgrade
+            - preflight_sv_check_after_sv_upgrade
+            - preflight_validator_runbook_after_upgrade
       - preflight_sv_check:
-          name: "preflight_sv_check_after_sv_upgrade"
+          name: "preflight_sv_check_after_sv_redeploy"
           <<: *main-branch-only
           context:
             - artifactory
@@ -213,9 +294,9 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           requires:
-            - upgrade_sv_runbook
+            - redeploy_sv_runbook_after_daml_upgrade
       - preflight_validator_check:
-          name: "preflight_validator_runbook_after_upgrade"
+          name: "preflight_validator_runbook_after_redeploy"
           <<: *main-branch-only
           context:
             - artifactory
@@ -223,7 +304,7 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           requires:
-            - upgrade_validator_runbook
+            - redeploy_validator_runbook_after_daml_upgrade
 
   deploy_ciupgrade_migration:
     when:

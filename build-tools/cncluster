@@ -1549,6 +1549,27 @@ function subcmd_partial_upgrade() {
 
 ###
 
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+
+function subcmd_wait_for_daml_upgrade() {
+    _info "Fetching DSO rules"
+    tmpdir=$(mktemp -d)
+    token=$(subcmd_get_token sv-1)
+    dso=$(curl -s "https://sv.sv-1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/dso" -H "authorization: Bearer ${token}")
+    # get the first futureValue's effective date, which corresponds to the vote from DamlCIUpgradeVotePreflightTest
+    effective_date=$(jq -r '.amulet_rules.payload.configSchedule.futureValues[0]._1' <<< "$dso")
+
+    echo "Effective date is $effective_date, sleeping until then"
+    while [ "$(date -d "$effective_date" +%s)" -gt "$(date +%s)" ]; do
+      echo "Sleeping..." # we need to log often enough that CircleCI doesn't stop the job
+      sleep 10
+    done
+
+    echo "Done."
+}
+
+###
+
 subcommand_whitelist[pdown]="Take the current Pulumi configuration down"
 
 function subcmd_pdown() {

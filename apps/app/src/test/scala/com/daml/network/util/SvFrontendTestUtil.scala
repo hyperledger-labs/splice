@@ -4,6 +4,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import org.openqa.selenium.By
 import org.scalatest.Assertion
+import scala.concurrent.duration.DurationInt
 
 trait SvFrontendTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
@@ -26,6 +27,17 @@ trait SvFrontendTestUtil extends CNNodeTestCommon {
           dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
       }
+    }
+  }
+
+  def clickVoteRequestSubmitButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
+    clue("wait for the submit button to become clickable") {
+      eventually(5.seconds)(
+        find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true
+      )
+    }
+    clue("click the submit button") {
+      click on "create-voterequest-submit-button"
     }
   }
 }

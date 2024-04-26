@@ -120,7 +120,7 @@ object DarResource {
   }
 
   def apply(file: String): DarResource = {
-    val path = s"dar/$file"
+    val path = s"$file"
     val (darBytes, dar) =
       Using.resource(getClass.getClassLoader.getResourceAsStream(path)) { resourceStream =>
         val bytes = ByteString.readFrom(resourceStream)
