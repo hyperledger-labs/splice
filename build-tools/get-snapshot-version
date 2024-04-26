@@ -32,7 +32,7 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
         fi
         cat "${REPO_ROOT}/deployed_cluster_version"
         exit 0
-    elif [[ "${OVERRIDE_VERSION}" =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
+    elif [[ "${OVERRIDE_VERSION}" =~ ^[0-9.]+(-snapshot[0-9.]*v[0-9a-z]*)? ]]; then
         echo "${OVERRIDE_VERSION}"
         exit 0
     elif [[ "${OVERRIDE_VERSION}" == "latest_main" ]]; then
