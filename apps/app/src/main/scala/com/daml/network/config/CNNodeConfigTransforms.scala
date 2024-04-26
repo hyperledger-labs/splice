@@ -13,6 +13,7 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingSequencerTrigger,
 }
 import com.daml.network.sv.config.*
+import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.validator.config.{
   AnsAppExternalClientConfig,
   AppManagerAppClientConfig,
@@ -561,6 +562,18 @@ object CNNodeConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
+          .focus(_.onboarding)
+          .modify(
+            _.map(oc =>
+              oc.copy(svClient =
+                SvAppClientConfig(
+                  NetworkAppClientConfig(url =
+                    setPortPrefixInUrl(range)(oc.svClient.adminApi.url.toString)
+                  )
+                )
+              )
+            )
+          )
       } else {
         config
       }
