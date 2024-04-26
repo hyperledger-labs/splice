@@ -1914,6 +1914,9 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
+      is_shared_cluster:
+        type: boolean
+        default: true
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -1934,7 +1937,11 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
-            cncluster ci_reset_unlock
+            if [[ << parameters.is_shared_cluster >> == true ]]; then
+              cncluster ci_reset_unlock
+            else
+              cncluster reset
+            fi
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cmd_retry_count: 2
           cmd_before_retry: |-
@@ -4444,6 +4451,7 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:
@@ -4467,6 +4475,7 @@ workflows:
           name: reset_cluster
           <<: *main-branch-only
           cluster: "ciupgrade"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:

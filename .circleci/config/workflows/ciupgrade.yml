@@ -17,6 +17,7 @@ workflow:
           name: reset_cluster
           <<: *main-branch-only
           cluster: "ciupgrade"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:
