@@ -1408,8 +1408,8 @@ printTests := {
     ),
     (
       "global domain soft migration test",
-      "test-full-class-names-global-soft-migration-sim-time.log",
-      (t: String) => isTimeBasedTest(t) && isGlobalSoftMigrationTest(t),
+      "test-full-class-names-global-soft-migration.log",
+      (t: String) => isGlobalSoftMigrationTest(t),
     ),
     (
       "disaster recovery tests",

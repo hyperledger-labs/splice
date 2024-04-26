@@ -3409,9 +3409,9 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test global upgrade sim time"
-          test_names_file: "test-full-class-names-global-soft-migration-sim-time.log"
-          start_canton_options: "-s -g"
+          name: "scala_test global upgrade"
+          test_names_file: "test-full-class-names-global-soft-migration.log"
+          start_canton_options: "-w -g"
           resource_class: "xlarge"
           parallelism: 1
       - scala_test:

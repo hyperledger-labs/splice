@@ -72,6 +72,11 @@ while getopts "hdap:c:wsbtfgm" arg; do
   esac
 done
 
+if [ $globalUpgradeDomain -ne 0 ] && [ $simtime -ne 0 ]; then
+  >&2 echo "-g requires -w to be passed as well"
+  exit 1
+fi
+
 tmux_session="canton"
 tmux_window=0
 
@@ -130,12 +135,12 @@ if [ $simtime -eq 1 ]; then
   IFS=' ' read -r -a simtime_db_names <<< \
       "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_simtime\1/g')"
   db_names+=("${simtime_db_names[@]}")
-
+else
   if [ $globalUpgradeDomain -eq 1 ]; then
     db_names+=(
-      "sequencer_global_upgrade_1_simtime"
-      "mediator_global_upgrade_1_simtime"
-      "sequencer_driver_global_upgrade_simtime"
+      "sequencer_global_upgrade_1"
+      "mediator_global_upgrade_1"
+      "sequencer_driver_global_upgrade"
     )
   fi
 fi
@@ -175,12 +180,12 @@ if [[ $global_cometbft -eq 1 ]]; then
 fi;
 
 
-if [ $globalUpgradeDomain -eq 1 ] && [ $wallclocktime -eq 0 ]; then
+if [ $globalUpgradeDomain -eq 1 ] && [ $simtime -eq 0 ]; then
   combinedBootstrapScriptPath="$(mktemp --suffix=.sc)"
   sed -e '/Inserting extra commands here (do not edit this line)/r bootstrap-canton-global-upgrade.sc' \
       "$bootstrapScriptPath" > "$combinedBootstrapScriptPath"
   bootstrapScriptPath="$combinedBootstrapScriptPath"
-  config_overrides_simtime="$config_overrides_simtime -c ./apps/app/src/test/resources/global-upgrade-domain-simtime-overrides.conf"
+  config_overrides="$config_overrides -c ./apps/app/src/test/resources/global-upgrade-domain-overrides.conf"
 fi
 
 tmux_cmd_canton() {

@@ -25,6 +25,7 @@ import com.daml.network.config.CNNodeConfigTransforms.{
   updateAutomationConfig,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.sv.automation.confirmation.ElectionRequestTrigger
 import com.daml.network.sv.automation.singlesv.{
   ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
@@ -37,6 +38,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   Contract,
   ContractWithState,
+  WalletTestUtil,
 }
 import com.daml.network.validator.config.AppManagerConfig
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
@@ -45,16 +47,21 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
 import java.time.Instant
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
 
 /** You must `start-canton` with `-g` to run this test locally. */
-class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
-    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
-    with ConfigScheduleUtil {
+class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
+    extends SvIntegrationTestBase
+    with ConfigScheduleUtil
+    with WalletTestUtil {
 
   override def environmentDefinition =
     super.environmentDefinition
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
       .addConfigTransforms(
         (_, config) =>
           (updateAllAutomationConfigs(c =>
@@ -65,8 +72,10 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
             )
           ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[AssignTrigger]
-              .withResumedTrigger[DsoRulesTransferTrigger]
+              .withPausedTrigger[DsoRulesTransferTrigger]
               .withResumedTrigger[TransferFollowTrigger]
+              // DsoRules gets replaced during create phase with this on
+              .withPausedTrigger[ElectionRequestTrigger]
               // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
               .withPausedTrigger[SubmitSvStatusReportTrigger]
               .withPausedTrigger[ReceiveSvRewardCouponTrigger]
@@ -103,8 +112,7 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
     initDsoWithSv1Only() withClue "spin up Dso"
     val sv1WalletUser = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
-    val timeUntilNewRule = defaultTickDuration
-    val timeToWaitForNewRule = tickDurationWithBuffer
+    val timeUntilNewRule = 5.seconds
 
     // If you fail here, see class scaladoc.
     val globalUpgradeId = sv1Backend.participantClient.domains.id_of(
@@ -127,7 +135,7 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
     val (previousGlobalId, amuletRulesCid) = clue("change amuletconfig to migrate domains") {
       inside(sv1ScanBackend.getAmuletRules()) {
         case ContractWithState(firstAmuletRules, Assigned(global1)) =>
-          val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+          val now = env.environment.clock.now
           val currentSchedule = firstAmuletRules.payload.configSchedule
           val activeSynchronizerId =
             AmuletConfigSchedule(currentSchedule)
@@ -139,7 +147,7 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
           global1.toProtoPrimitive shouldBe activeSynchronizerId
 
           val upgradeAfterTick = new Tuple2(
-            env.environment.clock.now.add(timeUntilNewRule.asJava).toInstant,
+            env.environment.clock.now.add(timeUntilNewRule.toJava).toInstant,
             mkUpdatedAmuletConfig(
               currentSchedule,
               defaultTickDuration,
@@ -147,6 +155,8 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
             ),
           )
 
+          // if fails on "The insertion is scheduled in the future",
+          // timeUntilNewRule may not be long enough
           val setScheduleResult = cleanAndAddNewSchedule(
             AssignedContract(firstAmuletRules, global1),
             upgradeAfterTick,
@@ -577,7 +587,9 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
       )
     }
 
-    advanceTime(timeToWaitForNewRule) withClue "advance time"
+    sv1Backend.dsoAutomation.trigger[DsoRulesTransferTrigger].resume()
+    // note that getDsoInfo can 404 transiently from this point on as
+    // DsoRules is being reassigned
 
     clue("see whether the dsorules moves") {
       eventually() {
@@ -640,8 +652,8 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
       allContractsMigrated(templatesMovedBySvAutomation.map(c(_, sv1Party))*)
     }
 
-    // wait a tick for next, as below wait for AmuletRules to move
-    advanceTime(tickDurationWithBuffer)
+    // below will wait for AmuletRules to move, which happens at least a
+    // trigger fire later than DsoRules moves
 
     clue(
       "see whether amulet contracts signed only by DSO (in particular mining rounds) follow dsorules"
