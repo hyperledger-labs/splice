@@ -36,6 +36,7 @@ import {
   disableCantonAutoInit,
   ApprovedSvIdentity,
   daSupportApprovedIdentities,
+  SV_APP_HELM_CHART_TIMEOUT_SEC,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -377,7 +378,8 @@ async function installSvAndValidator(
     imagePullDeps
       .concat([participant, decentralizedSynchronizer])
       .concat([svAppSecret, svAppUISecret, appsPg])
-      .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
+      .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
+    SV_APP_HELM_CHART_TIMEOUT_SEC
   );
 
   const scanValues: ChartValues = {

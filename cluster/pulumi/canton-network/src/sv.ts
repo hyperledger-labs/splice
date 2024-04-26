@@ -34,6 +34,7 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
   ApprovedSvIdentity,
+  SV_APP_HELM_CHART_TIMEOUT_SEC,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -515,9 +516,18 @@ function installSvApp(
     };
   }
 
-  const svApp = installCNHelmChart(xns, `sv-app`, 'cn-sv-node', svValues, defaultVersion, {
-    dependsOn: dependsOn.concat([participant, postgres, decentralizedSynchronizer]),
-  });
+  const svApp = installCNHelmChart(
+    xns,
+    `sv-app`,
+    'cn-sv-node',
+    svValues,
+    defaultVersion,
+    {
+      dependsOn: dependsOn.concat([participant, postgres, decentralizedSynchronizer]),
+    },
+    undefined,
+    SV_APP_HELM_CHART_TIMEOUT_SEC
+  );
   installPostgresMetrics(postgres, svDbName, [svApp]);
   return svApp;
 }

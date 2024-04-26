@@ -9,6 +9,8 @@ import { config } from './config';
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
 
+export const SV_APP_HELM_CHART_TIMEOUT_SEC = 1000;
+
 export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');

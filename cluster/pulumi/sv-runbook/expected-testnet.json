@@ -527,7 +527,7 @@
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv",
-      "timeout": 480,
+      "timeout": 1000,
       "values": {
         "approvedSvIdentities": [
           {

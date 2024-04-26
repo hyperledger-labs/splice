@@ -68,7 +68,8 @@ export function installCNHelmChartByNamespaceName(
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
   opts?: CNCustomResourceOptions,
-  includeNamespaceInName = true
+  includeNamespaceInName = true,
+  timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
   const release = new k8s.helm.v3.Release(
     includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
@@ -79,7 +80,7 @@ export function installCNHelmChartByNamespaceName(
       version: versionString(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
       values: cnChartValues(nsLogicalName, version, chartName, values),
-      timeout: HELM_CHART_TIMEOUT_SEC,
+      timeout,
     },
     opts
   );
@@ -93,7 +94,8 @@ export function installCNHelmChart(
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
   opts?: CNCustomResourceOptions,
-  includeNamespaceInName = true
+  includeNamespaceInName = true,
+  timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
@@ -103,7 +105,8 @@ export function installCNHelmChart(
     values,
     version,
     opts,
-    includeNamespaceInName
+    includeNamespaceInName,
+    timeout
   );
 }
 
@@ -162,7 +165,8 @@ export function installCNRunbookHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  dependsOn: CnInput<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = [],
+  timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
     name,
@@ -180,7 +184,7 @@ export function installCNRunbookHelmChartByNamespaceName(
             ? 'us-central1-docker.pkg.dev/da-cn-shared/cn-images'
             : undefined,
       },
-      timeout: HELM_CHART_TIMEOUT_SEC,
+      timeout,
     },
     {
       dependsOn: dependsOn,
@@ -194,7 +198,8 @@ export function installCNRunbookHelmChart(
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  dependsOn: CnInput<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = [],
+  timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
   return installCNRunbookHelmChartByNamespaceName(
     ns.ns.metadata.name,
@@ -203,7 +208,8 @@ export function installCNRunbookHelmChart(
     chartName,
     values,
     version,
-    dependsOn.concat([ns.ns])
+    dependsOn.concat([ns.ns]),
+    timeout
   );
 }
 
