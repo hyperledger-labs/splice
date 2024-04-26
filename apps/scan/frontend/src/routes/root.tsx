@@ -15,7 +15,7 @@ const Root: React.FC = () => {
     { name: 'Recent Activity', path: 'recent-activity' },
     { name: 'App Leaderboard', path: 'app-leaderboard' },
     { name: 'Validator Leaderboard', path: 'validator-leaderboard' },
-    { name: 'Domain Fees Leaderboard', path: 'domain-fees-leaderboard' },
+    { name: 'Synchronizer Fees Leaderboard', path: 'synchronizer-fees-leaderboard' },
     { name: 'Validator Liveness Leaderboard', path: 'validator-faucets-leaderboard' },
   ];
   // Unfortunately, NavLink from react-router-dom doesn't realize that 'recent-activity' is the index at '/',

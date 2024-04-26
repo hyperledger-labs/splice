@@ -49,7 +49,7 @@ const router = createBrowserRouter(
         <Route path="recent-activity" element={<Activity />} />
         <Route path="app-leaderboard" element={<AppLeaderboard />} />
         <Route path="validator-leaderboard" element={<ValidatorLeaderboard />} />
-        <Route path="domain-fees-leaderboard" element={<SynchronizerFeesLeaderboard />} />
+        <Route path="synchronizer-fees-leaderboard" element={<SynchronizerFeesLeaderboard />} />
         <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
     </Route>

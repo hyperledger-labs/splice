@@ -29,7 +29,7 @@ export const SynchronizerFeesLeaderboardTable: React.FC = () => {
           </Typography>
         </Stack>
       ) : (
-        <TitledTable title="Domain Fees Leaderboard">
+        <TitledTable title="Synchronizer Fees Leaderboard">
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
@@ -65,7 +65,7 @@ const ValidatorRow: React.FC<{
     validator;
   return (
     <TableRow
-      className="domain-fees-leaderboard-row"
+      className="synchronizer-fees-leaderboard-row"
       data-selenium-text={`${name} ${numPurchases} ${totalTrafficPurchased} ${totalCcSpent} CC ${lastPurchasedInRound}`}
     >
       <TableCell>{name}</TableCell>

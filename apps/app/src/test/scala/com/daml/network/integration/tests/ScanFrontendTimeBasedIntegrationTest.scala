@@ -255,7 +255,7 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
-    "See expected domain fees leaderboard" in { implicit env =>
+    "See expected synchronizer fees leaderboard" in { implicit env =>
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
       val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
@@ -301,18 +301,18 @@ class ScanFrontendTimeBasedIntegrationTest
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to Scan UI main page",
-          go to s"http://localhost:${scanUIPort}/domain-fees-leaderboard",
+          go to s"http://localhost:${scanUIPort}/synchronizer-fees-leaderboard",
         )(
           "See both entries in the leaderboard",
           _ => {
-            findAll(className("domain-fees-leaderboard-row")).toSeq should have length 2
+            findAll(className("synchronizer-fees-leaderboard-row")).toSeq should have length 2
           },
         )
 
-        clue("Compare domain fees leaderboard values") {
+        clue("Compare synchronizer fees leaderboard values") {
 
           compareLeaderboardTable(
-            "domain-fees-leaderboard-row",
+            "synchronizer-fees-leaderboard-row",
             Seq(
               s"${aliceValidatorWalletParty} 2 20000000 10 CC ${(firstRound + 1).toString}",
               s"${bobValidatorWalletParty} 1 10000000 5 CC ${(firstRound + 1).toString}",
