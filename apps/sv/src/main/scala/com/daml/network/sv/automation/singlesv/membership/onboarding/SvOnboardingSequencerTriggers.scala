@@ -110,7 +110,7 @@ object SequencerOnboarding {
   * - the sequencer is configured in the domain config found in the DsoRules
   */
 class SvOnboardingSequencerTrigger(
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
@@ -118,7 +118,7 @@ class SvOnboardingSequencerTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends SvTopologyStatePollingAndAssignedTrigger[SequencerToOnboard](
-      context,
+      baseContext,
       store,
     ) {
 

@@ -60,7 +60,9 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
           if (paused) {
             waitForResumePromise = Promise()
           }
-          logger.debug("Starting source processing loop")
+          logger.debug(
+            s"Starting source processing loop with parallelism ${context.config.parallelism}"
+          )
           val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = PekkoUtil.runSupervised(
             logger.error("Fatally failed to handle task", _),
             source

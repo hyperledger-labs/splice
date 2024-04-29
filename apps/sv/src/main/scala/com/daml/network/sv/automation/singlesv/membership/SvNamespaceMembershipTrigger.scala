@@ -120,7 +120,7 @@ private class NamespaceMembership(
   * Adding the sv to the decentralized namespace only after it's already part of the dso guarantees that party migration has finished
   */
 class SvNamespaceMembershipTrigger(
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
@@ -128,7 +128,7 @@ class SvNamespaceMembershipTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends SvTopologyStatePollingAndAssignedTrigger[NamespaceDiff](
-      context,
+      baseContext,
       store,
     ) {
 
