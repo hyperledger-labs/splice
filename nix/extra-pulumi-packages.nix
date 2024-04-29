@@ -8,6 +8,10 @@
         sha256 = "5199462923cd1431fe0457425696e7a93b979a864f7a106bc9d3c64a5cdcb016";
       }
       {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.1-linux-amd64.tar.gz";
+        sha256 = "008f8afbe723cc38ac5f557031dadc6324435d1c8dcb4037f32be856d87d0425";
+      }
+      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-linux-amd64.tar.gz";
         sha256 = "1fb8955dabbe81a767791e9769a32bd895dfee68d2bcc8ffd3dbd560cd5bcf0d";
       }
@@ -40,6 +44,10 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.1.0-darwin-amd64.tar.gz";
         sha256 = "fab4e2e5324dd90b4d01f5e21db1eed99a3cfa4cf9f46e25761de10e88dad89b";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.1-darwin-amd64.tar.gz";
+        sha256 = "c02df58f6a43d18fd7d275d28d46bf527a087d290a62b252a1da74e129ddc90c";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-amd64.tar.gz";
@@ -76,6 +84,10 @@
         sha256 = "50d37a8c053150ac18c33ea018069cfa34c0b141e31733cd7786ed1659a87347";
       }
       {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.1-linux-arm64.tar.gz";
+        sha256 = "c2b1d68b75ad613a7ed01c322609d03a9fa727d5833a0f4bb8ab037578502a82";
+      }
+      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-linux-arm64.tar.gz";
         sha256 = "0ef3b81713728d17c9d55e894c66d2c51658ce3bbe682559d1517fdd49ba126e";
       }
@@ -108,6 +120,10 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.1.0-darwin-arm64.tar.gz";
         sha256 = "0fe7496917d6f842e34d1b7942cce61d16c08b9eb49c232f3bba91244eba140a";
+      }
+      {
+        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.1-darwin-arm64.tar.gz";
+        sha256 = "35f76da2d17846c5772b55195c7ace2bd889f03b4b66dfbe78eb910c3e024549";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-arm64.tar.gz";

@@ -11,8 +11,15 @@ fi
 
 set -euo pipefail
 
+version="$(get-snapshot-version)"
+
+# the version has a v prefix hardcoded in the pulumi-kuburnetes-operator helm chart so we add one as well
+if [ "$appname" == "pulumi-kubernetes-operator" ]; then
+    version="v${version}"
+fi
+
 if [ "${2-}" != "--artifactory" ]; then
-    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(get-snapshot-version)"
+    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:${version}"
 else
-    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:$(get-snapshot-version)"
+    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:${version}"
 fi

@@ -9,6 +9,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 declare -a plugins
 plugins=(
   "auth0=3.1.0"
+  "auth0=3.3.1"
   "command=0.9.2"
   "kubernetes-cert-manager=0.0.5"
   "gcp=6.67.0"

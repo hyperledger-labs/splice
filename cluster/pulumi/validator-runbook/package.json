@@ -2,12 +2,10 @@
   "name": "validator-runbook",
   "main": "src/index.ts",
   "devDependencies": {
-    "@types/node": "^16",
     "@types/sinon": "^10.0.15",
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "@pulumi/auth0": "3.1.0",
     "cn-pulumi-common": "1.0.0",
     "@pulumi/random": "4.14.0"
   },

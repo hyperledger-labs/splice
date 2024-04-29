@@ -39,7 +39,7 @@ export const defaultVersion: CnChartVersion =
 const imageTagsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
 const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } } =
   imageTagsFile && loadJsonFromFile(imageTagsFile);
-const imageTagOverride: string | undefined = config.optionalEnv('IMAGE_TAG');
+export const imageTagOverride: string | undefined = config.optionalEnv('IMAGE_TAG');
 
 if (defaultVersion.type === 'remote') {
   void pulumi.log.info(

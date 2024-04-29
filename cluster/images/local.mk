@@ -25,6 +25,7 @@ images := \
 	load-tester \
 	multi-validator \
 	multi-participant \
+	pulumi-kubernetes-operator \
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app

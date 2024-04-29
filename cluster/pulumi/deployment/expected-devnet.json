@@ -1,0 +1,374 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+      "kind": "Alert",
+      "metadata": {
+        "name": "flux-deployment-alert",
+        "namespace": "operator"
+      },
+      "spec": {
+        "eventMetadata": {
+          "cluster": "mock"
+        },
+        "eventSeverity": "info",
+        "eventSources": [
+          {
+            "kind": "GitRepository",
+            "name": "*"
+          }
+        ],
+        "providerRef": {
+          "name": "flux-slack-provider"
+        },
+        "summary": "Deployment for stack"
+      }
+    },
+    "name": "deployment-alerts",
+    "provider": "",
+    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Alert"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "env",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "ARTIFACTORY_PASSWORD": "s3cr3t",
+        "ARTIFACTORY_USER": "art_user",
+        "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
+        "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+        "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
+        "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+        "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
+        "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+        "SLACK_ACCESS_TOKEN": "s3cr3t"
+      },
+      "type": "Opaque"
+    },
+    "name": "env",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "flux2",
+      "compat": "true",
+      "name": "flux",
+      "namespace": "operator",
+      "repositoryOpts": {
+        "repo": "https://fluxcd-community.github.io/helm-charts"
+      },
+      "values": {
+        "helmController": {
+          "create": false
+        },
+        "imageAutomationController": {
+          "create": false
+        },
+        "imageReflectionController": {
+          "create": false
+        },
+        "kustomizeController": {
+          "create": false
+        },
+        "prometheus": {
+          "podMonitor": {
+            "create": true
+          }
+        }
+      },
+      "version": "2.12.4"
+    },
+    "name": "flux",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "github",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "password": "s3cr3t",
+        "username": "githubuser-da"
+      },
+      "type": "Opaque"
+    },
+    "name": "github",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "pulumi.com/v1",
+      "kind": "Stack",
+      "metadata": {
+        "name": "infra",
+        "namespace": "operator"
+      },
+      "spec": {
+        "backend": "pulumi_url",
+        "continueResyncOnCommitMatch": false,
+        "destroyOnFinalize": false,
+        "envRefs": {
+          "ARTIFACTORY_PASSWORD": {
+            "secret": {
+              "key": "ARTIFACTORY_PASSWORD",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "ARTIFACTORY_USER": {
+            "secret": {
+              "key": "ARTIFACTORY_USER",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "GCP_CLUSTER_BASENAME": {
+            "literal": {
+              "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "REPO_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/infra/workspace"
+            },
+            "type": "Literal"
+          },
+          "SLACK_ACCESS_TOKEN": {
+            "secret": {
+              "key": "SLACK_ACCESS_TOKEN",
+              "name": "env"
+            },
+            "type": "Secret"
+          }
+        },
+        "fluxSource": {
+          "dir": "cluster/pulumi/infra",
+          "sourceRef": {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "splice-node"
+          }
+        },
+        "refresh": true,
+        "retryOnUpdateConflict": true,
+        "stack": "organization/infra/infra.mock",
+        "useLocalStackOnly": true
+      }
+    },
+    "name": "infra",
+    "provider": "",
+    "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {},
+        "name": "operator"
+      }
+    },
+    "name": "operator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": false,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator",
+      "compat": "true",
+      "name": "pulumi-kubernetes-operator",
+      "namespace": "operator",
+      "values": {
+        "controller": {
+          "args": [
+            "--zap-level=debug",
+            "--zap-time-encoding=iso8601",
+            "--zap-encoder=json"
+          ]
+        },
+        "createClusterRole": true,
+        "deploymentStrategy": "Recreate",
+        "extraEnv": [
+          {
+            "name": "CLOUDSDK_CORE_PROJECT",
+            "value": "da-cn-scratchnet"
+          },
+          {
+            "name": "CLOUDSDK_COMPUTE_REGION",
+            "value": "us-central1"
+          },
+          {
+            "name": "GOOGLE_CREDENTIALS",
+            "value": "s3cr3t"
+          },
+          {
+            "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+            "value": "true"
+          }
+        ],
+        "image": {
+          "pullPolicy": "Always",
+          "registry": "us-central1-docker.pkg.dev",
+          "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
+          "tag": "0.0.1-deadbeef"
+        },
+        "serviceMonitor": {
+          "enabled": true,
+          "namespace": "operator",
+          "service": {
+            "annotations": {},
+            "type": "ClusterIP"
+          }
+        }
+      },
+      "version": "0.7.3"
+    },
+    "name": "pulumi-kubernetes-operator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+      "kind": "Provider",
+      "metadata": {
+        "name": "flux-slack-provider",
+        "namespace": "operator"
+      },
+      "spec": {
+        "address": "https://slack.com/api/chat.postMessage",
+        "channel": "tmp-canton-network-deployments",
+        "secretRef": {
+          "name": "slack"
+        },
+        "type": "slack"
+      }
+    },
+    "name": "slack-notification-provider",
+    "provider": "",
+    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Provider"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "slack",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "token": "s3cr3t"
+      },
+      "type": "Opaque"
+    },
+    "name": "slack",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "name": "splice-node",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "30s",
+        "ref": {
+          "branch": "main"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  }
+]
