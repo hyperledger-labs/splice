@@ -10,7 +10,9 @@ considered stable releases.
 
 In light of the above, the process for cutting a new release is:
 
-1. Create a new branch, `release-line-X.Y.Z`
+1. (optional) Open an issue for cutting the release and upgrading our DevNet nodes to it.
+   We have a GitHub issue template for that ("Cut release and deploy").
+2. Create a new branch, `release-line-X.Y.Z`
     1. Ensure that the `dar` files in `daml/dars` are updated:
        1. Run `sbt cleanCnDars` to ensure a clean environment.
        2. Run `sbt damlBuild`, this will generate the dar files in `daml/dars/APP/dist/NAME-VERSION.dar`.
@@ -35,9 +37,10 @@ In light of the above, the process for cutting a new release is:
        ```
     3. Create a PR for that branch with whatever changes are required from main (e.g. updated to release notes).
        1. Also confirm that the version in `${REPO_ROOT}/VERSION` in that branch is the release you intend to publish.
-    4. Run a preflight test on scratchnet in that PR.
+    4. In case the release version has not already been tested against a cluster (e.g., as part of a `cimain` run):
+       Run a preflight test on scratchnet in that PR.
     5. Note that all commits to any branch named `release-line.*` go through CI, similarly to commits to main.
-       However, they do not get tested on a cluster, hence step 2 is crucial for testing cluster deployments.
+       However, they do not get tested on a cluster, hence step 4 is crucial for testing cluster deployments.
     6. To publish the latest release on the release-line branch for external use by partners:
        1. Navigate to the CircleCI dashboard for the release-line branch.
        2. Click on "Trigger Pipeline"
@@ -46,7 +49,8 @@ In light of the above, the process for cutting a new release is:
        deployment on DevNet with external partners.
     8. In order to finalize a release with a non-snapshot label, create another PR for the `release-line-X.Y.Z`
        branch with a commit message starting with the string `[release]`.
-    9. Repeat step 4 to publish the official release externally.
-2. Create a PR for main that bumps `${REPO_ROOT}/VERSION` to the *next* planned release
+    9. Repeat step 6 to publish the official release externally.
+3. Create a PR for main that bumps `${REPO_ROOT}/VERSION` to the *next* planned release
    (typically this will bump the minor version), and `${REPO_ROOT}/LATEST_RELEASE` to the
-   version of the newly created release line
+   version of the newly created release line.
+   Also make sure that whatever changes you made to the release notes in the release branch are also backported to main.
