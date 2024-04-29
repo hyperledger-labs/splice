@@ -127,3 +127,7 @@ spec:
   - name: cm-metrics
     port: 10013
     protocol: TCP
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.mediator.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity ) }}
+{{- end}}

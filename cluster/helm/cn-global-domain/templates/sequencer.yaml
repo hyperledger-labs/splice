@@ -163,3 +163,7 @@ spec:
     - name: cs-metrics
       port: 10013
       protocol: TCP
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "cn-util-lib.postgres-metrics" (dict "name" (print "postgres-" (.Values.sequencer.persistence.databaseName | replace "_" "-" ) "-e") "namespace" .Release.Namespace "persistence" .Values.sequencer.persistence "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity ) }}
+{{- end}}

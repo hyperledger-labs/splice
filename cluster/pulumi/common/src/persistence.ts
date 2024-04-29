@@ -7,4 +7,5 @@ export type PersistenceConfig = {
   secretName: string;
   schema: pulumi.Output<string>;
   user: pulumi.Output<string>;
+  postgresName: string;
 };

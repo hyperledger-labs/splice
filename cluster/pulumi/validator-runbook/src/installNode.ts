@@ -182,6 +182,11 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       ...participantValues.auth,
       targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
+    persistence: {
+      ...participantValues.persistence,
+      postgresName: 'postgres',
+    },
+    enablePostgresMetrics: true,
   };
 
   const participant = installCNRunbookHelmChart(
@@ -253,6 +258,11 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
             validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier,
         }
       : undefined,
+    persistence: {
+      ...validatorValuesFromYamlFiles.persistence,
+      postgresName: 'postgres',
+    },
+    enablePostgresMetrics: true,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

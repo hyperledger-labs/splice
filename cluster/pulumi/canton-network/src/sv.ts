@@ -40,7 +40,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { installPostgresMetrics, Postgres } from '../../common/src/postgres';
+import { Postgres } from '../../common/src/postgres';
 import { DecentralizedSynchronizerNode } from './decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
@@ -305,6 +305,7 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
     schema: dbNameO,
     user: pulumi.Output.create('cnadmin'),
     port: pulumi.Output.create(5432),
+    postgresName: postgresDb.name,
   };
 }
 
@@ -351,8 +352,6 @@ async function installValidator(
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
   });
-
-  installPostgresMetrics(postgres, validatorDbName, [validator]);
 
   return validator;
 }
@@ -508,6 +507,7 @@ function installSvApp(
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
     participantAddress: participant.name,
     onboardingPollingInterval: config.onboardingPollingInterval,
+    enablePostgresMetrics: true,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -528,7 +528,6 @@ function installSvApp(
     undefined,
     SV_APP_HELM_CHART_TIMEOUT_SEC
   );
-  installPostgresMetrics(postgres, svDbName, [svApp]);
   return svApp;
 }
 
@@ -559,10 +558,10 @@ function installScan(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
+    enablePostgresMetrics: true,
   };
   const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
     dependsOn: [svApp, decentralizedSynchronizerNode],
   });
-  installPostgresMetrics(postgres, scanDbName, [scan]);
   return scan;
 }

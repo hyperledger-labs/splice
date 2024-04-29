@@ -5,9 +5,9 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 
 import { config } from './config';
-import { CNCustomResourceOptions, defaultVersion, installCNHelmChart } from './helm';
+import { defaultVersion, installCNHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
-import { ChartValues, clusterSmallDisk, ExactNamespace, sanitizedForHelm } from './utils';
+import { ChartValues, clusterSmallDisk, ExactNamespace } from './utils';
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
@@ -104,8 +104,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       }
     );
 
-    installPostgresMetrics(this, 'cantonnet', [pgDB], { parent: this });
-
     const password = generatePassword(`${logicalName}-passwd`, {
       parent: this,
       protect: protectCloudSql,
@@ -178,28 +176,6 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
 }
 
 // toplevel
-
-export function installPostgresMetrics(
-  postgres: Postgres,
-  name: string,
-  dependsOn: pulumi.Input<pulumi.Resource>[],
-  opts?: CNCustomResourceOptions
-): Release {
-  return installCNHelmChart(
-    postgres.namespace,
-    `${postgres.name}-${sanitizedForHelm(name)}-e`,
-    'cn-postgres-metrics',
-    {
-      persistence: {
-        host: postgres.address,
-        databaseName: name,
-        secretName: postgres.secretName,
-      },
-    },
-    defaultVersion,
-    { ...{ dependsOn: dependsOn }, ...opts }
-  );
-}
 
 export function installPostgres(
   xns: ExactNamespace,

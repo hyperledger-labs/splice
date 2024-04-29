@@ -12,7 +12,7 @@ import {
   sequencerTokenExpirationTime,
 } from 'cn-pulumi-common';
 
-import { Postgres, installPostgresMetrics } from '../../common/src/postgres';
+import { Postgres } from '../../common/src/postgres';
 import { installCometBftNode } from './cometbft';
 import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
@@ -73,7 +73,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
 
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
-    const synchronizerNodeRelease = installCNHelmChart(
+    installCNHelmChart(
       xns,
       this.name,
       'cn-global-domain',
@@ -83,6 +83,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             databaseName: sequencerDbName,
             secretName: sequencerPostgres.secretName,
             host: sequencerPostgres.address,
+            postgresName: sequencerPostgres.name,
           },
           driver: {
             type: 'cometbft',
@@ -97,6 +98,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             databaseName: mediatorDbName,
             secretName: mediatorPostgres.secretName,
             host: mediatorPostgres.address,
+            postgresName: mediatorPostgres.name,
           },
         },
         metrics: {
@@ -105,13 +107,11 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
         additionalJvmOptions: jmxOptions(),
         disableAutoInit: disableAutoInit,
         nodeIdentifier,
+        enablePostgresMetrics: true,
       },
       version,
       { dependsOn: [cometbftRelease.release], parent: this }
     );
-
-    installPostgresMetrics(mediatorPostgres, mediatorDbName, [synchronizerNodeRelease]);
-    installPostgresMetrics(sequencerPostgres, sequencerDbName, [synchronizerNodeRelease]);
   }
 
   get namespaceInternalSequencerAddress(): string {

@@ -359,3 +359,7 @@ spec:
       storage: 20G
   storageClassName: {{ .Values.pvc.volumeStorageClass }}
 {{- end }}
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity ) }}
+{{- end}}

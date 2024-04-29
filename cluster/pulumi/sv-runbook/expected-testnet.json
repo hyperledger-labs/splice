@@ -332,11 +332,13 @@
       "timeout": 480,
       "values": {
         "disableAutoInit": false,
+        "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_0",
             "host": "mediator-pg.sv.svc.cluster.local",
+            "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secret"
           }
         },
@@ -353,6 +355,7 @@
           "persistence": {
             "databaseName": "sequencer_0",
             "host": "sequencer-pg.sv.svc.cluster.local",
+            "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secret"
           }
         }
@@ -408,6 +411,7 @@
         },
         "disableAutoInit": false,
         "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -416,6 +420,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "participant-pg.sv.svc.cluster.local",
+          "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secret"
         }
@@ -595,6 +600,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv.svrun.network.canton.global"
         },
+        "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
             "partyId": "dummy::partyId",
@@ -616,6 +622,7 @@
         "participantAddress": "participant-0",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
+          "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
         "scan": {
@@ -854,6 +861,7 @@
         },
         "clusterUrl": "svrun.network.canton.global",
         "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svrun.network.canton.global",
+        "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -877,6 +885,7 @@
         },
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
+          "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
         "scanAddress": "http://scan-app.sv:5012",

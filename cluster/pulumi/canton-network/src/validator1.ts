@@ -14,7 +14,6 @@ import {
 } from 'cn-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
-import { installPostgresMetrics } from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
@@ -88,6 +87,7 @@ export async function installValidator1(
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
+      postgresName: validatorPostgres.name,
     },
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
@@ -98,8 +98,6 @@ export async function installValidator1(
     scanAddress,
     secrets: validatorSecrets,
   });
-
-  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 
   if (installSplitwell) {

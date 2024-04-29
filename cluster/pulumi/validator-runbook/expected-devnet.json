@@ -146,6 +146,7 @@
         },
         "disableAutoInit": false,
         "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -161,6 +162,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres",
+          "postgresName": "postgres",
           "schema": "participant",
           "secretName": "postgres-secrets"
         }
@@ -232,6 +234,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "validatorrun.network.canton.global",
+        "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -245,6 +248,7 @@
         "participantAddress": "participant",
         "persistence": {
           "host": "postgres",
+          "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
         "scanAddress": "https://scan.sv-1.validatorrun.network.canton.global",

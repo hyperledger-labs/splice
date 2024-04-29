@@ -171,6 +171,7 @@ export async function installValidatorApp(
       participantAddress: config.participantAddress,
       additionalJvmOptions: jmxOptions(),
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
+      enablePostgresMetrics: true,
     },
     defaultVersion,
     { dependsOn }

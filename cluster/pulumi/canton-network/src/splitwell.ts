@@ -16,7 +16,6 @@ import {
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { installPostgresMetrics } from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
 import { installValidatorApp } from './validator';
 
@@ -132,6 +131,7 @@ export async function installSplitwell(
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
+      postgresName: validatorPostgres.name,
     },
     scanAddress: scanAddress,
     secrets: {
@@ -141,8 +141,6 @@ export async function installSplitwell(
     },
     validatorWalletUser,
   });
-
-  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   return validator;
 }

@@ -15,7 +15,7 @@ import {
 } from 'cn-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
-import { installPostgresMetrics, Postgres } from '../../common/src/postgres';
+import { Postgres } from '../../common/src/postgres';
 
 export function installMigrationSpecificValidatorParticipant(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
@@ -71,6 +71,7 @@ export function installParticipant(
         schema: 'participant',
         host: postgres.address,
         secretName: postgres.secretName,
+        postgresName: postgres.name,
       },
       participantAdminUserNameFrom,
       disableAutoInit,
@@ -79,14 +80,13 @@ export function installParticipant(
       },
       nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
+      enablePostgresMetrics: true,
     },
     version,
     {
       dependsOn,
     }
   );
-
-  installPostgresMetrics(postgres, pgName, [participant]);
 
   return participant;
 }

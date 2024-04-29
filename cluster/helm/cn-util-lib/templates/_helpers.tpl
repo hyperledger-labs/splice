@@ -65,3 +65,120 @@
   value: {{ $var.value }}
 {{- end }}
 {{- end }}
+{{- define "cn-util-lib.postgres-metrics" -}}
+{{- $name := print .persistence.postgresName "-" (.persistence.databaseName | replace "_" "-" ) "-e" }}
+{{- $namespace := .namespace }}
+{{- $persistence := .persistence }}
+{{- $nodeSelector := .nodeSelector }}
+{{- $affinity := .affinity }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      volumes:
+        - name: postgres-password
+          secret:
+            secretName: {{ $persistence.secretName }}
+            items:
+              - key: postgresPassword
+                path: postgresPassword
+      containers:
+      - name: postgres-exporter
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+        env:
+          - name: DATA_SOURCE_PASS_FILE
+            value: /tmp/pwd
+          - name: DATA_SOURCE_USER
+            value: cnadmin
+          - name: DATA_SOURCE_URI
+            value: {{ $persistence.host  }}:{{ $persistence.port | default 5432 }}/{{ $.persistence.databaseName }}?sslmode=disable
+        command:
+          - '/bin/postgres_exporter'
+          - '--log.format=json'
+        volumeMounts:
+          - name: postgres-password
+            mountPath: "/tmp/pwd"
+            subPath: postgresPassword
+            readOnly: true
+      initContainers:
+      # If postgres is not yet ready, postgres-exporter fails when initializing the collector
+      # but never retries nor indicates non-readiness, so we unfortunately need to wait for it
+      # to be ready before spinning up postgres-exporter.
+      - name: postgres-exporter-init
+        image: postgres:14
+        env:
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: postgresPassword
+                name: {{ $persistence.secretName }}
+        command:
+          - 'bash'
+          - '-c'
+          - |
+            until errmsg=$(psql -h {{ $persistence.host }} --username=cnadmin --dbname={{ $persistence.databaseName }} -p {{ $persistence.port | default 5432 }} -c 'select 1' 2>&1); do
+                echo "Waiting for database {{ $persistence.databaseName }}, at hostname {{ $persistence.host }}, port {{ $persistence.port | default 5432 }} to be accessible. Last error: $errmsg"
+                sleep 2;
+            done
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    app: {{ $name }}
+    server: {{ $persistence.host }}
+spec:
+  ports:
+  - name: postgres-metrics
+    port: 9187
+    protocol: TCP
+  selector:
+    app: {{ $name }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: prometheus-grafana-monitoring
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  endpoints:
+
+  - port: postgres-metrics
+    interval: 30s
+
+  selector:
+    matchLabels:
+      app: {{ $name }}
+
+  namespaceSelector:
+    matchNames:
+    - {{ $namespace }}
+
+  targetLabels:
+      - server
+{{- end }}
