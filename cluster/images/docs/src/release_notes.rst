@@ -10,6 +10,7 @@ Upcoming
 
   * Note change in urls in the Digital-Asset-2 node (which is used in several example and default configurations in the docs), from `*.sv-1.svc.<hostname>` to `*.sv-1.<hostname>`, as a step towards making that node compliant with the agreed upon URL formats.
 
+* Updated validator runbooks with instructions for re-onboarding a validator.
 
 0.1.6
 -----

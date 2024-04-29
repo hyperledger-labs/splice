@@ -984,18 +984,11 @@ While doing so, please note the following:
 * Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` so that ``disableAutoInit`` is set to ``true``.
   This will ensure that the Canton participant does not generate new :ref:`identities <validator-upgrades-state>` for itself and instead remains ready to be initialized with the identities from the backup.
 * Modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
-* Follow steps in :ref:`Restoring from a Participant Bootstrap Dump <validator-participant-bootstrap-dump-restore>` to configure to restore the validator with the identities from the backup.
+* Follow notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
   Use the separate JSON file prepared previously.
-* Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
-  This will specify a new participant ID for the validator.
-
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
-    :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
 
 Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
-Confirm that the amulet balance is as expected. It should be the same as the amount that the original SV owned.
+Confirm that the wallet balance is as expected. It should be the same as the amount that the original SV owned.
 
 You can now deploy and onboard a fresh SV node (reusing your SV identity but otherwise starting with a clean slate) by following the steps in :ref:`helm-sv-install`.
 

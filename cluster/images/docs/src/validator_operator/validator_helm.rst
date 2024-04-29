@@ -101,28 +101,6 @@ The password can be setup with the following command, assuming you set the envir
         --from-literal=postgresPassword=${POSTGRES_PASSWORD} \
         -n validator
 
-.. _validator-participant-bootstrap-dump-restore:
-
-Restoring from a Participant Bootstrap Dump
--------------------------------------------
-
-In the case of catastrophic failure, you may need to restore a participant from a bootstrap dump.
-You can restore from the dump by creating a Kubernetes secret with the content of that dump file.
-Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
-
-.. code-block:: bash
-
-    kubectl create secret generic participant-bootstrap-dump \
-        --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
-        -n validator
-
-Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
-
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
-
 Preparing for Validator Onboarding
 ----------------------------------
 
@@ -584,4 +562,61 @@ Canton Name Service.
 .. image:: images/ans_home.png
   :width: 600
   :alt: After logged in into the CNS UI
+
+Re-onboard an validator and recover balances of all users it hosts
+------------------------------------------------------------------
+
+In the case of a catastrophic failure of the validator node, some data owned by the validator and users it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved by deploying another validator node with control over the validator's participant keys.
+
+In order to be able to recover the data, you must have a backup of the identities of the validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
+
+From the backup of Node Identities, copy the content of the field ``identities.participant`` and save it as a separate JSON file.
+This file will be used as an identities bootstrap dump for the new validator.
+
+.. code-block:: bash
+
+    jq '.identities.participant' backup.json > dump.json
+
+
+We can deploy a new validator node to which the data will be recovered.
+
+Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
+While doing so, please follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
+Use the separate JSON file prepared previously.
+
+Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
+Confirm that the wallet balance is as expected. It should be the same as the amount that the original validator wallet user owned.
+By logging in with users that are hosted by the validator original, they should also see the same balance that they owned previously.
+
+.. _validator-restore-from-dump:
+
+Restoring from a Participant Identities Dump
+--------------------------------------------
+
+Before installing the validator app and participant with steps described in :ref:`helm-validator-install`,
+You can configure to restore the validator and participant with the dump file you have prepared previously.
+
+* Create a Kubernetes secret with the content of that dump file.
+  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
+
+.. code-block:: bash
+
+    kubectl create secret generic participant-bootstrap-dump \
+        --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
+        -n validator
+
+* Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
+
+* Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
+  This will specify a new participant ID for the validator. Replace ``put-some-new-string-never-used-before`` with a string that was never used before.
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
+    :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
 

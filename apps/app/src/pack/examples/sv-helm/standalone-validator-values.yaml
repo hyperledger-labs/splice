@@ -28,6 +28,6 @@ persistence:
 # PARTICIPANT_BOOTSTRAP_DUMP_END
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
 # Uncomment the following line if you want to migrate the validator party to a new participant
-  # newParticipantIdentifier: new-participant
+  # newParticipantIdentifier: put-some-new-string-never-used-before
 # migrateValidatorParty: true
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
