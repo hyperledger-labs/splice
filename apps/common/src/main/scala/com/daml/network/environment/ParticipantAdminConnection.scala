@@ -91,7 +91,7 @@ class ParticipantAdminConnection(
     )
   } yield ()
 
-  def registerDomain(config: DomainConnectionConfig, handshakeOnly: Boolean)(implicit
+  private def registerDomain(config: DomainConnectionConfig, handshakeOnly: Boolean)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
@@ -169,9 +169,20 @@ class ParticipantAdminConnection(
       .ensureThat(
         retryFor,
         "domain_registered",
-        s"participant registered ${config.domain}",
-        lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
-        (_: Unit) => registerDomain(config, handshakeOnly = false),
+        s"participant registered ${config.domain} with config $config",
+        lookupDomainConnectionConfig(config.domain).map {
+          case Some(existingConfig) if existingConfig == config => Right(())
+          case Some(other) => Left(Some(other))
+          case None => Left(None)
+        },
+        (existingDomainConfig: Option[DomainConnectionConfig]) =>
+          existingDomainConfig match {
+            case None =>
+              logger.info(s"Registering new domain with config $config")
+              registerDomain(config, handshakeOnly = false)
+            case Some(_) =>
+              modifyDomainConnectionConfig(config.domain, _ => Some(config)).map(_ => ())
+          },
         logger,
       )
     // Albeit Canton auto-connects on registering a domain that auto-connect fails if the domain is
@@ -294,7 +305,9 @@ class ParticipantAdminConnection(
           logger.trace("No update to domain connection config required")
           Future.successful(false)
         case Some(config) =>
-          logger.info(s"Updating to new domain connection config for domain $domain")
+          logger.info(
+            s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
+          )
           for {
             _ <- setDomainConnectionConfig(config)
           } yield true

@@ -155,7 +155,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
                       alias = DomainAlias.tryCreate("global"),
-                      url = Some("http://localhost:27109"),
+                      url = Some("http://localhost:27108"),
                     )
                   ),
                   domainMigrationId = 1L,

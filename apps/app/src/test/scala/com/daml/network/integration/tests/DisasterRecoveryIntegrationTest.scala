@@ -151,7 +151,7 @@ class DisasterRecoveryIntegrationTest
                     domains = ValidatorSynchronizerConfig(global =
                       ValidatorDecentralizedSynchronizerConfig(
                         alias = DomainAlias.tryCreate("global"),
-                        url = Some("http://localhost:28109"),
+                        url = Some("http://localhost:28108"),
                       )
                     ),
                     domainMigrationId = 1L,
