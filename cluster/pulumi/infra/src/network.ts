@@ -173,6 +173,13 @@ function clusterCertificate(
           `*.sv-7.${dnsName}`,
           `*.sv-8.${dnsName}`,
           `*.sv-9.${dnsName}`,
+          `*.sv-10.${dnsName}`,
+          `*.sv-11.${dnsName}`,
+          `*.sv-12.${dnsName}`,
+          `*.sv-13.${dnsName}`,
+          `*.sv-14.${dnsName}`,
+          `*.sv-15.${dnsName}`,
+          `*.sv-16.${dnsName}`,
           `*.sv.${dnsName}`,
         ],
         issuerRef: {

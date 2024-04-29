@@ -246,6 +246,13 @@
           "*.sv-7.test-stack.network.canton.global",
           "*.sv-8.test-stack.network.canton.global",
           "*.sv-9.test-stack.network.canton.global",
+          "*.sv-10.test-stack.network.canton.global",
+          "*.sv-11.test-stack.network.canton.global",
+          "*.sv-12.test-stack.network.canton.global",
+          "*.sv-13.test-stack.network.canton.global",
+          "*.sv-14.test-stack.network.canton.global",
+          "*.sv-15.test-stack.network.canton.global",
+          "*.sv-16.test-stack.network.canton.global",
           "*.sv.test-stack.network.canton.global"
         ],
         "issuerRef": {
