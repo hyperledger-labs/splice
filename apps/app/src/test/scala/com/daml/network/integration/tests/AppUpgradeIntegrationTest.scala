@@ -33,7 +33,8 @@ class AppUpgradeIntegrationTest
     with SplitwellTestUtil
     with WalletTestUtil {
 
-  private val splitwellDarPathV1 = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val splitwellDarPathV1 =
+    s"daml/splitwell/.daml/dist/splitwell-${DarResources.splitwell.others.head.metadata.version}.dar"
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
@@ -59,7 +60,12 @@ class AppUpgradeIntegrationTest
                   n -> appInstance
                     .focus(_.dars)
                     .modify(_.map { darPath =>
-                      Paths.get(darPath.toString.replace("current", "0.1.1"))
+                      Paths.get(
+                        darPath.toString.replace(
+                          "current",
+                          DarResources.splitwell_current.metadata.version.toString(),
+                        )
+                      )
                     })
                 case x => x
               })
@@ -216,9 +222,10 @@ class AppUpgradeIntegrationTest
             _ => {
               val newAmuletRules = sv1Client.getDsoInfo().amuletRules
               val configs =
-                (newAmuletRules.payload.configSchedule.initialValue :: newAmuletRules.payload.configSchedule.futureValues.asScala.toList
-                  .map(_._2))
-              configs.map(_.packageConfig.amulet) should contain("0.1.1")
+                newAmuletRules.payload.configSchedule.futureValues.asScala.toList.map(_._2)
+              forExactly(1, configs) { config =>
+                config.packageConfig.amulet should endWith(".123")
+              }
             },
           )
 

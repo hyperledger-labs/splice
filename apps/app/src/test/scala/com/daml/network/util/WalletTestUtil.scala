@@ -254,6 +254,10 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
           case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(response) =>
             response.status shouldBe TxLogEntry.Http.TransferOfferStatus.Completed
         }
+        inside(receiverWallet.getTransferOfferStatus(trackingId)) {
+          case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(response) =>
+            response.status shouldBe TxLogEntry.Http.TransferOfferStatus.Completed
+        }
       },
     )
   }
