@@ -7,6 +7,7 @@ import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_DNS_NAME,
+  GCP_PROJECT,
   GrafanaKeys,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
@@ -420,7 +421,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
         ...{
           'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
           'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml'),
-          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
+          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
+            .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
+            .replaceAll('$GCP_PROJECT', GCP_PROJECT),
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
           'templates.yaml': readGrafanaAlertingFile('templates.yaml')

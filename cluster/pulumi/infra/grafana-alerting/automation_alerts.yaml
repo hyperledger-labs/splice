@@ -36,7 +36,7 @@ groups:
         annotations:
           __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
           __panelId__: "8"
-          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "failures" }}% failures in the last 10 minutes.
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced {{ index $values "failures" }}% failures in the last 10 minutes. <https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-$CLUSTER_BASENAMEnet%22%0Aresource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A%22{{ index $labels "trigger_name" }}%22;startTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }}?project=$GCP_PROJECT|cloud logs>.
           runbook_url: ""
           severity: |-
             {{- if (gt $values.failures.Value 50.0) -}}
