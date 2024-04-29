@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainTimeSynchronization}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
@@ -82,6 +82,7 @@ class FoundingNodeInitializer(
     override protected val ledgerClient: CNLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
+    override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val storage: Storage,
     override protected val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,

@@ -24,6 +24,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `nonNegativeFiniteDurationWriter` made public
 * `CantonConfig.sequencerNodeParametersByStringX` made public
 * `ActiveContract.loadFromByteString` made public
+* ``PositiveFiniteDuration` config reader and writer made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

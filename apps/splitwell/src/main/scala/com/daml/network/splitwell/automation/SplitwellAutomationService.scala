@@ -20,6 +20,7 @@ import com.daml.network.environment.{
   PackageIdResolver,
   RetryProvider,
 }
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
@@ -45,6 +46,9 @@ class SplitwellAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
+      // splitwell does not have an admin connection to query the domain time
+      // and we care less about it behaving weirdly.
+      DomainTimeSynchronization.Noop,
       store,
       PackageIdResolver.inferFromAmuletRules(
         clock,

@@ -4,6 +4,7 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
@@ -26,6 +27,7 @@ class UserWalletService(
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     override protected[this] val retryProvider: RetryProvider,
@@ -78,6 +80,7 @@ class UserWalletService(
     scanConnection.getAmuletRulesDomain,
     automationConfig,
     clock,
+    domainTimeSync,
     scanConnection,
     retryProvider,
     ingestFromParticipantBegin,

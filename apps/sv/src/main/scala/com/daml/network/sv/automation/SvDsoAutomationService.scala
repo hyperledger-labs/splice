@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
@@ -42,6 +43,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SvDsoAutomationService(
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
@@ -61,6 +63,7 @@ class SvDsoAutomationService(
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
+      domainTimeSync,
       dsoStore,
       PackageIdResolver
         .inferFromAmuletRules(

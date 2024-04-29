@@ -78,15 +78,19 @@ abstract class TaskbasedTrigger[T: Pretty](
 
       if (!quiet)
         logger.info(show"Processing\n$task")
-      context.retryProvider
-        .retry(
-          RetryFor.Automation,
-          "processTaskWithRetry",
-          "processTaskWithRetry",
-          processTaskWithStalenessCheck(),
-          logger,
-          additionalRetryableConditions,
-          mc.labels,
+      context.domainTimeSync
+        .waitForDomainTimeSync()
+        .flatMap(_ =>
+          context.retryProvider
+            .retry(
+              RetryFor.Automation,
+              "processTaskWithRetry",
+              "processTaskWithRetry",
+              processTaskWithStalenessCheck(),
+              logger,
+              additionalRetryableConditions,
+              mc.labels,
+            )
         )
         .transform {
           case Success(taskOutcomeE) =>

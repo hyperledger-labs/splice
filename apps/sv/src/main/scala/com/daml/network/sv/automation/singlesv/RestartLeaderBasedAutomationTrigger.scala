@@ -141,6 +141,7 @@ class RestartLeaderBasedAutomationTrigger(
          )
        val leaderBasedAutomation = new LeaderBasedAutomationService(
          clock,
+         context.domainTimeSync,
          config,
          svTaskContext,
          retryProvider,

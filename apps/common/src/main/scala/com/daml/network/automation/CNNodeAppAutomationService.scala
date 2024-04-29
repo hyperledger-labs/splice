@@ -8,7 +8,11 @@ import com.daml.network.environment.{
   PackageIdResolver,
   RetryProvider,
 }
-import com.daml.network.store.{CNNodeAppStore, CNNodeAppStoreWithIngestion}
+import com.daml.network.store.{
+  CNNodeAppStore,
+  CNNodeAppStoreWithIngestion,
+  DomainTimeSynchronization,
+}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,6 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     automationConfig: AutomationConfig,
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     override val store: Store,
     packageIdResolver: PackageIdResolver,
     ledgerClient: CNLedgerClient,
@@ -31,7 +36,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clock, retryProvider)
+) extends AutomationService(automationConfig, clock, domainTimeSync, retryProvider)
     with CNNodeAppStoreWithIngestion[Store] {
 
   override val connection: CNLedgerConnection =

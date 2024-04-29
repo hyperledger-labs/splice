@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -31,6 +32,7 @@ class UserWalletAutomationService(
     decentralizedSynchronizer: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
@@ -42,6 +44,7 @@ class UserWalletAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
+      domainTimeSync,
       store,
       PackageIdResolver.inferFromAmuletRules(
         clock,

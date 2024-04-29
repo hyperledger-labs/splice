@@ -400,8 +400,7 @@ object PositiveFiniteDuration extends RefinedNonNegativeDurationCompanion[Positi
       s"Cannot convert `$input` to a positive finite duration: $reason"
   }
 
-  private[canton] implicit val positiveFiniteDurationReader
-      : ConfigReader[PositiveFiniteDuration] = {
+  implicit val positiveFiniteDurationReader: ConfigReader[PositiveFiniteDuration] = {
     ConfigReader.fromString[PositiveFiniteDuration] { str =>
       (for {
         duration <- strToFiniteDuration(str)
@@ -410,7 +409,7 @@ object PositiveFiniteDuration extends RefinedNonNegativeDurationCompanion[Positi
     }
   }
 
-  private[canton] implicit val positiveFiniteDurationWriter: ConfigWriter[PositiveFiniteDuration] =
+  implicit val positiveFiniteDurationWriter: ConfigWriter[PositiveFiniteDuration] =
     // avoid pretty printing by converting the underlying value to string
     ConfigWriter.toString(_.underlying.toString)
 }

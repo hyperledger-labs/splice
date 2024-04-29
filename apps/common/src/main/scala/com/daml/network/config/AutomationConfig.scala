@@ -1,7 +1,7 @@
 package com.daml.network.config
 
 import com.daml.network.automation.Trigger
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{PositiveFiniteDuration, NonNegativeFiniteDuration}
 
 import scala.reflect.ClassTag
 
@@ -69,6 +69,11 @@ case class AutomationConfig(
       * guaranteed to never perform any work.
       */
     pausedTriggers: Set[String] = Set.empty,
+
+    /** Maximum allowed domain delay before automation is paused.
+      * Defaults to 2min = participant delay + polling interval + max domain time lag.
+      */
+    maxAllowedDomainTimeDelay: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(2),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName

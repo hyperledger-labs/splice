@@ -65,7 +65,9 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           runningTaskFinishedVar = Some(Promise())
           // TODO(#8526) refactor for better latency reporting
           val latencyTimer = metrics.latency.startAsync()
-          performWorkIfAvailable()
+          context.domainTimeSync
+            .waitForDomainTimeSync()
+            .flatMap(_ => performWorkIfAvailable())
             .andThen { case performedWork =>
               MetricsContext.withExtraMetricLabels(("work_done", performedWork.toString)) { m =>
                 latencyTimer.stop()(m)

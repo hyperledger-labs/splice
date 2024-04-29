@@ -11,6 +11,7 @@ import com.daml.network.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import com.daml.network.environment.*
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
 import com.daml.network.validator.domain.DomainConnector
@@ -41,6 +42,7 @@ class ValidatorAutomationService(
     decentralizedSynchronizerAlias: DomainAlias,
     isSvValidator: Boolean,
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
     scanConnection: BftScanConnection,
@@ -63,6 +65,7 @@ class ValidatorAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
+      domainTimeSync,
       store,
       PackageIdResolver.inferFromAmuletRules(
         clock,

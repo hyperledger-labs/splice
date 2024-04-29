@@ -10,6 +10,7 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
+import com.daml.network.automation.DomainTimeAutomationService
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -254,6 +255,14 @@ class SvApp(
           )
         },
       ).tupled
+      domainTimeAutomationService = new DomainTimeAutomationService(
+        config.domains.global.alias,
+        participantAdminConnection,
+        config.automation,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       newJoiningNodeInitializer = (
           joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
           cometBftNode: Option[CometBftNode],
@@ -269,6 +278,7 @@ class SvApp(
           ledgerClient,
           participantAdminConnection,
           clock,
+          domainTimeAutomationService.domainTimeSync,
           storage,
           loggerFactory,
           retryProvider,
@@ -316,6 +326,7 @@ class SvApp(
                 ledgerClient,
                 participantAdminConnection,
                 clock,
+                domainTimeAutomationService.domainTimeSync,
                 storage,
                 retryProvider,
                 loggerFactory,
@@ -354,6 +365,7 @@ class SvApp(
               ledgerClient,
               participantAdminConnection,
               clock,
+              domainTimeAutomationService.domainTimeSync,
               storage,
               loggerFactory,
               retryProvider,
@@ -560,6 +572,7 @@ class SvApp(
         participantAdminConnection,
         localSynchronizerNode,
         storage,
+        domainTimeAutomationService,
         svStore,
         dsoStore,
         svAutomation,
@@ -726,6 +739,7 @@ object SvApp {
       participantAdminConnection: ParticipantAdminConnection,
       localSynchronizerNode: Option[LocalSynchronizerNode],
       storage: Storage,
+      domainTimeAutomationService: DomainTimeAutomationService,
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
@@ -760,6 +774,7 @@ object SvApp {
         SyncCloseable("dso automation", dsoAutomation.close()),
         SyncCloseable("sv store", svStore.close()),
         SyncCloseable("dso store", dsoStore.close()),
+        SyncCloseable("domain time automation", domainTimeAutomationService.close()),
         SyncCloseable("storage", storage.close()),
       )
   }

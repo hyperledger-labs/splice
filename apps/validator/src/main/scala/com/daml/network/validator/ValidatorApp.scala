@@ -5,6 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.automation.DomainTimeAutomationService
 import com.daml.network.auth.*
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
@@ -607,6 +608,14 @@ class ValidatorApp(
         domainMigrationInfo,
         participantId,
       )
+      domainTimeAutomationService = new DomainTimeAutomationService(
+        config.domains.global.alias,
+        participantAdminConnection,
+        config.automation,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       walletManagerOpt =
         if (config.enableWallet)
           Some(
@@ -616,6 +625,7 @@ class ValidatorApp(
               config.ledgerApiUser,
               config.automation,
               clock,
+              domainTimeAutomationService.domainTimeSync,
               config.treasury,
               storage: Storage,
               retryProvider,
@@ -640,6 +650,7 @@ class ValidatorApp(
         config.domains.global.alias,
         config.svValidator,
         clock,
+        domainTimeAutomationService.domainTimeSync,
         walletManagerOpt,
         store,
         scanConnection,
@@ -943,6 +954,7 @@ class ValidatorApp(
         scanConnection,
         participantAdminConnection,
         storage,
+        domainTimeAutomationService,
         store,
         automation,
         walletManagerOpt,
@@ -963,6 +975,7 @@ object ValidatorApp {
       scanConnection: BftScanConnection,
       participantAdminConnection: ParticipantAdminConnection,
       storage: Storage,
+      domainTimeAutomationService: DomainTimeAutomationService,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
@@ -986,6 +999,7 @@ object ValidatorApp {
         ) ++ walletManager.toList ++ Seq(
           store,
           storage,
+          domainTimeAutomationService,
           scanConnection,
           participantAdminConnection,
         ))*

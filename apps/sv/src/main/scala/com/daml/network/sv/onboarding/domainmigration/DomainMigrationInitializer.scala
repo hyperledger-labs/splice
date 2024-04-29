@@ -13,6 +13,7 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.setup.NodeInitializer
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
@@ -59,6 +60,7 @@ class DomainMigrationInitializer(
     override protected val ledgerClient: CNLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
+    override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val storage: Storage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
@@ -156,6 +158,7 @@ class DomainMigrationInitializer(
       dsoAutomationService =
         new SvDsoAutomationService(
           clock,
+          domainTimeSync,
           config,
           svStore,
           dsoStore,

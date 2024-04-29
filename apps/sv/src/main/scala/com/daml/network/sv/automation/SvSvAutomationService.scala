@@ -7,6 +7,7 @@ import com.daml.network.automation.{
   CNNodeAppAutomationService,
 }
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
@@ -18,6 +19,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 class SvSvAutomationService(
     clock: Clock,
+    domainTimeSync: DomainTimeSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
@@ -31,6 +33,7 @@ class SvSvAutomationService(
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
+      domainTimeSync,
       svStore,
       PackageIdResolver
         .inferFromAmuletRules(
