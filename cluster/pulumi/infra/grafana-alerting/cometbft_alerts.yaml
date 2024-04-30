@@ -436,5 +436,5 @@ groups:
           runbook_url: ""
           summary: Node in namespace {{ $labels.namespace }} didn't sign {{ index $values "current_blocks_not_signed" }} in the last 5 minutes
         labels:
-          "": ""
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A'
         isPaused: false

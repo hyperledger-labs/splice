@@ -114,5 +114,5 @@ groups:
           runbook_url: ""
           summary: The k6 load tester experienced HTTP request failures at a rate past the acceptable threshold
         labels:
-          "": ""
+          gcloud_filter: ''
         isPaused: false

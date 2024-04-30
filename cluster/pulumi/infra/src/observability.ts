@@ -6,6 +6,7 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersi
 import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
+  CLUSTER_NAME,
   CLUSTER_DNS_NAME,
   GCP_PROJECT,
   GrafanaKeys,
@@ -421,13 +422,13 @@ function createGrafanaAlerting(namespace: Input<string>) {
         ...{
           'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
           'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml'),
-          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
-            .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
-            .replaceAll('$GCP_PROJECT', GCP_PROJECT),
+          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
           'templates.yaml': readGrafanaAlertingFile('templates.yaml')
             .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
+            .replaceAll('$CLUSTER_NAME', CLUSTER_NAME)
+            .replaceAll('$GCP_PROJECT', GCP_PROJECT)
             .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl),
         },
       },

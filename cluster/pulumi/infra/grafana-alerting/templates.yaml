@@ -22,6 +22,7 @@ templates:
         {{ .Annotations.summary }}
         {{ .Annotations.description }}
         {{ .Labels.service }}
+        {{ template "slack_gcloud_log_link" . }}
       {{ end }}
 
       {{ define "slack_alert_resolved" }}
@@ -29,3 +30,8 @@ templates:
         {{ .Annotations.summary }}
         {{ .Annotations.description }}
       {{ end }}
+
+      {{ define "slack_gcloud_log_link" }}
+        <https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};query=resource.labels.cluster_name%3D%22$CLUSTER_NAME%22%0A{{ .Labels.gcloud_filter }}?project=$GCP_PROJECT|cloud logs>
+      {{ end }}
+

@@ -356,6 +356,6 @@ groups:
           runbook_url: ""
           summary: 'Unexpected mining round lag {{ index $values "max_publisher_lag" }} in SV status reports for publisher {{ $labels.report_publisher }} '
         labels:
-          "": ""
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A'
           topology_level: dso
         isPaused: false
