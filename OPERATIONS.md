@@ -54,6 +54,13 @@ After you've run a preview and audited the results, you can run
 cncluster pulumi $stack up --skip-preview --yes
 ```
 
+
+## Monitor Cluster health
+
+While working on the cluster and especially after you fixed the cluster, check [Network Health](./network-health/NETWORK_HEALTH.md).
+In particular, make sure that our nodes can submit SV status reports and if some other SVs are unable to do so, follow the
+steps in that doc to find the cause.
+
 ## Keep an Audit Trail
 
 Make sure that you capture all the steps you go through so that in
@@ -101,6 +108,11 @@ CI=1 cncluster pulumi canton-network up --skip-preview --yes
 
 This avoid potential mistakes where you exported it in the shell and
 kept that shell and accidentally run a command in that shell later.
+
+## Handling Failed Pulumi Operations
+
+If pulumi fails, you might need to run `cncluster pulumi $stack
+cancel` followed by `cncluster pulumi $stack refresh`.
 
 ## Workaround for pulumi assertion errors
 
