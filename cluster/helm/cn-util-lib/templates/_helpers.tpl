@@ -66,7 +66,7 @@
 {{- end }}
 {{- end }}
 {{- define "cn-util-lib.postgres-metrics" -}}
-{{- $name := print .persistence.postgresName "-" (.persistence.databaseName | replace "_" "-" ) "-e" }}
+{{- $name := print "pge-" .persistence.postgresName "-" (.persistence.databaseName | replace "_" "-" ) }}
 {{- $namespace := .namespace }}
 {{- $persistence := .persistence }}
 {{- $nodeSelector := .nodeSelector }}
