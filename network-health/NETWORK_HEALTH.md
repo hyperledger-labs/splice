@@ -289,6 +289,19 @@ It is often also useful to compare this to the domain catchup metrics of our own
 
 ![sequencer_client_delay](pics/sequencer_client_delay.png)
 
+If the SV appears to be up2date according to acknowledgements but you do not
+see status reports, check if you see other transactions from it. This is easiest
+by anaylzing the `Ingested transaction` logs from our SV app. You should see among other things
+reward coupon creations and confirmations for round operations.
+
+![SV ingested transaction](pics/sv_ingested_transaction.png)
+
+If you do see them, the SV app itself is active
+but there might be an issue specific to submitting status reports. One possible cause of this can be
+the mediator being unavailable since that is queried when submitting a status report. You can check that by looking at the traffic submitted by that mediator in the [sequencer traffic dashboard](https://grafana.dev.network.canton.global/d/fdjrxql2alblsd/sequencer-traffic?orgId=1&from=1714363043128&to=1714373918128). In the example here, Cumberland-2's mediator was unavailable and did not submit anything.
+
+![Mediator traffic](pics/mediator_traffic.png)
+
 #### Network Wide Issues
 
 Network wide issues can come from any of the layers involved in the daml transaction of submitting a status report:
@@ -329,5 +342,3 @@ Other failure types are usually more rare and require case by case analysis base
 5. Mediator receives confirmation
 6. Mediator reaches verdict
 7. Participant receives transaction accepted/rejected.
-
-
