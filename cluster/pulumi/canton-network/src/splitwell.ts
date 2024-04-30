@@ -58,7 +58,7 @@ export async function installSplitwell(
     sharedPostgres,
     participantBootstrapDump,
     'splitwell',
-    [loopback]
+    dependsOn.concat([loopback])
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', true);

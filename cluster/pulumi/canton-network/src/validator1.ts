@@ -64,7 +64,7 @@ export async function installValidator1(
     defaultPostgres,
     participantBootstrapDump,
     'validator1',
-    [loopback]
+    dependsOn.concat([loopback])
   );
 
   const extraDependsOn: pulumi.Resource[] = dependsOn.concat([participant, validatorPostgres]);

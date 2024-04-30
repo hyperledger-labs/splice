@@ -2408,6 +2408,8 @@ function subcmd_hard_domain_migration_migrate() {
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
     subcmd_pulumi canton-network up "$@"
+    # We need to redeploy infra to update the `/version` endpoint
+    subcmd_pulumi infra up "$@"
   fi
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
