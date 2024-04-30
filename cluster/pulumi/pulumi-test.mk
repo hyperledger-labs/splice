@@ -7,9 +7,10 @@ $(dir)/test-devnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-		IS_DEVNET=1 npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+	    . "${REPO_ROOT}/cluster/deployment/devnet/.envrc.vars"; \
+		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 IS_DEVNET_OVERRIDE=1 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec "${REPO_ROOT}/cluster/deployment/devnet" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
 .PHONY: $(dir)/test-testnet.json
@@ -17,9 +18,10 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-    	IS_DEVNET=0 npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+	    . "${REPO_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
+    	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 IS_DEVNET_OVERRIDE=0 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec "${REPO_ROOT}/cluster/deployment/testnet" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test

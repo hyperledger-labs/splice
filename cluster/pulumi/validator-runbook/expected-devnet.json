@@ -10,11 +10,14 @@
         "namespace": "validator"
       },
       "stringData": {
-        "audience": "https://ledger_api.example.com",
-        "client-id": "validator-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "validator-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-validator-validator",
@@ -32,8 +35,11 @@
         "namespace": "validator"
       },
       "stringData": {
-        "client-id": "cns-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator-cns",
@@ -51,8 +57,11 @@
         "namespace": "validator"
       },
       "stringData": {
-        "client-id": "wallet-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator-wallet",
@@ -70,7 +79,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "validatorrun.network.canton.global",
+          "hostname": "dev.network.canton.global",
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -87,7 +96,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -111,7 +123,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "validatorrun"
+          "basename": "dev"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -122,11 +134,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.validatorrun",
+    "id": "organization/infra/infra.dev",
     "inputs": {
-      "name": "organization/infra/infra.validatorrun"
+      "name": "organization/infra/infra.dev"
     },
-    "name": "organization/infra/infra.validatorrun",
+    "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -233,7 +245,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "validatorrun.network.canton.global",
+        "clusterUrl": "dev.network.canton.global",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
@@ -251,8 +263,8 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-1.validatorrun.network.canton.global",
-        "svSponsorAddress": "https://sv.sv-1.validatorrun.network.canton.global",
+        "scanAddress": "https://scan.sv-1.dev.network.canton.global",
+        "svSponsorAddress": "https://sv.sv-1.dev.network.canton.global",
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

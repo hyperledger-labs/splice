@@ -10,7 +10,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "clusterbase"
+          "basename": "test"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -38,11 +38,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.clusterbase",
+    "id": "organization/infra/infra.test",
     "inputs": {
-      "name": "organization/infra/infra.clusterbase"
+      "name": "organization/infra/infra.test"
     },
-    "name": "organization/infra/infra.clusterbase",
+    "name": "organization/infra/infra.test",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   }

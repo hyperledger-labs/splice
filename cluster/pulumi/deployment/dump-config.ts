@@ -2,9 +2,8 @@
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
 import { initDumpConfig } from '../common/src/dump-config-common';
 
-initDumpConfig();
-
 async function main() {
+  await initDumpConfig();
   process.env.GOOGLE_CREDENTIALS = 's3cr3t';
   process.env.SLACK_ACCESS_TOKEN = 's3cr3t';
   process.env.GITHUB_TOKEN = 's3cr3t';

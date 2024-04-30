@@ -20,6 +20,7 @@ import {
   installValidatorOnboardingSecret,
   loadYamlFromFile,
   REPO_ROOT,
+  CLUSTER_BASENAME,
   setupBootstrapping,
   validatorSecrets,
   isDevNet,
@@ -34,7 +35,6 @@ import {
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import {
-  CLUSTER_BASENAME,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
   VALIDATOR_PARTY_HINT,
   VALIDATOR_MIGRATE_PARTY,

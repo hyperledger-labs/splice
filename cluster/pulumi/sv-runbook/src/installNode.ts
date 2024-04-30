@@ -18,6 +18,7 @@ import {
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
   REPO_ROOT,
+  CLUSTER_BASENAME,
   svAppSecrets,
   svKeySecret,
   svKeyFromSecret,
@@ -44,7 +45,6 @@ import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installDecentralizedSynchronizerNode } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
-import { CLUSTER_BASENAME } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');

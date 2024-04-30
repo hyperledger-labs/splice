@@ -10,11 +10,14 @@
         "namespace": "sv"
       },
       "stringData": {
-        "audience": "https://ledger_api.example.com",
-        "client-id": "sv-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "sv-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "sv-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-sv-sv",
@@ -32,11 +35,14 @@
         "namespace": "sv"
       },
       "stringData": {
-        "audience": "https://ledger_api.example.com",
-        "client-id": "validator-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "validator-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-sv-validator",
@@ -54,8 +60,11 @@
         "namespace": "sv"
       },
       "stringData": {
-        "client-id": "cns-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-cns",
@@ -73,8 +82,11 @@
         "namespace": "sv"
       },
       "stringData": {
-        "client-id": "sv-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-sv",
@@ -92,8 +104,11 @@
         "namespace": "sv"
       },
       "stringData": {
-        "client-id": "wallet-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-wallet",
@@ -111,7 +126,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "svrun.network.canton.global",
+          "hostname": "test.network.canton.global",
           "svNamespace": "sv"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -134,7 +149,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -153,7 +171,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -172,8 +193,11 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
-        "public": "c3YtaWQtcHVibGljLWtleQ=="
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
+          "public": "c3YtaWQtcHVibGljLWtleQ=="
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -192,7 +216,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -211,7 +238,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -230,7 +260,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -249,8 +282,11 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
-        "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
+          "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -283,11 +319,11 @@
       "values": {
         "db": {},
         "founder": {
-          "externalAddress": "svrun.network.canton.global:26016"
+          "externalAddress": "test.network.canton.global:26016"
         },
         "genesis": {
-          "chainId": "svrun-0",
-          "chainIdSuffix": ""
+          "chainId": "test-0",
+          "chainIdSuffix": "0"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
@@ -305,7 +341,7 @@
           ]
         },
         "node": {
-          "externalAddress": "global-domain-0-cometbft.sv.svrun.network.canton.global:26056",
+          "externalAddress": "global-domain-0-cometbft.sv.test.network.canton.global:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
@@ -313,7 +349,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-1.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-1.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
@@ -376,7 +412,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "svrun"
+          "basename": "test"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -387,11 +423,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.svrun",
+    "id": "organization/infra/infra.test",
     "inputs": {
-      "name": "organization/infra/infra.svrun"
+      "name": "organization/infra/infra.test"
     },
-    "name": "organization/infra/infra.svrun",
+    "name": "organization/infra/infra.test",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -440,7 +476,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
-        "clusterUrl": "svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -491,13 +527,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "svrun",
-          "dnsName": "svrun.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-svrunnet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -589,16 +625,18 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svrun.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.test.network.canton.global",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
-            "enabled": false
+            "enabled": true,
+            "pruningInterval": "1 hours",
+            "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.svrun.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv.test.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -610,7 +648,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-1.svrun.network.canton.global"
+          "sponsorApiUrl": "https://sv.sv-1.test.network.canton.global"
         },
         "metrics": {
           "enable": true
@@ -627,7 +665,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
-          "publicUrl": "https://scan.sv.svrun.network.canton.global"
+          "publicUrl": "https://scan.sv.test.network.canton.global"
         }
       }
     },
@@ -666,13 +704,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "svrun",
-          "dnsName": "svrun.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-svrunnet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -730,13 +768,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "svrun",
-          "dnsName": "svrun.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-svrunnet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -794,13 +832,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "svrun",
-          "dnsName": "svrun.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-svrunnet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -859,8 +897,8 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "svrun.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.test.network.canton.global",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -880,7 +918,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "svrun/sv"
+            "prefix": "test/sv"
           }
         },
         "persistence": {

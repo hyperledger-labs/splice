@@ -4,10 +4,8 @@ import { Auth0Config } from 'cn-pulumi-common';
 
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
-initDumpConfig();
-
 async function main() {
-  process.env.GCP_CLUSTER_BASENAME = 'validatorrun';
+  await initDumpConfig();
   process.env.ARTIFACTORY_USER = 'artie';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
 

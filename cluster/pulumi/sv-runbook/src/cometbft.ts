@@ -16,9 +16,8 @@ import {
   clusterSmallDisk,
   config,
   cometbftRetainBlocks,
+  CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
-
-import { CLUSTER_BASENAME } from './utils';
 
 type NodeKeyContent = { priv_key: { type: string; value: Output<string> | string } };
 type ValidatorKeyContent = {

@@ -1,11 +1,7 @@
-import { config, isDevNet } from 'cn-pulumi-common';
+import { config, isDevNet, CLUSTER_BASENAME } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import fetch from 'node-fetch';
 
-export const CLUSTER_BASENAME = config.requireEnv(
-  'GCP_CLUSTER_BASENAME',
-  'The cluster in which this chart is being installed'
-);
 export const SV_NAME = 'DA-Helm-Test-Node';
 export const SV_NAMESPACE = 'sv';
 

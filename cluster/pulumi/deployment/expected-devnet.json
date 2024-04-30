@@ -11,7 +11,7 @@
       },
       "spec": {
         "eventMetadata": {
-          "cluster": "mock"
+          "cluster": "dev"
         },
         "eventSeverity": "info",
         "eventSources": [
@@ -41,15 +41,18 @@
         "namespace": "operator"
       },
       "stringData": {
-        "ARTIFACTORY_PASSWORD": "s3cr3t",
-        "ARTIFACTORY_USER": "art_user",
-        "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
-        "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
-        "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
-        "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
-        "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
-        "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
-        "SLACK_ACCESS_TOKEN": "s3cr3t"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ARTIFACTORY_PASSWORD": "s3cr3t",
+          "ARTIFACTORY_USER": "art_user",
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "SLACK_ACCESS_TOKEN": "s3cr3t"
+        }
       },
       "type": "Opaque"
     },
@@ -104,8 +107,11 @@
         "namespace": "operator"
       },
       "stringData": {
-        "password": "s3cr3t",
-        "username": "githubuser-da"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "password": "s3cr3t",
+          "username": "githubuser-da"
+        }
       },
       "type": "Opaque"
     },
@@ -186,7 +192,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "mock"
+              "value": "dev"
             },
             "type": "Literal"
           },
@@ -214,7 +220,7 @@
         },
         "refresh": true,
         "retryOnUpdateConflict": true,
-        "stack": "organization/infra/infra.mock",
+        "stack": "organization/infra/infra.dev",
         "useLocalStackOnly": true
       }
     },
@@ -239,11 +245,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.mock",
+    "id": "organization/infra/infra.dev",
     "inputs": {
-      "name": "organization/infra/infra.mock"
+      "name": "organization/infra/infra.dev"
     },
-    "name": "organization/infra/infra.mock",
+    "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -268,7 +274,7 @@
         "extraEnv": [
           {
             "name": "CLOUDSDK_CORE_PROJECT",
-            "value": "da-cn-scratchnet"
+            "value": "da-cn-devnet"
           },
           {
             "name": "CLOUDSDK_COMPUTE_REGION",
@@ -338,7 +344,10 @@
         "namespace": "operator"
       },
       "stringData": {
-        "token": "s3cr3t"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "token": "s3cr3t"
+        }
       },
       "type": "Opaque"
     },

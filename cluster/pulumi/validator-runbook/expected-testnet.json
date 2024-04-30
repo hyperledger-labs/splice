@@ -10,11 +10,14 @@
         "namespace": "validator"
       },
       "stringData": {
-        "audience": "https://ledger_api.example.com",
-        "client-id": "validator-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "validator-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-validator-validator",
@@ -32,8 +35,11 @@
         "namespace": "validator"
       },
       "stringData": {
-        "client-id": "cns-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator-cns",
@@ -51,8 +57,11 @@
         "namespace": "validator"
       },
       "stringData": {
-        "client-id": "wallet-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator-wallet",
@@ -70,7 +79,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "validatorrun.network.canton.global",
+          "hostname": "test.network.canton.global",
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -87,7 +96,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -106,7 +118,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -130,7 +145,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "validatorrun"
+          "basename": "test"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -141,11 +156,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.validatorrun",
+    "id": "organization/infra/infra.test",
     "inputs": {
-      "name": "organization/infra/infra.validatorrun"
+      "name": "organization/infra/infra.test"
     },
-    "name": "organization/infra/infra.validatorrun",
+    "name": "organization/infra/infra.test",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -252,7 +267,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "validatorrun.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
@@ -274,7 +289,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "validatorrun/validator"
+            "prefix": "test/validator"
           }
         },
         "persistence": {
@@ -282,8 +297,8 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-1.validatorrun.network.canton.global",
-        "svSponsorAddress": "https://sv.sv-1.validatorrun.network.canton.global",
+        "scanAddress": "https://scan.sv-1.test.network.canton.global",
+        "svSponsorAddress": "https://sv.sv-1.test.network.canton.global",
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

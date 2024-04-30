@@ -7,12 +7,10 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { config } from './config';
 import { defaultVersion, installCNHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
-import { ChartValues, clusterSmallDisk, ExactNamespace } from './utils';
+import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from './utils';
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
-
-const cluster = config.requireEnv('GCP_CLUSTER_BASENAME');
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -79,7 +77,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             enablePrivatePathForGoogleCloudServices: true,
           },
           userLabels: {
-            cluster: cluster,
+            cluster: CLUSTER_BASENAME,
           },
         },
       },

@@ -1,12 +1,11 @@
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { Auth0Config } from 'cn-pulumi-common';
+import { Auth0Config } from 'cn-pulumi-common/src/auth0types';
 
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
-initDumpConfig();
-
 async function main() {
+  initDumpConfig();
   const installCluster = await import('./src/installCluster');
   const auth0Cfg: Auth0Config = {
     appToClientId: {

@@ -10,10 +10,13 @@
         "namespace": "splitwell"
       },
       "stringData": {
-        "client-id": "splitwell-validator-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "splitwell-validator-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "splitwell-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-splitwell-splitwell_validator",
@@ -31,10 +34,13 @@
         "namespace": "splitwell"
       },
       "stringData": {
-        "client-id": "splitwell-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "splitwell-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "splitwell-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-splitwell-splitwell",
@@ -52,10 +58,13 @@
         "namespace": "sv-1"
       },
       "stringData": {
-        "client-id": "sv-1-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "sv-1-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-sv-1-sv-1",
@@ -73,10 +82,13 @@
         "namespace": "sv-1"
       },
       "stringData": {
-        "client-id": "sv1-validator-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "sv1-validator-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv1-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv1-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-sv-1-sv1_validator",
@@ -94,10 +106,13 @@
         "namespace": "validator1"
       },
       "stringData": {
-        "client-id": "validator1-client-id",
-        "client-secret": "***",
-        "ledger-api-user": "validator1-client-id@clients",
-        "url": "https://auth0Domain/.well-known/openid-configuration"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
       }
     },
     "name": "auth0-secret-validator1-validator1",
@@ -115,8 +130,11 @@
         "namespace": "splitwell"
       },
       "stringData": {
-        "client-id": "splitwell-cns-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-splitwell-cns",
@@ -134,8 +152,11 @@
         "namespace": "splitwell"
       },
       "stringData": {
-        "client-id": "splitwell-wallet-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-splitwell-wallet",
@@ -153,8 +174,11 @@
         "namespace": "sv-1"
       },
       "stringData": {
-        "client-id": "sv-1-cns-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-1-cns",
@@ -172,8 +196,11 @@
         "namespace": "sv-1"
       },
       "stringData": {
-        "client-id": "sv-1-sv-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-sv-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-1-sv-1",
@@ -191,8 +218,11 @@
         "namespace": "sv-1"
       },
       "stringData": {
-        "client-id": "sv-1-wallet-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-sv-1-wallet",
@@ -210,8 +240,11 @@
         "namespace": "validator1"
       },
       "stringData": {
-        "client-id": "validator1-cns-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator1-cns",
@@ -229,8 +262,11 @@
         "namespace": "validator1"
       },
       "stringData": {
-        "client-id": "validator1-splitwell-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-splitwell-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator1-splitwell",
@@ -248,8 +284,11 @@
         "namespace": "validator1"
       },
       "stringData": {
-        "client-id": "validator1-wallet-ui-client-id",
-        "url": "https://auth0Domain"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
       }
     },
     "name": "auth0-ui-secret-validator1-wallet",
@@ -262,7 +301,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -281,16 +323,19 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "postgres-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "splitwell"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-splitwell-postgres-secrets",
+    "name": "cn-app-splitwell-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -300,7 +345,32 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sw-pg-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-sw-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -319,7 +389,54 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-validator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-apps-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-apps-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -338,16 +455,19 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "postgres-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-postgres-secrets",
+    "name": "cn-app-sv-1-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -357,7 +477,54 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-0-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-participant-0-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-0-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-sequencer-0-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -376,7 +543,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -395,7 +565,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -414,16 +587,19 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "postgresPassword": ""
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "postgres-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "validator1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-validator1-postgres-secrets",
+    "name": "cn-app-validator1-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -433,7 +609,10 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
-        "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -443,6 +622,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -465,13 +666,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -504,11 +705,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.mock",
+    "id": "organization/infra/infra.test",
     "inputs": {
-      "name": "organization/infra/infra.mock"
+      "name": "organization/infra/infra.test"
     },
-    "name": "organization/infra/infra.mock",
+    "name": "organization/infra/infra.test",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -523,15 +724,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
-          "hostname": "mock.network.canton.global",
+          "hostname": "test.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
+          "name": "cn-testnet",
           "svNamespace": "splitwell"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -558,6 +759,36 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "splitwell-db-participant-0-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "splitwell-db-sw-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "splitwell-db-validator-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
@@ -565,14 +796,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -584,6 +815,56 @@
     "name": "splitwell-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "splitwell-participant-0-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "splitwell-participant-0-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "splitwell-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -601,13 +882,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -628,10 +909,9 @@
         },
         "persistence": {
           "databaseName": "participant_0",
-          "host": "splitwell-pg.splitwell.svc.cluster.local",
-          "postgresName": "splitwell-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "postgres-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
         "resources": {
           "limits": {
@@ -660,13 +940,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
@@ -682,13 +962,11 @@
         "participantHost": "participant-0",
         "persistence": {
           "databaseName": "app_splitwell",
-          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "port": 5432,
           "schema": "app_splitwell",
-          "secretName": "postgres-secrets",
+          "secretName": "sw-pg-secrets",
           "user": "cnadmin"
         },
-        "postgres": "splitwell-pg.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -714,7 +992,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-splitwell-pg-passwd",
+    "name": "splitwell-sw-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -722,53 +1000,89 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "splitwell-splitwell-pg",
+    "name": "splitwell-sw-pg",
     "provider": "",
-    "type": "canton:network:postgres"
+    "type": "canton:cloud:postgres"
   },
   {
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "../../../cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "splitwell-pg",
-      "namespace": "splitwell",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
         },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "maxConnections": 300,
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "1300Gi",
-          "volumeStorageClass": "standard-rwo"
+        "insightsConfig": {
+          "queryInsightsEnabled": true
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "postgres-secrets"
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
         },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
         }
       }
     },
-    "name": "splitwell-splitwell-pg",
+    "name": "splitwell-sw-pg",
     "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "splitwell-validator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "splitwell-validator-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "splitwell-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -800,13 +1114,13 @@
         ],
         "appDars": [],
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "enableWallet": true,
@@ -840,16 +1154,15 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "mock/splitwell"
+            "prefix": "test/splitwell"
           }
         },
         "persistence": {
           "databaseName": "val_splitwell",
-          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "port": 5432,
-          "postgresName": "splitwell-pg",
+          "postgresName": "validator-pg",
           "schema": "val_splitwell",
-          "secretName": "postgres-secrets",
+          "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
         "pvc": {
@@ -902,6 +1215,56 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-cn-apps-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-cn-apps-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "sv-1-cn-apps-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "../../../cluster/helm/cn-cometbft/",
       "compat": "true",
       "name": "cometbft-global-domain-0",
@@ -909,13 +1272,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "db": {
           "volumeSize": "640Gi",
           "volumeStorageClass": "premium-rwo"
@@ -927,8 +1290,8 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock-0",
-          "chainIdSuffix": ""
+          "chainId": "test-0",
+          "chainIdSuffix": "0"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -949,7 +1312,7 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "mock.network.canton.global:26016",
+          "externalAddress": "test.network.canton.global:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26016,
@@ -989,6 +1352,46 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "sv-1-db-cn-apps-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "sv-1-db-mediator-0-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "sv-1-db-participant-0-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "sv-1-db-sequencer-0-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -1008,13 +1411,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -1023,9 +1426,8 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_0_mediator",
-            "host": "postgres.sv-1.svc.cluster.local",
-            "postgresName": "postgres",
-            "secretName": "postgres-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
@@ -1052,9 +1454,8 @@
           },
           "persistence": {
             "databaseName": "global_domain_0_sequencer",
-            "host": "postgres.sv-1.svc.cluster.local",
-            "postgresName": "postgres",
-            "secretName": "postgres-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           },
           "resources": {
             "limits": {
@@ -1084,15 +1485,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
-          "hostname": "mock.network.canton.global",
+          "hostname": "test.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
+          "name": "cn-testnet",
           "svNamespace": "sv-1"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -1126,14 +1527,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -1145,6 +1546,106 @@
     "name": "sv-1-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-mediator-0-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-mediator-0-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "sv-1-mediator-0-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-participant-0-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-participant-0-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "sv-1-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -1162,13 +1663,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -1189,10 +1690,9 @@
         },
         "persistence": {
           "databaseName": "participant_0",
-          "host": "postgres.sv-1.svc.cluster.local",
-          "postgresName": "postgres",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "postgres-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
         "resources": {
           "limits": {
@@ -1214,70 +1714,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-postgres-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-postgres",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "../../../cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "postgres",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "maxConnections": 300,
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "1300Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "sv-1-postgres",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "../../../cluster/helm/cn-scan/",
       "compat": "true",
       "name": "scan",
@@ -1286,13 +1722,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -1309,11 +1745,10 @@
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_1",
-          "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "postgresName": "postgres",
+          "postgresName": "cn-apps-pg",
           "schema": "scan_sv_1",
-          "secretName": "postgres-secrets",
+          "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
         "resources": {
@@ -1332,6 +1767,56 @@
     "name": "sv-1-scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-sequencer-0-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-sequencer-0-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "sv-1-sequencer-0-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -1392,13 +1877,13 @@
           }
         ],
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -1410,9 +1895,11 @@
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
-            "enabled": false
+            "enabled": true,
+            "pruningInterval": "1 hours",
+            "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-1.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-1.test.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -1446,15 +1933,15 @@
             "projectId": "da-cn-devnet",
             "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
           },
-          "prefix": "mock/sv-1"
+          "prefix": "test/sv-1"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "initialHoldingFee": 0.0000192901,
         "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 165000,
+          "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,
-          "extraTrafficPrice": 20,
-          "minTopupAmount": 165000,
+          "extraTrafficPrice": 16.67,
+          "minTopupAmount": 200000,
           "readVsWriteScalingFactor": 200
         },
         "initialTickDuration": "600 seconds",
@@ -1471,15 +1958,15 @@
         },
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
+        "onboardingRoundZeroDuration": "27 h",
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_1",
-          "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "postgresName": "postgres",
+          "postgresName": "cn-apps-pg",
           "schema": "sv_sv_1",
-          "secretName": "postgres-secrets",
+          "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
         "pvc": {
@@ -1497,7 +1984,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
-          "publicUrl": "https://scan.sv-1.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-1.test.network.canton.global"
         }
       }
     },
@@ -1519,14 +2006,14 @@
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -1554,16 +2041,15 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "mock/sv-1"
+            "prefix": "test/sv-1"
           }
         },
         "persistence": {
           "databaseName": "validator_sv_1",
-          "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "postgresName": "postgres",
+          "postgresName": "cn-apps-pg",
           "schema": "validator_sv_1",
-          "secretName": "postgres-secrets",
+          "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
         "pvc": {
@@ -1615,6 +2101,132 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-splitwell-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-splitwell-sw-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-splitwell-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-1-cn-apps-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-1-mediator-0-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-1-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-sv-1-sequencer-0-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "../../../cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-validator1",
@@ -1622,15 +2234,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
-          "hostname": "mock.network.canton.global",
+          "hostname": "test.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
+          "name": "cn-testnet",
           "svNamespace": "validator1"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -1658,6 +2270,26 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-participant-0-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-validator-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
@@ -1665,14 +2297,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -1684,6 +2316,56 @@
     "name": "validator1-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-participant-0-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-participant-0-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "validator1-participant-0-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -1701,13 +2383,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -1728,10 +2410,9 @@
         },
         "persistence": {
           "databaseName": "participant_0",
-          "host": "postgres.validator1.svc.cluster.local",
-          "postgresName": "postgres",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "postgres-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
         "resources": {
           "limits": {
@@ -1753,70 +2434,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "validator1-postgres-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "validator1-postgres",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "../../../cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "postgres",
-      "namespace": "validator1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "maxConnections": 300,
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "1300Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "validator1-postgres",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "../../../cluster/helm/cn-splitwell-web-ui/",
       "compat": "true",
       "name": "splitwell-web-ui",
@@ -1824,13 +2441,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "resources": {
           "limits": {
@@ -1848,6 +2465,56 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-validator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "../../../cluster/helm/cn-validator/",
       "compat": "true",
       "name": "validator-validator1",
@@ -1860,13 +2527,13 @@
           "cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar"
         ],
         "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
+          "basename": "test",
+          "dnsName": "test.network.canton.global",
           "fixedTokens": false,
           "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
+          "name": "cn-testnet"
         },
-        "clusterUrl": "mock.network.canton.global",
+        "clusterUrl": "test.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "enableWallet": true,
@@ -1900,16 +2567,15 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "mock/validator1"
+            "prefix": "test/validator1"
           }
         },
         "persistence": {
           "databaseName": "validator1",
-          "host": "postgres.validator1.svc.cluster.local",
           "port": 5432,
-          "postgresName": "postgres",
+          "postgresName": "validator-pg",
           "schema": "validator1",
-          "secretName": "postgres-secrets",
+          "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
         "pvc": {
