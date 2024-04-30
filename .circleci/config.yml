@@ -4576,7 +4576,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard"
           wait_type: "wait_workflow"
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
@@ -4777,7 +4777,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_sv_reonboard"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard"
           wait_type: "wait_workflow"
       - docker_images_push:
           <<: *main-branch-only
