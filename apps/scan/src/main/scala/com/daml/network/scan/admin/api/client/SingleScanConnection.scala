@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMinin
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -18,7 +19,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -38,7 +38,7 @@ class SingleScanConnection private[client] (
     protected val ec: ExecutionContextExecutor,
     tc: TraceContext,
     protected val mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(
       config.adminApi,
@@ -374,7 +374,7 @@ object SingleScanConnection {
       ec: ExecutionContextExecutor,
       traceContext: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[T] =
     for {
@@ -401,7 +401,7 @@ class CachedScanConnection private[client] (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends SingleScanConnection(config, upgradesConfig, clock, retryProvider, outerLoggerFactory)
     with CachingScanConnection {

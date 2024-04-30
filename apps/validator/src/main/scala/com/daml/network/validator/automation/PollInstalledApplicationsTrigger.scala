@@ -1,6 +1,5 @@
 package com.daml.network.validator.automation
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
@@ -10,6 +9,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
@@ -27,7 +27,7 @@ final class PollInstalledApplicationsTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[AppManagerStore.InstalledApp] {
 

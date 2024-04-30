@@ -7,6 +7,7 @@ import com.daml.network.environment.{
   RetryFor,
   RetryProvider,
 }
+import com.daml.network.http.CNHttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
@@ -22,7 +23,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.jdk.CollectionConverters.*
@@ -106,7 +106,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateJsonDecoder: TemplateJsonDecoder,
   ) =
     new SvDsoAutomationService(

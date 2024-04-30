@@ -15,8 +15,6 @@ import com.digitalasset.canton.lifecycle.SyncCloseable
 
 import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.http.scaladsl.model.HttpRequest
-import org.apache.pekko.http.scaladsl.model.HttpResponse
 import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.concurrent.{Future, Promise}
@@ -24,6 +22,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.util.{Failure, Success}
 import ScanAggregator.*
 import com.daml.network.config.UpgradesConfig
+import com.daml.network.http.CNHttpClient
 
 trait ScanAggregatesReader extends AutoCloseable {
   def readRoundAggregateFromDso(round: Long)(implicit
@@ -40,7 +39,7 @@ final case class ScanAggregatesReaderContext(
     retryProvider: RetryProvider,
     ec: ExecutionContextExecutor,
     mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
 )
 object ScanAggregatesReader {

@@ -1,25 +1,26 @@
 package com.daml.network.splitwell.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.apache.pekko.stream.Materializer
 import cats.implicits.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.splitwell as http
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{
   AssignedContract,
+  Codec,
   Contract,
   ContractWithState,
-  Codec,
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 object HttpSplitwellAppClient {
 
@@ -27,7 +28,7 @@ object HttpSplitwellAppClient {
     override type Client = http.SplitwellClient
 
     def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

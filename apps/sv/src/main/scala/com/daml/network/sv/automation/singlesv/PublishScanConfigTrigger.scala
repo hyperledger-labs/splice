@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.splice as daml
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.http.CNHttpClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvScanConfig
@@ -25,7 +26,6 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -41,7 +41,7 @@ class PublishScanConfigTrigger(
 )(implicit
     override val ec: ExecutionContextExecutor,
     override val tracer: Tracer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[

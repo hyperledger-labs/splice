@@ -5,10 +5,12 @@ import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.environment.CNNodeStatus
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as externalHttp
 import com.daml.network.http.v0.external.common_admin.CommonAdminClient
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -39,7 +41,7 @@ object HttpAdminAppClient {
     override type Client = PrefixedCommonAdminClient
 
     override def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -72,6 +74,26 @@ object HttpAdminAppClient {
 
   case class GetVersion(basePath: String)
       extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo](basePath) {
+
+    override def createClient(host: String)(implicit
+        httpClient: CNHttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): PrefixedCommonAdminClient = PrefixedCommonAdminClient.httpClient(
+      HttpClientBuilder()(
+        httpClient.withOverrideParameters(
+          // Getting the version of an app is done on startup.
+          // If there's no response within 5s, we assume the app to be down.
+          CNHttpClient.HttpRequestParameters(requestTimeout = NonNegativeDuration.ofSeconds(5))
+        ),
+        ec,
+        mat,
+      ).buildClient(),
+      host,
+      basePath,
+    )
+
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],

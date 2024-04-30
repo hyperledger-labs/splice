@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
+import com.daml.network.http.CNHttpClient
 import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
@@ -35,7 +36,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
@@ -58,7 +58,7 @@ class SvDsoAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends CNNodeAppAutomationService(
       config.automation,

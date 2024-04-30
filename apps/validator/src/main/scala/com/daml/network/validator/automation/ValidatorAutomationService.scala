@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import com.daml.network.environment.*
+import com.daml.network.http.CNHttpClient
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.DomainTimeSynchronization
@@ -27,7 +28,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
@@ -61,7 +61,7 @@ class ValidatorAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     mat: Materializer,
     tracer: Tracer,
 ) extends CNNodeAppAutomationService(

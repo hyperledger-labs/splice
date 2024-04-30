@@ -9,6 +9,7 @@ import com.daml.network.environment.{
   RetryFor,
   RetryProvider,
 }
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
@@ -40,7 +41,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.io.FileNotFoundException
@@ -70,7 +70,7 @@ class DomainMigrationInitializer(
     ) => JoiningNodeInitializer,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,

@@ -6,6 +6,7 @@ import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
 import com.daml.network.automation.AutomationService
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -103,80 +104,95 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       .map(_.toTraceContext)
       .getOrElse(TraceContext.empty)
   }
-  protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) =>
-    {
-      implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
-      import parameters.loggingConfig.api.*
-      val logPayload = messagePayloads
-      val pathLimited = request.uri.path.toString
-        .limit(maxMethodLength)
-      def msg(message: String): String =
-        s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
 
-      if (logPayload) {
-        request.entity match {
-          // Only logging strict messages which are already in memory, not attempting to log streams
-          case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-            logger.debug(
-              msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-            )
-          case _ => logger.debug(msg(s"omitting logging of request entity data."))
-        }
-      }
-      logger
-        .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
-      val host = request.uri.authority.host.address()
-      val port = request.uri.effectivePort
-      logger.trace(
-        s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-      )
-      val connectionContext = request.uri.scheme match {
-        case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
-        case _ => ConnectionContext.noEncryption()
-      }
-      val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
-        Http()
-          .outgoingConnectionUsingContext(host, port, connectionContext)
+  private def buildHttpClient(
+      outerRequestParameters: CNHttpClient.HttpRequestParameters
+  ): CNHttpClient =
+    new CNHttpClient {
+      override val requestParameters: CNHttpClient.HttpRequestParameters = outerRequestParameters
 
-      // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
-      // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
-      def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
-        Source
-          .single(request)
-          .via(connectionFlow)
-          .completionTimeout(parameters.requestTimeout.asFiniteApproximation)
-          .runWith(Sink.head)
-          .recoverWith { case NonFatal(e) =>
-            logger.debug(msg("HTTP request failed"), e)(traceContext)
-            Future.failed(e)
-          }
-      val start = System.currentTimeMillis()
-      dispatchRequest(request).map { response =>
-        val responseTraceCtx = traceContextFromHeaders(response.headers)
-        val end = System.currentTimeMillis()
-        logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
-        logger.debug(msg(s"Received response with status code: ${response.status}"))(
-          responseTraceCtx
-        )
+      override def withOverrideParameters(
+          newParameters: CNHttpClient.HttpRequestParameters
+      ): CNHttpClient = buildHttpClient(outerRequestParameters)
+
+      override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
+        implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
+        import parameters.loggingConfig.api.*
+        val logPayload = messagePayloads
+        val pathLimited = request.uri.path.toString
+          .limit(maxMethodLength)
+        def msg(message: String): String =
+          s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
+
         if (logPayload) {
-          response.entity match {
+          request.entity match {
             // Only logging strict messages which are already in memory, not attempting to log streams
             case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
               logger.debug(
-                msg(
-                  s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
-                )
-              )(responseTraceCtx)
-            case _ =>
-              logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
+                msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
+              )
+            case _ => logger.debug(msg(s"omitting logging of request entity data."))
           }
         }
+        logger
+          .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
+        val host = request.uri.authority.host.address()
+        val port = request.uri.effectivePort
         logger.trace(
-          msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
-        )(responseTraceCtx)
-        response
+          s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
+        )
+        val connectionContext = request.uri.scheme match {
+          case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
+          case _ => ConnectionContext.noEncryption()
+        }
+        val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
+          Http()
+            .outgoingConnectionUsingContext(host, port, connectionContext)
+
+        // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
+        // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
+        def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
+          Source
+            .single(request)
+            .via(connectionFlow)
+            .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
+            .runWith(Sink.head)
+            .recoverWith { case NonFatal(e) =>
+              logger.debug(msg("HTTP request failed"), e)(traceContext)
+              Future.failed(e)
+            }
+        val start = System.currentTimeMillis()
+        dispatchRequest(request).map { response =>
+          val responseTraceCtx = traceContextFromHeaders(response.headers)
+          val end = System.currentTimeMillis()
+          logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
+          logger.debug(msg(s"Received response with status code: ${response.status}"))(
+            responseTraceCtx
+          )
+          if (logPayload) {
+            response.entity match {
+              // Only logging strict messages which are already in memory, not attempting to log streams
+              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+                logger.debug(
+                  msg(
+                    s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
+                  )
+                )(responseTraceCtx)
+              case _ =>
+                logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
+            }
+          }
+          logger.trace(
+            msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
+          )(responseTraceCtx)
+          response
+        }
       }
     }
+
+  protected implicit val httpClient: CNHttpClient = buildHttpClient(
+    CNHttpClient.HttpRequestParameters(parameters.requestTimeout)
+  )
 
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
     HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)

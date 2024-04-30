@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
@@ -496,7 +497,7 @@ object BftScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
@@ -574,26 +575,26 @@ object BftScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection] =
-    (uri: Uri, amuletRulesCacheTimeToLive: NonNegativeFiniteDuration) => {
-      ScanConnection.singleUncached( // BFTScanConnection caches itself so that caches don't desync
-        ScanAppClientConfig(
-          NetworkAppClientConfig(
-            uri
+    (uri: Uri, amuletRulesCacheTimeToLive: NonNegativeFiniteDuration) =>
+      ScanConnection
+        .singleUncached( // BFTScanConnection caches itself so that caches don't desync
+          ScanAppClientConfig(
+            NetworkAppClientConfig(
+              uri
+            ),
+            amuletRulesCacheTimeToLive,
           ),
-          amuletRulesCacheTimeToLive,
-        ),
-        upgradesConfig,
-        clock,
-        retryProvider,
-        loggerFactory,
-        // We only need f+1 Scans to be available, so so as long as those are connected we don't need to slow init down.
-        // Furthermore, the refresh (either on init, or periodically) will retry anyway.
-        retryConnectionOnInitialFailure = false,
-      )
-    }
+          upgradesConfig,
+          clock,
+          retryProvider,
+          loggerFactory,
+          // We only need f+1 Scans to be available, so so as long as those are connected we don't need to slow init down.
+          // Furthermore, the refresh (either on init, or periodically) will retry anyway.
+          retryConnectionOnInitialFailure = false,
+        )
 
   sealed trait BftScanClientConfig
   object BftScanClientConfig {

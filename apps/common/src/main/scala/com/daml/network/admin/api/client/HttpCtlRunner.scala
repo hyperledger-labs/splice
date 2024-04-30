@@ -3,7 +3,7 @@
 
 package com.daml.network.admin.api.client
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
@@ -14,6 +14,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.admin.api.client.commands.HttpCommandException
+import com.daml.network.http.CNHttpClient
 
 /** HTTP Variant of Canton’s GrpcCtlRunner.
   * Canton also has an HttpCtlRunner but it’s written
@@ -30,14 +31,13 @@ class HttpCtlRunner(
       headers: List[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): EitherT[Future, String, Result] = {
 
-    val client: command.Client = command
-      .createClient(host)
+    val client: command.Client = command.createClient(host)
 
     for {
       response <- command

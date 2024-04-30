@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
@@ -81,7 +82,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
@@ -747,7 +748,7 @@ object SvApp {
       binding: Http.ServerBinding,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       decoder: TemplateJsonDecoder,
   )(implicit el: ErrorLoggingContext)
       extends FlagCloseableAsync

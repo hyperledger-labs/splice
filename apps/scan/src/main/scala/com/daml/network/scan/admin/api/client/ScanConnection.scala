@@ -14,6 +14,7 @@ import com.daml.network.environment.{
   RetryFor,
   RetryProvider,
 }
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -28,7 +29,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -204,7 +204,7 @@ object ScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
@@ -230,7 +230,7 @@ object ScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[SingleScanConnection] =
     HttpAppConnection.checkVersionOrClose(
@@ -322,7 +322,7 @@ class MinimalScanConnection(
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(
       config.adminApi,
@@ -342,7 +342,7 @@ object MinimalScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[MinimalScanConnection] =
     HttpAppConnection.checkVersionOrClose(

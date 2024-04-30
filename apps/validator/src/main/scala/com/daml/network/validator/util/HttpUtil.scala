@@ -1,16 +1,11 @@
 package com.daml.network.validator.util
 
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpRequest,
-  HttpResponse,
-  StatusCodes,
-  Uri,
-}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpRequest, StatusCodes, Uri}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import cats.syntax.either.*
 import com.daml.network.environment.BaseAppConnection
+import com.daml.network.http.CNHttpClient
 import io.circe.parser.decode
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,11 +14,11 @@ private[validator] object HttpUtil {
   def getHttpJson[T](uri: Uri)(implicit
       ec: ExecutionContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       decoder: io.circe.Decoder[T],
   ): Future[T] =
     for {
-      response <- httpClient(HttpRequest(uri = uri))
+      response <- httpClient.executeRequest(HttpRequest(uri = uri))
       decoded <- response.status match {
         case StatusCodes.OK if (response.entity.contentType == ContentTypes.`application/json`) =>
           Unmarshal(response.entity).to[String].map { json =>

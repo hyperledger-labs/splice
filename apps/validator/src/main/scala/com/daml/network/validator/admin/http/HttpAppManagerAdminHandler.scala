@@ -1,13 +1,14 @@
 package com.daml.network.validator.admin.http
 
-import org.apache.pekko.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.ContentType
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.http.v0.{app_manager_admin as v0, definitions}
+import com.daml.network.http.CNHttpClient
+import com.daml.network.http.v0.{definitions, app_manager_admin as v0}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.{DarUtil, HttpUtil}
@@ -37,7 +38,7 @@ class HttpAppManagerAdminHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     mat: Materializer,
 ) extends v0.AppManagerAdminHandler[TracedUser]
     with Spanning

@@ -1,6 +1,6 @@
 package com.daml.network.sv.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.toTraverseOps
@@ -11,12 +11,13 @@ import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  VoteRequest,
   DsoRules_CloseVoteRequestResult,
+  VoteRequest,
 }
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
   TriggerDomainMigrationDumpRequest,
@@ -46,7 +47,7 @@ object HttpSvAdminAppClient {
     override type Client = http.SvAdminClient
 
     def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

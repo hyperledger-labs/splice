@@ -1,6 +1,7 @@
 package com.daml.network.sv
 
 import com.daml.network.environment.*
+import com.daml.network.http.CNHttpClient
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
@@ -24,7 +25,6 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.time.Duration
@@ -47,7 +47,7 @@ final class LocalSynchronizerNode(
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends RetryProvider.Has

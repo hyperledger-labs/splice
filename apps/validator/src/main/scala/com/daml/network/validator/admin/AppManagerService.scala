@@ -1,6 +1,5 @@
 package com.daml.network.validator.admin
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.{
   CNLedgerConnection,
@@ -22,6 +21,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.User
+import com.daml.network.http.CNHttpClient
 import io.grpc.Status
 
 import java.io.{
@@ -123,7 +123,7 @@ class AppManagerService(
       appUrl: AppManagerStore.AppUrl
   )(implicit
       tc: TraceContext,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       mat: Materializer,
   ): Future[Unit] = {
     for {

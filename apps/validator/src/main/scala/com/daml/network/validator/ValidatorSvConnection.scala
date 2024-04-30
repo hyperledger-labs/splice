@@ -3,6 +3,7 @@ package com.daml.network.validator
 import cats.data.EitherT
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.TemplateJsonDecoder
@@ -10,7 +11,7 @@ import com.daml.network.validator.ValidatorSvConnection.OnboardValidator
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -24,14 +25,14 @@ final class ValidatorSvConnection private (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */
   def onboardValidator(validator: PartyId, secret: String)(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -50,7 +51,7 @@ object ValidatorSvConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ValidatorSvConnection] =
     HttpAppConnection.checkVersionOrClose(

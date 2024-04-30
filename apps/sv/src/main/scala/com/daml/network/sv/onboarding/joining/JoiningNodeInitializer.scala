@@ -1,7 +1,6 @@
 package com.daml.network.sv.onboarding.joining
 
 import cats.data.OptionT
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
@@ -9,6 +8,7 @@ import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
+import com.daml.network.http.CNHttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainTimeSynchronization}
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -71,7 +71,7 @@ class JoiningNodeInitializer(
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,

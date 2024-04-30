@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
+import com.daml.network.http.CNHttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainTimeSynchronization}
 import com.daml.network.store.MultiDomainAcsStore.*
@@ -63,7 +64,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.TimeUnit
@@ -88,7 +88,7 @@ class FoundingNodeInitializer(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,

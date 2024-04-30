@@ -7,10 +7,10 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
+import com.daml.network.http.CNHttpClient
 import io.circe.parser.*
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.tracing.TraceContext
@@ -28,7 +28,7 @@ trait HttpCommand[Res, Result] {
   type Client
 
   def createClient(host: String)(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -58,7 +58,7 @@ trait HttpCommand[Res, Result] {
 
 object HttpClientBuilder {
   def apply()(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       ec: ExecutionContext,
       mat: Materializer,
   ) =
@@ -66,7 +66,7 @@ object HttpClientBuilder {
 }
 
 final class HttpClientBuilder()(implicit
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     ec: ExecutionContext,
     mat: Materializer,
 ) {
@@ -109,7 +109,7 @@ final class HttpClientBuilder()(implicit
       nonErrorStatusCode: Set[StatusCode] = Set.empty
   ): HttpRequest => Future[HttpResponse] = {
     httpClientWithErrors(
-      httpClient,
+      httpClient.executeRequest,
       {
         case code @ (StatusCodes.ServerError(_) | StatusCodes.ClientError(_))
             if !nonErrorStatusCode.contains(code) =>

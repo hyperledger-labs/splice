@@ -1,19 +1,13 @@
 package com.daml.network.scan.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{
-  HttpHeader,
-  HttpRequest,
-  HttpResponse,
-  StatusCodes,
-  Uri,
-}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -21,6 +15,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.scan.store.db.ScanAggregator
@@ -42,7 +37,7 @@ object HttpScanAppClient {
     override type Client = http.ScanClient
 
     def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -54,7 +49,7 @@ object HttpScanAppClient {
     override type Client = externalHttp.ScanClient
 
     def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

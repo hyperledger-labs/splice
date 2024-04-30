@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingRequest,
 }
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
@@ -22,7 +23,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.apache.pekko.stream.Materializer
 
 import java.util.Base64
@@ -243,7 +244,7 @@ object HttpSvAppClient {
       ] {
 
     override def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

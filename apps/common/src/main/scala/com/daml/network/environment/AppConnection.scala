@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, Uri}
 import org.apache.pekko.stream.Materializer
 import com.daml.network.admin.api.client.{
   ApiClientRequestLogger,
@@ -11,6 +11,7 @@ import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -50,7 +51,7 @@ abstract class BaseAppConnection(
       headers: List[HttpHeader] = List.empty[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -143,7 +144,7 @@ abstract class HttpAppConnection(
     tc: TraceContext,
     mat: Materializer,
     templateDecoder: TemplateJsonDecoder,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
 ) extends BaseAppConnection(loggerFactory)
     with RetryProvider.Has
     with FlagCloseableAsync

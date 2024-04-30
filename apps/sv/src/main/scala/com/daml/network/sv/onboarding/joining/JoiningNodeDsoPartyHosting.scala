@@ -2,6 +2,7 @@ package com.daml.network.sv.onboarding.joining
 
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
 import com.daml.network.sv.config.SvOnboardingConfig
@@ -13,7 +14,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -28,7 +28,7 @@ class JoiningNodeDsoPartyHosting(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends NamedLogging {

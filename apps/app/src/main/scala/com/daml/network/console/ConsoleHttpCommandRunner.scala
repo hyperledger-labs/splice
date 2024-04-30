@@ -12,6 +12,7 @@ import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeEnvironment
+import com.daml.network.http.CNHttpClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
 import com.digitalasset.canton.console.{
@@ -65,35 +66,48 @@ class ConsoleHttpCommandRunner(
       )
       val commandTimeout = commandTimeouts.bounded
 
-      implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) => {
-        val host = request.uri.authority.host.address()
-        val port = request.uri.effectivePort
-        logger.trace(
-          s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-        )
+      def buildHttpClient(
+          outerRequestParameters: CNHttpClient.HttpRequestParameters
+      ): CNHttpClient = new CNHttpClient {
+        override val requestParameters: CNHttpClient.HttpRequestParameters = outerRequestParameters
 
-        val connectionContext = request.uri.scheme match {
-          case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
-          case _ => ConnectionContext.noEncryption()
+        override def withOverrideParameters(
+            newParameters: CNHttpClient.HttpRequestParameters
+        ): CNHttpClient = buildHttpClient(newParameters)
+
+        override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
+          val host = request.uri.authority.host.address()
+          val port = request.uri.effectivePort
+          logger.trace(
+            s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
+          )
+
+          val connectionContext = request.uri.scheme match {
+            case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
+            case _ => ConnectionContext.noEncryption()
+          }
+          val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
+            Http()
+              .outgoingConnectionUsingContext(host, port, connectionContext)
+          // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
+          // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
+          def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
+            Source
+              .single(request)
+              .via(connectionFlow)
+              .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
+              .runWith(Sink.head)
+              .recoverWith { case NonFatal(e) =>
+                logger.debug(s"$commandDescription, HTTP request failed", e)(traceContext)
+                Future.failed(e)
+              }
+
+          dispatchRequest(request)
         }
-        val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
-          Http()
-            .outgoingConnectionUsingContext(host, port, connectionContext)
-        // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
-        // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
-        def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
-          Source
-            .single(request)
-            .via(connectionFlow)
-            .completionTimeout(commandTimeouts.requestTimeout.asFiniteApproximation)
-            .runWith(Sink.head)
-            .recoverWith { case NonFatal(e) =>
-              logger.debug(s"$commandDescription, HTTP request failed", e)(traceContext)
-              Future.failed(e)
-            }
-
-        dispatchRequest(request)
       }
+
+      implicit val httpClient: CNHttpClient =
+        buildHttpClient(CNHttpClient.HttpRequestParameters(commandTimeouts.requestTimeout))
 
       val url = clientConfig.url
       try {

@@ -1,9 +1,10 @@
 package com.daml.network.validator.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.validator_public as http
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
@@ -23,7 +24,7 @@ object HttpValidatorPublicAppClient {
     override type Client = http.ValidatorPublicClient
 
     def createClient(host: String)(implicit
-        httpClient: HttpRequest => Future[HttpResponse],
+        httpClient: CNHttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

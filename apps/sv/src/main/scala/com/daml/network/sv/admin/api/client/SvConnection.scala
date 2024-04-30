@@ -2,12 +2,12 @@ package com.daml.network.sv.admin.api.client
 
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
+import com.daml.network.http.CNHttpClient
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import com.google.protobuf.ByteString
 
@@ -22,14 +22,14 @@ final class SvConnection private (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClient: CNHttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */
   def startSvOnboarding(token: String)(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -42,7 +42,7 @@ final class SvConnection private (
       candidateParticipantId: ParticipantId,
       candidateParty: PartyId,
   )(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -61,7 +61,7 @@ final class SvConnection private (
   def onboardSvSequencer(
       sequencerId: SequencerId
   )(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -74,7 +74,7 @@ final class SvConnection private (
     )
 
   def getDsoInfo()(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -96,7 +96,7 @@ object SvConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[SvConnection] =
     HttpAppConnection.checkVersionOrClose(
