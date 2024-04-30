@@ -19,8 +19,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.AmuletPosition
+import com.daml.network.wallet.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -217,9 +217,10 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
       env: CNNodeTestConsoleEnvironment
   ): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
-      sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees,
-      validatorApp.config.domains.global.buyExtraTraffic,
-      validatorApp.config.automation.pollingInterval,
+      validatorApp.config.domains.global.buyExtraTraffic.targetThroughput,
+      validatorApp.config.domains.global.buyExtraTraffic.minTopupInterval,
+      sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees.minTopupAmount,
+      validatorApp.config.automation.topupTriggerPollingInterval_,
     )
   }
 

@@ -600,7 +600,7 @@ class SvApp(
 
   private def newTrafficBalanceService(participantAdminConnection: ParticipantAdminConnection) = {
     TrafficBalanceService(
-      _ => Future.successful(Some(config.domains.global.trafficReservedForTopups)),
+      _ => Future.successful(Some(config.domains.global.reservedTraffic)),
       participantAdminConnection,
       clock,
       config.domains.global.trafficBalanceCacheTimeToLive,

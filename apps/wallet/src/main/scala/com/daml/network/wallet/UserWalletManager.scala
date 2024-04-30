@@ -11,6 +11,7 @@ import com.daml.network.store.{DomainTimeSynchronization, Limit, LimitHelpers}
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
+import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -40,6 +41,7 @@ class UserWalletManager(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
+    validatorTopupConfig: ValidatorTopupConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -194,6 +196,7 @@ class UserWalletManager(
       domainMigrationInfo,
       participantId,
       ingestFromParticipantBegin,
+      Option.when(endUserParty == store.walletKey.validatorParty)(validatorTopupConfig),
     )
     (userRetryProvider, walletService)
   }

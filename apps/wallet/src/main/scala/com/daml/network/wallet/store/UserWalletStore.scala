@@ -253,6 +253,35 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       )
     )
 
+  def getAmuletBalanceWithHoldingFees(asOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, BigDecimal)] = for {
+    amulets <- multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
+  } yield {
+    val holdingFees =
+      amulets.view
+        .map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, asOfRound)))
+        .sum
+    val totalAmount =
+      amulets.view
+        .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, asOfRound)))
+        .sum
+    (totalAmount, holdingFees)
+  }
+
+  def getLockedAmuletBalance(asOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = for {
+    lockedAmulets <- multiDomainAcsStore.listContracts(
+      amuletCodegen.LockedAmulet.COMPANION
+    )
+  } yield {
+    val totalAmount = lockedAmulets.view
+      .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.amulet, asOfRound)))
+      .sum
+    totalAmount
+  }
+
   /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
     * and optionally filtered by a set of issuing rounds.
     */

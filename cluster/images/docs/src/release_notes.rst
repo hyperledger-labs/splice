@@ -11,6 +11,9 @@ Upcoming
   * Note change in urls in the Digital-Asset-2 node (which is used in several example and default configurations in the docs), from `*.sv-1.svc.<hostname>` to `*.sv-1.<hostname>`, as a step towards making that node compliant with the agreed upon URL formats.
 
 * Updated validator runbooks with instructions for re-onboarding a validator.
+* Renamed `traffic-reserved-for-topups` in the validator app and SV app config to `reserved-traffic` to better reflect the fact that
+  the "reserved" traffic amount is used for more than just traffic top-ups. No change is needed unless you explicitly set a value for this instead
+  of just relying on the default.
 
 0.1.6
 -----

@@ -1,31 +1,36 @@
 package com.daml.network.wallet.automation
 
-import cats.implicits.toTraverseOps
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_MergeTransferInputs
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryFor}
+import com.daml.network.environment.{CommandPriority, RetryFor}
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 class CollectRewardsAndMergeAmuletsTrigger(
     override protected val context: TriggerContext,
+    store: UserWalletStore,
     treasury: TreasuryService,
     scanConnection: BftScanConnection,
-    connection: CNLedgerConnection,
+    validatorTopupConfigO: Option[ValidatorTopupConfig],
+    clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
+    val mat: Materializer,
 ) extends PollingTrigger {
 
   override def isRewardOperationTrigger: Boolean = true
@@ -50,18 +55,18 @@ class CollectRewardsAndMergeAmuletsTrigger(
       traceContext: TraceContext
   ): Future[Boolean] =
     for {
-      activeDomain <- scanConnection.getAmuletRulesDomain()(traceContext)
-      trafficBalance <- connection.trafficBalanceService
-        .traverse(_.lookupAvailableTraffic(activeDomain))
-        .map(_.flatten)
+      commandPriority <- validatorTopupConfigO match {
+        case None =>
+          Future.successful(CommandPriority.Low) // not the wallet of the validator operator
+        case Some(validatorTopupConfig) =>
+          TopupUtil
+            .hasSufficientFundsForTopup(scanConnection, store, validatorTopupConfig, clock)
+            .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
+      }
       result <- treasury
         .enqueueAmuletOperation(
           new CO_MergeTransferInputs(com.daml.ledger.javaapi.data.Unit.getInstance()),
-          // Make this a high-prio tx if traffic balance is too low so that coupons can be redeemed for amulets
-          // that can then be used to purchase domain traffic.
-          if (trafficBalance.getOrElse(NonNegativeLong.zero) == NonNegativeLong.zero)
-            CommandPriority.High
-          else CommandPriority.Low,
+          commandPriority,
         )
         .transform {
           case Success(coo) =>

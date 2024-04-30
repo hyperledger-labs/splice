@@ -130,12 +130,12 @@ final case class SvDecentralizedSynchronizerConfig(
     alias: DomainAlias,
     url: String,
 
-    /** amount of extra traffic reserved for transactions required to do traffic topups
+    /** amount of extra traffic reserved for high priority transactions
       *
       * Note that this value MUST be smaller or euqal to the value provided in SV's validator config; and ideally it SHOULD be equal to it.
       * Also an SV's validator must always be configured to do top-ups
       */
-    trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
+    reservedTraffic: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(200_000L),
 
     /** The SV's ledger client compares its remaining traffic balance against the reserved amount
       * on every command submission. This setting controls how long the traffic balance is cached before

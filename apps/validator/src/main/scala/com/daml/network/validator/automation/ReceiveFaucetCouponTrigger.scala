@@ -13,7 +13,11 @@ import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.{AssignedContract, ContractWithState, DisclosedContracts}
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.util.ValidatorUtil
+import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -26,7 +30,10 @@ class ReceiveFaucetCouponTrigger(
     override protected val context: TriggerContext,
     scanConnection: BftScanConnection,
     validatorStore: ValidatorStore,
+    userWalletManager: UserWalletManager,
+    validatorTopupConfig: ValidatorTopupConfig,
     cnLedgerConnection: CNLedgerConnection,
+    clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -85,20 +92,31 @@ class ReceiveFaucetCouponTrigger(
               s"This is expected in case of validator inactivity."
           )
     }
-    cnLedgerConnection
-      .submit(
-        actAs = Seq(validatorParty),
-        readAs = Seq(validatorParty),
-        license
-          .exercise(_.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)),
-        priority = CommandPriority.High,
-      )
-      .noDedup
-      .withDisclosedContracts(DisclosedContracts(unclaimedRound))
-      .yieldUnit()
-      .map(_ =>
-        TaskSuccess(s"Received faucet coupon for Round ${unclaimedRound.payload.round.number}")
-      )
+    for {
+      validatorWallet <- ValidatorUtil.getValidatorWallet(validatorStore, userWalletManager)
+      commandPriority <- TopupUtil
+        .hasSufficientFundsForTopup(
+          scanConnection,
+          validatorWallet.store,
+          validatorTopupConfig,
+          clock,
+        )
+        .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
+      outcome <- cnLedgerConnection
+        .submit(
+          actAs = Seq(validatorParty),
+          readAs = Seq(validatorParty),
+          license
+            .exercise(_.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)),
+          priority = commandPriority,
+        )
+        .noDedup
+        .withDisclosedContracts(DisclosedContracts(unclaimedRound))
+        .yieldUnit()
+        .map(_ =>
+          TaskSuccess(s"Received faucet coupon for Round ${unclaimedRound.payload.round.number}")
+        )
+    } yield outcome
   }
 
   override protected def isStaleTask(task: ReceiveFaucetCouponTrigger.Task)(implicit

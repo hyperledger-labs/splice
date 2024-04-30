@@ -61,6 +61,7 @@ import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.daml.network.wallet.automation.UserWalletAutomationService
+import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -479,16 +480,16 @@ class ValidatorApp(
       scanConnection: BftScanConnection,
   )(implicit traceContext: TraceContext) = {
     def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] = {
-      config.domains.global.trafficReservedForTopupsO
-        .fold(Future.successful(Option.empty[NonNegativeLong]))(trafficReservedForTopups => {
+      config.domains.global.reservedTrafficO
+        .fold(Future.successful(Option.empty[NonNegativeLong]))(reservedTraffic => {
           for {
             amuletRules <- scanConnection.getAmuletRulesWithState()
             amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(clock.now)
-            reservedTraffic = Option.when(
+            reservedTrafficO = Option.when(
               amuletConfig.decentralizedSynchronizer.requiredSynchronizers.map
                 .containsKey(domainId.toProtoPrimitive)
-            )(trafficReservedForTopups)
-          } yield reservedTraffic
+            )(reservedTraffic)
+          } yield reservedTrafficO
         })
     }
 
@@ -616,6 +617,11 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
+      validatorTopupConfig = ValidatorTopupConfig(
+        config.domains.global.buyExtraTraffic.targetThroughput,
+        config.domains.global.buyExtraTraffic.minTopupInterval,
+        config.automation.topupTriggerPollingInterval_,
+      )
       walletManagerOpt =
         if (config.enableWallet)
           Some(
@@ -634,6 +640,7 @@ class ValidatorApp(
               domainMigrationInfo,
               participantId,
               config.ingestFromParticipantBegin,
+              validatorTopupConfig,
             )
           )
         else {
@@ -643,7 +650,8 @@ class ValidatorApp(
       automation = new ValidatorAutomationService(
         config.automation,
         config.participantIdentitiesBackup,
-        config.domains.global.buyExtraTraffic,
+        validatorTopupConfig,
+        config.domains.global.buyExtraTraffic.grpcDeadline,
         config.appManager,
         config.domains.global.url.isEmpty,
         config.prevetDuration,
@@ -749,6 +757,8 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
           retryProvider,
+          validatorTopupConfig,
+          clock,
         )
       )
 

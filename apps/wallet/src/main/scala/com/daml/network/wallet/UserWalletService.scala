@@ -10,6 +10,7 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -36,6 +37,7 @@ class UserWalletService(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
+    validatorTopupConfigO: Option[ValidatorTopupConfig],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -85,6 +87,7 @@ class UserWalletService(
     retryProvider,
     ingestFromParticipantBegin,
     loggerFactory,
+    validatorTopupConfigO,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.

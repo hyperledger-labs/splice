@@ -28,6 +28,7 @@ import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
+import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.error.MediatorError.Timeout
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.NotConnectedToAnyDomain
@@ -38,6 +39,7 @@ import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
   InactiveContracts,
   LockedContracts,
 }
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.retry.RetryUtil.*
@@ -56,6 +58,8 @@ class HttpWalletHandler(
     scanConnection: BftScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
+    validatorTopupConfig: ValidatorTopupConfig,
+    clock: Clock,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -293,24 +297,35 @@ class HttpWalletHandler(
       retryProvider.retryForClientCalls(
         "accept_transfer",
         "accept transfer offer",
-        exerciseWalletAction((installCid, _) => {
-          val requestCid =
-            Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-              contractId
+        for {
+          userStore <- getUserStore(user)
+          commandPriority <-
+            if (userStore.key.validatorParty != userStore.key.validatorParty)
+              Future.successful(CommandPriority.Low)
+            else
+              TopupUtil
+                .hasSufficientFundsForTopup(scanConnection, userStore, validatorTopupConfig, clock)
+                .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
+          outcome <-
+            exerciseWalletAction((installCid, _) => {
+              val requestCid =
+                Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+                  contractId
+                )
+              Future.successful(
+                installCid
+                  .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
+                  .map { cid =>
+                    d0.AcceptTransferOfferResponse(
+                      Codec.encodeContractId(cid.exerciseResult.acceptedTransferOffer)
+                    ): r0.AcceptTransferOfferResponse
+                  }
+              )
+            })(
+              user,
+              priority = commandPriority,
             )
-          Future.successful(
-            installCid
-              .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
-              .map { cid =>
-                d0.AcceptTransferOfferResponse(
-                  Codec.encodeContractId(cid.exerciseResult.acceptedTransferOffer)
-                ): r0.AcceptTransferOfferResponse
-              }
-          )
-        })(
-          user,
-          priority = CommandPriority.High,
-        ),
+        } yield outcome,
         logger,
       )
     }
@@ -510,29 +525,14 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
         userStore <- getUserStore(user)
-        amulets <- userStore.multiDomainAcsStore.listContracts(
-          amuletCodegen.Amulet.COMPANION
-        )
-        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
-          amuletCodegen.LockedAmulet.COMPANION
-        )
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
+        (unlockedQty, unlockedHoldingFees) <- userStore.getAmuletBalanceWithHoldingFees(
+          currentRound
+        )
+        lockedQty <- userStore.getLockedAmuletBalance(currentRound)
       } yield {
-        val unlockedHoldingFees =
-          amulets.view
-            .map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, currentRound)))
-            .sum
-        val unlockedQty =
-          amulets.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, currentRound)))
-            .sum
-        val lockedQty =
-          lockedAmulets.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.amulet, currentRound)))
-            .sum
-
         d0.GetBalanceResponse(
           currentRound,
           Codec.encode(unlockedQty),
@@ -542,6 +542,7 @@ class HttpWalletHandler(
       }
     }
   }
+
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
       tuser: TracedUser
   ): Future[r0.TapResponse] = {

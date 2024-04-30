@@ -4,8 +4,8 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.automation.UnassignTrigger.GetTargetDomain
 import com.daml.network.automation.{
   AssignTrigger,
-  CNNodeAppAutomationService,
   AutomationServiceCompanion,
+  CNNodeAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
 }
@@ -18,6 +18,7 @@ import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -37,6 +38,7 @@ class UserWalletAutomationService(
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
+    validatorTopupConfigO: Option[ValidatorTopupConfig],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -75,7 +77,14 @@ class UserWalletAutomationService(
   )
   if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
     registerTrigger(
-      new CollectRewardsAndMergeAmuletsTrigger(triggerContext, treasury, scanConnection, connection)
+      new CollectRewardsAndMergeAmuletsTrigger(
+        triggerContext,
+        store,
+        treasury,
+        scanConnection,
+        validatorTopupConfigO,
+        clock,
+      )
     )
   }
 

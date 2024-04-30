@@ -1,8 +1,7 @@
-package com.daml.network.validator.util
+package com.daml.network.wallet.util
 
-import com.daml.network.codegen.java.splice.decentralizedsynchronizer.SynchronizerFeesConfig
-import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 
 import scala.math.BigDecimal.RoundingMode
@@ -28,33 +27,32 @@ case class ExtraTrafficTopupParameters(
 
 object ExtraTrafficTopupParameters {
   def apply(
-      globalConfig: SynchronizerFeesConfig,
-      validatorConfig: BuyExtraTrafficConfig,
+      targetThroughput: NonNegativeNumeric[BigDecimal],
+      minTopupInterval: NonNegativeFiniteDuration,
+      minTopupAmount: Long,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
   ): ExtraTrafficTopupParameters = {
-    val targetRateBytesPerSecond = validatorConfig.targetThroughput.value
+    val targetRateBytesPerSecond = targetThroughput.value
     if (targetRateBytesPerSecond <= 0L) {
       // the topup interval in this case is irrelevant
       ExtraTrafficTopupParameters(0L, NonNegativeFiniteDuration.ofSeconds(0))
     } else {
       // ensure minTopupInterval is at least equal to the polling interval
-      val minTopupInterval =
-        maximumOfDuration(validatorConfig.minTopupInterval, topupTriggerPollingInterval)
+      val minTopupInterval_ =
+        maximumOfDuration(minTopupInterval, topupTriggerPollingInterval)
       val expectedTopupParameters = roundUpIntervalAndCalculateAmount(
         targetRateBytesPerSecond,
-        minTopupInterval,
+        minTopupInterval_,
         topupTriggerPollingInterval,
       )
-      if (expectedTopupParameters.topupAmount >= globalConfig.minTopupAmount)
+      if (expectedTopupParameters.topupAmount >= minTopupAmount)
         expectedTopupParameters
       else {
         // If the minTopupAmount is higher than expectedTopupAmount, adjust the topupInterval to
         // provide target traffic rate.
         // Note that the target rate is greater than the base rate at this point => the denominator is positive.
         val topupIntervalMillis = (
-          BigDecimal(
-            globalConfig.minTopupAmount
-          ) / targetRateBytesPerSecond * 1e3
+          BigDecimal(minTopupAmount) / targetRateBytesPerSecond * 1e3
         ).setScale(0, RoundingMode.CEILING).toLong
         roundUpIntervalAndCalculateAmount(
           targetRateBytesPerSecond,
@@ -64,6 +62,17 @@ object ExtraTrafficTopupParameters {
       }
     }
   }
+
+  def apply(
+      validatorTopupConfig: ValidatorTopupConfig,
+      minTopupAmount: Long,
+  ): ExtraTrafficTopupParameters =
+    apply(
+      validatorTopupConfig.targetThroughput,
+      validatorTopupConfig.minTopupInterval,
+      minTopupAmount,
+      validatorTopupConfig.topupTriggerPollingInterval,
+    )
 
   private def maximumOfDuration(
       duration1: NonNegativeFiniteDuration,
@@ -93,3 +102,9 @@ object ExtraTrafficTopupParameters {
     )
   }
 }
+
+case class ValidatorTopupConfig(
+    targetThroughput: NonNegativeNumeric[BigDecimal],
+    minTopupInterval: NonNegativeFiniteDuration,
+    topupTriggerPollingInterval: NonNegativeFiniteDuration,
+)

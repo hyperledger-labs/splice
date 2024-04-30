@@ -50,7 +50,7 @@ export const initialSynchronizerFeesConfig: SynchronizerFeesConfig = {
 export type ValidatorTopupConfig = {
   targetThroughput: number;
   minTopupInterval: string;
-  trafficReservedForTopups?: number;
+  reservedTraffic?: number;
 };
 
 export const svValidatorTopupConfig: ValidatorTopupConfig = {

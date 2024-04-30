@@ -8,8 +8,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.daml.network.wallet.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
@@ -241,9 +241,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
   ) = {
     val now = sv1Backend.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
-      sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees,
-      validatorAppRef.config.domains.global.buyExtraTraffic,
-      validatorAppRef.config.automation.pollingInterval,
+      validatorAppRef.config.domains.global.buyExtraTraffic.targetThroughput,
+      validatorAppRef.config.domains.global.buyExtraTraffic.minTopupInterval,
+      sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees.minTopupAmount,
+      validatorAppRef.config.automation.topupTriggerPollingInterval_,
     )
     advanceTime((validatorTopupParameters.minTopupInterval * multiple).asJava)
   }

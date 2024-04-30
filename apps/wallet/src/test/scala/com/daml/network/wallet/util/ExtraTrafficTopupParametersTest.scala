@@ -1,7 +1,5 @@
-package com.daml.network.validator.util
+package com.daml.network.wallet.util
 
-import com.daml.network.util.CNNodeUtil.domainFeesConfig
-import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.BaseTestWordSpec
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
@@ -10,8 +8,6 @@ import org.scalatest.prop.TableFor2
 import scala.math.BigDecimal.RoundingMode
 
 class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
-  private lazy val defaultBaseRateBurstAmount = 10 * 20 * 1000L
-  private lazy val defaultBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
   private lazy val defaultMinTopupAmount = 1_000_000L
   private lazy val defaultTargetRate = BigDecimal(20_000)
   private lazy val defaultMinTopupInterval = NonNegativeFiniteDuration.ofMinutes(10)
@@ -37,12 +33,9 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
       targetRate: BigDecimal = defaultTargetRate,
   ) = {
     ExtraTrafficTopupParameters(
-      domainFeesConfig(
-        baseRateBurstAmount = defaultBaseRateBurstAmount,
-        baseRateBurstWindow = defaultBaseRateBurstWindow,
-        minTopupAmount = minTopupAmount,
-      ),
-      BuyExtraTrafficConfig(NonNegativeNumeric.tryCreate(targetRate), minTopupInterval),
+      NonNegativeNumeric.tryCreate(targetRate),
+      minTopupInterval,
+      minTopupAmount,
       triggerPollingInterval,
     )
   }

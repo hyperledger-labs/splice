@@ -81,4 +81,6 @@ case class AutomationConfig(
   def withResumedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers - tag.runtimeClass.getCanonicalName
   )
+  def topupTriggerPollingInterval_ : NonNegativeFiniteDuration =
+    topupTriggerPollingInterval.getOrElse(pollingInterval)
 }

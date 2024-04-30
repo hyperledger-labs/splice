@@ -669,7 +669,7 @@ class CNLedgerConnection(
                 if (availableTraffic <= reservedTraffic && commandPriority == CommandPriority.Low)
                   throw Status.ABORTED
                     .withDescription(
-                      s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
+                      s"Traffic balance below reserved traffic amount ($availableTraffic < $reservedTraffic)"
                     )
                     .asRuntimeException()
                 else Future.unit

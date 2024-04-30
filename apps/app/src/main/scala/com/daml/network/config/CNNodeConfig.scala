@@ -497,15 +497,15 @@ object CNNodeConfig {
       deriveReader[ValidatorDecentralizedSynchronizerConfig].emap(config => {
         val trafficPurchasedOnEachTopup =
           config.buyExtraTraffic.targetThroughput.value * config.buyExtraTraffic.minTopupInterval.duration.toSeconds
-        val trafficReservedForTopups = config.trafficReservedForTopupsO.fold(0L)(_.value)
+        val reservedTraffic = config.reservedTrafficO.fold(0L)(_.value)
         Either.cond(
           // config is valid if either the validator is not configured to do top-ups
           // or the reserved traffic is less than the traffic purchased per top-up
-          trafficPurchasedOnEachTopup == 0 || trafficReservedForTopups < trafficPurchasedOnEachTopup,
+          trafficPurchasedOnEachTopup == 0 || reservedTraffic < trafficPurchasedOnEachTopup,
           config,
           ConfigValidationFailed(
             s"The target-throughput times the min-topup-interval in the buy-extra-traffic config (currently: $trafficPurchasedOnEachTopup) " +
-              s"must be greater than the traffic-reserved-for-topups (currently: $trafficReservedForTopups)"
+              s"must be greater than the reserved-traffic (currently: $reservedTraffic)"
           ),
         )
       })

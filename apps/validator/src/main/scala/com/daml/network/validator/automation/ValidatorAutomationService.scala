@@ -13,12 +13,13 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
-import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
+import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.domain.DomainConnector
 import com.daml.network.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
+import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -35,7 +36,8 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
     backupDumpConfig: Option[PeriodicBackupDumpConfig],
-    buyExtraTrafficConfig: BuyExtraTrafficConfig,
+    validatorTopupConfig: ValidatorTopupConfig,
+    grpcDeadline: Option[NonNegativeFiniteDuration],
     appManagerConfig: Option[AppManagerConfig],
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
@@ -98,7 +100,10 @@ class ValidatorAutomationService(
           triggerContext,
           scanConnection,
           store,
+          walletManager,
+          validatorTopupConfig,
           connection,
+          clock,
         )
       )
     }
@@ -107,21 +112,21 @@ class ValidatorAutomationService(
       logger.info(
         s"Not starting TopupMemberTrafficTrigger, as this is an SV validator."
       )(TraceContext.empty)
-    else if (buyExtraTrafficConfig.targetThroughput.value <= 0L)
+    else if (validatorTopupConfig.targetThroughput.value <= 0L)
       logger.info(
         s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
       )(TraceContext.empty)
     else
       registerTrigger(
         new TopupMemberTrafficTrigger(
-          triggerContext.config.topupTriggerPollingInterval.fold(triggerContext)(
-            topupTriggerPollingInterval =>
-              triggerContext.focus(_.config.pollingInterval).replace(topupTriggerPollingInterval)
-          ),
+          triggerContext
+            .focus(_.config.pollingInterval)
+            .replace(triggerContext.config.topupTriggerPollingInterval_),
           store,
           connection,
           participantAdminConnection,
-          buyExtraTrafficConfig,
+          validatorTopupConfig,
+          grpcDeadline,
           clock,
           walletManager,
           scanConnection,
