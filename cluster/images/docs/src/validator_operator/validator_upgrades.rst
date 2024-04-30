@@ -23,6 +23,20 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 8. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
 9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
 
+.. note::
+  This process creates a new synchronizer instance. Because
+  synchronizer traffic balances are tracked per synchronizer instance this implies
+  that all validator traffic balances start at zero on this new instance. The
+  remaining traffic on the old synchronizer instance cannot be used anymore once
+  that instance is shut down, effectively resulting in a loss of that balance.
+
+  **Validator operators are thus strongly encouraged to purchase traffic on a
+  pay-as-you-go basis** in small enough increments such that the cost of the
+  remaining traffic balance lost due to a synchronizer upgrade with downtime is
+  well acceptable and easily amortized across the activity of the validator node
+  on the old synchronizer instance.
+
+
 Technical Details
 -----------------
 
