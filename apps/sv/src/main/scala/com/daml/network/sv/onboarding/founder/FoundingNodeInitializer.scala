@@ -474,20 +474,6 @@ class FoundingNodeInitializer(
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithOffset(),
         ).tupled
-        _ <- (
-          participantAdminConnection.ensureTrafficControlState(
-            domainId,
-            participantId,
-            Long.MaxValue,
-            participantId.uid.namespace.fingerprint,
-          ),
-          participantAdminConnection.ensureTrafficControlState(
-            domainId,
-            mediatorId,
-            Long.MaxValue,
-            participantId.uid.namespace.fingerprint,
-          ),
-        ).tupled
         _ <- dsoRules match {
           case QueryResult(offset, None) =>
             amuletRules match {

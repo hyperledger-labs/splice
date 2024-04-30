@@ -23,7 +23,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListOwnerToKeyMappingResult,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
 import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
@@ -472,25 +472,6 @@ abstract class TopologyAdminConnection(
       ),
       filterNamespace = participantId.namespace.filterString,
     )
-
-  def lookupTrafficControlState(
-      domainId: DomainId,
-      member: Member,
-  )(implicit traceContext: TraceContext): Future[Option[TopologyResult[TrafficControlStateX]]] = {
-    runCmd(
-      TopologyAdminCommandsX.Read.ListTrafficControlState(
-        BaseQueryX(
-          filterStore = domainId.filterString,
-          proposals = false,
-          timeQuery = TimeQuery.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        filterMember = member.filterString,
-      )
-    ).map(_.headOption.map(tx => TopologyResult(tx.context, tx.item)))
-  }
 
   private def proposeMapping[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
@@ -1267,39 +1248,6 @@ abstract class TopologyAdminConnection(
       )
     )
   }
-
-  def ensureTrafficControlState(
-      domainId: DomainId,
-      member: Member,
-      newTotalExtraTrafficLimit: Long,
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    retryProvider.ensureThat(
-      RetryFor.WaitingOnInitDependency,
-      "ensure_traffic_control",
-      s"Extra traffic limit for $member on domain $domainId set to $newTotalExtraTrafficLimit (or higher)",
-      lookupTrafficControlState(domainId, member).map(result =>
-        Either.cond(
-          result.fold(0L)(_.mapping.totalExtraTrafficLimit.value) >= newTotalExtraTrafficLimit,
-          (),
-          result,
-        )
-      ),
-      (previousOrNone: Option[TopologyResult[TrafficControlStateX]]) =>
-        proposeMapping(
-          TopologyStoreId.DomainStore(domainId),
-          TrafficControlStateX
-            .create(
-              domainId,
-              member,
-              PositiveLong.tryCreate(newTotalExtraTrafficLimit),
-            ),
-          signedBy,
-          serial = previousOrNone.fold(PositiveInt.one)(_.base.serial + PositiveInt.one),
-          isProposal = true,
-        ).map(_ => ()),
-      logger,
-    )
 
   def proposeInitialDomainParameters(
       domainId: DomainId,
