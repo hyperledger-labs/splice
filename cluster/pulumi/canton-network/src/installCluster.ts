@@ -15,6 +15,7 @@ import {
   ExpectedValidatorOnboarding,
   preApproveValidatorRunbook,
   ApprovedSvIdentity,
+  nonDevNetNonSvValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -191,10 +192,12 @@ export async function installCluster(
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,
-      // x10 validator1's traffic targetThroughput for load tester -- see #9064
       {
-        ...nonSvValidatorTopupConfig,
-        targetThroughput: nonSvValidatorTopupConfig.targetThroughput * 10,
+        ...(isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig),
+        // x10 validator1's traffic targetThroughput for load tester -- see #9064
+        targetThroughput: isDevNet
+          ? nonSvValidatorTopupConfig.targetThroughput * 10
+          : nonDevNetNonSvValidatorTopupConfig.targetThroughput,
       }
     );
   }
@@ -210,7 +213,7 @@ export async function installCluster(
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,
-      nonSvValidatorTopupConfig
+      isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig
     );
   }
 

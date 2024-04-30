@@ -22,8 +22,10 @@ import {
   REPO_ROOT,
   setupBootstrapping,
   validatorSecrets,
+  isDevNet,
   ValidatorTopupConfig,
   nonSvValidatorTopupConfig,
+  nonDevNetNonSvValidatorTopupConfig,
   defaultVersion,
   participantBootstrapDumpSecretName,
   config,
@@ -99,7 +101,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     loopback,
     backupConfigSecret,
     backupConfig,
-    topupConfig: nonSvValidatorTopupConfig,
+    topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
     otherDeps: [passwordSecret],
   });
 

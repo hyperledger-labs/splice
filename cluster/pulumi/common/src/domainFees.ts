@@ -59,7 +59,14 @@ export const svValidatorTopupConfig: ValidatorTopupConfig = {
 };
 
 export const nonSvValidatorTopupConfig: ValidatorTopupConfig = {
-  // TODO(#11377): Determine the best defaults here
-  targetThroughput: 20000,
+  targetThroughput: 100000,
+  minTopupInterval: '1m',
+};
+// Configure target throughput such that a validator is able to top-up within 2-3 rounds on non-DevNet clusters.
+// Redeeming faucet coupons earns each validator 564CC each round.
+// Given the coin config as of this writing and with the topup config set here, a validator would require
+// (4500 * 60 / 10^6)MB * 20$/MB / 0.005$/CC = 1080CC for each top-up.
+export const nonDevNetNonSvValidatorTopupConfig: ValidatorTopupConfig = {
+  targetThroughput: 4500,
   minTopupInterval: '1m',
 };

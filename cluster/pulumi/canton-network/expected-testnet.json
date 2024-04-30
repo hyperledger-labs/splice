@@ -871,7 +871,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 20000
+          "targetThroughput": 4500
         },
         "useSequencerConnectionsFromScan": true,
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
@@ -1931,7 +1931,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 200000
+          "targetThroughput": 4500
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",

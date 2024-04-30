@@ -119,8 +119,7 @@ canton.validator-apps.validator_backend_$index = {
         global {
             alias = "global"
             buy-extra-traffic {
-              # TODO(#11377): Determine the best defaults here
-              target-throughput: 2000000
+              target-throughput: 1000000
               min-topup-interval: 1m
             }
         }
