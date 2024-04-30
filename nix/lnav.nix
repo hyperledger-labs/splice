@@ -9,7 +9,7 @@ stdenv.mkDerivation rec {
     if stdenv.isDarwin then
       fetchzip {
         url = "https://github.com/tstack/lnav/releases/download/v${version}/lnav-${version}-x86_64-macos.zip";
-        sha256 = "sha256-3JH7Kflbr6weH7t1YOYqFy7cncZyx+vWntDQ1Ovpd8w=";
+        sha256 = "sha256-mf7pjOd0lNVb71PZzwusesf6hMhz3I66apZMk8XMSPE";
       } else fetchzip {
         url = "https://github.com/tstack/lnav/releases/download/v${version}/lnav-${version}-linux-musl-x86_64.zip";
         sha256 = "sha256-Zahqcior1oWAhDaK1K3u/o6AsLpKuiQxNmGtRb8AEj4=";
