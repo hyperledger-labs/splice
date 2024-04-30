@@ -93,7 +93,7 @@ workflow:
           cluster: "ciupgrade"
           requires:
             - deploy_cluster_for_upgrade
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           <<: *main-branch-only
           context:
@@ -110,7 +110,7 @@ workflow:
           <<: *main-branch-only
           run: << pipeline.parameters.run-partial-upgrade >>
           requires:
-            - docker_images_push
+            - artifacts_push
             - preflight_check_initial
             - preflight_sv_check_initial
             - preflight_validator_initial

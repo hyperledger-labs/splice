@@ -11,7 +11,7 @@ workflow:
             - slack-context
           workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard"
           wait_type: "wait_workflow"
-      - docker_images_push:
+      - artifacts_push:
           <<: *main-branch-only
           context:
             - artifactory
@@ -30,7 +30,7 @@ workflow:
           cancel_workflow_on_failure: true
           send_deployment_notification: false
           requires:
-            - docker_images_push
+            - artifacts_push
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:

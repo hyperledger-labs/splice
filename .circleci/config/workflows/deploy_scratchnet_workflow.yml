@@ -45,7 +45,7 @@
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
-      - docker_images_push:
+      - artifacts_push:
           <<: *main-branch-never
           context:
             - artifactory
@@ -65,7 +65,7 @@
           cancel_workflow_on_failure: true
           requires:
             - set_scratchnet
-            - docker_images_push
+            - artifacts_push
       - preflight_check:
           name: "preflight_check_core"
           <<: *main-branch-never
@@ -77,7 +77,7 @@
           wait_for_sv: false
           parallelism: 1
           requires:
-            - docker_images_push
+            - artifacts_push
             - set_scratchnet
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
@@ -325,7 +325,7 @@
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
-      - docker_images_push:
+      - artifacts_push:
           <<: *main-branch-never
           context:
             - artifactory
@@ -343,7 +343,7 @@
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
-            - docker_images_push
+            - artifacts_push
             - set_scratchnet
       - preflight_check:
           <<: *main-branch-never
@@ -354,7 +354,7 @@
           cluster: "user-selected-scratchnet"
           parallelism: 1
           requires:
-            - docker_images_push
+            - artifacts_push
             - set_scratchnet
       - backup_cluster:
           <<: *main-branch-never
@@ -485,7 +485,7 @@
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
-      - docker_images_push:
+      - artifacts_push:
           <<: *main-branch-never
           context:
             - artifactory
@@ -500,7 +500,7 @@
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
-            - docker_images_push
+            - artifacts_push
             - set_scratchnet
       - preflight_check:
           name: preflight_check_DR

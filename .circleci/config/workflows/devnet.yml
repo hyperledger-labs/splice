@@ -136,7 +136,7 @@ workflow:
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
           workflow_names: "deploy_devnet"
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           context:
             - artifactory
@@ -156,7 +156,7 @@ workflow:
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
-            - docker_images_push
+            - artifacts_push
       - preflight_sv_check:
           filters:
             branches:

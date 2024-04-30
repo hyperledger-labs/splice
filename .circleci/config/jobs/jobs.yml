@@ -296,7 +296,7 @@ jobs:
            . .envrc.vars
            .circleci/triggers/setup-pipeline.sh
 
-  docker_images_push:
+  artifacts_push:
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -321,6 +321,7 @@ jobs:
          cmd: |
            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+           gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
       - when:
           condition: << parameters.skip_if_exists >>
           steps:
@@ -357,6 +358,10 @@ jobs:
            --keep NO_PROXY"
          cmd: make docker-push -j
          cmd_retry_count: 5
+      - run_bash_command_in_nix:
+          cmd_name: Push Helm Artifacts
+          cmd: make cluster/helm/push -j
+          cmd_retry_count: 5
       - save_frontend_builds
       - cleanup_sbt_test_job
 

@@ -21,6 +21,9 @@ docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 .PHONY: cluster/images/clean
 cluster/images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)
 
+.PHONY: cluster/helm-push
+helm-push: cluster/helm/push
+
 .PHONY: cluster/build
 cluster/build: cluster/pulumi/build cluster/helm/build
 

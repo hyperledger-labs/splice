@@ -3,7 +3,7 @@ workflow:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           <<: *main-branch-only
           context:
@@ -29,7 +29,7 @@ workflow:
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
-            - docker_images_push
+            - artifacts_push
       - preflight_check:
           <<: *main-branch-only
           context:
@@ -41,7 +41,7 @@ workflow:
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
-            - docker_images_push
+            - artifacts_push
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
           <<: *main-branch-only

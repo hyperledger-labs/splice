@@ -3,7 +3,7 @@ workflow:
     when:
       equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
     jobs:
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           <<: *main-branch-only
           context:
@@ -24,7 +24,7 @@ workflow:
             - slack-context
           cluster: "cidaily"
           requires:
-            - docker_images_push
+            - artifacts_push
             - wait_for_previous_pipeline
       - deploy_cluster:
           name: deploy_cluster_cidaily_testnet
@@ -34,7 +34,7 @@ workflow:
             - slack-context
           cluster: "cidaily-testnet"
           requires:
-            - docker_images_push
+            - artifacts_push
             - wait_for_previous_pipeline
       - preflight_check:
           name: preflight_check_devnet
@@ -47,7 +47,7 @@ workflow:
           wait_for_sv: false
           # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
           requires:
-            - docker_images_push
+            - artifacts_push
             - deploy_cluster_cidaily
       - preflight_check:
           name: preflight_check_testnet
@@ -60,7 +60,7 @@ workflow:
             - slack-context
           # require deploy_cluster and deploy_sv_runbook for stability and reliability
           requires:
-            - docker_images_push
+            - artifacts_push
             - deploy_cluster_cidaily_testnet
       - publish_public_release:
           <<: *main-branch-only
@@ -290,7 +290,7 @@ workflow:
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           context:
             - artifactory
@@ -309,7 +309,7 @@ workflow:
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
-            - docker_images_push
+            - artifacts_push
       - preflight_sv_check:
           filters:
             branches:

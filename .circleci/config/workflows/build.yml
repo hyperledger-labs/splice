@@ -4,7 +4,7 @@ workflow:
     when:
       equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
     jobs:
-      - docker_images_push:
+      - artifacts_push:
           <<: *notify-fail
           context:
             - artifactory
@@ -15,7 +15,7 @@ workflow:
             - artifactory
             - slack-context
           requires:
-            - docker_images_push
+            - artifacts_push
       - bundle:
           <<: *notify-fail
           context:

@@ -19,6 +19,13 @@ all_charts := $(app_charts) cn-util-lib
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
 
+# Makefile for each file in cluster/helm/target run `helm push $file`
+.PHONY: cluster/helm/push
+cluster/helm/push:
+	@for file in cluster/helm/target/*.tgz; do \
+		helm push $$file oci://us-central1-docker.pkg.dev/da-cn-shared/cn-images; \
+	done
+
 .PHONY: cluster/helm/write-version
 cluster/helm/write-version:
 	overwrite-if-changed '$(shell get-snapshot-version)' $(HELM_VERSION_TAG)
