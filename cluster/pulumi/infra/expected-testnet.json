@@ -724,6 +724,7 @@
       },
       "values": {
         "service": {
+          "externalTrafficPolicy": "Local",
           "loadBalancerSourceRanges": [
             "35.194.81.56/32",
             "35.198.147.95/32",
@@ -1263,6 +1264,9 @@
           "accessLogEncoding": "JSON",
           "accessLogFile": "/dev/stdout",
           "defaultConfig": {
+            "gatewayTopology": {
+              "numTrustedProxies": 1
+            },
             "holdApplicationUntilProxyStarts": true
           },
           "enablePrometheusMerge": false

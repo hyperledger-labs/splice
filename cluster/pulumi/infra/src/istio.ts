@@ -59,6 +59,15 @@ function configureIstiod(
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
           enablePrometheusMerge: false,
           defaultConfig: {
+            // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
+            // https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#http-https
+            // Also see:
+            // https://istio.io/latest/docs/ops/configuration/traffic-management/network-topologies/#configuring-x-forwarded-for-headers
+            // This controls the value populated by the ingress gateway in the X-Envoy-External-Address header which can be reliably used
+            // by the upstream services to access client’s original IP address.
+            gatewayTopology: {
+              numTrustedProxies: 1,
+            },
             // wait for the istio container to start before starting apps to avoid network errors
             holdApplicationUntilProxyStarts: true,
           },
@@ -220,6 +229,11 @@ function configureGatewayService(
         service: {
           loadBalancerIP: ingressIp,
           loadBalancerSourceRanges: externalIPRanges,
+          // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
+          // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
+          // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
+          // and preventing it from sending traffic to other nodes.
+          externalTrafficPolicy: 'Local',
           ports: [
             ingressPort('status-port', 15021), // istio default
             ingressPort('http2', 80),
