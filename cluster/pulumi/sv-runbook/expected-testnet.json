@@ -345,7 +345,7 @@
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
-          "retainBlocks": 10000
+          "retainBlocks": 5040000
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {

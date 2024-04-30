@@ -212,9 +212,6 @@ jobs:
          cmd_name: Deployment Test
          cmd_retry_count: 5 # Retry in case of dependency download errors
          cmd: make cluster/pulumi/test
-      - run_bash_command_in_nix:
-         cmd_name: Check Pulumi deployment
-         cmd: make --keep-going cluster/pulumi/test
 
   auth0_user_cleanup:
     docker:
@@ -592,7 +589,7 @@ jobs:
           name: Launches the deploy_ciupgrade workflow, disabling partial upgrade if there are Helm/Pulumi changes
           command: |
             source .envrc.vars
-            
+
             run_partial_upgrade=""
             if build-tools/changes-vs-base "$REPO_ROOT/cluster"; then
               echo "Proceeding with partial upgrade."
@@ -601,7 +598,7 @@ jobs:
               echo "Skipping cluster partial upgrade and preflights steps."
               run_partial_upgrade="false"
             fi
-            
+
             run_daml_upgrade=""
             if build-tools/changes-vs-base "$REPO_ROOT/daml/dars.lock"; then
               echo "Skipping cluster daml upgrade."
@@ -610,7 +607,7 @@ jobs:
               echo "Proceeding with daml upgrade."
               run_daml_upgrade="true"
             fi
-            
+
             latest_base_version=$(build-tools/find_latest_base_version.sh)
             curl --fail-with-body --request POST \
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
@@ -781,7 +778,7 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Run disaster recovery test

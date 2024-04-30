@@ -1,7 +1,6 @@
 # When running locally, we want to run dump-config without any local environment variables,
-# so we use env -i to unload everything except PATH and HOME,
-# and then we direnv exec to restore the repo's environment variables before running dump-config.
-# This doesn't translate well to CI, but that's okay because CI doesn't change variables anyway.
+# so we use env -i to unload everything except PATH, HOME and the envs required for our code to load the cluster config directly.
+# In CI we load the env variables for the cluster directly, thus ensuring that the code loaded configuration and the env loaded config is always the same.
 .PHONY: $(dir)/test-devnet.json
 $(dir)/test-devnet.json: $(dir $(dir)).build
 	set -o pipefail \
@@ -10,7 +9,7 @@ $(dir)/test-devnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/devnet/.envrc.vars"; \
 		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec "${REPO_ROOT}/cluster/deployment/devnet" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="devnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
 .PHONY: $(dir)/test-testnet.json
@@ -21,7 +20,7 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec "${REPO_ROOT}/cluster/deployment/testnet" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test

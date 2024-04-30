@@ -7,7 +7,6 @@ async function main() {
   process.env.GOOGLE_CREDENTIALS = 's3cr3t';
   process.env.SLACK_ACCESS_TOKEN = 's3cr3t';
   process.env.GITHUB_TOKEN = 's3cr3t';
-  process.env.PULUMI_BACKEND_URL = 'pulumi_url';
   process.env.ARTIFACTORY_USER = 'art_user';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -52,7 +52,7 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - setup_vpn # VPN is required to resolve Validator1's PartyId
       - setup_vpn_routes:
@@ -166,7 +166,7 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - when:
           condition:
@@ -242,7 +242,7 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - when:
           condition:
@@ -331,7 +331,7 @@ jobs:
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - when:
           condition:
@@ -475,7 +475,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             if [[ << parameters.run >> == true ]]; then
-              make cluster/build
+              make -j cluster/build
             fi
           cmd_retry_count: 2
       - run_bash_command_in_nix:
@@ -576,7 +576,7 @@ jobs:
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply the pulumi infra stack

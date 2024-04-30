@@ -1319,7 +1319,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "sv1-cometbft-keys-node-private-key",
-          "retainBlocks": 10000,
+          "retainBlocks": 5040000,
           "rpcPort": 26657,
           "snapshotHeightDelta": 1000,
           "validator": {

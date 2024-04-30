@@ -21,7 +21,6 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
 
 /*eslint no-process-env: "off"*/
 export async function initDumpConfig(): Promise<void> {
-  process.env.CNCLUSTER_FIXED_TOKENS = '0';
   process.env.IMAGE_TAG = '0.0.1-deadbeef';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
@@ -29,11 +28,6 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
-  process.env.COMETBFT_RETAIN_BLOCKS = '10000';
-  process.env.IS_DEVNET = process.env.IS_DEVNET_OVERRIDE
-    ? process.env.IS_DEVNET_OVERRIDE
-    : process.env.IS_DEVNET;
-
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon

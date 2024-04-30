@@ -130,7 +130,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "backend": "pulumi_url",
+        "backend": "gs://da-cn-pulumi-dev-stacks",
         "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {

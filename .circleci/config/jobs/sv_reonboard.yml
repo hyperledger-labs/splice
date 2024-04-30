@@ -35,7 +35,7 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            make cluster/build
+            make -j cluster/build
           cmd_retry_count: 2
       - setup_vpn # VPN is required to get sv runbook identities
       - setup_vpn_routes:
