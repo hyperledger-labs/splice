@@ -428,7 +428,8 @@ subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to a
 function subcmd_activate() {
     _cluster_must_exist
 
-    gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
+    # If the zone is set, the command will try to use it instead of the region for the cluster
+    env -u CLOUDSDK_COMPUTE_ZONE gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
 }
 
 ###
@@ -803,7 +804,7 @@ function subcmd_create() {
                --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
                --num-nodes "${GCP_CLUSTER_MIN_NODES}" \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
-               --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
+               --node-locations "${CLOUDSDK_COMPUTE_ZONE}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --enable-autoscaling \
