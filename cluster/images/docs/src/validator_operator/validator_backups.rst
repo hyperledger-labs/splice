@@ -112,7 +112,7 @@ This file can now be copied to the Validator app's PVC:
 
 .. code-block:: bash
 
-    kubectl cp dump.json validator/<validator_pod_name>:/app/dump.json
+    kubectl cp dump.json validator/<validator_pod_name>:/domain-upgrade-dump/domain_migration_dump.json
 
 where `<validator_pod_name>` is the full name of the pod running the validator app.
 
@@ -120,4 +120,3 @@ Migrating the Data:
 
 Please follow the instructions in the :ref:`Deploying the Validator App and Participant <validator-upgrades-deploying>` section
 to update the configuration of the validator app and participant to consume the migration dump file.
-

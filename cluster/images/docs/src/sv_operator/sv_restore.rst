@@ -156,7 +156,7 @@ This file can now be copied to the SV app's PVC:
 
 .. code-block:: bash
 
-    kubectl cp dump.json sv/<sv_app_pod_name>:/app/dump.json
+    kubectl cp dump.json sv/<sv_app_pod_name>:/domain-upgrade-dump/domain_migration_dump.json
 
 where `<sv_app_pod_name>` is the full name of the pod running the SV app.
 
