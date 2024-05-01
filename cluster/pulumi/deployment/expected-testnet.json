@@ -281,6 +281,10 @@
             "value": "us-central1"
           },
           {
+            "name": "CLOUDSDK_COMPUTE_ZONE",
+            "value": "us-central1-a"
+          },
+          {
             "name": "GOOGLE_CREDENTIALS",
             "value": "s3cr3t"
           },

@@ -856,6 +856,9 @@
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
         },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test"
@@ -1024,6 +1027,9 @@
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
         },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test"
@@ -1073,6 +1079,9 @@
           "enablePrivatePathForGoogleCloudServices": true,
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1250,6 +1259,9 @@
           "enablePrivatePathForGoogleCloudServices": true,
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1587,6 +1599,9 @@
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
         },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test"
@@ -1636,6 +1651,9 @@
           "enablePrivatePathForGoogleCloudServices": true,
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1807,6 +1825,9 @@
           "enablePrivatePathForGoogleCloudServices": true,
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2357,6 +2378,9 @@
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
         },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test"
@@ -2500,6 +2524,9 @@
           "enablePrivatePathForGoogleCloudServices": true,
           "ipv4Enabled": false,
           "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {

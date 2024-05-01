@@ -79,6 +79,10 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           userLabels: {
             cluster: CLUSTER_BASENAME,
           },
+          locationPreference: {
+            // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
+            zone: config.requireEnv('CLOUDSDK_COMPUTE_ZONE'),
+          },
         },
       },
       {

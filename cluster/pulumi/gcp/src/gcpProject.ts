@@ -32,7 +32,7 @@ class GcpProject extends pulumi.ComponentResource {
 
     const { gcpProjectId } = args;
     const sharedProjectId = 'da-cn-shared';
-    const sharedProjectRegion = config.optionalEnv('CLOUDSDK_COMPUTE_REGION') || 'us-central1';
+    const sharedProjectRegion = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
 
     // Enable required services
 
