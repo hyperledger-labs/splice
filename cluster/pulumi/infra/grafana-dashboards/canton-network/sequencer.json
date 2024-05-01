@@ -120,7 +120,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum(rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum(rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -136,7 +136,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum by(type) (rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\"}[$__rate_interval]))",
+          "expr": "sum by(type) (rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -238,7 +238,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum by(sender) (rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\", type=\"send-confirmation-request\"}[$__rate_interval]))",
+          "expr": "sum by(sender) (rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\", type=\"send-confirmation-request\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -313,7 +313,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sort_desc(sum(delta(daml_block_events_total{namespace=\"sv-1\",job=\"$job\",type=\"send-confirmation-request\"}[1h])) by (sender))",
+          "expr": "sort_desc(sum(delta(daml_block_events_total{namespace=\"$namespace\",job=\"$job\",type=\"send-confirmation-request\"}[1h])) by (sender))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -427,7 +427,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\",sender=~\"PAR::.*\"}[$__rate_interval])) by (sender)",
+          "expr": "sum(rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\",sender=~\"PAR::.*\"}[$__rate_interval])) by (sender)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -528,7 +528,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\",sender=~\"MED::.*\"}[$__rate_interval])) by (sender)",
+          "expr": "sum(rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\",sender=~\"MED::.*\"}[$__rate_interval])) by (sender)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -629,7 +629,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(sender) (rate(daml_block_events_total{namespace=\"sv-1\", job=\"$job\", sender!~\"(MED|PAR)::.*\"}[$__rate_interval]))",
+          "expr": "sum by(sender) (rate(daml_block_events_total{namespace=\"$namespace\", job=\"$job\", sender!~\"(MED|PAR)::.*\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -651,14 +651,41 @@
       {
         "current": {
           "selected": false,
-          "text": "global-domain-0-sequencer",
-          "value": "global-domain-0-sequencer"
+          "text": "sv-1",
+          "value": "sv-1"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_block_events_total,job)",
+        "definition": "label_values(daml_block_events_total,namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(daml_block_events_total,namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "global-domain-1-sequencer",
+          "value": "global-domain-1-sequencer"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(daml_block_events_total{namespace=\"$namespace\"},job)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -666,7 +693,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_block_events_total,job)",
+          "query": "label_values(daml_block_events_total{namespace=\"$namespace\"},job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -685,6 +712,6 @@
   "timezone": "browser",
   "title": "Sequencer Traffic",
   "uid": "fdjrxql2alblsd",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

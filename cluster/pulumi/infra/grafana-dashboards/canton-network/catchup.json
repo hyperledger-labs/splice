@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 71,
+  "id": 81,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -441,8 +441,8 @@
           "showLegend": false
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "10.4.0",
@@ -461,6 +461,7 @@
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
+          "legendFormat": "{{namespace}} {{job}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -929,13 +930,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-2h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96c9",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }
