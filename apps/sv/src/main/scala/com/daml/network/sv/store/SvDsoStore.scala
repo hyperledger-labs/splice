@@ -537,6 +537,13 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       }
   }
 
+  def listOldestSummarizingMiningRounds(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[
+    splice.round.SummarizingMiningRound.ContractId,
+    splice.round.SummarizingMiningRound,
+  ]]]
+
   /** All `ClosedMiningRound` contracts that should be confirmed to be archived.
     *
     * These are all `ClosedMiningRound` contracts for which

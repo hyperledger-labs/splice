@@ -9,7 +9,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet.*
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import com.daml.network.codegen.java.splice.round.ClosedMiningRound
+import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
 import com.daml.network.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,
   ValidatorLicense,
@@ -460,6 +460,26 @@ class DbSvDsoStore(
         )
       } yield assignedContractFromRow(ClosedMiningRound.COMPANION)(result)).value
     }
+
+  override def listOldestSummarizingMiningRounds(limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[AssignedContract[SummarizingMiningRound.ContractId, SummarizingMiningRound]]] =
+    for {
+      result <- storage
+        .query(
+          selectFromAcsTableWithState(
+            DsoTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                SummarizingMiningRound.TEMPLATE_ID
+              )}""",
+            orderLimit = sql"""order by mining_round limit ${sqlLimit(limit)}""",
+          ),
+          "listOldestSummarizingMiningRounds",
+        )
+      limited = applyLimit("listOldestSummarizingMiningRounds", limit, result)
+    } yield limited.map(assignedContractFromRow(SummarizingMiningRound.COMPANION)(_))
 
   override def lookupConfirmationByActionWithOffset(
       confirmer: PartyId,

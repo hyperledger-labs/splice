@@ -62,6 +62,9 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
       unnamedParam(prettyOfString[javaapi.data.Numeric](_.getValue.toString).treeOf),
     )
 
+  implicit def prettyBigDecimal: Pretty[BigDecimal] =
+    prettyOfString[BigDecimal](_.toString)
+
   implicit def prettyDamlBool: Pretty[javaapi.data.Bool] =
     prettyOfString[javaapi.data.Bool](_.getValue.toString)
 
