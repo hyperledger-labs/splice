@@ -575,13 +575,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       def resultCids(store: UserWalletStore) = store
         .listSubscriptions(time(0))
         .futureValue
-        .map(r =>
-          r.subscription.contractId.contractId -> (r.state match {
-            case s: UserWalletStore.SubscriptionIdleState => s.contract.contractId.contractId
-            case s: UserWalletStore.SubscriptionPaymentState =>
-              s.contract.contractId.contractId
-          })
-        )
+        .map(r => r.subscription.contractId.contractId -> r.state.contract.contractId.contractId)
 
       "return correct results" in {
         val payData = subscriptionPayData()

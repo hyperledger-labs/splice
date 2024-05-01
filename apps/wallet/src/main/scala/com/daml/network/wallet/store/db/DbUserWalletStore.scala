@@ -13,7 +13,7 @@ import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
-import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store
 import com.daml.network.wallet.store.{
   BuyTrafficRequestTxLogEntry,
@@ -334,32 +334,59 @@ class DbUserWalletStore(
       )
     }
 
-  protected[this] override def listSubscriptionIdleStates(
-      unlessExpiredAsOf: CantonTimestamp,
-      limit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[ContractWithState[
-    subsCodegen.SubscriptionIdleState.ContractId,
-    subsCodegen.SubscriptionIdleState,
-  ]]] = {
-    val opName = "listSubscriptionIdleStates"
+  override def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[UserWalletStore.Subscription]] = waitUntilAcsIngested {
+    import UserWalletStore.{Subscription, SubscriptionIdleState, SubscriptionPaymentState}
+    val opName = "listSubscriptions"
+    val idleStateFlag = 0 // we sort by which_state so distinct prefers IdleState
     for {
-      _ <- waitUntilAcsIngested()
-      idleStates <- storage.query(
-        selectFromAcsTableWithState(
-          WalletTables.acsTableName,
-          storeId,
-          domainMigrationId,
-          where = sql"""template_id_qualified_name = ${QualifiedName(
-              subsCodegen.SubscriptionIdleState.TEMPLATE_ID
-            )}
-              and contract_expires_at >= $unlessExpiredAsOf""",
-          orderLimit = sql"""order by event_number
-                             limit ${sqlLimit(limit)}""",
-        ),
+      rows <- storage.query(
+        // The intent of the contract_expires_at filter is is to match the
+        // expiry behavior of SvDsoStore#listExpiredAnsSubscriptions, not to
+        // provide a grace period for subscription payments.
+        sql"""select distinct on (sub.contract_id)
+                     #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
+                     #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
+                     (case when st.template_id_qualified_name =
+                                  ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
+                           then $idleStateFlag
+                           else ${idleStateFlag + 1} end) which_state
+             from #${WalletTables.acsTableName} st, #${WalletTables.acsTableName} sub
+             where st.store_id = $storeId
+                   and sub.store_id = $storeId
+                   and st.migration_id = $domainMigrationId
+                   and sub.migration_id = $domainMigrationId
+                   and ((st.template_id_qualified_name =
+                           ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
+                         and st.contract_expires_at >= $now)
+                        or st.template_id_qualified_name =
+                             ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID)})
+                   and sub.template_id_qualified_name =
+                         ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID)}
+                   and (st.create_arguments ->> 'subscription') = sub.contract_id
+             order by sub.contract_id, which_state asc, st.event_number asc
+             limit ${sqlLimit(limit)}
+           """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult, Int)],
         opName,
       )
-    } yield applyLimit(opName, limit, idleStates).map(
-      contractWithStateFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(_)
-    )
+      joinedSubs = rows.view
+        // re-sort since contract_id, which_state order took priority above
+        .sortBy { case (rawState, _, _) => rawState.eventNumber }
+        .map { case (rawState, rawSub, whichState) =>
+          Subscription(
+            contractFromRow(subsCodegen.Subscription.COMPANION)(rawSub),
+            if (whichState == idleStateFlag)
+              SubscriptionIdleState(
+                contractFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(rawState)
+              )
+            else
+              SubscriptionPaymentState(
+                contractFromRow(subsCodegen.SubscriptionPayment.COMPANION)(rawState)
+              ),
+          )
+        }
+    } yield applyLimit(opName, limit, joinedSubs).toSeq
   }
 }

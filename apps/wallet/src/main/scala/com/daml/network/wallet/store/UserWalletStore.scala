@@ -154,54 +154,10 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         .take(limit.limit)
     }
 
-  final def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Seq[Subscription]] = {
-    // This is racy: you can miss subscriptions if their state change concurrently, i.e., you don't see them
-    // as either idle or payment. This is okay since it'll just refresh in the UI.
-    for {
-      subscriptions <- multiDomainAcsStore.listContracts(
-        subsCodegen.Subscription.COMPANION,
-        limit,
-      )
-      subscriptionIdleStates <- listSubscriptionIdleStates(now, limit)
-      subscriptionPayments <- multiDomainAcsStore.listContracts(
-        subsCodegen.SubscriptionPayment.COMPANION,
-        limit,
-      )
-    } yield {
-      val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
-      val idleStates: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
-        subscriptionIdleStates.map(state =>
-          (state.payload.subscription, SubscriptionIdleState(state.contract))
-        )
-      val payments: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
-        subscriptionPayments.map(state =>
-          (state.payload.subscription, SubscriptionPaymentState(state.contract))
-        )
-      val states: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
-        (idleStates ++ payments).distinctBy(_._1)
-      for {
-        (mainId, state) <- states
-        main <- mainMap.get(mainId)
-      } yield Subscription(main.contract, state)
-    }
-  }
-
-  /** Exclude any idle states that expired strictly before `unlessExpiredAsOf`.
-    * This is '''not the same''' as a historical query, as it may also exclude
-    * states that expired ''after'' that value.  The intent is to match the
-    * expiry behavior of `SvDsoStore#listExpiredAnsSubscriptions`, not to
-    * provide a grace period for subscription payments.
-    */
-  protected[this] def listSubscriptionIdleStates(
-      unlessExpiredAsOf: CantonTimestamp,
-      limit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[ContractWithState[
-    subsCodegen.SubscriptionIdleState.ContractId,
-    subsCodegen.SubscriptionIdleState,
-  ]]]
+  ): Future[Seq[Subscription]]
 
   final def getSubscriptionRequest(
       cid: subsCodegen.SubscriptionRequest.ContractId

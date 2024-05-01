@@ -58,13 +58,13 @@ object PageLimit {
 
 trait LimitHelpers { _: NamedLogging =>
 
-  protected def applyLimit[T, S[A] <: scala.collection.IterableOps[A, S, S[A]]](
+  protected final def applyLimit[CC[_], C](
       name: String,
       limit: Limit,
-      result: S[T],
+      result: C & scala.collection.IterableOps[?, CC, C],
   )(implicit
       traceContext: TraceContext
-  ): S[T] = {
+  ): C = {
     limit match {
       case PageLimit(limit) =>
         result.take(limit.intValue())
