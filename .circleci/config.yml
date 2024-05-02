@@ -748,6 +748,7 @@ commands:
     steps:
       - get_cluster:
           cluster: << parameters.cluster >>
+          when: << parameters.when >>
       - run:
           name: << parameters.cmd_name >>
           when: << parameters.when >>
@@ -1383,9 +1384,14 @@ commands:
   get_cluster:
     parameters:
       <<: *cluster-parameter
+      when:
+        type: enum
+        enum: ["on_success", "always", "on_fail"]
+        default: "on_success"
     steps:
       - attach_workspace:
           at: /tmp/workspace
+          when: << parameters.when >>
       - run:
           name: Setting TARGET_CLUSTER env var
           command: |
@@ -1395,9 +1401,11 @@ commands:
             else
               echo "export TARGET_CLUSTER=<< parameters.cluster >>" >> "$BASH_ENV"
             fi
+          when: << parameters.when >>
       - run:
           name: Print TARGET_CLUSTER for debugging
           command: echo "TARGET_CLUSTER set to $TARGET_CLUSTER"
+          when: << parameters.when >>
 jobs:
   deploy_sv_runbook:
     machine:
