@@ -44,7 +44,7 @@ class ParticipantPartyMigrator(
       getAcsSnapshot: PartyId => Future[ByteString],
       requiredDars: Seq[DarResource] = Seq.empty,
       overridePartiesToMigrate: Option[Seq[PartyId]],
-  ): Future[PartyId] = {
+  ): Future[Unit] = {
 
     for {
       participantId <- participantAdminConnection.getParticipantId()
@@ -68,9 +68,39 @@ class ParticipantPartyMigrator(
           s"ignoring parties that is not hosted by a single participant: ${topologyTxsToIgnore
               .map(_.mapping.partyId)}"
         )
-      partyIdsToMigrate = topologyTxs.map(_.mapping.partyId)
-      _ = if (!partyIdsToMigrate.contains(validatorPartyId))
-        sys.error(s"Validator party $validatorPartyId not found from previous topology txs")
+      partyIdsToMigrate = topologyTxs.map(_.mapping.partyId).toSet
+      partyIdsAlreadyMigrated <- participantAdminConnection
+        .listPartyToParticipant(
+          domainId.filterString,
+          filterParticipant = participantId.uid.toProtoPrimitive,
+        )
+        .map(_.filter(_.mapping.participants.size == 1).map(_.mapping.partyId).toSet)
+      _ = if (partyIdsAlreadyMigrated.nonEmpty)
+        logger.info(
+          s"These party ids are already migrated to the participant $participantId: $partyIdsAlreadyMigrated"
+        )
+      missingPartiesToMigrate = overridePartiesToMigrate
+        .map(_.toSet)
+        .getOrElse(Set.empty)
+        .diff(partyIdsToMigrate)
+        .diff(partyIdsAlreadyMigrated)
+
+      _ = if (missingPartiesToMigrate.nonEmpty)
+        sys.error(
+          s"Parties $missingPartiesToMigrate is neither migrated nor found from previous topology txs"
+        )
+      _ <-
+        if (partyIdsToMigrate.isEmpty) {
+          logger.info("Party ids already migrated")
+          Future.unit
+        } else {
+          logger.info(s"Migrating parties $partyIdsToMigrate to new participant")
+          ensurePartiesMigrated(
+            domainAlias,
+            partyIdsToMigrate.toSeq,
+            participantId,
+          )
+        }
       // There isn't a great way to check if we already imported the ACS so instead we check if the user already has a primary party
       // which is set afterwards. If things really go wrong during this step, we can always start over on a fresh participant.
       primaryPartyO <- connection.getOptionalPrimaryParty(ledgerApiUser)
@@ -79,19 +109,13 @@ class ParticipantPartyMigrator(
           logger.info("Party migration already complete, continuing")
           Future.unit
         case None =>
-          logger.info(s"Migrating parties $partyIdsToMigrate to new participant")
+          logger.info(s"Importing ACS for party ids $partyIdsToMigrate from scan")
           for {
-            _ <- ensurePartiesMigrated(
-              domainAlias,
-              partyIdsToMigrate,
-              participantId,
-              getAcsSnapshot,
-              requiredDars,
-            )
+            _ <- importAcs(partyIdsToMigrate.toSeq, getAcsSnapshot, requiredDars)
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
-          } yield validatorPartyId
+          } yield ()
       }
-    } yield validatorPartyId
+    } yield ()
   }
 
   private def toPartyId(partyHint: String, participantId: ParticipantId) = PartyId(
@@ -102,8 +126,6 @@ class ParticipantPartyMigrator(
       domainAlias: DomainAlias,
       partyIds: Seq[PartyId],
       participantId: ParticipantId,
-      getAcsSnapshot: PartyId => Future[ByteString],
-      requiredDars: Seq[DarResource],
   ): Future[Unit] = {
     Future
       .traverse(partyIds) { partyId =>
@@ -145,12 +167,9 @@ class ParticipantPartyMigrator(
             signedBy = participantId.uid.namespace.fingerprint,
             retryFor = RetryFor.WaitingOnInitDependency,
           )
-        } yield partyId
+        } yield ()
       }
-      .flatMap { partyIds =>
-        logger.info(s"Importing ACS for party ids $partyIds from scan")
-        importAcs(partyIds, getAcsSnapshot, requiredDars)
-      }
+      .map(_ => ())
   }
 
   private def importAcs(

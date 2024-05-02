@@ -228,7 +228,7 @@ class ValidatorApp(
                     nodeIdentitiesDump <- ParticipantInitializer.getDump(
                       participantBootstrappingConfig
                     )
-                    (_, partyId) <- (
+                    (_, _) <- (
                       setupDarsForAcsImport(participantAdminConnection),
                       participantPartyMigrator
                         .migrate(
@@ -253,7 +253,7 @@ class ValidatorApp(
                           partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                         ),
                     ).tupled
-                  } yield partyId
+                  } yield ()
                 }
               case (Some(_), None) =>
                 sys.error(
