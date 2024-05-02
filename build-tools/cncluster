@@ -2496,7 +2496,7 @@ function subcmd_disaster_recovery_test() {
         fi
     fi
     id=$(cat "$tmpdir/id-${sv}.json")
-    dump=$(echo "{\"migration_id\": 1} $id $data" | jq -s add)
+    dump=$(echo "{\"migration_id\": 1, \"created_at\": \"$dump_timestamp\"} $id $data" | jq -s add)
     echo "$dump" > "$tmpdir/dump${sv}.json"
   done
 
@@ -2514,11 +2514,13 @@ function subcmd_disaster_recovery_test() {
 
   token=$(subcmd_get_token validator1)
   dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
-  echo "$dump" > "$tmpdir/dump-validator1.json"
+  echo "$(echo "$dump" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')" '{"migrationId": 1}' | jq -s add > "$tmpdir/dump-validator1.json"
   pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
 
   _info "Deploying new domain"
+  export DISABLE_CANTON_AUTO_INIT="true"
+  export DISABLE_COMETBFT_STATE_SYNC="true"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
   _cluster_apply "$version"
@@ -2526,11 +2528,13 @@ function subcmd_disaster_recovery_test() {
   _info "Switching to new domain"
   unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
   _cluster_apply "$version"
 
-  _info "Installing Splitwell"
-  export CN_INSTALL_SPLITWELL="true"
-  _cluster_apply "$version"
+  # TODO(#12123) Reenable this.
+  # _info "Installing Splitwell"
+  # export CN_INSTALL_SPLITWELL="true"
+  # _cluster_apply "$version"
 }
 
 function take_sv_disaster_recovery_dump() {
@@ -2546,9 +2550,9 @@ function take_sv_disaster_recovery_dump() {
     fi
     data_dump_file="$output_directory/${namespace}_id_dump.json"
     id_dump_file="$output_directory/${namespace}_data_dump.json"
-    curl -sSLf "https://sv.${namespace}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
-    curl -sSLf "https://sv.$namespace.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
-    (echo "{\"migration_id\": $migration_id}"; cat "$data_dump_file" "$id_dump_file") | jq -s add > "$output_directory/${namespace}_dump.json"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
+    (echo "{\"migration_id\": $migration_id, \"created_at\": \"$timestamp\"}"; cat "$data_dump_file" "$id_dump_file") | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
 function take_validator_disaster_recovery_dump() {
@@ -2562,7 +2566,8 @@ function take_validator_disaster_recovery_dump() {
     else
         token=$(subcmd_get_token "$namespace")
     fi
-    (curl -s "https://wallet.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json"; echo "{\"migration_id\": $migration_id}") | jq -s add > "$output_directory/${namespace}_dump.json"
+    dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')"
+    echo "$dump" "{\"migrationId\": $migration_id}" | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
 subcommand_whitelist[take_disaster_recovery_dumps]='Take disaster recovery dumps of the specified namespaces'
