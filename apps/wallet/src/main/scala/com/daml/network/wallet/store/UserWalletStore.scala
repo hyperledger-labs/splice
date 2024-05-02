@@ -313,75 +313,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
 
   def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
-  ): Future[
-    Seq[UserWalletStore.AnsEntryWithPayData]
-  ] = {
-    import UserWalletStore.{
-      AnsEntryWithPayData,
-      EntryWithSubscriptionContext,
-      SubscriptionIdleState,
-      SubscriptionPayData,
-      SubscriptionPaymentState,
-    }
-    for {
-      // NOTE: entries and entry contexts are sometimes out of sync so we just filter out entries in such cases
-      entries <- multiDomainAcsStore.listContracts(
-        ansCodegen.AnsEntry.COMPANION,
-        limit,
-      )
-      entryContexts <- multiDomainAcsStore.listContracts(
-        ansCodegen.AnsEntryContext.COMPANION,
-        limit,
-      )
-      subscriptions <- listSubscriptions(now, limit)
-    } yield {
-      val entriesWithSubs = entries.foldLeft(Seq.empty[EntryWithSubscriptionContext]) {
-        (acc, entry) =>
-          val context = entryContexts.find(_.payload.name == entry.payload.name)
-          context match {
-            case Some(c) =>
-              acc :+ EntryWithSubscriptionContext(entry.contract, c.payload.reference)
-            case _ => acc
-          }
-      }
-
-      val subscriptionsPayData = subscriptions.map { s =>
-        s.state match {
-          case SubscriptionIdleState(contract) =>
-            SubscriptionPayData(
-              contract.payload.subscription,
-              s.subscription.payload.reference,
-              contract.payload.payData,
-            )
-          case SubscriptionPaymentState(contract) =>
-            SubscriptionPayData(
-              contract.payload.subscription,
-              s.subscription.payload.reference,
-              contract.payload.payData,
-            )
-        }
-      }
-
-      val subRefToPayData =
-        subscriptionsPayData.map(spd => spd.subscriptionReference -> spd.payData).toMap
-
-      entriesWithSubs.flatMap { es =>
-        subRefToPayData
-          .get(es.subscriptionReference)
-          .map(subPayData =>
-            AnsEntryWithPayData(
-              contractId = es.entry.contractId,
-              expiresAt = es.entry.payload.expiresAt,
-              entryName = es.entry.payload.name,
-              amount = subPayData.paymentAmount.amount,
-              currency = subPayData.paymentAmount.unit,
-              paymentInterval = subPayData.paymentInterval,
-              paymentDuration = subPayData.paymentDuration,
-            )
-          )
-      }
-    }
-  }
+  ): Future[Seq[UserWalletStore.AnsEntryWithPayData]]
 
   final def listLaggingAmuletRulesFollowers(
       targetDomain: DomainId
@@ -461,11 +393,6 @@ object UserWalletStore {
       state: SubscriptionState,
   )
 
-  final case class SubscriptionPayData(
-      subscription: subsCodegen.Subscription.ContractId,
-      subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
-      payData: subsCodegen.SubscriptionPayData,
-  )
   final case class AnsEntryWithPayData(
       contractId: ansCodegen.AnsEntry.ContractId,
       expiresAt: Instant,

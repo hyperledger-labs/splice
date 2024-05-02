@@ -1,7 +1,9 @@
 package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
@@ -25,6 +27,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
+import DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -280,6 +283,50 @@ class DbUserWalletStore(
     }
   }
 
+  override def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[UserWalletStore.AnsEntryWithPayData]] = for {
+    _ <- waitUntilAcsIngested()
+    opName = "listAnsEntries"
+    rows <- storage.query(
+      // getting the payData from any subscription state is fine because it's
+      // copied between states verbatim
+      (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("ansEntry.")},
+                    st.create_arguments -> 'payData'
+             from #${WalletTables.acsTableName} ansEntry,
+                  #${WalletTables.acsTableName} ansEntryContext,
+                  #${WalletTables.acsTableName} st,
+                  #${WalletTables.acsTableName} sub
+             where """ ++
+        filterStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
+        sql" and " ++ subscriptionFilter(now) ++ sql"""
+               and ansEntry.template_id_qualified_name =
+                     ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID)}
+               and ansEntryContext.template_id_qualified_name =
+                     ${QualifiedName(ansCodegen.AnsEntryContext.TEMPLATE_ID)}
+               and ansEntry.create_arguments ->> 'name' = ansEntryContext.create_arguments ->> 'name'
+               and ansEntryContext.create_arguments ->> 'reference' = sub.create_arguments ->> 'reference'
+             order by ansEntry.event_number
+             limit ${sqlLimit(limit)}
+        """).as[(SelectFromAcsTableResult, io.circe.Json)],
+      opName,
+    )
+    parsed = rows.view.map { case (rawAnsEntry, payDataJson) =>
+      val entry = contractFromRow(ansCodegen.AnsEntry.COMPANION)(rawAnsEntry)
+      val subPayData: subsCodegen.SubscriptionPayData =
+        subsCodegen.SubscriptionPayData.jsonDecoder().decode(new JsonLfReader(payDataJson.noSpaces))
+      UserWalletStore.AnsEntryWithPayData(
+        contractId = entry.contractId,
+        expiresAt = entry.payload.expiresAt,
+        entryName = entry.payload.name,
+        amount = subPayData.paymentAmount.amount,
+        currency = subPayData.paymentAmount.unit,
+        paymentInterval = subPayData.paymentInterval,
+        paymentDuration = subPayData.paymentDuration,
+      )
+    }
+  } yield applyLimit(opName, limit, parsed).toSeq
+
   override def getLatestTransferOfferEventByTrackingId(trackingId: String)(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[TransferOfferTxLogEntry]]] =
@@ -340,40 +387,27 @@ class DbUserWalletStore(
   ): Future[Seq[UserWalletStore.Subscription]] = waitUntilAcsIngested {
     import UserWalletStore.{Subscription, SubscriptionIdleState, SubscriptionPaymentState}
     val opName = "listSubscriptions"
-    val idleStateFlag = 0 // we sort by which_state so distinct prefers IdleState
+    val idleStateFlag = 0
     for {
       rows <- storage.query(
         // The intent of the contract_expires_at filter is is to match the
         // expiry behavior of SvDsoStore#listExpiredAnsSubscriptions, not to
         // provide a grace period for subscription payments.
-        sql"""select distinct on (sub.contract_id)
-                     #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
-                     #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
-                     (case when st.template_id_qualified_name =
-                                  ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
-                           then $idleStateFlag
-                           else ${idleStateFlag + 1} end) which_state
-             from #${WalletTables.acsTableName} st, #${WalletTables.acsTableName} sub
-             where st.store_id = $storeId
-                   and sub.store_id = $storeId
-                   and st.migration_id = $domainMigrationId
-                   and sub.migration_id = $domainMigrationId
-                   and ((st.template_id_qualified_name =
-                           ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
-                         and st.contract_expires_at >= $now)
-                        or st.template_id_qualified_name =
-                             ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID)})
-                   and sub.template_id_qualified_name =
-                         ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID)}
-                   and (st.create_arguments ->> 'subscription') = sub.contract_id
-             order by sub.contract_id, which_state asc, st.event_number asc
-             limit ${sqlLimit(limit)}
-           """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult, Int)],
+        (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
+                      #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
+                      (case when st.template_id_qualified_name =
+                                   ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
+                            then $idleStateFlag
+                            else ${idleStateFlag + 1} end) which_state
+              from #${WalletTables.acsTableName} st, #${WalletTables.acsTableName} sub
+              where """ ++ filterStoreMigrationIds("st.", "sub.") ++ sql"""
+                    and """ ++ subscriptionFilter(now) ++ sql"""
+              order by st.event_number
+              limit ${sqlLimit(limit)}
+          """).as[(SelectFromAcsTableResult, SelectFromAcsTableResult, Int)],
         opName,
       )
       joinedSubs = rows.view
-        // re-sort since contract_id, which_state order took priority above
-        .sortBy { case (rawState, _, _) => rawState.eventNumber }
         .map { case (rawState, rawSub, whichState) =>
           Subscription(
             contractFromRow(subsCodegen.Subscription.COMPANION)(rawSub),
@@ -389,4 +423,19 @@ class DbUserWalletStore(
         }
     } yield applyLimit(opName, limit, joinedSubs).toSeq
   }
+
+  private[this] def subscriptionFilter(now: CantonTimestamp) =
+    sql"""((st.template_id_qualified_name =
+               ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
+            and st.contract_expires_at >= $now)
+           or st.template_id_qualified_name =
+                ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID)})
+      and sub.template_id_qualified_name =
+            ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID)}
+      and (st.create_arguments ->> 'subscription') = sub.contract_id"""
+
+  private[this] def filterStoreMigrationIds(acsPrefixes: String*) =
+    acsPrefixes
+      .map(p => sql"#${p}store_id = $storeId and #${p}migration_id = $domainMigrationId")
+      .intercalate(sql" and ")
 }
