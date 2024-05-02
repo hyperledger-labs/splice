@@ -15,6 +15,9 @@ Upcoming
   the "reserved" traffic amount is used for more than just traffic top-ups. No change is needed unless you explicitly set a value for this instead
   of just relying on the default.
 
+* APIs
+  * The ``admin/domain/data-snapshot`` endpoints on the SV and validator app now require specifying the timestamp as a query parameter instead of in the payload body. This was changed since ``GET`` requests must not have request bodies.
+
 0.1.6
 -----
 

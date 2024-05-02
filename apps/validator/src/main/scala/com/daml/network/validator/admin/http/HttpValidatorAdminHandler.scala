@@ -102,7 +102,7 @@ class HttpValidatorAdminHandler(
 
   override def getValidatorDomainDataSnapshot(
       respond: v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.type
-  )(body: definitions.GetValidatorDomainDataSnapshotRequest)(
+  )(timestamp: String)(
       tuser: TracedUser
   ): Future[v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
@@ -111,7 +111,7 @@ class HttpValidatorAdminHandler(
         domainId <- getAmuletRulesDomain()(tracedContext)
         res <- dumpGenerator
           .getDomainDataSnapshot(
-            Instant.parse(body.timestamp),
+            Instant.parse(timestamp),
             domainId,
             // TODO(#9731): get migration id from scan instead of configuring here
             config.domainMigrationId,

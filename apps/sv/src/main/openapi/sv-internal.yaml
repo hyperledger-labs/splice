@@ -225,12 +225,16 @@ paths:
       tags: [ sv ]
       x-jvm-package: sv_admin
       operationId: "getDomainDataSnapshot"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/GetDomainDataSnapshotRequest"
+      parameters:
+        - name: timestamp
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: party_id
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: ok
@@ -1183,16 +1187,6 @@ components:
       properties:
         identities:
           $ref: "#/components/schemas/SynchronizerNodeIdentities"
-
-    GetDomainDataSnapshotRequest:
-      type: object
-      required:
-        - timestamp
-      properties:
-        timestamp:
-          type: string
-        party_id:
-          type: string
 
     GetDomainDataSnapshotResponse:
       type: object

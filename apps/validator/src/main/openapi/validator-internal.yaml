@@ -120,12 +120,12 @@ paths:
       tags: [ validator ]
       x-jvm-package: validator_admin
       operationId: "getValidatorDomainDataSnapshot"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/GetValidatorDomainDataSnapshotRequest"
+      parameters:
+        - in: query
+          name: timestamp
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: ok
@@ -877,14 +877,6 @@ components:
         content:
           description: |
             base64 encoded string of a dar package
-          type: string
-
-    GetValidatorDomainDataSnapshotRequest:
-      type: object
-      required:
-        - timestamp
-      properties:
-        timestamp:
           type: string
 
     DomainMigrationDump:

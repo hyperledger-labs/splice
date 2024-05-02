@@ -94,7 +94,7 @@ The data dump can be fetched from the validator app by running the following com
 
 .. code-block:: bash
 
-    curl -sSLf "https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/domain/data-snapshot" -H "authorization: Bearer <token>" -d '{"timestamp": "<timestamp>"}' -X GET -H "Content-Type: application/json" > dump.json
+    curl -sSLf "https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/domain/data-snapshot?timestamp=<timestamp>" -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json" > dump.json
 
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app, as obtained from your OAuth provider, and `<timestamp>` is the timestamp provided by the SVs,
 in the format `"2024-04-17T19:12:02.000000000Z"`.

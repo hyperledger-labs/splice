@@ -522,8 +522,8 @@ object HttpSvAdminAppClient {
       HttpResponse,
     ], http.GetDomainDataSnapshotResponse] =
       client.getDomainDataSnapshot(
-        body = definitions
-          .GetDomainDataSnapshotRequest(timestamp.toString, partyId.map(_.toProtoPrimitive)),
+        timestamp.toString,
+        partyId.map(_.toProtoPrimitive),
         headers = headers,
       )
 

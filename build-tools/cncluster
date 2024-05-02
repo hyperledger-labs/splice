@@ -2431,8 +2431,6 @@ function subcmd_disaster_recovery_test() {
 
   local tmpdir
   tmpdir=$(mktemp -d)
-  trap 'rm -rf "$tmpdir"' EXIT
-
 
   _cluster_reset
 
@@ -2462,7 +2460,7 @@ function subcmd_disaster_recovery_test() {
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
         _info "Attempting to get ACS from time $acs_time"
-        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$acs_time"'"}' -X GET -H "Content-Type: application/json")
+        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
         snapshot=$(echo "$data" | jq .data_snapshot)
         if [ "$snapshot" == "null" ]; then
             error=$(echo "$data" | jq -r .error)
@@ -2487,7 +2485,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting data dumps"
   for sv in 1 2 3 4; do
     token=$(subcmd_get_token sv-${sv})
-    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
+    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
         error=$(echo "$data" | jq -r .error)
@@ -2515,7 +2513,7 @@ function subcmd_disaster_recovery_test() {
   done
 
   token=$(subcmd_get_token validator1)
-  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
+  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
   echo "$dump" > "$tmpdir/dump-validator1.json"
   pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
@@ -2549,7 +2547,7 @@ function take_sv_disaster_recovery_dump() {
     data_dump_file="$output_directory/${namespace}_id_dump.json"
     id_dump_file="$output_directory/${namespace}_data_dump.json"
     curl -sSLf "https://sv.${namespace}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
-    curl -sSLf "https://sv.$namespace.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer $token" -d "{\"timestamp\": \"$timestamp\"}" -X GET -H "Content-Type: application/json" > "$id_dump_file"
+    curl -sSLf "https://sv.$namespace.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
     (echo "{\"migration_id\": $migration_id}"; cat "$data_dump_file" "$id_dump_file") | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
@@ -2564,7 +2562,7 @@ function take_validator_disaster_recovery_dump() {
     else
         token=$(subcmd_get_token "$namespace")
     fi
-    (curl -s "https://wallet.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d "{\"timestamp\": \"$timestamp\"}" -X GET -H "Content-Type: application/json"; echo "{\"migration_id\": $migration_id}") | jq -s add > "$output_directory/${namespace}_dump.json"
+    (curl -s "https://wallet.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json"; echo "{\"migration_id\": $migration_id}") | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
 subcommand_whitelist[take_disaster_recovery_dumps]='Take disaster recovery dumps of the specified namespaces'

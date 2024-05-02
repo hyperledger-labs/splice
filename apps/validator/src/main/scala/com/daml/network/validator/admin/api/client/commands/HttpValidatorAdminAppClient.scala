@@ -105,10 +105,7 @@ object HttpValidatorAdminAppClient {
       HttpResponse,
     ], http.GetValidatorDomainDataSnapshotResponse] =
       client.getValidatorDomainDataSnapshot(
-        body = definitions
-          .GetValidatorDomainDataSnapshotRequest(
-            timestamp.toString
-          ),
+        timestamp.toString,
         headers = headers,
       )
 

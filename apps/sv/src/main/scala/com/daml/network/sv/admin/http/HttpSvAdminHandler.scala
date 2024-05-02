@@ -489,7 +489,8 @@ class HttpSvAdminHandler(
   }
 
   override def getDomainDataSnapshot(respond: SvAdminResource.GetDomainDataSnapshotResponse.type)(
-      body: definitions.GetDomainDataSnapshotRequest
+      timestamp: String,
+      partyId: Option[String],
   )(
       tuser: TracedUser
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
@@ -497,8 +498,8 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
       domainDataSnapshotGenerator
         .getDomainDataSnapshot(
-          Instant.parse(body.timestamp),
-          body.partyId.map(Codec.tryDecode(Codec.Party)(_)),
+          Instant.parse(timestamp),
+          partyId.map(Codec.tryDecode(Codec.Party)(_)),
         )
         .map { response =>
           SvAdminResource.GetDomainDataSnapshotResponse.OK(
