@@ -36,8 +36,10 @@ class CometBftPreflightIntegrationTest
       clue(s"Connection to $cometBftP2pHost with port $port") {
         // All we care about is the p2p port for CometBFT being accessible by other nodes
         // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
-        Using.resource(new Socket()) { socket =>
-          socket.connect(new InetSocketAddress(cometBftP2pHost, port), 1000)
+        eventuallySucceeds() {
+          Using.resource(new Socket()) { socket =>
+            socket.connect(new InetSocketAddress(cometBftP2pHost, port), 1000)
+          }
         }
       }
     }
