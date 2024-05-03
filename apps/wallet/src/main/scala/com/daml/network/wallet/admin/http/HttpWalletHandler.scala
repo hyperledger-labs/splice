@@ -300,7 +300,7 @@ class HttpWalletHandler(
         for {
           userStore <- getUserStore(user)
           commandPriority <-
-            if (userStore.key.validatorParty != userStore.key.validatorParty)
+            if (userStore.key.endUserParty != userStore.key.validatorParty)
               Future.successful(CommandPriority.Low)
             else
               TopupUtil
