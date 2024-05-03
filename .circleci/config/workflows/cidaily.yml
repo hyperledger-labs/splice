@@ -277,7 +277,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily cidaily_health_check"
+          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily cidaily_health_check restore_sv_cidaily restore_validator_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
