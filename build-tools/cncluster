@@ -2596,7 +2596,9 @@ function subcmd_copy_disaster_recovery_dumps() {
         _error "Usage: $SCRIPTNAME take_disaster_recovery_dumps <timestamp> <migration_id> <output_directory> <namespaces>"
     fi
     dump_directory="$1"
+    shift
     for namespace in "$@"; do
+        echo "Copying dump to $namespace"
         dump_src_path="$dump_directory/${namespace}_dump.json"
         if [[ "$namespace" == sv* ]]; then
             pod=$(kubectl get pod -n "$namespace" -l app=sv-app -o name)
