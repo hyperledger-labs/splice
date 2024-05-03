@@ -7,10 +7,10 @@ import {
   DomainMigrationIndex,
   jmxOptions,
   defaultVersion,
-  CnChartVersion,
   sequencerResources,
   sequencerTokenExpirationTime,
 } from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
 import { Postgres } from '../../common/src/postgres';
 import { installCometBftNode } from './cometbft';

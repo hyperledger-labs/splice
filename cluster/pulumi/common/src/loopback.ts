@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 
-import { CnChartVersion, installCNRunbookHelmChart } from './helm';
+import { CnChartVersion } from './artifacts';
+import { installCNRunbookHelmChart } from './helm';
 import { ExactNamespace } from './utils';
 
 export function installLoopback(

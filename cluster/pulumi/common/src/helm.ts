@@ -5,6 +5,7 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
+import { artifactsRepository, CnChartVersion, parsedVersion, repositories } from './artifacts';
 import { config } from './config';
 import {
   ChartValues,
@@ -28,13 +29,9 @@ export type CNCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'depend
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
 export type CnInput<T> = T | pulumi.OutputInstance<T>;
 
-export type CnChartVersion = { type: 'local' } | { type: 'remote'; version: string };
 const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
 
-export const defaultVersion: CnChartVersion =
-  CHARTS_VERSION && CHARTS_VERSION !== 'local'
-    ? { type: 'remote', version: CHARTS_VERSION }
-    : { type: 'local' };
+export const defaultVersion: CnChartVersion = parsedVersion(CHARTS_VERSION);
 
 const imageTagsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
 const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } } =
@@ -71,7 +68,7 @@ export function installCNHelmChartByNamespaceName(
   includeNamespaceInName = true,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
-  const release = new k8s.helm.v3.Release(
+  return new k8s.helm.v3.Release(
     includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
     {
       name,
@@ -84,7 +81,6 @@ export function installCNHelmChartByNamespaceName(
     },
     opts
   );
-  return release;
 }
 
 export function installCNHelmChart(
@@ -135,7 +131,7 @@ function cnChartValues(
     chartDefaultValues,
     {
       // No need to use artifactory as an image repo for our core nodes
-      imageRepo: 'us-central1-docker.pkg.dev/da-cn-shared/cn-images',
+      imageRepo: repositories.google.dockerImages,
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
@@ -180,8 +176,8 @@ export function installCNRunbookHelmChartByNamespaceName(
         ...values,
         // Here we do want to use artifactory images, so we know this works for our partners
         imageRepo:
-          version.type === 'local'
-            ? 'us-central1-docker.pkg.dev/da-cn-shared/cn-images'
+          version.type === 'local' || artifactsRepository === 'google'
+            ? repositories.google.dockerImages
             : undefined,
       },
       timeout,
@@ -216,7 +212,9 @@ export function installCNRunbookHelmChart(
 export function chartPath(chartName: string, version: CnChartVersion): string {
   return version.type === 'local'
     ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${chartName}/`
-    : chartName;
+    : version.repository === repositories.google
+      ? `${version.repository.helm}/${chartName}`
+      : chartName;
 }
 
 function versionString(version: CnChartVersion, nsLogicalName: string, chartPath: string) {
@@ -228,14 +226,15 @@ function versionString(version: CnChartVersion, nsLogicalName: string, chartPath
   }
 }
 
+// repository opts are not supported for oci charts
 export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
-  if (version.type === 'local') {
+  if (version.type === 'local' || version.repository === repositories.google) {
     return undefined;
   } else {
     const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
     const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
     return {
-      repo: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
+      repo: version.repository.helm,
       username: username,
       password: password,
     };

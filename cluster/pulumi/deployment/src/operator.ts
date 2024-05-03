@@ -4,6 +4,17 @@ import { config } from 'cn-pulumi-common';
 import { namespace } from './namespace';
 import { Version } from './version';
 
+const credentialsSecret = new k8s.core.v1.Secret('gke-credentials', {
+  metadata: {
+    name: 'gke-credentials',
+    namespace: namespace.ns.metadata.name,
+  },
+  type: 'Opaque',
+  stringData: {
+    googleCredentials: config.requireEnv('GOOGLE_CREDENTIALS'),
+  },
+});
+
 export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
   name: 'pulumi-kubernetes-operator',
   chart: 'oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator',
@@ -43,12 +54,36 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         value: config.requireEnv('CLOUDSDK_COMPUTE_ZONE'),
       },
       {
+        name: 'GOOGLE_APPLICATION_CREDENTIALS',
+        value: '/app/gcp-credentials.json',
+      },
+      {
         name: 'GOOGLE_CREDENTIALS',
-        value: config.requireEnv('GOOGLE_CREDENTIALS'),
+        valueFrom: {
+          secretKeyRef: {
+            name: credentialsSecret.metadata.name,
+            key: 'googleCredentials',
+          },
+        },
       },
       {
         name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
         value: 'true',
+      },
+    ],
+    extraVolumeMounts: [
+      {
+        name: 'gcp-credentials',
+        mountPath: '/app/gcp-credentials.json',
+        subPath: 'googleCredentials',
+      },
+    ],
+    extraVolumes: [
+      {
+        name: 'gcp-credentials',
+        secret: {
+          secretName: credentialsSecret.metadata.name,
+        },
       },
     ],
   },

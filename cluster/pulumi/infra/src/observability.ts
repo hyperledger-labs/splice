@@ -420,6 +420,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
           ? { 'notification_policies.yaml': readGrafanaAlertingFile('notification_policies.yaml') }
           : {}),
         ...{
+          'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
           'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
           'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml'),
           'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),

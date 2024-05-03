@@ -9,7 +9,7 @@ $(dir)/test-devnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/devnet/.envrc.vars"; \
 		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="devnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="devnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
 .PHONY: $(dir)/test-testnet.json
@@ -20,7 +20,7 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test

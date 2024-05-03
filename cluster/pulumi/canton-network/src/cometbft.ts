@@ -10,10 +10,10 @@ import {
   isDevNet,
   DomainMigrationIndex,
   defaultVersion,
-  CnChartVersion,
   stableCometBftChainId,
   config,
 } from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svConfigs';
 

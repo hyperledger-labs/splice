@@ -55,7 +55,8 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         mark-for-testnet,
-        apply-infra
+        apply-infra,
+        update-deployment
       ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.

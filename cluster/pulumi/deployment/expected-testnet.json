@@ -3,6 +3,115 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "pulumi.com/v1",
+      "kind": "Stack",
+      "metadata": {
+        "name": "canton-network",
+        "namespace": "operator"
+      },
+      "spec": {
+        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "continueResyncOnCommitMatch": false,
+        "destroyOnFinalize": false,
+        "envRefs": {
+          "ARTIFACTORY_PASSWORD": {
+            "secret": {
+              "key": "ARTIFACTORY_PASSWORD",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "ARTIFACTORY_USER": {
+            "secret": {
+              "key": "ARTIFACTORY_USER",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "GCP_CLUSTER_BASENAME": {
+            "literal": {
+              "value": "test"
+            },
+            "type": "Literal"
+          },
+          "REPO_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace"
+            },
+            "type": "Literal"
+          },
+          "SLACK_ACCESS_TOKEN": {
+            "secret": {
+              "key": "SLACK_ACCESS_TOKEN",
+              "name": "env"
+            },
+            "type": "Secret"
+          }
+        },
+        "fluxSource": {
+          "dir": "cluster/pulumi/canton-network",
+          "sourceRef": {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "splice-node"
+          }
+        },
+        "refresh": false,
+        "retryOnUpdateConflict": true,
+        "stack": "organization/canton-network/canton-network.test",
+        "useLocalStackOnly": true
+      }
+    },
+    "name": "canton-network",
+    "provider": "",
+    "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
       "kind": "Alert",
       "metadata": {
@@ -123,6 +232,28 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "pulumi.com/v1",
       "kind": "Stack",
       "metadata": {
@@ -218,7 +349,7 @@
             "name": "splice-node"
           }
         },
-        "refresh": true,
+        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/infra/infra.test",
         "useLocalStackOnly": true
@@ -285,12 +416,36 @@
             "value": "us-central1-a"
           },
           {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          },
+          {
             "name": "GOOGLE_CREDENTIALS",
-            "value": "s3cr3t"
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "googleCredentials",
+                "name": "gke-credentials"
+              }
+            }
           },
           {
             "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
             "value": "true"
+          }
+        ],
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials"
+            }
           }
         ],
         "image": {
@@ -326,7 +481,7 @@
       },
       "spec": {
         "address": "https://slack.com/api/chat.postMessage",
-        "channel": "tmp-canton-network-deployments",
+        "channel": "slack_channel",
         "secretRef": {
           "name": "slack"
         },
@@ -372,7 +527,7 @@
       "spec": {
         "interval": "30s",
         "ref": {
-          "branch": "main"
+          "name": "refs/heads/releases/0.1.x"
         },
         "secretRef": {
           "name": "github"

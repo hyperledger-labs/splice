@@ -60,7 +60,8 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         mark-for-testnet,
-        apply-infra
+        apply-infra,
+        update-deployment
       ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
@@ -814,6 +815,10 @@ commands:
               fi
 
               if [[ << parameters.gce_authenticate >> == true ]]; then
+                if [[ "$TARGET_CLUSTER" == none ]]; then
+                  echo "TARGET_CLUSTER must be set"
+                  exit 1
+                fi
                 # Authenticate to the correct GCP project for the cluster
                 echo "Authenticating to cluster \"$TARGET_CLUSTER\" in project \"${CLOUDSDK_CORE_PROJECT}\""
                 case ${CLOUDSDK_CORE_PROJECT} in
@@ -3061,6 +3066,49 @@ jobs:
           root: /tmp/workspace
           paths:
               - cn_env_vars
+
+  deploy_operator:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: large
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply the deployment stack
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep SLACK_ACCESS_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster pulumi deployment up --skip-preview
 
   preflight_check:
     parameters:
@@ -6113,4 +6161,14 @@ workflows:
             - slack-context
           requires:
             - wait_for_previous_pipeline
+
+  update_deployment:
+    when:
+      equal: [ update-deployment, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_operator:
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
 

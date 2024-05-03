@@ -644,6 +644,10 @@ commands:
               fi
 
               if [[ << parameters.gce_authenticate >> == true ]]; then
+                if [[ "$TARGET_CLUSTER" == none ]]; then
+                  echo "TARGET_CLUSTER must be set"
+                  exit 1
+                fi
                 # Authenticate to the correct GCP project for the cluster
                 echo "Authenticating to cluster \"$TARGET_CLUSTER\" in project \"${CLOUDSDK_CORE_PROJECT}\""
                 case ${CLOUDSDK_CORE_PROJECT} in

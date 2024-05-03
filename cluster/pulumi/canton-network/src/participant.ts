@@ -4,7 +4,6 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   auth0UserNameEnvVarSource,
   BootstrappingDumpConfig,
-  CnChartVersion,
   disableCantonAutoInit,
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
@@ -13,6 +12,7 @@ import {
   jmxOptions,
   sanitizedForPostgres,
 } from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
 import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';

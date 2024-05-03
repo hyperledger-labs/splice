@@ -1,5 +1,6 @@
+import { CnChartVersion, parsedVersion } from './artifacts';
 import { config } from './config';
-import { CnChartVersion, defaultVersion } from './helm';
+import { defaultVersion } from './helm';
 
 export class DecentralizedSynchronizerMigrationConfig {
   // the current running migration, to which the ingresses point, and it's expected to be the active CN network
@@ -111,13 +112,8 @@ function processMigrationId(maybeValue?: string): DomainMigrationIndex | undefin
 function processVersion(maybeValue?: string): CnChartVersion {
   if (maybeValue == undefined) {
     return defaultVersion;
-  } else if (maybeValue == 'local') {
-    return { type: 'local' };
   } else {
-    return {
-      type: 'remote',
-      version: maybeValue,
-    };
+    return parsedVersion(maybeValue);
   }
 }
 

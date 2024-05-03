@@ -1,0 +1,10 @@
+workflow:
+  update_deployment:
+    when:
+      equal: [ update-deployment, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_operator:
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
