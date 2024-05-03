@@ -7,7 +7,7 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
-import com.daml.network.wallet.config.TreasuryConfig
+import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, TreasuryConfig, WalletSweepConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
@@ -187,6 +187,13 @@ case class ValidatorAppBackendConfig(
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(10),
+    /** The configuration for sweeping funds periodically to other validator's wallet
+      */
+    walletSweep: Map[String, WalletSweepConfig] = Map.empty,
+
+    /** The configuration for auto-accepting transfers from other parties
+      */
+    autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig] = Map.empty,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

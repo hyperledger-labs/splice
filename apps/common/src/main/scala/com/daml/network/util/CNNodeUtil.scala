@@ -442,6 +442,16 @@ object CNNodeUtil {
     com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, amuletPriceN))
   }
 
+  def ccToDollars(
+      cc: java.math.BigDecimal,
+      amuletPrice: java.math.BigDecimal,
+  ): java.math.BigDecimal = {
+    val scale = Numeric.Scale.assertFromInt(10)
+    val ccN = Numeric.assertFromBigDecimal(scale, cc)
+    val amuletPriceN = Numeric.assertFromBigDecimal(scale, amuletPrice)
+    com.daml.lf.data.assertRight(Numeric.multiply(scale, amuletPriceN, ccN))
+  }
+
   def synchronizerFees(
       topupAmount: Long,
       extraTrafficPrice: BigDecimal,

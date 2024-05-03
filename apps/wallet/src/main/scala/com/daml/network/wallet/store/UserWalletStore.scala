@@ -351,6 +351,35 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       .value
   }
 
+  final def getOutstandingTransferOffers(
+      fromParty: Option[String],
+      toParty: Option[String],
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[AssignedContract[
+    transferOffersCodegen.TransferOffer.ContractId,
+    transferOffersCodegen.TransferOffer,
+  ]]] = {
+    for {
+      transferOffers <- multiDomainAcsStore.listAssignedContracts(
+        transferOffersCodegen.TransferOffer.COMPANION
+      )
+    } yield {
+      val offersFilteredFrom = fromParty match {
+        case None => transferOffers
+        case Some(fromParty) =>
+          transferOffers.filter(_.payload.sender == fromParty)
+      }
+      val offersFilteredTo = toParty match {
+        case None => offersFilteredFrom
+        case Some(toParty) =>
+          offersFilteredFrom.filter(_.payload.receiver == toParty)
+      }
+      offersFilteredTo
+    }
+  }
+
   private[this] def assignedOrNotFound[TCid, T](
       companion: Contract.Companion.Template[TCid, T]
   )(ct: Option[ContractWithState[TCid, T]]) =

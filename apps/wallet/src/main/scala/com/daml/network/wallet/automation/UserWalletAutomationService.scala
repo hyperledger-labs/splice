@@ -16,6 +16,7 @@ import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.QualifiedName
+import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.util.ValidatorTopupConfig
@@ -39,6 +40,8 @@ class UserWalletAutomationService(
     ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
+    walletSweep: Option[WalletSweepConfig],
+    autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -117,6 +120,32 @@ class UserWalletAutomationService(
         },
     )
   )
+
+  walletSweep.foreach { config =>
+    registerTrigger(
+      new WalletSweepTrigger(
+        triggerContext,
+        store,
+        connection,
+        config,
+        scanConnection,
+      )
+    )
+  }
+
+  autoAcceptTransfers.foreach { config =>
+    registerTrigger(
+      new AutoAcceptTransferOffersTrigger(
+        triggerContext,
+        store,
+        connection,
+        config,
+        scanConnection,
+        validatorTopupConfigO,
+        clock,
+      )
+    )
+  }
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
@@ -142,5 +171,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[UnassignTrigger.Template[?, ?]],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],
+      aTrigger[WalletSweepTrigger],
+      aTrigger[AutoAcceptTransferOffersTrigger],
     )
 }

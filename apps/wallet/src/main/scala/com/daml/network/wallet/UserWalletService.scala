@@ -7,7 +7,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
-import com.daml.network.wallet.config.TreasuryConfig
+import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, TreasuryConfig, WalletSweepConfig}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.util.ValidatorTopupConfig
@@ -38,6 +38,8 @@ class UserWalletService(
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
+    walletSweep: Option[WalletSweepConfig],
+    autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -88,6 +90,8 @@ class UserWalletService(
     ingestFromParticipantBegin,
     loggerFactory,
     validatorTopupConfigO,
+    walletSweep,
+    autoAcceptTransfers,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.

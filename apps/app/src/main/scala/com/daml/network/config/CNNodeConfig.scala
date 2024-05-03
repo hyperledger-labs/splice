@@ -23,8 +23,10 @@ import com.daml.network.sv.config.*
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
+  AutoAcceptTransfersConfig,
   TreasuryConfig,
   WalletAppClientConfig,
+  WalletSweepConfig,
   WalletSynchronizerConfig,
   WalletValidatorAppClientConfig,
 }
@@ -492,6 +494,10 @@ object CNNodeConfig {
       deriveReader[TreasuryConfig]
     implicit val buyExtraTrafficConfigReader: ConfigReader[BuyExtraTrafficConfig] =
       deriveReader[BuyExtraTrafficConfig]
+    implicit val walletSweepConfigReader: ConfigReader[WalletSweepConfig] =
+      deriveReader[WalletSweepConfig]
+    implicit val autoAcceptTransfersConfigReader: ConfigReader[AutoAcceptTransfersConfig] =
+      deriveReader[AutoAcceptTransfersConfig]
     implicit val validatorDecentralizedSynchronizerConfigReader
         : ConfigReader[ValidatorDecentralizedSynchronizerConfig] =
       deriveReader[ValidatorDecentralizedSynchronizerConfig].emap(config => {
@@ -730,6 +736,10 @@ object CNNodeConfig {
       confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)
     implicit val buyExtraTrafficWriter: ConfigWriter[BuyExtraTrafficConfig] =
       deriveWriter[BuyExtraTrafficConfig]
+    implicit val walletSweepConfigWriter: ConfigWriter[WalletSweepConfig] =
+      deriveWriter[WalletSweepConfig]
+    implicit val autoAcceptTransfersConfigWriter: ConfigWriter[AutoAcceptTransfersConfig] =
+      deriveWriter[AutoAcceptTransfersConfig]
     implicit val validatorDecentralizedSynchronizerConfigWriter
         : ConfigWriter[ValidatorDecentralizedSynchronizerConfig] =
       deriveWriter[ValidatorDecentralizedSynchronizerConfig]

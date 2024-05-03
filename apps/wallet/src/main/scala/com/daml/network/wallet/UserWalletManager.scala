@@ -9,7 +9,7 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{DomainTimeSynchronization, Limit, LimitHelpers}
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
-import com.daml.network.wallet.config.TreasuryConfig
+import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, TreasuryConfig, WalletSweepConfig}
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.*
@@ -42,6 +42,8 @@ class UserWalletManager(
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     validatorTopupConfig: ValidatorTopupConfig,
+    walletSweep: Map[String, WalletSweepConfig],
+    autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -197,6 +199,8 @@ class UserWalletManager(
       participantId,
       ingestFromParticipantBegin,
       Option.when(endUserParty == store.walletKey.validatorParty)(validatorTopupConfig),
+      walletSweep.get(endUserName),
+      autoAcceptTransfers.get(endUserName),
     )
     (userRetryProvider, walletService)
   }

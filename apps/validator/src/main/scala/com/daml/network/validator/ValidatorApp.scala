@@ -641,6 +641,8 @@ class ValidatorApp(
               participantId,
               config.ingestFromParticipantBegin,
               validatorTopupConfig,
+              config.walletSweep,
+              config.autoAcceptTransfers,
             )
           )
         else {
