@@ -59,7 +59,7 @@ groups:
               type: threshold
         dashboardUid: QP_wDqDnz
         panelId: 6
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
