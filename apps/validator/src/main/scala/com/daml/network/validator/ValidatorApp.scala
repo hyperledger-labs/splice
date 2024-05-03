@@ -199,9 +199,15 @@ class ValidatorApp(
                     }
                 }
               case None =>
-                appInitStep("Ensuring decentralized synchronizer registered") {
-                  domainConnector.ensureDecentralizedSynchronizerRegistered()
-                }
+                if (config.svValidator)
+                  appInitStep("Ensuring decentralized synchronizer already registered") {
+                    domainConnector.waitForDecentralizedSynchronizerIsRegisteredAndConnected()
+                  }
+                else
+                  appInitStep("Ensuring decentralized synchronizer registered") {
+                    domainConnector
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()
+                  }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
               domainConnector.ensureExtraDomainsRegistered()

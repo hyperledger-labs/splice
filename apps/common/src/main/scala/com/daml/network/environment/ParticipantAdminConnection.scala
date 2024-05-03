@@ -261,6 +261,13 @@ class ParticipantAdminConnection(
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
 
+  def listConnectedDomain()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[ListConnectedDomainsResult]] =
+    for {
+      connectedDomain <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
+    } yield connectedDomain
+
   def lookupDomainConnectionConfig(
       domain: DomainAlias
   )(implicit traceContext: TraceContext): Future[Option[DomainConnectionConfig]] =

@@ -33,7 +33,36 @@ class DomainConnector(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def ensureDecentralizedSynchronizerRegistered()(implicit tc: TraceContext): Future[Unit] = {
+  def waitForDecentralizedSynchronizerIsRegisteredAndConnected()(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "ensure_decentralized_synchronizer_registered",
+      "decentralized synchronizer is already registered",
+      participantAdminConnection.lookupDomainConnectionConfig(config.domains.global.alias).flatMap {
+        case Some(_) =>
+          participantAdminConnection
+            .listConnectedDomain()
+            .map(
+              _.find(_.domainAlias == config.domains.global.alias).fold(
+                throw Status.FAILED_PRECONDITION
+                  .withDescription("Global Synchronizer not connected in the participant")
+                  .asRuntimeException()
+              )(_ => ())
+            )
+        case None =>
+          throw Status.NOT_FOUND
+            .withDescription("Global Synchronizer not registered in the participant")
+            .asRuntimeException()
+      },
+      logger,
+    )
+  }
+
+  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
     val decentralizedSynchronizerAlias = config.domains.global.alias
     getDecentralizedSynchronizerSequencerConnections.flatMap(
       ensureDomainRegistered(decentralizedSynchronizerAlias, _)
