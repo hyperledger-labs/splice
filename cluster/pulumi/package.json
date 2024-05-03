@@ -30,6 +30,7 @@
         "sv-runbook",
         "observability",
         "validator-runbook",
-        "deployment"
+        "deployment",
+        "multi-validator"
     ]
 }
