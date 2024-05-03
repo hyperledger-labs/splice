@@ -6,7 +6,6 @@ metadata:
 spec:
   hosts:
   - "{{ (.Values.cluster).basename }}.network.canton.global"
-  - "*.{{ (.Values.cluster).basename }}.network.canton.global"
   exportTo:
   - "."
   ports:

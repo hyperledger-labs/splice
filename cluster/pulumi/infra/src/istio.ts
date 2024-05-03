@@ -6,15 +6,18 @@ import { defaultVersion, ExactNamespace, installCNHelmChart, loadIPRanges } from
 import { clusterBasename } from './config';
 
 export const istioVersion = {
-  istio: '1.21.0',
+  istio: '1.21.2',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 201,
-    wasm: 158,
+    general: 211,
+    wasm: 168,
   },
 };
 
-function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
+function configureIstioBase(
+  ns: k8s.core.v1.Namespace,
+  istioDNamespace: k8s.core.v1.Namespace
+): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
     'istio-base',
     {
@@ -24,6 +27,14 @@ function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
       namespace: ns.metadata.name,
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
+      },
+      values: {
+        defaults: {
+          global: {
+            istioNamespace: istioDNamespace.metadata.name,
+            platform: 'gcp',
+          },
+        },
       },
     },
     {
@@ -48,8 +59,11 @@ function configureIstiod(
       },
       values: {
         global: {
-          istioNamespace: 'cluster-ingress',
+          istioNamespace: ingressNs.metadata.name,
           logAsJson: true,
+        },
+        pilot: {
+          autoscaleMax: 10,
         },
         meshConfig: {
           // Turns on envoy logging
@@ -226,6 +240,21 @@ function configureGatewayService(
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
       values: {
+        defaults: {
+          resources: {
+            requests: {
+              cpu: '500m',
+              memory: '512Mi',
+            },
+            limits: {
+              cpu: 4,
+              memory: '2024Mi',
+            },
+          },
+          autoscaling: {
+            maxReplicas: 10,
+          },
+        },
         service: {
           loadBalancerIP: ingressIp,
           loadBalancerSourceRanges: externalIPRanges,
@@ -306,7 +335,7 @@ export function configureIstio(
       name: nsName,
     },
   });
-  const base = configureIstioBase(istioSystemNs);
+  const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const publicGwSvc = publicIngressIp
