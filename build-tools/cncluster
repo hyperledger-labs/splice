@@ -1148,7 +1148,6 @@ function subcmd_sbt_for_preflight() {
     _needs_auth0_management_api_creds
 
     (cd "${REPO_ROOT}" && \
-         DOMAIN_URL=https://sequencer-0.sv-1.${GCP_CLUSTER_BASENAME}.network.canton.global \
          MIGRATION_ID=0 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \

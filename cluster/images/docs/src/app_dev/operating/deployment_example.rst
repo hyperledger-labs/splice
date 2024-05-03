@@ -21,11 +21,11 @@ Following the :ref:`recommended topology <topology_image>` for
 deploying Canton network applications, we run a separate validator
 node for our application.
 
-To start the validator node, first start the validator participant using the Canton binary and connect it to the domain. Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+To start the validator node, first start the validator participant using the Canton binary . Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Before starting the splitwell backend, some setup is required:
 
@@ -128,11 +128,11 @@ First, start the splitwell domain ::
 
   ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-domain.conf
 
-Next, in a separate terminal, start the participant again using the same command that we used in the single-domain setup. Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+Next, in a separate terminal, start the participant again using the same command that we used in the single-domain setup.
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Once the console opened, connect it to the domain you started earlier ::
 

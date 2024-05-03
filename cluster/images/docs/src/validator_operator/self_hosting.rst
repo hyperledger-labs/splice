@@ -62,13 +62,12 @@ The Canton participant is responsible for hosting your Daml apps; i.e. interpret
    bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/cn-node/bin/cn-node`) to your PATH as `canton` and `cn-node`.
    This is also the convention we will use in this tutorial.
 
-First off, you will need to start the validator participant and connect it to the domain: We assume here that
+First off, you will need to start the validator participant: We assume here that
 you extracted Canton next to the Canton network tarball. If you placed it somewhere else, you might need to adjust the path.
-Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster (`0` on a fresh deployment).
 
 .. parsed-literal::
 
-  DOMAIN_URL=https://sequencer.sv-MIGRATION_ID.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf
+  ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf
 
 Next, open a second terminal and navigate to the extracted bundle's root directory.
 In order to become a validator, you need the sponsorship of a current supervalidator.
@@ -357,7 +356,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/validator/validator-participant-secure.conf
+    ../|canton_subdir|/bin/canton --config examples/validator/validator-participant-secure.conf
 
 9. Now start the validator again:
 
@@ -375,7 +374,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
     .. parsed-literal::
 
-        NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
+        NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 10. If you have not already done so, while trying out the insecure
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`. For the next steps,
