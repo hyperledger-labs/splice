@@ -2624,7 +2624,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 4500
+          "targetThroughput": 45000
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",

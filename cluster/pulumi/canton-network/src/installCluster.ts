@@ -186,6 +186,7 @@ export async function installCluster(
   let validator1;
 
   if (mustInstallValidator1) {
+    const topupConfig = isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig;
     validator1 = await installValidator1(
       auth0Client,
       'validator1',
@@ -198,11 +199,9 @@ export async function installCluster(
       periodicBackupConfig,
       bootstrappingDumpConfig,
       {
-        ...(isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig),
+        ...topupConfig,
         // x10 validator1's traffic targetThroughput for load tester -- see #9064
-        targetThroughput: isDevNet
-          ? nonSvValidatorTopupConfig.targetThroughput * 10
-          : nonDevNetNonSvValidatorTopupConfig.targetThroughput,
+        targetThroughput: topupConfig.targetThroughput * 10,
       }
     );
   }
