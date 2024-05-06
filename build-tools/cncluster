@@ -807,6 +807,7 @@ function subcmd_create() {
                --node-locations "${CLOUDSDK_COMPUTE_ZONE}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
+               --addons=NodeLocalDNS \
                --enable-autoscaling \
                --min-nodes "${GCP_CLUSTER_MIN_NODES}" \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
