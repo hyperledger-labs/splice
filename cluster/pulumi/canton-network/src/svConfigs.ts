@@ -9,6 +9,7 @@ import {
 
 export interface StaticSvConfig {
   nodeName: string;
+  ingressName: string;
   onboardingName: string;
   validatorWalletUser: string;
   auth0ValidatorAppName: string;
@@ -55,7 +56,9 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = [
 // TODO(#11109): rotate the keys as they have been exposed in github (once mechanism is in place)
 const svConfigs: StaticSvConfig[] = [
   {
+    // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
     nodeName: 'sv-1',
+    ingressName: 'sv-2', // fun, right?
     onboardingName: 'Digital-Asset-2',
     auth0ValidatorAppName: 'sv1_validator',
     validatorWalletUser: isDevNet
@@ -74,7 +77,9 @@ const svConfigs: StaticSvConfig[] = [
     },
   },
   {
+    // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
     nodeName: 'sv-2',
+    ingressName: 'sv-2-eng',
     onboardingName: 'Digital-Asset-Eng-2',
     auth0ValidatorAppName: 'sv2_validator',
     validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
@@ -92,6 +97,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-3',
+    ingressName: 'sv-3-eng',
     onboardingName: 'Digital-Asset-Eng-3',
     auth0ValidatorAppName: 'sv3_validator',
     validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
@@ -109,6 +115,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-4',
+    ingressName: 'sv-4-eng',
     onboardingName: 'Digital-Asset-Eng-4',
     auth0ValidatorAppName: 'sv4_validator',
     validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
@@ -126,6 +133,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-5',
+    ingressName: 'sv-5-eng',
     onboardingName: 'Digital-Asset-Eng-5',
     auth0ValidatorAppName: 'sv5_validator',
     validatorWalletUser: 'auth0|65c15c482a18b1ef030ba290',
@@ -143,6 +151,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-6',
+    ingressName: 'sv-6-eng',
     onboardingName: 'Digital-Asset-Eng-6',
     auth0ValidatorAppName: 'sv6_validator',
     validatorWalletUser: 'auth0|65c26e959666d60d24fe523a',
@@ -160,6 +169,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-7',
+    ingressName: 'sv-7-eng',
     onboardingName: 'Digital-Asset-Eng-7',
     auth0ValidatorAppName: 'sv7_validator',
     validatorWalletUser: 'auth0|65c26e9d45eaef5c191a167e',
@@ -177,6 +187,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-8',
+    ingressName: 'sv-8-eng',
     onboardingName: 'Digital-Asset-Eng-8',
     auth0ValidatorAppName: 'sv8_validator',
     validatorWalletUser: 'auth0|65c26ea449ef8564a0ec9297',
@@ -194,6 +205,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-9',
+    ingressName: 'sv-9-eng',
     onboardingName: 'Digital-Asset-Eng-9',
     auth0ValidatorAppName: 'sv9_validator',
     validatorWalletUser: 'auth0|65c26eac58f141b4ca1dc5da',
@@ -211,6 +223,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-10',
+    ingressName: 'sv-10-eng',
     onboardingName: 'Digital-Asset-Eng-10',
     auth0ValidatorAppName: 'sv10_validator',
     validatorWalletUser: 'auth0|65e0a7854c76b74b28b8477f',
@@ -228,6 +241,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-11',
+    ingressName: 'sv-11-eng',
     onboardingName: 'Digital-Asset-Eng-11',
     auth0ValidatorAppName: 'sv11_validator',
     validatorWalletUser: 'auth0|65e0a78976d9757e3f14846b',
@@ -245,6 +259,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-12',
+    ingressName: 'sv-12-eng',
     onboardingName: 'Digital-Asset-Eng-12',
     auth0ValidatorAppName: 'sv12_validator',
     validatorWalletUser: 'auth0|65e0a78d68c39e5cc0351ed2',
@@ -262,6 +277,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-13',
+    ingressName: 'sv-13-eng',
     onboardingName: 'Digital-Asset-Eng-13',
     auth0ValidatorAppName: 'sv13_validator',
     validatorWalletUser: 'auth0|65e0a7914c76b74b28b84793',
@@ -279,6 +295,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-14',
+    ingressName: 'sv-14-eng',
     onboardingName: 'Digital-Asset-Eng-14',
     auth0ValidatorAppName: 'sv14_validator',
     validatorWalletUser: 'auth0|65e0a795aa7a40df0cc65ace',
@@ -296,6 +313,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-15',
+    ingressName: 'sv-15-eng',
     onboardingName: 'Digital-Asset-Eng-15',
     auth0ValidatorAppName: 'sv15_validator',
     validatorWalletUser: 'auth0|65e0a7994c76b74b28b8479c',
@@ -313,6 +331,7 @@ const svConfigs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-16',
+    ingressName: 'sv-16-eng',
     onboardingName: 'Digital-Asset-Eng-16',
     auth0ValidatorAppName: 'sv16_validator',
     validatorWalletUser: 'auth0|65e0a79de124e5c43dcb6a19',

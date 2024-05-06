@@ -7,12 +7,13 @@ function newUiApp(
   name: string,
   description: string,
   urlPrefixes: string[],
-  namespace: string,
+  // TODO(#12169) Make ingressName the same as the namespace (and rename this argument back to namespace)
+  ingressName: string,
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): auth0.Client {
   const urls = urlPrefixes.map(prefix => {
-    return `https://${prefix}.${namespace}.${clusterBasename}.network.canton.global`;
+    return `https://${prefix}.${ingressName}.${clusterBasename}.network.canton.global`;
   });
 
   const ret = new auth0.Client(
@@ -78,7 +79,8 @@ function cnAuth0(clusterBasename: string) {
       `SV${sv} UI`,
       `Used for the Wallet, ANS and SV UIs for SV${sv}`,
       ['wallet', 'cns', 'sv'],
-      `sv-${sv}`,
+      // TODO(#12169) Clean up this fun
+      sv == 1 ? 'sv-2' : `sv-${sv}-eng`,
       clusterBasename,
       provider
     );

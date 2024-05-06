@@ -84,7 +84,7 @@ SV. This file should be saved under ``validator-onboarding.conf`` in the directo
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-2.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next, start a postgres docker container that will be used by the CN apps:
 
@@ -368,7 +368,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
          .. parsed-literal::
 
-             curl -X POST https://sv.sv-1.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+             curl -X POST https://sv.sv-2.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
     b. start Canton Network:
 

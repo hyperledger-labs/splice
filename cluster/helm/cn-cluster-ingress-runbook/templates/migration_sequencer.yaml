@@ -2,6 +2,7 @@
 {{- $cluster := .Values.cluster }}
 {{- $releaseNamespace := .Release.Namespace }}
 {{- range $migrationId := .Values.ingress.decentralizedSynchronizer.migrationIds }}
+{{- $ingressName := $cluster.svIngressName | default $cluster.svNamespace }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
@@ -9,7 +10,7 @@ metadata:
   namespace: {{ $releaseNamespace }}
 spec:
   hosts:
-    - "sequencer-{{ $migrationId }}.{{ $cluster.svNamespace }}.{{ $cluster.hostname }}"
+    - "sequencer-{{ $migrationId }}.{{ $ingressName }}.{{ $cluster.hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

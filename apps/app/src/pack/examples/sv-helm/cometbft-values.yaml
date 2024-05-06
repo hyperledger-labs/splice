@@ -23,7 +23,7 @@ stateSync:
   # enable: false
 
   # Note that the port number is significant in the list of rpcServers
-  rpcServers: "https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+  rpcServers: "https://sv.sv-2.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

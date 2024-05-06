@@ -10,7 +10,7 @@ window.canton_network_config = {
   services: {
     scan: {
       // URL of the scan backend.
-      url: `https://scan.sv-1.${cluster}/api/scan`,
+      url: `https://scan.sv-2.${cluster}/api/scan`,
     },
     validator: {
       url: "https://" + window.location.hostname + "/api/validator",

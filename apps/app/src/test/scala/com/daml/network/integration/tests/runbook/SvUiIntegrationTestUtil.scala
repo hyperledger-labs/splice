@@ -134,7 +134,8 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
   }
 
   def withWebUiSv[A](i: Int)(f: WebDriverType => A): A = {
-    val svUiUrl = s"https://sv.sv-$i.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+    val svUiUrl = s"https://sv.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svUsername = s"admin@sv$i-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
 

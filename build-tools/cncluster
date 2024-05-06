@@ -1573,7 +1573,7 @@ function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"
     tmpdir=$(mktemp -d)
     token=$(subcmd_get_token sv-1)
-    dso=$(curl -s "https://sv.sv-1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/dso" -H "authorization: Bearer ${token}")
+    dso=$(curl -s "https://sv.sv-2.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/dso" -H "authorization: Bearer ${token}")
     # get the first futureValue's effective date, which corresponds to the vote from DamlCIUpgradeVotePreflightTest
     effective_date=$(jq -r '.amulet_rules.payload.configSchedule.futureValues[0]._1' <<< "$dso")
 

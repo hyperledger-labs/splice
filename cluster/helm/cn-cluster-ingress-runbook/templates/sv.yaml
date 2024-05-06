@@ -1,4 +1,4 @@
-{{/*Used by the sv runbook, which is not aware of multiple domains yet.*/}}
+{{- $ingressName := (.Values.cluster).svIngressName | default (.Values.cluster).svNamespace }}
 {{- if .Values.withSvIngress }}
   {{- if .Values.ingress.sv }}
 apiVersion: networking.istio.io/v1alpha3
@@ -8,7 +8,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "sv.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
+    - "sv.{{ $ingressName }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -38,7 +38,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "scan.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
+    - "scan.{{ $ingressName }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

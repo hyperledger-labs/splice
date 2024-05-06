@@ -349,7 +349,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-1.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.test.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
@@ -625,7 +625,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.test.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.test.network.canton.global",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -648,7 +648,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-1.test.network.canton.global"
+          "sponsorApiUrl": "https://sv.sv-2.test.network.canton.global"
         },
         "metrics": {
           "enable": true
@@ -898,7 +898,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "test.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.test.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.test.network.canton.global",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

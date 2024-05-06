@@ -1,3 +1,4 @@
+{{- $ingressName := (.Values.cluster).svIngressName | default (.Values.cluster).svNamespace }}
 {{ if .Values.ingress.splitwell }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -6,7 +7,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "splitwell.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostname }}"
+    - "splitwell.{{ $ingressName }}.{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:

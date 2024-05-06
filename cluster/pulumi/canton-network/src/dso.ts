@@ -89,6 +89,7 @@ export class Dso extends pulumi.ComponentResource {
       {
         isFounder,
         nodeName: svConf.nodeName,
+        ingressName: svConf.ingressName,
         onboardingName: svConf.onboardingName,
         nodeConfigs,
         cometBft: svConf.cometBft,
@@ -132,10 +133,15 @@ export class Dso extends pulumi.ComponentResource {
       }))
       .concat(daSupportApprovedIdentities);
 
-    const founderCometBftConf = { ...founderConf.cometBft, nodeName: founderConf.nodeName };
+    const founderCometBftConf = {
+      ...founderConf.cometBft,
+      nodeName: founderConf.nodeName,
+      ingressName: founderConf.ingressName,
+    };
     const peerCometBftConfs = restSvConfs.map(conf => ({
       ...conf.cometBft,
       nodeName: conf.nodeName,
+      ingressName: conf.ingressName,
     }));
 
     const foundingSvRewardWeightBps = 140_000;

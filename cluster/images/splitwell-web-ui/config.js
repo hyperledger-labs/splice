@@ -28,7 +28,7 @@ window.canton_network_config = {
     },
     scan: {
       // URL of the scan app's HTTP API
-      url: `https://scan.sv-1.${cluster}/api/scan`,
+      url: `https://scan.sv-2.${cluster}/api/scan`,
     },
   },
 };

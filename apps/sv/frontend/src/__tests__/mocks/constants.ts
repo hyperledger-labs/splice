@@ -195,7 +195,7 @@ export const voteResults: ListDsoRulesVoteResultsResponse = {
   ],
 };
 
-// Obtained via `curl https://sv.sv-1.cimain.network.canton.global/api/sv/v0/dso`
+// Obtained via `curl https://sv.sv-2.cimain.network.canton.global/api/sv/v0/dso`
 // ...and then npmFix made it look nice.
 // You'll need to update this on template changes to DsoRules and AmuletRules.
 export const dsoInfo: GetDsoInfoResponse = {
@@ -406,7 +406,7 @@ export const dsoInfo: GetDsoInfoResponse = {
                     migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12209f0d96157ae83871bd347d2fe22fe0b982dfbfe50016f7cf6dcfdfcd4eb8e132',
-                    url: 'https://sequencer-0.sv-1.cimain.network.canton.global',
+                    url: 'https://sequencer-0.sv-2.cimain.network.canton.global',
                     availableAfter: '2024-01-09T19:15:31.137243Z',
                   },
                   mediator: {
@@ -457,7 +457,7 @@ export const dsoInfo: GetDsoInfoResponse = {
                     migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12207eec8b03a668493a6068a755e2eb32084d9b588717049690cdbecb6558fd325c',
-                    url: 'https://sequencer-0.sv-2.cimain.network.canton.global',
+                    url: 'https://sequencer-0.sv-2-eng.cimain.network.canton.global',
                     availableAfter: '2024-01-09T19:19:10.755996Z',
                   },
                   mediator: {
@@ -508,7 +508,7 @@ export const dsoInfo: GetDsoInfoResponse = {
                     migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12207a75f3778b60414df3bb876e4a7c84976f35640b4daf30894189bc73e5c7fe38',
-                    url: 'https://sequencer-0.sv-3.cimain.network.canton.global',
+                    url: 'https://sequencer-0.sv-3-eng.cimain.network.canton.global',
                     availableAfter: '2024-01-09T19:19:14.361604Z',
                   },
                   mediator: {
@@ -559,7 +559,7 @@ export const dsoInfo: GetDsoInfoResponse = {
                     migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12208d47d9361a0e84ee10648c611fc2436885ab5193aa67fa5d9eefc7929f732e96',
-                    url: 'https://sequencer-0.sv-4.cimain.network.canton.global',
+                    url: 'https://sequencer-0.sv-4-eng.cimain.network.canton.global',
                     availableAfter: '2024-01-09T19:18:43.522097Z',
                   },
                   mediator: {

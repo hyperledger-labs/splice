@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Deployment
+
+  * Note the change in URLs of the Digital-Asset-2 node (which is used in several example and default configurations in the docs), from `*.sv-1.<hostname>` to `*.sv-2.<hostname>`, as another step towards making that node compliant with the agreed upon URLs.
+    All Digital-Asset-Eng-X nodes similarly change URLs with this release, from `*.sv-x.<hostname>` to `*.sv-x-eng.<hostname>`.
+
 0.1.7
 -----
 
@@ -17,6 +25,7 @@ Release Notes
   of just relying on the default.
 
 * APIs
+
   * The ``admin/domain/data-snapshot`` endpoints on the SV and validator app now require specifying the timestamp as a query parameter instead of in the payload body. This was changed since ``GET`` requests must not have request bodies.
 
 0.1.6

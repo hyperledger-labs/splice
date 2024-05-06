@@ -2203,6 +2203,7 @@
           "hostname": "dev.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
+          "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
         "clusterUrl": "dev.network.canton.global",
@@ -2645,7 +2646,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-1.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2.dev.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -2730,7 +2731,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
-          "publicUrl": "https://scan.sv-1.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-2.dev.network.canton.global"
         }
       }
     },
@@ -2759,7 +2760,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.dev.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -3125,6 +3126,7 @@
           "hostname": "dev.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
+          "svIngressName": "sv-2-eng",
           "svNamespace": "sv-2"
         },
         "clusterUrl": "dev.network.canton.global",
@@ -3567,7 +3569,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-2.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2-eng.dev.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -3623,7 +3625,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-2:5012",
-          "publicUrl": "https://scan.sv-2.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-2-eng.dev.network.canton.global"
         }
       }
     },
@@ -3652,7 +3654,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.dev.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -4018,6 +4020,7 @@
           "hostname": "dev.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
+          "svIngressName": "sv-3-eng",
           "svNamespace": "sv-3"
         },
         "clusterUrl": "dev.network.canton.global",
@@ -4460,7 +4463,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-3.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-3-eng.dev.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -4516,7 +4519,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-3:5012",
-          "publicUrl": "https://scan.sv-3.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-3-eng.dev.network.canton.global"
         }
       }
     },
@@ -4545,7 +4548,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.dev.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -4911,6 +4914,7 @@
           "hostname": "dev.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
+          "svIngressName": "sv-4-eng",
           "svNamespace": "sv-4"
         },
         "clusterUrl": "dev.network.canton.global",
@@ -5353,7 +5357,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-4.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-4-eng.dev.network.canton.global"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -5409,7 +5413,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-4:5012",
-          "publicUrl": "https://scan.sv-4.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-4-eng.dev.network.canton.global"
         }
       }
     },
@@ -5438,7 +5442,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.dev.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
