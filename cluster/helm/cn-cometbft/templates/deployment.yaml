@@ -20,6 +20,7 @@ spec:
         app: {{ $.Values.node.identifier }}
         cn-component: cometbft
     spec:
+      {{- if $.Values.enableAntiAffinity }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -30,7 +31,8 @@ spec:
                     values:
                       - cometbft
               topologyKey: kubernetes.io/hostname
-              namespaceSelector: {} # search in all namespaces
+              namespaceSelector: { } # search in all namespaces
+      {{- end }}
       containers:
         - name: "cometbft"
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
@@ -104,7 +106,7 @@ spec:
                   name: {{ $.Values.node.keysSecret }}
                   {{- end }}
         - name: config
-          emptyDir: {}
+          emptyDir: { }
         - name: initial-data
           configMap:
             name: {{ include "prefix" (list $.Values "initial-data") }}

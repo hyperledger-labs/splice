@@ -18,6 +18,7 @@ spec:
         app: {{ .Release.Name }}-sequencer
         cn-component: sequencer
     spec:
+      {{- if $.Values.enableAntiAffinity }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -29,6 +30,7 @@ spec:
                       - sequencer
               topologyKey: kubernetes.io/hostname
               namespaceSelector: {} # search in all namespaces
+      {{- end }}
       containers:
         - name: sequencer
         {{- if eq .Values.sequencer.driver.type "cometbft"}}

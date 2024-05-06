@@ -89,3 +89,5 @@ metrics:
 
 # k8s nodeSelector for all deployed pods (optional)
 # nodeSelector:
+
+enableAntiAffinity: true
