@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 81,
+  "id": 58,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -34,6 +34,110 @@
       "panels": [],
       "title": "Canton",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"} / 1000",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{namespace}} {{service}} {{sender}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Acks",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -100,7 +204,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 17
       },
       "id": 1,
       "options": {
@@ -126,8 +230,8 @@
             "uid": "${DS}"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"sequencer\"}",
+          "editorMode": "code",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -205,7 +309,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 28
       },
       "id": 3,
       "options": {
@@ -232,7 +336,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"}",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\",job=~\"participant-$migration\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -310,7 +414,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 28
       },
       "id": 2,
       "options": {
@@ -336,8 +440,8 @@
             "uid": "${DS}"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\"}",
+          "editorMode": "code",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -356,7 +460,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 36
       },
       "id": 10,
       "panels": [],
@@ -429,7 +533,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 37
       },
       "hideTimeOverride": false,
       "id": 11,
@@ -452,8 +556,8 @@
             "uid": "$DS"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "sum by(namespace, job) (rate(daml_block_events_total{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "editorMode": "code",
+          "expr": "sum by(namespace, job) (rate(daml_block_events_total{namespace=~\"$namespace\",job=~\"global-domain-$migration-sequencer\"}[$__rate_interval]))",
           "format": "time_series",
           "fullMetaSearch": false,
           "hide": false,
@@ -536,7 +640,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 44
       },
       "hideTimeOverride": false,
       "id": 7,
@@ -559,8 +663,8 @@
             "uid": "$DS"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "rate(daml_block_height{namespace=~\"$namespace\"}[$__rate_interval])",
+          "editorMode": "code",
+          "expr": "rate(daml_block_height{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"}[$__rate_interval])",
           "format": "time_series",
           "fullMetaSearch": false,
           "hide": false,
@@ -643,7 +747,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 51
       },
       "hideTimeOverride": false,
       "id": 6,
@@ -666,8 +770,8 @@
             "uid": "$DS"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "rate(cometbft_consensus_height{namespace=~\"$namespace\"}[$__rate_interval])",
+          "editorMode": "code",
+          "expr": "rate(cometbft_consensus_height{namespace=~\"$namespace\", job=~\"global-domain-$migration-cometbft-cometbft-rpc\"}[$__rate_interval])",
           "format": "time_series",
           "fullMetaSearch": false,
           "hide": false,
@@ -746,7 +850,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 57
       },
       "id": 8,
       "options": {
@@ -768,8 +872,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "daml_block_height{namespace=~\"$namespace\"}",
+          "editorMode": "code",
+          "expr": "daml_block_height{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -845,7 +949,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 57
       },
       "id": 4,
       "options": {
@@ -867,8 +971,8 @@
             "uid": "${DS}"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "cometbft_consensus_latest_block_height{namespace=~\"$namespace\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_latest_block_height{namespace=~\"$namespace\", job=~\"global-domain-$migration-cometbft-cometbft-rpc\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -944,7 +1048,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 64
       },
       "id": 5,
       "options": {
@@ -966,8 +1070,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "cometbft_consensus_block_syncing{namespace=~\"$namespace\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_block_syncing{namespace=~\"$namespace\", job=~\"global-domain-$migration-cometbft-cometbft-rpc\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1005,12 +1109,12 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "All"
+            "sv-1"
           ],
           "value": [
-            "$__all"
+            "sv-1"
           ]
         },
         "datasource": {
@@ -1033,6 +1137,38 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(daml_sequencer_client_handler_delay{namespace=~\"$namespace\"},job)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "name": "migration",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(daml_sequencer_client_handler_delay{namespace=~\"$namespace\"},job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/global-domain-(?<value>\\d)-sequencer/g",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -1042,8 +1178,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Global Domain Catchup",
-  "uid": "ca9df344-c699-4efe-83c2-5fb2639d96c9",
-  "version": 5,
+  "title": "Global Domain Catchup2",
+  "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
+  "version": 3,
   "weekStart": ""
 }
