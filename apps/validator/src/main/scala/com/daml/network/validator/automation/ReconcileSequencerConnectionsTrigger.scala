@@ -4,6 +4,7 @@ import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
@@ -23,7 +24,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class ReconcileSequencerConnectionsTrigger(
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
     decentralizedSynchronizerAlias: DomainAlias,
@@ -33,6 +34,10 @@ class ReconcileSequencerConnectionsTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
+  // Disabling domain time sync since we might need to fix domain connections to allow for catchup.
+  override protected lazy val context =
+    baseContext.copy(domainTimeSync = DomainTimeSynchronization.Noop)
+
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       decentralizedSynchronizer <- amuletRulesDomain()

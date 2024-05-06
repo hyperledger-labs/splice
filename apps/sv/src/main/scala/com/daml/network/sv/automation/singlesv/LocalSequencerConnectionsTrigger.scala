@@ -3,6 +3,7 @@ package com.daml.network.sv.automation.singlesv
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
 import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
@@ -24,7 +25,7 @@ import scala.jdk.OptionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class LocalSequencerConnectionsTrigger(
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: DomainAlias,
     store: SvDsoStore,
@@ -34,6 +35,10 @@ class LocalSequencerConnectionsTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
+  // Disabling domain time sync since we might need to fix domain connections to allow for catchup.
+  override protected lazy val context =
+    baseContext.copy(domainTimeSync = DomainTimeSynchronization.Noop)
+
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
