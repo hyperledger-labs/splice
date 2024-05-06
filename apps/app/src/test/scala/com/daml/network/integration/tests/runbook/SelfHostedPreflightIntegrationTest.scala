@@ -60,7 +60,6 @@ class SelfHostedPreflightIntegrationTest
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
       // Obtain a fresh onboarding secret from an SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
-      .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
       // Reduce top-up trigger polling interval to ensure that the first top-up gets done quickly enough during onboarding
       .addConfigTransform((_, conf) =>
         CNNodeConfigTransforms.updateAllValidatorConfigs_(

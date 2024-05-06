@@ -75,7 +75,6 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
-      .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
       // Reduce top-up trigger polling interval to ensure that the first top-up gets done quickly enough during onboarding
       .addConfigTransform((_, conf) =>
         CNNodeConfigTransforms.updateAllValidatorConfigs_(

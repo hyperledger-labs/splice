@@ -14,9 +14,7 @@ import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT node of the node deployed through sv-runbook has initialized fine.
   */
-class RunbookSvCometBftPreflightIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
-    with DomainMigrationIntegrationTestUtil {
+class RunbookSvCometBftPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 

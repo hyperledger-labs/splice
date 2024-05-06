@@ -18,8 +18,7 @@ import scala.util.Using
   */
 class CometBftPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with PreflightAuthUtil
-    with DomainMigrationIntegrationTestUtil {
+    with PreflightAuthUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 

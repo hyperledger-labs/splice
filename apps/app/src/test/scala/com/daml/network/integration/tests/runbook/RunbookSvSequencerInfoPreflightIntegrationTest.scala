@@ -15,8 +15,7 @@ import scala.jdk.OptionConverters.*
 /** Preflight test that makes sure that the sequencer url is published to dsoRules
   */
 class RunbookSvSequencerInfoPreflightIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
-    with DomainMigrationIntegrationTestUtil {
+    extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
