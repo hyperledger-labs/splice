@@ -23,7 +23,7 @@ export const gitRepo = new k8s.apiextensions.CustomResource(
     kind: 'GitRepository',
     metadata: { name: 'splice-node', namespace: namespace.logicalName },
     spec: {
-      interval: '30s',
+      interval: '5m',
       url: 'https://github.com/DACH-NY/canton-network-node',
       ref: {
         name: config.requireEnv('CN_DEPLOYMENT_FLUX_REF'),

@@ -47,8 +47,8 @@ parameters:
         healthcheck-devnet,
         healthcheck-testnet,
         redeploy-sv-runbook-cidaily,
-        redeploy-sv-runbook-cilr,
         redeploy-sv-runbook-devnet,
+        reset-sv-runbook-cilr,
         backup-cidaily,
         restore-sv-cidaily,
         backup-cidaily-testnet,
@@ -1325,6 +1325,18 @@ commands:
           event: pass
           custom: |
             { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+
+  notify-cluster-reset:
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+    steps:
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          branch_pattern: (deployment\/.*|main|release-line.*)
+          event: pass
+          custom: |
+            { "text": "*✅Job '${CIRCLE_JOB}' reset on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
 
   docker_build:
     steps:
@@ -3454,6 +3466,46 @@ jobs:
                 name: Upload vpn log
                 path: /var/log/vpn.log
 
+  reset_sv_runbook:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_deployment_notification:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Reset SV runbook
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster ci_pdown_sv
+      - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-reset:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
   deploy_validator_to_recover_sv_amulets:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -4327,66 +4379,26 @@ workflows:
             - wait_for_previous_pipeline
             - cancel_if_previous_pipeline
 
-  redeploy_sv_runbook_cilr:
+  reset_sv_runbook_cilr:
     when:
-      equal: [ redeploy-sv-runbook-cilr, << pipeline.parameters.run-job >> ]
+      equal: [ reset-sv-runbook-cilr, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cilr
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cilr
+          workflow_names: "reset_sv_runbook_cilr"
+      - reset_sv_runbook:
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
-          # because the branch is not yet updated.
-          workflow_names: "deploy_cilr"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          skip_if_exists: true
-      - deploy_sv_runbook:
-          filters:
-            branches:
-              only:
-                - deployment/cilr
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
           cluster: "cilr"
           channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
-          use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
-      - preflight_sv_check:
-          filters:
-            branches:
-              only:
-                - deployment/cilr
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cilr"
-          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
-          requires:
-            - deploy_sv_runbook
 
   deploy_cimain:
     when:

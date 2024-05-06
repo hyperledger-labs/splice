@@ -13,10 +13,11 @@ export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = config.envFlag(
 export const SV_BENEFICIARY_VALIDATOR1 = config.envFlag('SV_BENEFICIARY_VALIDATOR1', true);
 
 export async function getValidator1PartyId(): Promise<string> {
-  return retry('getValidator1PartyId', 1000, 100, async () => {
-    const response = await fetch(
-      `https://wallet.validator1.${CLUSTER_BASENAME}.network.canton.global/api/validator/v0/validator-user`
-    );
+  return retry('getValidator1PartyId', 1000, 10, async () => {
+    const validatorApiUrl = config.envFlag('CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS')
+      ? `http://validator-app.validator1:5003/api/validator/v0/validator-user`
+      : `https://wallet.validator1.${CLUSTER_BASENAME}.network.canton.global/api/validator/v0/validator-user`;
+    const response = await fetch(validatorApiUrl);
     const json = await response.json();
     if (!response.ok) {
       throw new Error(`Response is not OK: ${JSON.stringify(json)}`);

@@ -401,7 +401,6 @@
           ]
         },
         "createClusterRole": true,
-        "deploymentStrategy": "Recreate",
         "extraEnv": [
           {
             "name": "CLOUDSDK_CORE_PROJECT",
@@ -453,6 +452,16 @@
           "registry": "us-central1-docker.pkg.dev",
           "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
+        },
+        "resources": {
+          "limits": {
+            "cpu": 5,
+            "memory": "10G"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "2G"
+          }
         },
         "serviceMonitor": {
           "enabled": true,
@@ -525,7 +534,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "interval": "30s",
+        "interval": "5m",
         "ref": {
           "name": "refs/heads/releases/0.1.x"
         },

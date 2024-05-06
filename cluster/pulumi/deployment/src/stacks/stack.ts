@@ -6,7 +6,7 @@ import { gitRepo } from '../flux';
 import { namespace } from '../namespace';
 import { operator } from '../operator';
 
-const whitelistedEnvs = Array.from([
+const requiredEnvs = Array.from([
   'SLACK_ACCESS_TOKEN',
   'AUTH0_CN_MANAGEMENT_API_CLIENT_ID',
   'AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET',
@@ -17,11 +17,19 @@ const whitelistedEnvs = Array.from([
   'ARTIFACTORY_USER',
   'ARTIFACTORY_PASSWORD',
 ]);
+const optionalEnvs = Array.from(['K6_USERS_PASSWORD', 'K6_VALIDATOR_ADMIN_PASSWORD']);
+
 const env: {
   [key: string]: string;
 } = {};
 
-whitelistedEnvs.forEach(key => (env[key] = config.requireEnv(key)));
+requiredEnvs.forEach(key => (env[key] = config.requireEnv(key)));
+optionalEnvs.forEach(key => {
+  const optionalEnv = config.optionalEnv(key);
+  if (optionalEnv) {
+    env[key] = optionalEnv;
+  }
+});
 
 const envSecret = new k8s.core.v1.Secret('env', {
   metadata: {

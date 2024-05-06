@@ -11,6 +11,11 @@
     - [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
     - [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
   - [Cluster Tooling](#cluster-tooling)
+  - [Cluster Deployments](#cluster-deployments)
+    - [Operator deployments](#operator-deployments)
+      - [Deployment stack configuration](#deployment-stack-configuration)
+      - [The operator](#the-operator)
+      - [Alerts](#alerts)
   - [Pulumi and Helm](#pulumi-and-helm)
     - [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
     - [Docker Image Hosting](#docker-image-hosting)
@@ -269,6 +274,49 @@ specific configuration for these clusters is defined in a combination of
 
 All cluster management commands are defined as subcommands of the
 `cncluster` script, and are written in terms of Pulumi charts.
+
+## Cluster Deployments
+
+### Operator deployments
+
+The `pulumi/deployment` project controls the deployment of production clusters (currently only cilr) using the [pulumi operator](https://github.com/pulumi/pulumi-kubernetes-operator).
+
+#### Deployment stack configuration
+
+The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the `CN_DEPLOYMENT_FLUX_REF` git reference and applies that git deployment code
+to the cluster.
+The deployment uses `dotenv` to read the cluster specific env configuration files.
+The version used for the deployment is set using `CHARTS_VERSION`.
+The use of artifactory/google release artifacts can be controlled through `CN_ARTIFACTS_REPOSITORY`.
+
+The infra stack and the canton network stack are included by default.
+The other stacks can be included through the use of env variables:
+- CN_DEPLOY_VALIDATOR_RUNBOOK
+- CN_DEPLOY_MULTI_VALIDATOR
+- CN_DEPLOY_SV_RUNBOOK
+
+#### The operator
+
+The operator is deployed in each cluster in the `operator` namespace.
+Logs for the operator can be checked, for example for the `cilr` cluster and `canton-network` stack, with the following google query
+
+```
+resource.type="k8s_container"
+resource.labels.cluster_name="cn-cilrnet"
+resource.labels.namespace_name="operator"
+resource.labels.container_name="pulumi-kubernetes-operator"
+json_payload."Request.Name"="canton-network"
+```
+
+
+#### Alerts
+
+The operator exposes a basic set of prometheus metrics, that we use to create alerts if a stack is in failing state for a set period of time.
+
+There's also a dashboard that allow to easily view the current state/historical state.
+The dashboard is available in grafana, for exampel for CILR: [Pulumi Operator Dashboard](https://grafana.cilr.network.canton.global/d/QP_wDqDnz/pulumi-operator-stacks-dashboard?orgId=1&from=now-1h&to=now&refresh=30s)
+
 
 ## Pulumi and Helm
 

@@ -3,8 +3,8 @@
     "description": "Daily CILR SV Runbook Redeployment",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "deployment/cilr",
-      "run-job": "redeploy-sv-runbook-cilr"
+      "branch": "main",
+      "run-job": "reset-sv-runbook-cilr"
     },
     "timetable" : {
       "per-hour" : 1,

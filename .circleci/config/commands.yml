@@ -1155,6 +1155,18 @@ commands:
           custom: |
             { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
 
+  notify-cluster-reset:
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+    steps:
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          branch_pattern: (deployment\/.*|main|release-line.*)
+          event: pass
+          custom: |
+            { "text": "*✅Job '${CIRCLE_JOB}' reset on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+
   docker_build:
     steps:
       - run_bash_command_in_nix:
