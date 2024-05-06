@@ -156,10 +156,10 @@ function restore_cloudsql_postgres() {
       if [[ $output == *"another operation was already in progress"* ]]; then
         echo "Restore failed due to another operation in progress, retrying: $output"
         retry_count=$((retry_count+1))
-        sleep 25
       else
-        _error output
+        _error "$output"
       fi
+      sleep 25
     else
       echo "Restore succeeded"
       return 0

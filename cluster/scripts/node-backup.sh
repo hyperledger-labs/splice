@@ -99,10 +99,10 @@ function backup_cloudsql() {
       if [[ $output == *"another operation was already in progress"* ]]; then
         echo "Backup failed due to another operation in progress, retrying: $output"
         retry_count=$((retry_count+1))
-        sleep 25
       else
-        _error output
+        _error "$output"
       fi
+      sleep 25
     else
       echo "Backup succeeded"
       return 0
