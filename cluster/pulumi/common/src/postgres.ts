@@ -60,7 +60,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         databaseVersion: 'POSTGRES_14',
         deletionProtection: false,
-        region: 'us-central1',
+        region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           backupConfiguration: {
             enabled: true,
