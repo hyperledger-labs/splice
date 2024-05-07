@@ -28,7 +28,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
 
   protected def svNumber: Int
   protected val svName = s"sv$svNumber"
-  protected val svUrlPrefix = s"sv-$svNumber"
+  protected val svUrlPrefix = if (svNumber == 1) "sv-2" else s"sv-$svNumber-eng"
   protected val svNamespace = svUrlPrefix
 
   protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = sv_client(svName)
