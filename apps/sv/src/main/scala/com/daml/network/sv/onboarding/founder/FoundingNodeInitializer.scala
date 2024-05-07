@@ -44,7 +44,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   TrafficControlParameters,
 }
-import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -311,6 +311,8 @@ class FoundingNodeInitializer(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
           trafficControlParameters = Some(initialTrafficControlParameters),
+          reconciliationInterval =
+            PositiveSeconds.fromConfig(config.acsCommitmentReconcilationInterval),
         )
         for {
           _ <- retryProvider.ensureThatO(

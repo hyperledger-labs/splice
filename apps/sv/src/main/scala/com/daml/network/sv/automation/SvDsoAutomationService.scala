@@ -309,10 +309,11 @@ class SvDsoAutomationService(
     }
 
     registerTrigger(
-      new ReconcileSynchronizerFeesConfigTrigger(
+      new ReconcileDynamicDomainParametersTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
+        config.acsCommitmentReconcilationInterval,
       )
     )
   }
@@ -442,6 +443,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SequencerPruningTrigger],
       aTrigger[SubmitSvStatusReportTrigger],
       aTrigger[SvStatusReportMetricsExportTrigger],
-      aTrigger[ReconcileSynchronizerFeesConfigTrigger],
+      aTrigger[ReconcileDynamicDomainParametersTrigger],
     )
 }

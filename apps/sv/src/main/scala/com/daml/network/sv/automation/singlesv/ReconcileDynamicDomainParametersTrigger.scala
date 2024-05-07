@@ -11,7 +11,8 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTrigger.Task
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AmuletConfigSchedule
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
+import com.digitalasset.canton.config.PositiveDurationSeconds
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.tracing.TraceContext
@@ -21,12 +22,13 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** A trigger to reconcile the domain fees configuration from the AmuletConfig to the domain parameters
+/** A trigger to reconcile the domain config from the AmuletConfig to the dynamic domain parameters
   */
-class ReconcileSynchronizerFeesConfigTrigger(
+class ReconcileDynamicDomainParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
+    acsCommitmentReconcilationInterval: PositiveDurationSeconds,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -41,8 +43,7 @@ class ReconcileSynchronizerFeesConfigTrigger(
       amuletRules <- store.getAmuletRules()
       amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(context.clock.now)
       state <- participantAdminConnection.getDomainParametersState(decentralizedSynchronizerId)
-      updatedConfig = updateDomainParameter(state.mapping.parameters, amuletConfig)
-
+      updatedConfig = updateDomainParameters(state.mapping.parameters, amuletConfig)
     } yield if (state.mapping.parameters != updatedConfig) Seq(Task(amuletConfig)) else Seq.empty
   }
 
@@ -54,7 +55,7 @@ class ReconcileSynchronizerFeesConfigTrigger(
       participantId <- participantAdminConnection.getId()
       _ <- participantAdminConnection.ensureDomainParameters(
         decentralizedSynchronizerId,
-        updateDomainParameter(_, task.amuletConfig),
+        updateDomainParameters(_, task.amuletConfig),
         participantId.namespace.fingerprint,
       )
     } yield {
@@ -70,14 +71,14 @@ class ReconcileSynchronizerFeesConfigTrigger(
     Future.successful(false)
   }
 
-  private def updateDomainParameter(
-      existingDomainParameter: DynamicDomainParameters,
+  private def updateDomainParameters(
+      existingDomainParameters: DynamicDomainParameters,
       amuletConfig: AmuletConfig[USD],
   ): DynamicDomainParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
-    existingDomainParameter.tryUpdate(
+    existingDomainParameters.tryUpdate(
       trafficControlParameters =
-        existingDomainParameter.trafficControlParameters.map { trafficControl =>
+        existingDomainParameters.trafficControlParameters.map { trafficControl =>
           trafficControl.copy(
             maxBaseTrafficAmount =
               NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
@@ -87,10 +88,12 @@ class ReconcileSynchronizerFeesConfigTrigger(
               domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds
             ),
           )
-        }
+        },
+      reconciliationInterval = PositiveSeconds.fromConfig(acsCommitmentReconcilationInterval),
     )
   }
 }
+
 object ReconcileSynchronizerFeesConfigTrigger {
   case class Task(amuletConfig: AmuletConfig[USD]) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
