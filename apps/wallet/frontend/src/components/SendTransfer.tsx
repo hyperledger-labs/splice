@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { DisableConditionally, exponentialBackoffDelay } from 'common-frontend';
+import { DisableConditionally } from 'common-frontend';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -68,7 +68,6 @@ const SendTransfer: React.FC = () => {
     },
     // in case the participant is unavailable
     retry: 4,
-    retryDelay: attempt => exponentialBackoffDelay(attempt),
   });
 
   useMemo(() => {
