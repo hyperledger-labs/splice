@@ -812,14 +812,7 @@ commands:
               . .envrc.vars
               if [[ "$TARGET_CLUSTER" != none ]]; then
                 . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
-                # Duplicate a relevant part of `build-tools/lib/cluster.envrc` because we're not actually using direnv
-                if [ -z "${GCP_CLUSTER_HOSTNAME:-}" ]; then
-                  if (env-bool GCP_CLUSTER_PROD_LIKE) || (env-bool GCP_CLUSTER_DA_HOSTNAME); then
-                    export GCP_CLUSTER_HOSTNAME="${GCP_CLUSTER_BASENAME}.global.canton.network.digitalasset.com"
-                  else
-                    export GCP_CLUSTER_HOSTNAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
-                  fi
-                fi
+                . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
                 echo "Using cluster hostname suffix: ${GCP_CLUSTER_HOSTNAME}"
               fi
 
