@@ -18,7 +18,7 @@ groups:
               disableTextWrap: false
               editorMode: code
               exemplar: false
-              expr: ((sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="failure"}[10m])) / sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome=~"success|failure"}[10m]))) > 0) * 100
+              expr: ((sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome="failure"}[10m])) / sum by(namespace, node_type, trigger_name) (increase(cn_trigger_completed_total{trigger_name=~".+", outcome=~".+"}[10m]))) > 0) * 100
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true

@@ -1,5 +1,6 @@
 package com.daml.network.validator.automation
 
+import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -13,6 +14,7 @@ import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcom
 }
 import com.daml.network.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.environment.{
   CNLedgerConnection,
@@ -28,6 +30,7 @@ import com.daml.network.wallet.util.{ExtraTrafficTopupParameters, TopupUtil, Val
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.sequencing.protocol.SequencerErrors
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -138,6 +141,13 @@ class TopupMemberTrafficTrigger(
               .withDescription(s"Unexpected COO return type: $otherwise")
               .asRuntimeException()
         }
+        .recover {
+          case GrpcException(GrpcStatus(statusCode, someDescription), _)
+              if statusCode == Status.Code.FAILED_PRECONDITION && someDescription.exists(
+                _.contains(SequencerErrors.TrafficCredit.id)
+              ) =>
+            throw OutOfTrafficCredit()
+        }
     } yield outcome
   }
 
@@ -242,3 +252,6 @@ object TopupMemberTrafficTrigger {
       )
   }
 }
+
+final case class OutOfTrafficCredit()
+    extends QuietNonRetryableException("Member does not have sufficient traffic credit available")

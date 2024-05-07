@@ -4,7 +4,7 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.network.environment.RetryFor
-import com.daml.network.environment.RetryProvider.RetryableConditions
+import com.daml.network.environment.RetryProvider.{QuietNonRetryableException, RetryableConditions}
 import com.daml.metrics.api.MetricsContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -118,6 +118,23 @@ abstract class TaskbasedTrigger[T: Pretty](
                 }
                 Success(true)
             }
+
+          case Failure(ex: QuietNonRetryableException) =>
+            if (context.retryProvider.isClosing) {
+              logger.info(
+                "Ignoring processing failure, as we are shutting down",
+                ex,
+              )
+            } else {
+              MetricsContext.withExtraMetricLabels(("outcome", "expected_failure")) { m =>
+                metrics.completed.mark()(m)
+              }
+              logger.info(
+                show"Skipping processing of \n$task\ndue to expected non-retryable failure",
+                ex,
+              )
+            }
+            Success(false)
 
           case Failure(ex) =>
             if (context.retryProvider.isClosing) {
