@@ -336,6 +336,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           server: {
             root_url: grafanaExternalUrl,
           },
+          date_formats: {
+            default_timezone: 'UTC',
+          },
         },
         adminUser: 'cn-admin',
         adminPassword: grafanaKeysFromSecret().adminPassword,

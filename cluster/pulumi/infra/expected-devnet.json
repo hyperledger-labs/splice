@@ -1565,6 +1565,9 @@
           },
           "fullnameOverride": "grafana",
           "grafana.ini": {
+            "date_formats": {
+              "default_timezone": "UTC"
+            },
             "server": {
               "root_url": "https://grafana.cluster.mock.com"
             }
