@@ -3,8 +3,8 @@ cluster:
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 resources:
   limits:
-    cpu: "2"
-    memory: 8Gi
+    cpu: "4"
+    memory: 12Gi
   requests:
     cpu: "0.5"
     memory: 1Gi
