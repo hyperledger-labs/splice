@@ -11,6 +11,7 @@ import {
   loadYamlFromFile,
   sequencerResources,
   sequencerTokenExpirationTime,
+  config,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -84,6 +85,7 @@ export function installDecentralizedSynchronizerNode(
             },
           },
           enablePostgresMetrics: true,
+          logLevel: config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') ? 'INFO' : 'DEBUG',
         },
         version,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])

@@ -9,12 +9,13 @@ import {
   defaultVersion,
   sequencerResources,
   sequencerTokenExpirationTime,
+  config,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
 import { Postgres } from '../../common/src/postgres';
 import { installCometBftNode } from './cometbft';
-import { StaticCometBftConfigWithNodeName } from './svConfigs';
+import svConfigs, { StaticCometBftConfigWithNodeName } from './svConfigs';
 
 export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
@@ -78,6 +79,11 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       this.name,
       'cn-global-domain',
       {
+        logLevel: config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
+          ? nodeIdentifier !== svConfigs[0].onboardingName
+            ? 'INFO'
+            : 'DEBUG'
+          : 'DEBUG',
         sequencer: {
           persistence: {
             databaseName: sequencerDbName,

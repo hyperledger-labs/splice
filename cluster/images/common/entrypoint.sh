@@ -6,7 +6,7 @@ source /app/tools.sh
 
 EXE=$(readlink -f cn-image-bin)
 
-declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off )
+declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off )
 
 if [ -f /app/logback.xml ]; then
    export JAVA_TOOL_OPTIONS="-Dlogback.configurationFile=/app/logback.xml ${JAVA_TOOL_OPTIONS:-}"

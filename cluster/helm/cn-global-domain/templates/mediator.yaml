@@ -46,6 +46,7 @@ spec:
               name = "{{ .Values.nodeIdentifier }}"
             }
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "cn-util-lib.log-level" .Values | indent 8}}
         imagePullPolicy: Always
         ports:
         - containerPort: 5007

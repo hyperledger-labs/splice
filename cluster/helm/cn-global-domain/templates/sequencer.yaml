@@ -81,6 +81,7 @@ spec:
               value: "{{ . }}"
             {{- end }}
             {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
+            {{- include "cn-util-lib.log-level" .Values | indent 12}}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008

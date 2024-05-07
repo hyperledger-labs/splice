@@ -1,3 +1,4 @@
+import * as pulumi from '@pulumi/pulumi';
 import { config as dotenvConfig } from 'dotenv';
 import { expand } from 'dotenv-expand';
 
@@ -5,6 +6,7 @@ import Dict = NodeJS.Dict;
 
 class CnConfig {
   env: Dict<string>;
+  pulumiConfig = new pulumi.Config();
 
   /*eslint no-process-env: "off"*/
   constructor() {

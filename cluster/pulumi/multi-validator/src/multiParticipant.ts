@@ -35,6 +35,14 @@ export class MultiParticipant extends MultiNodeDeployment {
                 secretKeyRef: args.postgres.secret,
               },
             },
+            {
+              name: 'LOG_LEVEL_CANTON',
+              value: 'INFO',
+            },
+            {
+              name: 'LOG_LEVEL_STDOUT',
+              value: 'INFO',
+            },
           ],
           ports: ports.map(port => ({
             name: port.name,
@@ -43,12 +51,12 @@ export class MultiParticipant extends MultiNodeDeployment {
           })),
           resources: {
             requests: {
-              cpu: '1',
-              memory: '6Gi',
+              cpu: '3',
+              memory: '16Gi',
             },
             limits: {
-              cpu: '4',
-              memory: '16Gi',
+              cpu: '8',
+              memory: '48Gi',
             },
           },
         },

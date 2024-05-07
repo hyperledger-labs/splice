@@ -370,6 +370,7 @@
         "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_0",

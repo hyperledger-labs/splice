@@ -182,3 +182,11 @@ spec:
   targetLabels:
       - server
 {{- end }}
+{{- define "cn-util-lib.log-level" -}}
+{{- if .logLevel }}
+- name: LOG_LEVEL_CANTON
+  value: {{ .logLevel }}
+- name: LOG_LEVEL_STDOUT
+  value: {{ .logLevel }}
+{{- end }}
+{{- end }}
