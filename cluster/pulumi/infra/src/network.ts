@@ -21,8 +21,8 @@ function ipAddress(addressName: string): gcp.compute.Address {
 }
 
 function clusterDnsEntries(
-  clusterName: string,
   dnsName: string,
+  managedZone: string,
   ingressIp: gcp.compute.Address,
   publicIngressIp?: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
@@ -32,7 +32,7 @@ function clusterDnsEntries(
       ttl: 60,
       type: 'A',
       project: gcpDnsProject,
-      managedZone: 'canton-global',
+      managedZone: managedZone,
       rrdatas: [ingressIp.address],
     }),
     new gcp.dns.RecordSet(dnsName + '-subdomains', {
@@ -40,7 +40,7 @@ function clusterDnsEntries(
       ttl: 60,
       type: 'A',
       project: gcpDnsProject,
-      managedZone: 'canton-global',
+      managedZone: managedZone,
       rrdatas: [ingressIp.address],
     }),
   ].concat(
@@ -51,7 +51,7 @@ function clusterDnsEntries(
             ttl: 60,
             type: 'A',
             project: gcpDnsProject,
-            managedZone: 'canton-global',
+            managedZone: managedZone,
             rrdatas: [publicIngressIp.address],
           }),
         ]
@@ -76,7 +76,7 @@ function certManager(certManagerNamespaceName: string): certmanager.CertManager 
 
 function clusterCertificate(
   clusterName: string,
-  dnsName: string,
+  dnsNames: string[],
   ns: k8s.core.v1.Namespace,
   manager: certmanager.CertManager,
   dnsEntries: gcp.dns.RecordSet[]
@@ -147,6 +147,34 @@ function clusterCertificate(
     );
   });
 
+  const certDnsNames = dnsNames
+    .map(dnsName => [
+      `${dnsName}`,
+      `*.${dnsName}`,
+      `*.validator.${dnsName}`,
+      `*.validator1.${dnsName}`,
+      `*.splitwell.${dnsName}`,
+      `*.${dnsName}`,
+      `*.sv-2.${dnsName}`,
+      `*.sv-2-eng.${dnsName}`,
+      `*.sv-3-eng.${dnsName}`,
+      `*.sv-4-eng.${dnsName}`,
+      `*.sv-5-eng.${dnsName}`,
+      `*.sv-6-eng.${dnsName}`,
+      `*.sv-7-eng.${dnsName}`,
+      `*.sv-8-eng.${dnsName}`,
+      `*.sv-9-eng.${dnsName}`,
+      `*.sv-10-eng.${dnsName}`,
+      `*.sv-11-eng.${dnsName}`,
+      `*.sv-12-eng.${dnsName}`,
+      `*.sv-13-eng.${dnsName}`,
+      `*.sv-14-eng.${dnsName}`,
+      `*.sv-15-eng.${dnsName}`,
+      `*.sv-16-eng.${dnsName}`,
+      `*.sv.${dnsName}`,
+    ])
+    .flat();
+
   return new k8s.apiextensions.CustomResource(
     'certificate',
     {
@@ -157,31 +185,7 @@ function clusterCertificate(
         namespace: ns.metadata.name,
       },
       spec: {
-        dnsNames: [
-          `${dnsName}`,
-          `*.${dnsName}`,
-          `*.validator.${dnsName}`,
-          `*.validator1.${dnsName}`,
-          `*.splitwell.${dnsName}`,
-          `*.${dnsName}`,
-          `*.sv-2.${dnsName}`,
-          `*.sv-2-eng.${dnsName}`,
-          `*.sv-3-eng.${dnsName}`,
-          `*.sv-4-eng.${dnsName}`,
-          `*.sv-5-eng.${dnsName}`,
-          `*.sv-6-eng.${dnsName}`,
-          `*.sv-7-eng.${dnsName}`,
-          `*.sv-8-eng.${dnsName}`,
-          `*.sv-9-eng.${dnsName}`,
-          `*.sv-10-eng.${dnsName}`,
-          `*.sv-11-eng.${dnsName}`,
-          `*.sv-12-eng.${dnsName}`,
-          `*.sv-13-eng.${dnsName}`,
-          `*.sv-14-eng.${dnsName}`,
-          `*.sv-15-eng.${dnsName}`,
-          `*.sv-16-eng.${dnsName}`,
-          `*.sv.${dnsName}`,
-        ],
+        dnsNames: certDnsNames,
         issuerRef: {
           name: 'letsencrypt-production',
         },
@@ -253,8 +257,6 @@ class CantonNetwork extends pulumi.ComponentResource {
   constructor(clusterName: string, opts: pulumi.ComponentResourceOptions | undefined = undefined) {
     super('canton:gcp:CantonNetwork', clusterName, {}, opts);
 
-    const dnsName = `${clusterName}.network.canton.global`;
-
     const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
 
     const publicIngressIp = publicPrometheusRemoteWrite
@@ -265,13 +267,28 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const certManagerDeployment = certManager('cert-manager');
 
-    const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp, publicIngressIp);
-
     const ingressNs = exactNamespace('cluster-ingress');
 
-    natGateway(clusterName, egressIp, { parent: this });
+    const cantonGlobalDnsName = `${clusterName}.network.canton.global`;
+    const cantonGlobalDnsEntries = clusterDnsEntries(
+      cantonGlobalDnsName,
+      'canton-global',
+      ingressIp,
+      publicIngressIp
+    );
 
-    clusterCertificate(clusterName, dnsName, ingressNs.ns, certManagerDeployment, dnsEntries);
+    const daDnsName = `${clusterName}.global.canton.network.digitalasset.com`;
+    const daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+
+    clusterCertificate(
+      clusterName,
+      [cantonGlobalDnsName, daDnsName],
+      ingressNs.ns,
+      certManagerDeployment,
+      [...cantonGlobalDnsEntries, ...daDnsEntries]
+    );
+
+    natGateway(clusterName, egressIp, { parent: this });
 
     this.ingressIp = ingressIp;
     this.publicIngressIp = publicIngressIp;

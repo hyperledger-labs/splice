@@ -16,26 +16,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.splitwell.test-stack.network.canton.global",
+        "https://wallet.splitwell.test-stack.global.canton.network.digitalasset.com",
         "https://cns.splitwell.test-stack.network.canton.global",
-        "https://splitwell.splitwell.test-stack.network.canton.global"
+        "https://cns.splitwell.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.splitwell.test-stack.network.canton.global",
+        "https://splitwell.splitwell.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.splitwell.test-stack.network.canton.global",
+        "https://wallet.splitwell.test-stack.global.canton.network.digitalasset.com",
         "https://cns.splitwell.test-stack.network.canton.global",
-        "https://splitwell.splitwell.test-stack.network.canton.global"
+        "https://cns.splitwell.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.splitwell.test-stack.network.canton.global",
+        "https://splitwell.splitwell.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.splitwell.test-stack.network.canton.global",
+        "https://wallet.splitwell.test-stack.global.canton.network.digitalasset.com",
         "https://cns.splitwell.test-stack.network.canton.global",
-        "https://splitwell.splitwell.test-stack.network.canton.global"
+        "https://cns.splitwell.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.splitwell.test-stack.network.canton.global",
+        "https://splitwell.splitwell.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and Splitwell UIs for the Splitwell validator",
       "name": "Splitwell UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.splitwell.test-stack.network.canton.global",
+        "https://wallet.splitwell.test-stack.global.canton.network.digitalasset.com",
         "https://cns.splitwell.test-stack.network.canton.global",
-        "https://splitwell.splitwell.test-stack.network.canton.global"
+        "https://cns.splitwell.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.splitwell.test-stack.network.canton.global",
+        "https://splitwell.splitwell.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "SplitwellUiApp",
@@ -58,19 +70,23 @@
     "id": "",
     "inputs": {
       "allowedLogoutUrls": [
-        "https://cns.sv.test-stack.network.canton.global"
+        "https://cns.sv.test-stack.network.canton.global",
+        "https://cns.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
-        "https://cns.sv.test-stack.network.canton.global"
+        "https://cns.sv.test-stack.network.canton.global",
+        "https://cns.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
-        "https://cns.sv.test-stack.network.canton.global"
+        "https://cns.sv.test-stack.network.canton.global",
+        "https://cns.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the SV runbook",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
-        "https://cns.sv.test-stack.network.canton.global"
+        "https://cns.sv.test-stack.network.canton.global",
+        "https://cns.sv.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "SvCnsUi",
@@ -93,19 +109,23 @@
     "id": "",
     "inputs": {
       "allowedLogoutUrls": [
-        "https://sv.sv.test-stack.network.canton.global"
+        "https://sv.sv.test-stack.network.canton.global",
+        "https://sv.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
-        "https://sv.sv.test-stack.network.canton.global"
+        "https://sv.sv.test-stack.network.canton.global",
+        "https://sv.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
-        "https://sv.sv.test-stack.network.canton.global"
+        "https://sv.sv.test-stack.network.canton.global",
+        "https://sv.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV UI for the SV runbook",
       "name": "SV UI (Pulumi managed, test-stack)",
       "webOrigins": [
-        "https://sv.sv.test-stack.network.canton.global"
+        "https://sv.sv.test-stack.network.canton.global",
+        "https://sv.sv.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "SvSvUi",
@@ -128,19 +148,23 @@
     "id": "",
     "inputs": {
       "allowedLogoutUrls": [
-        "https://wallet.sv.test-stack.network.canton.global"
+        "https://wallet.sv.test-stack.network.canton.global",
+        "https://wallet.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
-        "https://wallet.sv.test-stack.network.canton.global"
+        "https://wallet.sv.test-stack.network.canton.global",
+        "https://wallet.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
-        "https://wallet.sv.test-stack.network.canton.global"
+        "https://wallet.sv.test-stack.network.canton.global",
+        "https://wallet.sv.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the SV runbook",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [
-        "https://wallet.sv.test-stack.network.canton.global"
+        "https://wallet.sv.test-stack.network.canton.global",
+        "https://wallet.sv.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "SvWalletUi",
@@ -253,7 +277,30 @@
           "*.sv-14-eng.test-stack.network.canton.global",
           "*.sv-15-eng.test-stack.network.canton.global",
           "*.sv-16-eng.test-stack.network.canton.global",
-          "*.sv.test-stack.network.canton.global"
+          "*.sv.test-stack.network.canton.global",
+          "test-stack.global.canton.network.digitalasset.com",
+          "*.test-stack.global.canton.network.digitalasset.com",
+          "*.validator.test-stack.global.canton.network.digitalasset.com",
+          "*.validator1.test-stack.global.canton.network.digitalasset.com",
+          "*.splitwell.test-stack.global.canton.network.digitalasset.com",
+          "*.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-2.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
+          "*.sv.test-stack.global.canton.network.digitalasset.com"
         ],
         "issuerRef": {
           "name": "letsencrypt-production"
@@ -299,9 +346,10 @@
       "values": {
         "cluster": {
           "basename": "test-stack",
+          "cantonHostname": "test-stack.network.canton.global",
+          "daHostname": "test-stack.global.canton.network.digitalasset.com",
           "dnsName": "dev.network.canton.global",
           "fixedTokens": false,
-          "hostname": "test-stack.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
@@ -1705,26 +1753,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-10-eng.test-stack.network.canton.global",
+        "https://wallet.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-10-eng.test-stack.network.canton.global",
-        "https://sv.sv-10-eng.test-stack.network.canton.global"
+        "https://cns.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-10-eng.test-stack.network.canton.global",
+        "https://sv.sv-10-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-10-eng.test-stack.network.canton.global",
+        "https://wallet.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-10-eng.test-stack.network.canton.global",
-        "https://sv.sv-10-eng.test-stack.network.canton.global"
+        "https://cns.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-10-eng.test-stack.network.canton.global",
+        "https://sv.sv-10-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-10-eng.test-stack.network.canton.global",
+        "https://wallet.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-10-eng.test-stack.network.canton.global",
-        "https://sv.sv-10-eng.test-stack.network.canton.global"
+        "https://cns.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-10-eng.test-stack.network.canton.global",
+        "https://sv.sv-10-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV10",
       "name": "SV10 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-10-eng.test-stack.network.canton.global",
+        "https://wallet.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-10-eng.test-stack.network.canton.global",
-        "https://sv.sv-10-eng.test-stack.network.canton.global"
+        "https://cns.sv-10-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-10-eng.test-stack.network.canton.global",
+        "https://sv.sv-10-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv10UiApp",
@@ -1748,26 +1808,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-11-eng.test-stack.network.canton.global",
+        "https://wallet.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-11-eng.test-stack.network.canton.global",
-        "https://sv.sv-11-eng.test-stack.network.canton.global"
+        "https://cns.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-11-eng.test-stack.network.canton.global",
+        "https://sv.sv-11-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-11-eng.test-stack.network.canton.global",
+        "https://wallet.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-11-eng.test-stack.network.canton.global",
-        "https://sv.sv-11-eng.test-stack.network.canton.global"
+        "https://cns.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-11-eng.test-stack.network.canton.global",
+        "https://sv.sv-11-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-11-eng.test-stack.network.canton.global",
+        "https://wallet.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-11-eng.test-stack.network.canton.global",
-        "https://sv.sv-11-eng.test-stack.network.canton.global"
+        "https://cns.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-11-eng.test-stack.network.canton.global",
+        "https://sv.sv-11-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV11",
       "name": "SV11 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-11-eng.test-stack.network.canton.global",
+        "https://wallet.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-11-eng.test-stack.network.canton.global",
-        "https://sv.sv-11-eng.test-stack.network.canton.global"
+        "https://cns.sv-11-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-11-eng.test-stack.network.canton.global",
+        "https://sv.sv-11-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv11UiApp",
@@ -1791,26 +1863,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-12-eng.test-stack.network.canton.global",
+        "https://wallet.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-12-eng.test-stack.network.canton.global",
-        "https://sv.sv-12-eng.test-stack.network.canton.global"
+        "https://cns.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-12-eng.test-stack.network.canton.global",
+        "https://sv.sv-12-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-12-eng.test-stack.network.canton.global",
+        "https://wallet.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-12-eng.test-stack.network.canton.global",
-        "https://sv.sv-12-eng.test-stack.network.canton.global"
+        "https://cns.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-12-eng.test-stack.network.canton.global",
+        "https://sv.sv-12-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-12-eng.test-stack.network.canton.global",
+        "https://wallet.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-12-eng.test-stack.network.canton.global",
-        "https://sv.sv-12-eng.test-stack.network.canton.global"
+        "https://cns.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-12-eng.test-stack.network.canton.global",
+        "https://sv.sv-12-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV12",
       "name": "SV12 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-12-eng.test-stack.network.canton.global",
+        "https://wallet.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-12-eng.test-stack.network.canton.global",
-        "https://sv.sv-12-eng.test-stack.network.canton.global"
+        "https://cns.sv-12-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-12-eng.test-stack.network.canton.global",
+        "https://sv.sv-12-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv12UiApp",
@@ -1834,26 +1918,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-13-eng.test-stack.network.canton.global",
+        "https://wallet.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-13-eng.test-stack.network.canton.global",
-        "https://sv.sv-13-eng.test-stack.network.canton.global"
+        "https://cns.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-13-eng.test-stack.network.canton.global",
+        "https://sv.sv-13-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-13-eng.test-stack.network.canton.global",
+        "https://wallet.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-13-eng.test-stack.network.canton.global",
-        "https://sv.sv-13-eng.test-stack.network.canton.global"
+        "https://cns.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-13-eng.test-stack.network.canton.global",
+        "https://sv.sv-13-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-13-eng.test-stack.network.canton.global",
+        "https://wallet.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-13-eng.test-stack.network.canton.global",
-        "https://sv.sv-13-eng.test-stack.network.canton.global"
+        "https://cns.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-13-eng.test-stack.network.canton.global",
+        "https://sv.sv-13-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV13",
       "name": "SV13 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-13-eng.test-stack.network.canton.global",
+        "https://wallet.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-13-eng.test-stack.network.canton.global",
-        "https://sv.sv-13-eng.test-stack.network.canton.global"
+        "https://cns.sv-13-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-13-eng.test-stack.network.canton.global",
+        "https://sv.sv-13-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv13UiApp",
@@ -1877,26 +1973,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-14-eng.test-stack.network.canton.global",
+        "https://wallet.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-14-eng.test-stack.network.canton.global",
-        "https://sv.sv-14-eng.test-stack.network.canton.global"
+        "https://cns.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-14-eng.test-stack.network.canton.global",
+        "https://sv.sv-14-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-14-eng.test-stack.network.canton.global",
+        "https://wallet.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-14-eng.test-stack.network.canton.global",
-        "https://sv.sv-14-eng.test-stack.network.canton.global"
+        "https://cns.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-14-eng.test-stack.network.canton.global",
+        "https://sv.sv-14-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-14-eng.test-stack.network.canton.global",
+        "https://wallet.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-14-eng.test-stack.network.canton.global",
-        "https://sv.sv-14-eng.test-stack.network.canton.global"
+        "https://cns.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-14-eng.test-stack.network.canton.global",
+        "https://sv.sv-14-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV14",
       "name": "SV14 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-14-eng.test-stack.network.canton.global",
+        "https://wallet.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-14-eng.test-stack.network.canton.global",
-        "https://sv.sv-14-eng.test-stack.network.canton.global"
+        "https://cns.sv-14-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-14-eng.test-stack.network.canton.global",
+        "https://sv.sv-14-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv14UiApp",
@@ -1920,26 +2028,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-15-eng.test-stack.network.canton.global",
+        "https://wallet.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-15-eng.test-stack.network.canton.global",
-        "https://sv.sv-15-eng.test-stack.network.canton.global"
+        "https://cns.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-15-eng.test-stack.network.canton.global",
+        "https://sv.sv-15-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-15-eng.test-stack.network.canton.global",
+        "https://wallet.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-15-eng.test-stack.network.canton.global",
-        "https://sv.sv-15-eng.test-stack.network.canton.global"
+        "https://cns.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-15-eng.test-stack.network.canton.global",
+        "https://sv.sv-15-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-15-eng.test-stack.network.canton.global",
+        "https://wallet.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-15-eng.test-stack.network.canton.global",
-        "https://sv.sv-15-eng.test-stack.network.canton.global"
+        "https://cns.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-15-eng.test-stack.network.canton.global",
+        "https://sv.sv-15-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV15",
       "name": "SV15 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-15-eng.test-stack.network.canton.global",
+        "https://wallet.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-15-eng.test-stack.network.canton.global",
-        "https://sv.sv-15-eng.test-stack.network.canton.global"
+        "https://cns.sv-15-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-15-eng.test-stack.network.canton.global",
+        "https://sv.sv-15-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv15UiApp",
@@ -1963,26 +2083,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-16-eng.test-stack.network.canton.global",
+        "https://wallet.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-16-eng.test-stack.network.canton.global",
-        "https://sv.sv-16-eng.test-stack.network.canton.global"
+        "https://cns.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-16-eng.test-stack.network.canton.global",
+        "https://sv.sv-16-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-16-eng.test-stack.network.canton.global",
+        "https://wallet.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-16-eng.test-stack.network.canton.global",
-        "https://sv.sv-16-eng.test-stack.network.canton.global"
+        "https://cns.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-16-eng.test-stack.network.canton.global",
+        "https://sv.sv-16-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-16-eng.test-stack.network.canton.global",
+        "https://wallet.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-16-eng.test-stack.network.canton.global",
-        "https://sv.sv-16-eng.test-stack.network.canton.global"
+        "https://cns.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-16-eng.test-stack.network.canton.global",
+        "https://sv.sv-16-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV16",
       "name": "SV16 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-16-eng.test-stack.network.canton.global",
+        "https://wallet.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-16-eng.test-stack.network.canton.global",
-        "https://sv.sv-16-eng.test-stack.network.canton.global"
+        "https://cns.sv-16-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-16-eng.test-stack.network.canton.global",
+        "https://sv.sv-16-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv16UiApp",
@@ -2006,26 +2138,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-2.test-stack.network.canton.global",
+        "https://wallet.sv-2.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2.test-stack.network.canton.global",
-        "https://sv.sv-2.test-stack.network.canton.global"
+        "https://cns.sv-2.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2.test-stack.network.canton.global",
+        "https://sv.sv-2.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-2.test-stack.network.canton.global",
+        "https://wallet.sv-2.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2.test-stack.network.canton.global",
-        "https://sv.sv-2.test-stack.network.canton.global"
+        "https://cns.sv-2.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2.test-stack.network.canton.global",
+        "https://sv.sv-2.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-2.test-stack.network.canton.global",
+        "https://wallet.sv-2.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2.test-stack.network.canton.global",
-        "https://sv.sv-2.test-stack.network.canton.global"
+        "https://cns.sv-2.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2.test-stack.network.canton.global",
+        "https://sv.sv-2.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV1",
       "name": "SV1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-2.test-stack.network.canton.global",
+        "https://wallet.sv-2.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2.test-stack.network.canton.global",
-        "https://sv.sv-2.test-stack.network.canton.global"
+        "https://cns.sv-2.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2.test-stack.network.canton.global",
+        "https://sv.sv-2.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv1UiApp",
@@ -2049,26 +2193,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-2-eng.test-stack.network.canton.global",
+        "https://wallet.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2-eng.test-stack.network.canton.global",
-        "https://sv.sv-2-eng.test-stack.network.canton.global"
+        "https://cns.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2-eng.test-stack.network.canton.global",
+        "https://sv.sv-2-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-2-eng.test-stack.network.canton.global",
+        "https://wallet.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2-eng.test-stack.network.canton.global",
-        "https://sv.sv-2-eng.test-stack.network.canton.global"
+        "https://cns.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2-eng.test-stack.network.canton.global",
+        "https://sv.sv-2-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-2-eng.test-stack.network.canton.global",
+        "https://wallet.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2-eng.test-stack.network.canton.global",
-        "https://sv.sv-2-eng.test-stack.network.canton.global"
+        "https://cns.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2-eng.test-stack.network.canton.global",
+        "https://sv.sv-2-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV2",
       "name": "SV2 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-2-eng.test-stack.network.canton.global",
+        "https://wallet.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-2-eng.test-stack.network.canton.global",
-        "https://sv.sv-2-eng.test-stack.network.canton.global"
+        "https://cns.sv-2-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-2-eng.test-stack.network.canton.global",
+        "https://sv.sv-2-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv2UiApp",
@@ -2092,26 +2248,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-3-eng.test-stack.network.canton.global",
+        "https://wallet.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-3-eng.test-stack.network.canton.global",
-        "https://sv.sv-3-eng.test-stack.network.canton.global"
+        "https://cns.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-3-eng.test-stack.network.canton.global",
+        "https://sv.sv-3-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-3-eng.test-stack.network.canton.global",
+        "https://wallet.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-3-eng.test-stack.network.canton.global",
-        "https://sv.sv-3-eng.test-stack.network.canton.global"
+        "https://cns.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-3-eng.test-stack.network.canton.global",
+        "https://sv.sv-3-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-3-eng.test-stack.network.canton.global",
+        "https://wallet.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-3-eng.test-stack.network.canton.global",
-        "https://sv.sv-3-eng.test-stack.network.canton.global"
+        "https://cns.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-3-eng.test-stack.network.canton.global",
+        "https://sv.sv-3-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV3",
       "name": "SV3 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-3-eng.test-stack.network.canton.global",
+        "https://wallet.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-3-eng.test-stack.network.canton.global",
-        "https://sv.sv-3-eng.test-stack.network.canton.global"
+        "https://cns.sv-3-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-3-eng.test-stack.network.canton.global",
+        "https://sv.sv-3-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv3UiApp",
@@ -2135,26 +2303,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-4-eng.test-stack.network.canton.global",
+        "https://wallet.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-4-eng.test-stack.network.canton.global",
-        "https://sv.sv-4-eng.test-stack.network.canton.global"
+        "https://cns.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-4-eng.test-stack.network.canton.global",
+        "https://sv.sv-4-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-4-eng.test-stack.network.canton.global",
+        "https://wallet.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-4-eng.test-stack.network.canton.global",
-        "https://sv.sv-4-eng.test-stack.network.canton.global"
+        "https://cns.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-4-eng.test-stack.network.canton.global",
+        "https://sv.sv-4-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-4-eng.test-stack.network.canton.global",
+        "https://wallet.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-4-eng.test-stack.network.canton.global",
-        "https://sv.sv-4-eng.test-stack.network.canton.global"
+        "https://cns.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-4-eng.test-stack.network.canton.global",
+        "https://sv.sv-4-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV4",
       "name": "SV4 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-4-eng.test-stack.network.canton.global",
+        "https://wallet.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-4-eng.test-stack.network.canton.global",
-        "https://sv.sv-4-eng.test-stack.network.canton.global"
+        "https://cns.sv-4-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-4-eng.test-stack.network.canton.global",
+        "https://sv.sv-4-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv4UiApp",
@@ -2178,26 +2358,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-5-eng.test-stack.network.canton.global",
+        "https://wallet.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-5-eng.test-stack.network.canton.global",
-        "https://sv.sv-5-eng.test-stack.network.canton.global"
+        "https://cns.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-5-eng.test-stack.network.canton.global",
+        "https://sv.sv-5-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-5-eng.test-stack.network.canton.global",
+        "https://wallet.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-5-eng.test-stack.network.canton.global",
-        "https://sv.sv-5-eng.test-stack.network.canton.global"
+        "https://cns.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-5-eng.test-stack.network.canton.global",
+        "https://sv.sv-5-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-5-eng.test-stack.network.canton.global",
+        "https://wallet.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-5-eng.test-stack.network.canton.global",
-        "https://sv.sv-5-eng.test-stack.network.canton.global"
+        "https://cns.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-5-eng.test-stack.network.canton.global",
+        "https://sv.sv-5-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV5",
       "name": "SV5 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-5-eng.test-stack.network.canton.global",
+        "https://wallet.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-5-eng.test-stack.network.canton.global",
-        "https://sv.sv-5-eng.test-stack.network.canton.global"
+        "https://cns.sv-5-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-5-eng.test-stack.network.canton.global",
+        "https://sv.sv-5-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv5UiApp",
@@ -2221,26 +2413,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-6-eng.test-stack.network.canton.global",
+        "https://wallet.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-6-eng.test-stack.network.canton.global",
-        "https://sv.sv-6-eng.test-stack.network.canton.global"
+        "https://cns.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-6-eng.test-stack.network.canton.global",
+        "https://sv.sv-6-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-6-eng.test-stack.network.canton.global",
+        "https://wallet.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-6-eng.test-stack.network.canton.global",
-        "https://sv.sv-6-eng.test-stack.network.canton.global"
+        "https://cns.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-6-eng.test-stack.network.canton.global",
+        "https://sv.sv-6-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-6-eng.test-stack.network.canton.global",
+        "https://wallet.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-6-eng.test-stack.network.canton.global",
-        "https://sv.sv-6-eng.test-stack.network.canton.global"
+        "https://cns.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-6-eng.test-stack.network.canton.global",
+        "https://sv.sv-6-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV6",
       "name": "SV6 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-6-eng.test-stack.network.canton.global",
+        "https://wallet.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-6-eng.test-stack.network.canton.global",
-        "https://sv.sv-6-eng.test-stack.network.canton.global"
+        "https://cns.sv-6-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-6-eng.test-stack.network.canton.global",
+        "https://sv.sv-6-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv6UiApp",
@@ -2264,26 +2468,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-7-eng.test-stack.network.canton.global",
+        "https://wallet.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-7-eng.test-stack.network.canton.global",
-        "https://sv.sv-7-eng.test-stack.network.canton.global"
+        "https://cns.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-7-eng.test-stack.network.canton.global",
+        "https://sv.sv-7-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-7-eng.test-stack.network.canton.global",
+        "https://wallet.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-7-eng.test-stack.network.canton.global",
-        "https://sv.sv-7-eng.test-stack.network.canton.global"
+        "https://cns.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-7-eng.test-stack.network.canton.global",
+        "https://sv.sv-7-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-7-eng.test-stack.network.canton.global",
+        "https://wallet.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-7-eng.test-stack.network.canton.global",
-        "https://sv.sv-7-eng.test-stack.network.canton.global"
+        "https://cns.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-7-eng.test-stack.network.canton.global",
+        "https://sv.sv-7-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV7",
       "name": "SV7 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-7-eng.test-stack.network.canton.global",
+        "https://wallet.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-7-eng.test-stack.network.canton.global",
-        "https://sv.sv-7-eng.test-stack.network.canton.global"
+        "https://cns.sv-7-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-7-eng.test-stack.network.canton.global",
+        "https://sv.sv-7-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv7UiApp",
@@ -2307,26 +2523,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-8-eng.test-stack.network.canton.global",
+        "https://wallet.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-8-eng.test-stack.network.canton.global",
-        "https://sv.sv-8-eng.test-stack.network.canton.global"
+        "https://cns.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-8-eng.test-stack.network.canton.global",
+        "https://sv.sv-8-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-8-eng.test-stack.network.canton.global",
+        "https://wallet.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-8-eng.test-stack.network.canton.global",
-        "https://sv.sv-8-eng.test-stack.network.canton.global"
+        "https://cns.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-8-eng.test-stack.network.canton.global",
+        "https://sv.sv-8-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-8-eng.test-stack.network.canton.global",
+        "https://wallet.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-8-eng.test-stack.network.canton.global",
-        "https://sv.sv-8-eng.test-stack.network.canton.global"
+        "https://cns.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-8-eng.test-stack.network.canton.global",
+        "https://sv.sv-8-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV8",
       "name": "SV8 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-8-eng.test-stack.network.canton.global",
+        "https://wallet.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-8-eng.test-stack.network.canton.global",
-        "https://sv.sv-8-eng.test-stack.network.canton.global"
+        "https://cns.sv-8-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-8-eng.test-stack.network.canton.global",
+        "https://sv.sv-8-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv8UiApp",
@@ -2350,26 +2578,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.sv-9-eng.test-stack.network.canton.global",
+        "https://wallet.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-9-eng.test-stack.network.canton.global",
-        "https://sv.sv-9-eng.test-stack.network.canton.global"
+        "https://cns.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-9-eng.test-stack.network.canton.global",
+        "https://sv.sv-9-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.sv-9-eng.test-stack.network.canton.global",
+        "https://wallet.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-9-eng.test-stack.network.canton.global",
-        "https://sv.sv-9-eng.test-stack.network.canton.global"
+        "https://cns.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-9-eng.test-stack.network.canton.global",
+        "https://sv.sv-9-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.sv-9-eng.test-stack.network.canton.global",
+        "https://wallet.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-9-eng.test-stack.network.canton.global",
-        "https://sv.sv-9-eng.test-stack.network.canton.global"
+        "https://cns.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-9-eng.test-stack.network.canton.global",
+        "https://sv.sv-9-eng.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV9",
       "name": "SV9 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.sv-9-eng.test-stack.network.canton.global",
+        "https://wallet.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
         "https://cns.sv-9-eng.test-stack.network.canton.global",
-        "https://sv.sv-9-eng.test-stack.network.canton.global"
+        "https://cns.sv-9-eng.test-stack.global.canton.network.digitalasset.com",
+        "https://sv.sv-9-eng.test-stack.network.canton.global",
+        "https://sv.sv-9-eng.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "sv9UiApp",
@@ -2387,6 +2627,40 @@
     "name": "sv",
     "provider": "",
     "type": "pulumi:providers:auth0"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "managedZone": "prod-networks",
+      "name": "*.test-stack.global.canton.network.digitalasset.com.",
+      "project": "da-gcp-canton-domain",
+      "rrdatas": [
+        null
+      ],
+      "ttl": 60,
+      "type": "A"
+    },
+    "name": "test-stack.global.canton.network.digitalasset.com-subdomains",
+    "provider": "",
+    "type": "gcp:dns/recordSet:RecordSet"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "managedZone": "prod-networks",
+      "name": "test-stack.global.canton.network.digitalasset.com.",
+      "project": "da-gcp-canton-domain",
+      "rrdatas": [
+        null
+      ],
+      "ttl": 60,
+      "type": "A"
+    },
+    "name": "test-stack.global.canton.network.digitalasset.com",
+    "provider": "",
+    "type": "gcp:dns/recordSet:RecordSet"
   },
   {
     "custom": true,
@@ -2457,26 +2731,38 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.validator1.test-stack.network.canton.global",
+        "https://wallet.validator1.test-stack.global.canton.network.digitalasset.com",
         "https://cns.validator1.test-stack.network.canton.global",
-        "https://splitwell.validator1.test-stack.network.canton.global"
+        "https://cns.validator1.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.validator1.test-stack.network.canton.global",
+        "https://splitwell.validator1.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
         "https://wallet.validator1.test-stack.network.canton.global",
+        "https://wallet.validator1.test-stack.global.canton.network.digitalasset.com",
         "https://cns.validator1.test-stack.network.canton.global",
-        "https://splitwell.validator1.test-stack.network.canton.global"
+        "https://cns.validator1.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.validator1.test-stack.network.canton.global",
+        "https://splitwell.validator1.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.validator1.test-stack.network.canton.global",
+        "https://wallet.validator1.test-stack.global.canton.network.digitalasset.com",
         "https://cns.validator1.test-stack.network.canton.global",
-        "https://splitwell.validator1.test-stack.network.canton.global"
+        "https://cns.validator1.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.validator1.test-stack.network.canton.global",
+        "https://splitwell.validator1.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and Splitwell UIs for the standalone Validator1",
       "name": "Validator1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.validator1.test-stack.network.canton.global",
+        "https://wallet.validator1.test-stack.global.canton.network.digitalasset.com",
         "https://cns.validator1.test-stack.network.canton.global",
-        "https://splitwell.validator1.test-stack.network.canton.global"
+        "https://cns.validator1.test-stack.global.canton.network.digitalasset.com",
+        "https://splitwell.validator1.test-stack.network.canton.global",
+        "https://splitwell.validator1.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "validator1UiApp",
@@ -2499,19 +2785,23 @@
     "id": "",
     "inputs": {
       "allowedLogoutUrls": [
-        "https://cns.validator.test-stack.network.canton.global"
+        "https://cns.validator.test-stack.network.canton.global",
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
-        "https://cns.validator.test-stack.network.canton.global"
+        "https://cns.validator.test-stack.network.canton.global",
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
-        "https://cns.validator.test-stack.network.canton.global"
+        "https://cns.validator.test-stack.network.canton.global",
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the validator runbook",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
-        "https://cns.validator.test-stack.network.canton.global"
+        "https://cns.validator.test-stack.network.canton.global",
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "validatorCnsUi",
@@ -2534,19 +2824,23 @@
     "id": "",
     "inputs": {
       "allowedLogoutUrls": [
-        "https://wallet.validator.test-stack.network.canton.global"
+        "https://wallet.validator.test-stack.network.canton.global",
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "allowedOrigins": [
-        "https://wallet.validator.test-stack.network.canton.global"
+        "https://wallet.validator.test-stack.network.canton.global",
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "appType": "spa",
       "callbacks": [
-        "https://wallet.validator.test-stack.network.canton.global"
+        "https://wallet.validator.test-stack.network.canton.global",
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the validator runbook",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [
-        "https://wallet.validator.test-stack.network.canton.global"
+        "https://wallet.validator.test-stack.network.canton.global",
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
       ]
     },
     "name": "validatorWalletUi",

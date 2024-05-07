@@ -12,9 +12,14 @@ function newUiApp(
   clusterBasename: string,
   auth0DomainProvider: auth0.Provider
 ): auth0.Client {
-  const urls = urlPrefixes.map(prefix => {
-    return `https://${prefix}.${ingressName}.${clusterBasename}.network.canton.global`;
-  });
+  const urls = urlPrefixes
+    .map(prefix => {
+      return [
+        `https://${prefix}.${ingressName}.${clusterBasename}.network.canton.global`,
+        `https://${prefix}.${ingressName}.${clusterBasename}.global.canton.network.digitalasset.com`,
+      ];
+    })
+    .flat();
 
   const ret = new auth0.Client(
     resourceName,

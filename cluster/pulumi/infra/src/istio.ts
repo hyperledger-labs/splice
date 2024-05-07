@@ -311,7 +311,8 @@ function configureGateway(
     'cn-istio-gateway',
     {
       cluster: {
-        hostname: `${clusterBasename}.network.canton.global`,
+        cantonHostname: `${clusterBasename}.network.canton.global`,
+        daHostname: `${clusterBasename}.global.canton.network.digitalasset.com`,
         basename: clusterBasename,
       },
       enablePublicGateway: !!publicGwSvc,
@@ -341,6 +342,5 @@ export function configureIstio(
   const publicGwSvc = publicIngressIp
     ? configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod)
     : undefined;
-  const gw = configureGateway(ingressNs, gwSvc, publicGwSvc);
-  return gw;
+  return configureGateway(ingressNs, gwSvc, publicGwSvc);
 }
