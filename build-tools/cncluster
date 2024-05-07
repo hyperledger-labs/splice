@@ -808,6 +808,8 @@ function subcmd_create() {
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --addons=NodeLocalDNS \
+               --cluster-dns=clouddns \
+               --cluster-dns-scope=cluster \
                --enable-autoscaling \
                --min-nodes "${GCP_CLUSTER_MIN_NODES}" \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
