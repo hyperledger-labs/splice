@@ -5,7 +5,7 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'da-cn-shared'/locations/'us-central1'/keyRings/pulumi\")",
+        "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'mock-gcp-project'/locations/'mock-compute-region'/keyRings/pulumi\")",
         "title": "Pulumi KMS"
       },
       "role": "roles/cloudkms.cryptoKeyEncrypterDecrypter"
@@ -235,16 +235,6 @@
     "name": "grafana-keys",
     "provider": "",
     "type": "cn:gcp:ImportedSecret"
-  },
-  {
-    "custom": false,
-    "id": "organization/infra/infra.test",
-    "inputs": {
-      "name": "organization/infra/infra.test"
-    },
-    "name": "organization/infra/infra.test",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,

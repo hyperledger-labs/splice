@@ -841,7 +841,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1012,7 +1012,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1065,7 +1065,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1245,7 +1245,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1588,7 +1588,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1641,7 +1641,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1815,7 +1815,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2366,7 +2366,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2513,7 +2513,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "us-central1",
+      "region": "mock-compute-region",
       "settings": {
         "backupConfiguration": {
           "enabled": true,

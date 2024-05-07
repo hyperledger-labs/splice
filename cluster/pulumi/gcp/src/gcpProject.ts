@@ -1,6 +1,5 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { config } from 'cn-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 import { ServiceAccount } from './serviceAccount';
@@ -25,14 +24,21 @@ class GcpProject extends pulumi.ComponentResource {
     );
   }
 
+  /*eslint no-process-env: "off"*/
   constructor(name: string, args: GcpProjectArgs, opts?: pulumi.CustomResourceOptions) {
     super('cn:gcp:project', name, args, opts);
 
     this.opts = opts;
 
     const { gcpProjectId } = args;
-    const sharedProjectId = 'da-cn-shared';
-    const sharedProjectRegion = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
+    const keyringProjectId = process.env.PULUMI_BACKEND_GCPKMS_PROJECT;
+    if (!keyringProjectId) {
+      throw new Error('PULUMI_BACKEND_GCPKMS_PROJECT is undefined');
+    }
+    const keyringRegion = process.env.CLOUDSDK_COMPUTE_REGION;
+    if (!keyringRegion) {
+      throw new Error('CLOUDSDK_COMPUTE_REGION is undefined');
+    }
 
     // Enable required services
 
@@ -139,7 +145,7 @@ class GcpProject extends pulumi.ComponentResource {
               title: 'Pulumi KMS',
               description: '(managed by Pulumi)',
               expression: `resource.type == "cloudkms.googleapis.com/CryptoKey" &&
-            resource.name.startsWith("projects/'${sharedProjectId}'/locations/'${sharedProjectRegion}'/keyRings/pulumi")`,
+            resource.name.startsWith("projects/'${keyringProjectId}'/locations/'${keyringRegion}'/keyRings/pulumi")`,
             },
           },
         ],
