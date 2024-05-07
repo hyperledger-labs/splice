@@ -1,7 +1,7 @@
 import { Resource } from '@pulumi/pulumi';
 import {
   Auth0Client,
-  CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   defaultVersion,
   config,
   exactNamespace,
@@ -16,7 +16,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
   if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
-    const clusterHostname = `${CLUSTER_BASENAME}.network.canton.global`;
+    const clusterHostname = `${CLUSTER_HOSTNAME}`;
 
     // install loopback so the test can hit the wallet/validator API via its public DNS name
     const loopback = installCNHelmChart(
@@ -25,7 +25,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
       'cn-cluster-loopback-gateway',
       {
         cluster: {
-          basename: CLUSTER_BASENAME,
+          hostname: CLUSTER_HOSTNAME,
         },
       },
       defaultVersion,

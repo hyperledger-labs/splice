@@ -4,10 +4,10 @@ This chart solves the following problem: In our clusters, only traffic originati
 list of IPs is allowed (AKA a whitelist). This restriction prevents also traffic originating from
 within the cluster that is routed through the external URL, since the source IP of such traffic is
 the IP of the pod from which it originates. Therefore, a pod trying to access e.g.
-`http://<CLUSTER_BASENAME>.network.canton.global` will get blocked.
+`http://<CLUSTER_HOSTNAME>` will get blocked.
 
 To overcome that, this chart configures a given namespace to use an istio egress as a loopback controller.
-All traffic from pods in that namespace, directed at `<CLUSTER_BASENAME>.network.canton.global` will be
+All traffic from pods in that namespace, directed at `<CLUSTER_HOSTNAME>` will be
 routed to the egress pod, and from there routed directly to the ingress controller instead of going outside of
 the cluster and then back in through the load balancer service.
 

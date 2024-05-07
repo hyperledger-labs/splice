@@ -1,4 +1,4 @@
-clusterUrl: "TARGET_CLUSTER.network.canton.global"
+clusterUrl: "TARGET_HOSTNAME"
 
 # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
 migration:

@@ -4,7 +4,7 @@ import {
   auth0UserNameEnvVar,
   BackupConfig,
   BootstrappingDumpConfig,
-  CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   defaultVersion,
   exactNamespace,
   ExactNamespace,
@@ -43,7 +43,7 @@ export async function installSplitwell(
     'cn-cluster-loopback-gateway',
     {
       cluster: {
-        basename: CLUSTER_BASENAME,
+        hostname: CLUSTER_HOSTNAME,
       },
     },
     defaultVersion,
@@ -148,7 +148,7 @@ export async function installSplitwell(
 function installIngress(xns: ExactNamespace) {
   installCNHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
     cluster: {
-      hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+      hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,

@@ -19,6 +19,7 @@ import {
   participantBootstrapDumpSecretName,
   REPO_ROOT,
   CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   svAppSecrets,
   svKeySecret,
   svKeyFromSecret,
@@ -99,7 +100,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_BASENAME, defaultVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
@@ -136,7 +137,7 @@ export async function installNode(
     'cn-cluster-ingress-runbook',
     {
       cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        hostname: CLUSTER_HOSTNAME,
         svNamespace: svNamespaceStr,
       },
       ingress: {
@@ -300,10 +301,10 @@ async function installSvAndValidator(
   const valuesFromYamlFile = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
-      TARGET_CLUSTER: CLUSTER_BASENAME,
+      TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+      YOUR_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
     }
   );
@@ -386,7 +387,7 @@ async function installSvAndValidator(
 
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
-      TARGET_CLUSTER: CLUSTER_BASENAME,
+      TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
     }),
     metrics: {
@@ -411,7 +412,7 @@ async function installSvAndValidator(
 
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-      TARGET_CLUSTER: CLUSTER_BASENAME,
+      TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
@@ -419,7 +420,7 @@ async function installSvAndValidator(
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
-        TARGET_CLUSTER: CLUSTER_BASENAME,
+        TARGET_HOSTNAME: CLUSTER_HOSTNAME,
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
       }
     ),

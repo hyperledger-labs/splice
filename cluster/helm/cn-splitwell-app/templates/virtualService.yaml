@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-  - "splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "splitwell.{{ (.Values.cluster).hostname }}"
   gateways:
   - cluster-ingress/cn-http-gateway
   http:
@@ -24,7 +24,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-  - "{{ (.Values.cluster).basename }}.network.canton.global"
+  - "{{ (.Values.cluster).hostname }}"
   gateways:
   - cluster-ingress/cn-apps-gateway
   http:

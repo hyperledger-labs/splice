@@ -186,7 +186,7 @@
           "cluster-ingress/cn-http-gateway"
         ],
         "hosts": [
-          "alertmanager.test.network.canton.global"
+          "alertmanager.cluster.mock.com"
         ],
         "http": [
           {
@@ -348,12 +348,13 @@
           "basename": "test-stack",
           "cantonHostname": "test-stack.network.canton.global",
           "daHostname": "test-stack.global.canton.network.digitalasset.com",
-          "dnsName": "test.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -672,7 +673,7 @@
           "cluster-ingress/cn-http-gateway"
         ],
         "hosts": [
-          "grafana.test.network.canton.global"
+          "grafana.cluster.mock.com"
         ],
         "http": [
           {
@@ -1423,7 +1424,7 @@
       "values": {
         "alertmanager": {
           "alertmanagerSpec": {
-            "externalUrl": "https://alertmanager.test.network.canton.global"
+            "externalUrl": "https://alertmanager.cluster.mock.com"
           },
           "config": {
             "receivers": [
@@ -1557,7 +1558,7 @@
           "fullnameOverride": "grafana",
           "grafana.ini": {
             "server": {
-              "root_url": "https://grafana.test.network.canton.global"
+              "root_url": "https://grafana.cluster.mock.com"
             }
           },
           "ingress": {
@@ -1603,7 +1604,7 @@
               "promql-experimental-functions"
             ],
             "enableRemoteWriteReceiver": true,
-            "externalUrl": "https://prometheus.test.network.canton.global",
+            "externalUrl": "https://prometheus.cluster.mock.com",
             "podMonitorSelectorNilUsesHelmValues": false,
             "resources": {
               "requests": {
@@ -1688,7 +1689,7 @@
           "cluster-ingress/cn-http-gateway"
         ],
         "hosts": [
-          "prometheus.test.network.canton.global"
+          "prometheus.cluster.mock.com"
         ],
         "http": [
           {

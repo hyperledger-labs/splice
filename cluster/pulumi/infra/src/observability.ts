@@ -7,7 +7,7 @@ import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_NAME,
-  CLUSTER_DNS_NAME,
+  CLUSTER_HOSTNAME,
   GCP_PROJECT,
   GrafanaKeys,
   publicPrometheusRemoteWrite,
@@ -34,7 +34,7 @@ function istioVirtualService(
         namespace: ns.metadata.name,
       },
       spec: {
-        hosts: [`${name}.${CLUSTER_DNS_NAME}`],
+        hosts: [`${name}.${CLUSTER_HOSTNAME}`],
         gateways: ['cluster-ingress/cn-http-gateway'],
         http: [
           {
@@ -73,7 +73,7 @@ function istioPrometheusRemoteWriteVirtualService(
         namespace: ns.metadata.name,
       },
       spec: {
-        hosts: [`public.${CLUSTER_DNS_NAME}`],
+        hosts: [`public.${CLUSTER_HOSTNAME}`],
         gateways: ['cluster-ingress/cn-public-http-gateway'],
         http: [
           {
@@ -96,9 +96,9 @@ function istioPrometheusRemoteWriteVirtualService(
   );
 }
 
-const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
-const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_DNS_NAME}`;
-const prometheusExternalUrl = `https://prometheus.${CLUSTER_DNS_NAME}`;
+const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
+const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
+const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
 const disablePrometheusAlerts = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
 const shouldIgnoreDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');

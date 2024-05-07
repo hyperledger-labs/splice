@@ -13,9 +13,9 @@ export const SV_APP_HELM_CHART_TIMEOUT_SEC = 1000;
 
 export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
+export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
-export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
 

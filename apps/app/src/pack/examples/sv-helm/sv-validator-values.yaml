@@ -8,7 +8,7 @@ participantAddress: "participant-MIGRATION_ID"
 svValidator: true
 useSequencerConnectionsFromScan: false
 # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
-decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_CLUSTER.network.canton.global"
+decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNAME"
 
 persistence:
   host: apps-pg

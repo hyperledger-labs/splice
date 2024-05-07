@@ -22,9 +22,9 @@ window.canton_network_config = {
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://scan.sv-2.TARGET_CLUSTER.network.canton.global/api/scan',
+      url: 'https://scan.sv-2.TARGET_HOSTNAME/api/scan',
     },
   },
-  clusterUrl: `https://TARGET_CLUSTER.network.canton.global`,
+  clusterUrl: `https://TARGET_HOSTNAME`,
   // END_WALLET_CLUSTER_BACKEND_CONFIG
 };

@@ -21,6 +21,7 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   setupBootstrapping,
   validatorSecrets,
   isDevNet,
@@ -64,7 +65,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ? 'Using locally built charts by default'
       : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
-  console.error(`CLUSTER_BASENAME: ${CLUSTER_BASENAME}`);
+  console.error(`CLUSTER_HOSTNAME: ${CLUSTER_HOSTNAME}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
 
   const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
@@ -80,7 +81,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_BASENAME, defaultVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
@@ -115,7 +116,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     'cn-cluster-ingress-runbook',
     {
       cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        hostname: CLUSTER_HOSTNAME,
         svNamespace: RUNBOOK_NAMESPACE,
       },
       withSvIngress: false,
@@ -223,16 +224,16 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
 
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-      TARGET_CLUSTER: CLUSTER_BASENAME,
+      TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_BASENAME}.network.canton.global`,
+      TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
-        SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_BASENAME}.network.canton.global`,
+        SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
       }
     ),
   };

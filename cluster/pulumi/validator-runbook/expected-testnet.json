@@ -79,7 +79,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "test.network.canton.global",
+          "hostname": "cluster.mock.com",
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -145,7 +145,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "test"
+          "hostname": "cluster.mock.com"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -267,7 +267,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "test.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
@@ -297,8 +297,8 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.test.network.canton.global",
-        "svSponsorAddress": "https://sv.sv-2.test.network.canton.global",
+        "scanAddress": "https://scan.sv-2.cluster.mock.com",
+        "svSponsorAddress": "https://sv.sv-2.cluster.mock.com",
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

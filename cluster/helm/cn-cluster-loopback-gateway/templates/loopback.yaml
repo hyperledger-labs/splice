@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-  - "{{ (.Values.cluster).basename }}.network.canton.global"
+  - "{{ (.Values.cluster).hostname }}"
   exportTo:
   - "."
   ports:
@@ -36,8 +36,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    - "{{ (.Values.cluster).hostname }}"
+    - "*.{{ (.Values.cluster).hostname }}"
   gateways:
   - mesh
   http:
@@ -52,8 +52,8 @@ spec:
     - gateways:
       - mesh
       sniHosts:
-      - "{{ (.Values.cluster).basename }}.network.canton.global"
-      - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+      - "{{ (.Values.cluster).hostname }}"
+      - "*.{{ (.Values.cluster).hostname }}"
     route:
     - destination:
         host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"

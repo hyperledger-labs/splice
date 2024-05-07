@@ -10,7 +10,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev"
+          "hostname": "cluster.mock.com"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }

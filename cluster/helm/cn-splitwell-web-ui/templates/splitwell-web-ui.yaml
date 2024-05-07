@@ -34,6 +34,8 @@ spec:
               key: url
               name: cn-app-splitwell-ui-auth
               optional: false
+        - name: CN_APP_SPLITWELL_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
         ports:
         - containerPort: 80
           name: val1-sw-ui

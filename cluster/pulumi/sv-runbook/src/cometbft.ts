@@ -16,6 +16,7 @@ import {
   clusterSmallDisk,
   config,
   cometbftRetainBlocks,
+  CLUSTER_HOSTNAME,
   CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
 
@@ -84,11 +85,14 @@ export function installCometBftNode(
       const cometBftValues = loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
         {
+          // We don't currently support deploying the sv runbook on a different
+          // cluster from the rest of the network, so TARGET_CLUSTER == YOUR_CLUSTER
           TARGET_CLUSTER: CLUSTER_BASENAME,
+          TARGET_HOSTNAME: CLUSTER_HOSTNAME,
           MIGRATION_ID: migrationId.toString(),
           YOUR_SV_NAME: svName,
           YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
-          YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+          YOUR_HOSTNAME: CLUSTER_HOSTNAME,
         }
       );
       return installCNRunbookHelmChart(
@@ -108,7 +112,7 @@ export function installCometBftNode(
           genesis: {
             // for TestNet-like deployments on scratchnet, set the chainId to 'test'
             chainId:
-              `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
+              `${CLUSTER_HOSTNAME}`.startsWith('scratch') && !isDevNet
                 ? 'test'
                 : cometBftValues.genesis.chainId,
             chainIdSuffix: stableCometBftChainId ? cometBftValues.genesis.chainIdSuffix : '',

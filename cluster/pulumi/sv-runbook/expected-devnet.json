@@ -126,7 +126,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "svNamespace": "sv"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -297,7 +297,7 @@
       "values": {
         "db": {},
         "founder": {
-          "externalAddress": "dev.network.canton.global:26016"
+          "externalAddress": "cluster.mock.com:26016"
         },
         "genesis": {
           "chainId": "dev-0",
@@ -320,7 +320,7 @@
           ]
         },
         "node": {
-          "externalAddress": "global-domain-0-cometbft.sv.dev.network.canton.global:26056",
+          "externalAddress": "global-domain-0-cometbft.sv.cluster.mock.com:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
@@ -328,7 +328,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-2.dev.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.cluster.mock.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.cluster.mock.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
@@ -392,7 +392,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev"
+          "hostname": "cluster.mock.com"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -456,7 +456,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -507,13 +507,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -630,7 +630,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -641,7 +641,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv.cluster.mock.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -653,7 +653,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-2.dev.network.canton.global"
+          "sponsorApiUrl": "https://sv.sv-2.cluster.mock.com"
         },
         "metrics": {
           "enable": true
@@ -670,7 +670,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
-          "publicUrl": "https://scan.sv.dev.network.canton.global"
+          "publicUrl": "https://scan.sv.cluster.mock.com"
         }
       }
     },
@@ -709,13 +709,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -773,13 +773,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -837,13 +837,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -902,8 +902,8 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

@@ -9,8 +9,7 @@ import { artifactsRepository, CnChartVersion, parsedVersion, repositories } from
 import { config } from './config';
 import {
   ChartValues,
-  CLUSTER_BASENAME,
-  CLUSTER_DNS_NAME,
+  CLUSTER_HOSTNAME,
   CLUSTER_NAME,
   ExactNamespace,
   fixedTokens,
@@ -133,12 +132,13 @@ function cnChartValues(
       // No need to use artifactory as an image repo for our core nodes
       imageRepo: repositories.google.dockerImages,
       cluster: {
-        basename: CLUSTER_BASENAME,
+        hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        dnsName: CLUSTER_DNS_NAME,
+        dnsName: CLUSTER_HOSTNAME,
       },
-      clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
+      // TODO(#12200) do we still need both cluster.hostname and clusterUrl ?
+      clusterUrl: CLUSTER_HOSTNAME,
     },
     overrideValues,
     finalOverride

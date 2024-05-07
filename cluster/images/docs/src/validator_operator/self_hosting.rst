@@ -84,7 +84,7 @@ SV. This file should be saved under ``validator-onboarding.conf`` in the directo
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-2.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-2.\ |cn_cluster|.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next, start a postgres docker container that will be used by the CN apps:
 
@@ -111,7 +111,7 @@ Replace ``$MIGRATION_ID`` with the migration ID of the global synchronizer on yo
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
+  NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.global.canton.network.digitalasset.com bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 The `validator-onboarding.conf` enables the validator to request its onboarding from the sponsoring supervalidator.
 Upon verification of the onboarding secret, the sponsoring supervalidator issues a `ValidatorLicense` to the validator party and exposes a `AmuletRules` contract to it.
@@ -199,7 +199,7 @@ The Wallet UI is distributed as static files that connect to the
 validator backend that we started in the previous section. It also connects to the Scan service in the cluster.
 
 Before we can deploy the Wallet UI, we need to configure the URL of the Scan service so the wallet can resolve party IDs.
-Open ``web-uis/wallet/config.js`` and change all occurrences of ``TARGET_CLUSTER`` to |cn_cluster_literal|:
+Open ``web-uis/wallet/config.js`` and change all occurrences of ``TARGET_HOSTNAME`` to |cn_cluster_literal|.global.canton.network.digitalasset.com:
 
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
@@ -212,7 +212,7 @@ The CNS UI is distributed as static files that connect to the validator backend 
 It also connects to the Scan service in the cluster.
 
 Before we can deploy the CNS UI, we need to configure the URL of the Scan service.
-Open ``web-uis/ans/config.js`` and change ``TARGET_CLUSTER`` in the Scan URL to |cn_cluster_literal|:
+Open ``web-uis/ans/config.js`` and change ``TARGET_HOSTNAME`` in the Scan URL to |cn_cluster_literal|.global.canton.network.digitalasset.com:
 
 .. literalinclude:: ../../../../../apps/ans/frontend/public/config.js
     :start-after: BEGIN_ANS_CLUSTER_BACKEND_CONFIG
@@ -239,7 +239,7 @@ are running the validator (the one using "validator.conf"), and type:
 
    @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-current.dar")
 
-As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the CNS and wallet UIs:
+As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_HOSTNAME`` to |cn_cluster_literal|.global.canton.network.digitalasset.com like you did earlier for the CNS and wallet UIs:
 
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
@@ -368,17 +368,17 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
          .. parsed-literal::
 
-             curl -X POST https://sv.sv-2.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+             curl -X POST https://sv.sv-2.\ |cn_cluster|.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
     b. start Canton Network:
 
     .. parsed-literal::
 
-        NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
+        NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.global.canton.network.digitalasset.com bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 10. If you have not already done so, while trying out the insecure
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`. For the next steps,
-    the occurences of ``TARGET_CLUSTER`` in the ``config.js`` files should have been replaced.
+    the occurences of ``TARGET_HOSTNAME`` in the ``config.js`` files should have been replaced.
 
 11. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
@@ -445,7 +445,7 @@ NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to a
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.global.canton.network.digitalasset.com bin/cn-node --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
 
 7. Refresh your browser with the wallet UI, log out of any user you may be logged in as, and login again using the validator admin user defined above.
 

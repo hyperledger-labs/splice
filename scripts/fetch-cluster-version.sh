@@ -11,7 +11,7 @@ count=0
 # Prevent the -e flag from bypassing the retry logic in this loop
 set +e
 while [ "${count}" -lt 10 ]; do
-    if cluster_version=$(curl -sL "http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" --connect-timeout 2); then
+    if cluster_version=$(curl -sL "http://${GCP_CLUSTER_HOSTNAME}/version" --connect-timeout 2); then
         if [[ -n $cluster_version ]]; then
             break
         else

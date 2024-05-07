@@ -19,7 +19,6 @@ fi
 ##
 
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
-CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
 ################################
 ### Utilities
@@ -159,7 +158,7 @@ function _cluster_show() {
     _log "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
     _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
     _log "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
-    _log "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
+    _log "GCP_CLUSTER_HOSTNAME    : ${GCP_CLUSTER_HOSTNAME}"
     _log "PULUMI_BACKEND_URL      : ${PULUMI_BACKEND_URL}"
 
     _log ""
@@ -1084,7 +1083,7 @@ function subcmd_start_frontends() {
     _log "Starting frontends needed for preflight check..."
 
     (cd "${REPO_ROOT}" && \
-         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global ./start-frontends.sh -d -v -p)
+         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} ./start-frontends.sh -d -v -p)
 }
 
 ###
@@ -1096,7 +1095,7 @@ function subcmd_load_test() {
 
     cd "$REPO_ROOT" && sbt load-tester/npmBuild
 
-    hostname="$GCP_CLUSTER_BASENAME.network.canton.global"
+    hostname="$GCP_CLUSTER_HOSTNAME"
 
     export K6_WALLET_BASE_URL="https://wallet.validator1.$hostname"
     prometheus_rw="https://prometheus.$hostname/api/v1/write"
@@ -1152,7 +1151,7 @@ function subcmd_sbt_for_preflight() {
 
     (cd "${REPO_ROOT}" && \
          MIGRATION_ID=0 \
-         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
+         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \
          VALIDATOR_USER_NAME=manual_preflight \
              sbt "$@")
@@ -1168,7 +1167,7 @@ function subcmd_preflight_global_domain_upgrade() {
     preflight_tests=$(_get_preflight_test_names "global-domain-upgrade")
     _log "Starting global domain upgrade preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -1182,7 +1181,7 @@ function subcmd_preflight_refresh_auth0_credentials() {
     preflight_tests=$(_get_preflight_test_names "auth0-credentials")
     _log "Starting auth0 tokens preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -1228,7 +1227,7 @@ function subcmd_preflight_sv() {
     preflight_tests=$(_get_preflight_test_names "sv")
     _log "Starting runbook SV preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -1240,7 +1239,7 @@ function subcmd_preflight_validator() {
     preflight_tests=$(_get_preflight_test_names "validator")
     _log "Starting runbook validator preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -1313,7 +1312,7 @@ function subcmd_wait_version() {
         exit 1
     fi
 
-    _retry_until_value "curl -sSLf --connect-timeout 5 http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
+    _retry_until_value "curl -sSLf --connect-timeout 5 http://${GCP_CLUSTER_HOSTNAME}/version" "expected version" "$expected"
 
     _log "Done. Cluster is now reporting version: $expected"
 }
@@ -1575,7 +1574,7 @@ function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"
     tmpdir=$(mktemp -d)
     token=$(subcmd_get_token sv-1)
-    dso=$(curl -s "https://sv.sv-2.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/dso" -H "authorization: Bearer ${token}")
+    dso=$(curl -s "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" -H "authorization: Bearer ${token}")
     # get the first futureValue's effective date, which corresponds to the vote from DamlCIUpgradeVotePreflightTest
     effective_date=$(jq -r '.amulet_rules.payload.configSchedule.futureValues[0]._1' <<< "$dso")
 
@@ -2444,7 +2443,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting identity dumps"
   for sv in 1 2 3 4; do
     token=$(subcmd_get_token sv-${sv})
-    id=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
+    id=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
     echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
@@ -2462,7 +2461,7 @@ function subcmd_disaster_recovery_test() {
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
         _info "Attempting to get ACS from time $acs_time"
-        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
         snapshot=$(echo "$data" | jq .data_snapshot)
         if [ "$snapshot" == "null" ]; then
             error=$(echo "$data" | jq -r .error)
@@ -2487,7 +2486,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting data dumps"
   for sv in 1 2 3 4; do
     token=$(subcmd_get_token sv-${sv})
-    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
         error=$(echo "$data" | jq -r .error)
@@ -2515,7 +2514,7 @@ function subcmd_disaster_recovery_test() {
   done
 
   token=$(subcmd_get_token validator1)
-  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
   echo "$(echo "$dump" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')" '{"migrationId": 1}' | jq -s add > "$tmpdir/dump-validator1.json"
   pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
@@ -2552,8 +2551,8 @@ function take_sv_disaster_recovery_dump() {
     fi
     data_dump_file="$output_directory/${namespace}_id_dump.json"
     id_dump_file="$output_directory/${namespace}_data_dump.json"
-    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
-    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
     (echo "{\"migration_id\": $migration_id, \"created_at\": \"$timestamp\"}"; cat "$data_dump_file" "$id_dump_file") | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
@@ -2568,7 +2567,7 @@ function take_validator_disaster_recovery_dump() {
     else
         token=$(subcmd_get_token "$namespace")
     fi
-    dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_BASENAME}.network.canton.global/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')"
+    dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')"
     echo "$dump" "{\"migrationId\": $migration_id}" | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
@@ -2621,7 +2620,7 @@ function subcmd_offboard_sv_runbook() {
     preflight_tests=$(_get_preflight_test_names "offboard-sv-runbook")
     _log "Starting sv offboard preparation preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -2635,7 +2634,7 @@ function subcmd_preflight_sv_reonboard() {
     preflight_tests=$(_get_preflight_test_names "re-onboard-sv-runbook")
     _log "Starting sv re onboard preparation preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
 
@@ -2648,8 +2647,8 @@ function subcmd_list_sv_cometbft_addresses() {
   token=$(subcmd_get_token "${sv}")
   pubkey_sv=$(mktemp)
   pubkey_address=$(mktemp)
-  curl -sSLf https://sv."$sv"."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/dso | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
-  curl -sSLf https://sv."$sv"."${GCP_CLUSTER_BASENAME}".network.canton.global/api/sv/v0/admin/domain/cometbft/debug -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
+  curl -sSLf "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
+  curl -sSLf "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/debug" -H "Authorization: Bearer $token" -H "Content-Type: application/json" | jq '[.validators.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
 
   jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
 }

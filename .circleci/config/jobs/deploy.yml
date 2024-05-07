@@ -548,7 +548,7 @@ jobs:
             else
               cncluster reset
             fi
-          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
           cmd_retry_count: 2
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."

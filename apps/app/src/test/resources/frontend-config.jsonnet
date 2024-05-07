@@ -108,7 +108,7 @@ local services(node, clusterProtocol, clusterAddress, port) =
 
 local clusterUrl(app) =
   if (app == 'wallet') then
-    { clusterUrl: 'https://TARGET_CLUSTER.network.canton.global' }
+    { clusterUrl: 'https://TARGET_HOSTNAME' }
   else
     {};
 

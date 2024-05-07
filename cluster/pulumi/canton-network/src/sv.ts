@@ -11,6 +11,7 @@ import {
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   CnInput,
   defaultVersion,
   disableCantonAutoInit,
@@ -123,7 +124,7 @@ type InstalledMigrationSpecificSv = {
   participant: Release;
 };
 
-const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
+const clusterUrl = CLUSTER_HOSTNAME;
 
 export type InstalledSv = {
   validatorApp: Resource;
@@ -146,7 +147,7 @@ export async function installSvNode(
     'cn-cluster-loopback-gateway',
     {
       cluster: {
-        basename: CLUSTER_BASENAME,
+        hostname: CLUSTER_HOSTNAME,
       },
     },
     defaultVersion,
@@ -284,7 +285,7 @@ export async function installSvNode(
         },
       },
       cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        hostname: CLUSTER_HOSTNAME,
         svNamespace: xns.logicalName,
         svIngressName: config.ingressName,
       },
@@ -326,7 +327,7 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-2.${CLUSTER_BASENAME}.network.canton.global`;
+  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-2.${CLUSTER_HOSTNAME}`;
 
   const validator = await installValidatorApp({
     xns,
@@ -476,7 +477,7 @@ function installSvApp(
         sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
         mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.ingressName}.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {

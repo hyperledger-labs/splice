@@ -72,7 +72,7 @@ to submit a status report but its CometBFT node might be healthy.
 
 ### CometBFT Issues
 
-A good starting point is the [CometBFT dashboard](https://grafana.dev.network.canton.global/d/UJyurCTWz/cometbft?orgId=1) (adjust cluster as needed).
+A good starting point is the [CometBFT dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/UJyurCTWz/cometbft?orgId=1) (adjust cluster as needed).
 This allows you to easily see when the blocks stopped advancing/voting power dropped and if it maybe resumed already since the alert.
 
 However, to pin down the cause, the primary
@@ -248,7 +248,7 @@ The first point of investigation is to check whether this is a network wide issu
 or whether it affects only some SVs.
 
 This is easiest to do using the
-[SV Status Report Dashboard](https://grafana.dev.network.canton.global/d/caffa6f7-c421-4579-a839-b026d3b76826/sv-status-reports?orgId=1&from=1714410390143&to=1714414927195)
+[SV Status Report Dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/caffa6f7-c421-4579-a839-b026d3b76826/sv-status-reports?orgId=1&from=1714410390143&to=1714414927195)
 (adjust cluster as needed).
 
 An SV local issue shows up as one SV’s report creation time not advancing while other SVs report creation time is still advancing.
@@ -278,14 +278,14 @@ transactions because it sees the confirmation only after the configured `partici
 
 If you do see a lag, you want to check:
 
-1. Has there been a sudden traffic spike that might have overloaded their sequencer? This is easiest to do using the [sequencer traffic dashboard](https://grafana.dev.network.canton.global/d/fdjrxql2alblsd/sequencer-traffic?orgId=1&from=1714363043128&to=1714373918128) (adjust cluster as needed). E.g., here we can see a spike starting at 6:50
+1. Has there been a sudden traffic spike that might have overloaded their sequencer? This is easiest to do using the [sequencer traffic dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/fdjrxql2alblsd/sequencer-traffic?orgId=1&from=1714363043128&to=1714373918128) (adjust cluster as needed). E.g., here we can see a spike starting at 6:50
 
 ![domain traffic spike](pics/sequencer_traffic_spike.png)
 2. Are they catching up faster than realtime, i.e., do their acknowledgements advance within 10 minutes by more than 10 minutes and they will eventually catch up or do they fall further and further behind. E.g., in the screenshot here we can see that within 10 minutes, the acknowledgements only advance from `2024-04-29T05:02:33.813218Z` to `2024-04-29T05:04:32.392203Z` so SBI is falling further and further behind. Note that even if they can eventually catch up, we likely want to follow up with them to make sure they improve performance of our nodes.
 
 ![sbi lagging further and further](pics/acknowledgement_falling_behind.png)
 
-It is often also useful to compare this to the domain catchup metrics of our own nodes to see if the overload was specific to their node. This is best done using the [sequencer client delay](https://grafana.dev.network.canton.global/d/ca9df344-c699-4efe-83c2-5fb2639d96c9/global-domain-catchup?orgId=1&refresh=30s&var-DS=prometheus&var-namespace=sv-1&from=now-12h&to=now&viewPanel=1) graph in the domain catchup dashboard.
+It is often also useful to compare this to the domain catchup metrics of our own nodes to see if the overload was specific to their node. This is best done using the [sequencer client delay](https://grafana.dev.global.canton.network.digitalasset.com/d/ca9df344-c699-4efe-83c2-5fb2639d96c9/global-domain-catchup?orgId=1&refresh=30s&var-DS=prometheus&var-namespace=sv-1&from=now-12h&to=now&viewPanel=1) graph in the domain catchup dashboard.
 
 ![sequencer_client_delay](pics/sequencer_client_delay.png)
 
@@ -298,7 +298,7 @@ reward coupon creations and confirmations for round operations.
 
 If you do see them, the SV app itself is active
 but there might be an issue specific to submitting status reports. One possible cause of this can be
-the mediator being unavailable since that is queried when submitting a status report. You can check that by looking at the traffic submitted by that mediator in the [sequencer traffic dashboard](https://grafana.dev.network.canton.global/d/fdjrxql2alblsd/sequencer-traffic?orgId=1&from=1714363043128&to=1714373918128). In the example here, Cumberland-2's mediator was unavailable and did not submit anything.
+the mediator being unavailable since that is queried when submitting a status report. You can check that by looking at the traffic submitted by that mediator in the [sequencer traffic dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/fdjrxql2alblsd/sequencer-traffic?orgId=1&from=1714363043128&to=1714373918128). In the example here, Cumberland-2's mediator was unavailable and did not submit anything.
 
 ![Mediator traffic](pics/mediator_traffic.png)
 

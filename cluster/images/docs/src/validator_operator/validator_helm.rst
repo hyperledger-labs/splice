@@ -340,7 +340,7 @@ If you are deploying a new instance of the participant as part of a :ref:`synchr
 
 To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator.
   (This Scan instances will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
@@ -352,7 +352,7 @@ Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/s
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
-  ``https://sv.sv-2.|cn_cluster|.network.canton.global``.
+  ``https://sv.sv-2.|cn_cluster|.global.canton.network.digitalasset.com``.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 

@@ -28,6 +28,7 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  process.env.GCP_CLUSTER_HOSTNAME = 'cluster.mock.com';
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon

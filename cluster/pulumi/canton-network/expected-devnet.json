@@ -1363,13 +1363,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -1421,15 +1421,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svNamespace": "splitwell"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -1493,14 +1492,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -1582,13 +1581,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -1640,13 +1639,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
@@ -1820,13 +1819,13 @@
         ],
         "appDars": [],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "enableWallet": true,
@@ -1969,13 +1968,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "volumeSize": "640Gi",
           "volumeStorageClass": "premium-rwo"
@@ -2011,7 +2010,7 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "dev.network.canton.global:26016",
+          "externalAddress": "cluster.mock.com:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26016,
@@ -2123,13 +2122,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableAntiAffinity": true,
@@ -2199,16 +2198,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -2242,14 +2240,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -2384,13 +2382,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -2443,13 +2441,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -2626,13 +2624,13 @@
           }
         ],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -2648,7 +2646,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-2.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2.cluster.mock.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -2733,7 +2731,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
-          "publicUrl": "https://scan.sv-2.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-2.cluster.mock.com"
         }
       }
     },
@@ -2755,14 +2753,14 @@
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -2898,13 +2896,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "volumeSize": "640Gi",
           "volumeStorageClass": "premium-rwo"
@@ -2940,7 +2938,7 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "dev.network.canton.global:26026",
+          "externalAddress": "cluster.mock.com:26026",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26026,
@@ -3048,13 +3046,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableAntiAffinity": true,
@@ -3124,16 +3122,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-2-eng",
           "svNamespace": "sv-2"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -3167,14 +3164,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -3309,13 +3306,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -3368,13 +3365,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -3551,13 +3548,13 @@
           }
         ],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -3573,7 +3570,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-2-eng.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2-eng.cluster.mock.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -3629,7 +3626,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-2:5012",
-          "publicUrl": "https://scan.sv-2-eng.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-2-eng.cluster.mock.com"
         }
       }
     },
@@ -3651,14 +3648,14 @@
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -3794,13 +3791,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "volumeSize": "640Gi",
           "volumeStorageClass": "premium-rwo"
@@ -3836,7 +3833,7 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "dev.network.canton.global:26036",
+          "externalAddress": "cluster.mock.com:26036",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26036,
@@ -3944,13 +3941,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableAntiAffinity": true,
@@ -4020,16 +4017,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-3-eng",
           "svNamespace": "sv-3"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -4063,14 +4059,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -4205,13 +4201,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -4264,13 +4260,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -4447,13 +4443,13 @@
           }
         ],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -4469,7 +4465,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-3-eng.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-3-eng.cluster.mock.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -4525,7 +4521,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-3:5012",
-          "publicUrl": "https://scan.sv-3-eng.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-3-eng.cluster.mock.com"
         }
       }
     },
@@ -4547,14 +4543,14 @@
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -4690,13 +4686,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "db": {
           "volumeSize": "640Gi",
           "volumeStorageClass": "premium-rwo"
@@ -4732,7 +4728,7 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "dev.network.canton.global:26046",
+          "externalAddress": "cluster.mock.com:26046",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26046,
@@ -4840,13 +4836,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableAntiAffinity": true,
@@ -4916,16 +4912,15 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-4-eng",
           "svNamespace": "sv-4"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -4959,14 +4954,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -5101,13 +5096,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -5160,13 +5155,13 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -5343,13 +5338,13 @@
           }
         ],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -5365,7 +5360,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv-4-eng.dev.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-4-eng.cluster.mock.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -5421,7 +5416,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-4:5012",
-          "publicUrl": "https://scan.sv-4-eng.dev.network.canton.global"
+          "publicUrl": "https://scan.sv-4-eng.cluster.mock.com"
         }
       }
     },
@@ -5443,14 +5438,14 @@
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -5827,15 +5822,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
-          "hostname": "dev.network.canton.global",
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svNamespace": "validator1"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
@@ -5890,14 +5884,14 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "cometbftPorts": {
           "domains": 5,
           "nodes": 10
@@ -5979,13 +5973,13 @@
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
@@ -6037,13 +6031,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "resources": {
           "limits": {
@@ -6126,13 +6120,13 @@
           "cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar"
         ],
         "cluster": {
-          "basename": "dev",
-          "dnsName": "dev.network.canton.global",
+          "dnsName": "cluster.mock.com",
           "fixedTokens": false,
+          "hostname": "cluster.mock.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.network.canton.global",
+        "clusterUrl": "cluster.mock.com",
         "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "enableWallet": true,

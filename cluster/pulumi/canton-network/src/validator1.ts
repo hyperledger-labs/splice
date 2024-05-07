@@ -3,7 +3,7 @@ import {
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
-  CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
   defaultVersion,
   ExactNamespace,
   exactNamespace,
@@ -38,7 +38,7 @@ export async function installValidator1(
     'cn-cluster-loopback-gateway',
     {
       cluster: {
-        basename: CLUSTER_BASENAME,
+        hostname: CLUSTER_HOSTNAME,
       },
     },
     defaultVersion,
@@ -116,7 +116,7 @@ function installIngress(
 ) {
   installCNHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
     cluster: {
-      hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+      hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,

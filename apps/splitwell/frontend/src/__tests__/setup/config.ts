@@ -26,12 +26,12 @@ const config = {
     splitwell: {
       // URL of the splitwell backend.
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://splitwell.TARGET_CLUSTER.network.canton.global',
+      url: 'https://splitwell.TARGET_HOSTNAME',
     },
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://scan.sv-2.TARGET_CLUSTER.network.canton.global/api/scan',
+      url: 'https://scan.sv-2.TARGET_HOSTNAME/api/scan',
     },
     // END_SPLITWELL_CLUSTER_BACKEND_CONFIG
   },

@@ -1,4 +1,4 @@
-import { config, isDevNet, CLUSTER_BASENAME } from 'cn-pulumi-common';
+import { config, isDevNet, CLUSTER_HOSTNAME } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import fetch from 'node-fetch';
 
@@ -16,7 +16,7 @@ export async function getValidator1PartyId(): Promise<string> {
   return retry('getValidator1PartyId', 1000, 10, async () => {
     const validatorApiUrl = config.envFlag('CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS')
       ? `http://validator-app.validator1:5003/api/validator/v0/validator-user`
-      : `https://wallet.validator1.${CLUSTER_BASENAME}.network.canton.global/api/validator/v0/validator-user`;
+      : `https://wallet.validator1.${CLUSTER_HOSTNAME}/api/validator/v0/validator-user`;
     const response = await fetch(validatorApiUrl);
     const json = await response.json();
     if (!response.ok) {

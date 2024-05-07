@@ -20,7 +20,7 @@ const config = {
       url: 'http://localhost:5003/api/validator',
     },
   },
-  clusterUrl: `https://TARGET_CLUSTER.network.canton.global`,
+  clusterUrl: `https://TARGET_HOSTNAME`,
 };
 
 export { config };

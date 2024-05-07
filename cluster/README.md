@@ -1547,7 +1547,7 @@ The following steps assume that:
 1. Change into the deployment directory of the cluster undergoing the migration.
 1. Run `git fetch --tags -f` to make sure that we'll be using the correct version.
    To check, run `get-snapshot-version` and compare the result with
-   `curl "https://${GCP_CLUSTER_BASENAME}.network.canton.global/version"` - they should be the same.
+   `curl "https://${GCP_CLUSTER_HOSTNAME}/version"` - they should be the same.
    You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
    in case you have made local changes to the repo (that you can confirm are harmless).
 1. The `cncluster` commands below can use helm charts published to artifactory.

@@ -3,7 +3,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
-  CLUSTER_DNS_NAME,
+  CLUSTER_HOSTNAME,
   clusterSmallDisk,
   ExactNamespace,
   installCNHelmChart,
@@ -193,7 +193,7 @@ class CometBftNodeConfig {
   }
 
   private p2pExternalAddress(nodeIndex: number): string {
-    return `${CLUSTER_DNS_NAME}:${this.istioExternalPort(nodeIndex)}`;
+    return `${CLUSTER_HOSTNAME}:${this.istioExternalPort(nodeIndex)}`;
   }
 
   private istioExternalPort(nodeIndex: number) {

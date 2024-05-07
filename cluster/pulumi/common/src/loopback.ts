@@ -6,7 +6,7 @@ import { ExactNamespace } from './utils';
 
 export function installLoopback(
   namespace: ExactNamespace,
-  clusterBasename: string,
+  clusterHostname: string,
   version: CnChartVersion
 ): k8s.helm.v3.Release {
   return installCNRunbookHelmChart(
@@ -15,7 +15,7 @@ export function installLoopback(
     'cn-cluster-loopback-gateway',
     {
       cluster: {
-        basename: clusterBasename,
+        hostname: clusterHostname,
       },
     },
     version,

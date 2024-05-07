@@ -432,7 +432,7 @@ if:
 - the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
   the height of the latest block is greater than or equal to the configured interval between snapshots
 
-The snapshots are fetched from the founding SV node which exposes its CometBft RPC API at `https://sv.sv-2.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`.
+The snapshots are fetched from the founding SV node which exposes its CometBft RPC API at `https://sv.sv-2.TARGET_HOSTNAME:443/cometbft-rpc/`.
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
@@ -517,6 +517,7 @@ An SV node includes a CometBft node so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
@@ -555,13 +556,13 @@ If you are deploying new instances of your global domain components as part of a
 
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
@@ -572,7 +573,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 
 Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 The private and public key for your SV are defined in a K8s secret.
@@ -591,7 +592,7 @@ identity.
 
 For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
@@ -835,11 +836,11 @@ This list is useful for an SV that wishes to limit egress to only allow the mini
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
-Sponsor SV             sv.sv-2.<TARGET_CLUSTER>.network.canton.global:443                                               HTTPS     sv-app
-Sponsor SV Sequencer   sequencer-<M>.sv-2.<TARGET_CLUSTER>.network.canton.global:443                                    HTTPS     participant-<M>
-Sponsor SV Scan        scan.sv-2.<TARGET_CLUSTER>.network.canton.global:443                                             HTTPS     validator-app
+Sponsor SV             sv.sv-2.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
+Sponsor SV Sequencer   sequencer-<M>.sv-2.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
+Sponsor SV Scan        scan.sv-2.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
 CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
-CometBft JSON RPC      sv.sv-2.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc      HTTPS     global-domain-<M>-cometbft
+CometBft JSON RPC      sv.sv-2.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
 At present, we designate the founding SV as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
