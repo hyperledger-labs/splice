@@ -1,8 +1,7 @@
 package com.daml.network.wallet.automation
 
-import cats.syntax.traverse.*
 import com.daml.network.automation.{
-  PollingParallelTaskExecutionTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -21,7 +20,6 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-// TODO(#12128): transform this trigger to an OnAssignedContractTrigger
 class AutoAcceptTransferOffersTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
@@ -31,63 +29,59 @@ class AutoAcceptTransferOffersTrigger(
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     clock: Clock,
 )(implicit
-    override val ec: ExecutionContext,
-    override val tracer: Tracer,
+    ec: ExecutionContext,
+    tracer: Tracer,
     mat: Materializer,
-) extends PollingParallelTaskExecutionTrigger[AutoAcceptTransferOffersTrigger.Task] {
-
-  override protected def retrieveTasks()(implicit
-      tc: TraceContext
-  ): Future[Seq[AutoAcceptTransferOffersTrigger.Task]] =
-    autoAcceptTransfers.fromParties
-      .traverse { party =>
-        for {
-          filteredTransferOffers <- store.getOutstandingTransferOffers(
-            Some(party),
-            None,
-          )
-        } yield filteredTransferOffers
-      }
-      .map(_.flatten)
+) extends OnAssignedContractTrigger.Template[
+      transferOffersCodegen.TransferOffer.ContractId,
+      transferOffersCodegen.TransferOffer,
+    ](store, transferOffersCodegen.TransferOffer.COMPANION) {
 
   override protected def completeTask(
-      task: AutoAcceptTransferOffersTrigger.Task
+      transferOffer: AssignedContract[
+        transferOffersCodegen.TransferOffer.ContractId,
+        transferOffersCodegen.TransferOffer,
+      ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    for {
-      install <- store.getInstall()
-      cmd = install.exercise(
-        _.exerciseWalletAppInstall_TransferOffer_Accept(
-          task.contractId
+    if (
+      transferOffer.contract.payload.receiver == store.key.validatorParty.toProtoPrimitive && autoAcceptTransfers.fromParties
+        .contains(transferOffer.contract.payload.sender)
+    ) {
+      for {
+        install <- store.getInstall()
+        cmd = install.exercise(
+          _.exerciseWalletAppInstall_TransferOffer_Accept(
+            transferOffer.contractId
+          )
+        )
+        // validatorTopupConfigO exist iff we are the validator party
+        commandPriority <- validatorTopupConfigO match {
+          case None => Future.successful(CommandPriority.Low)
+          case Some(validatorTopupConfig) =>
+            TopupUtil
+              .hasSufficientFundsForTopup(scanConnection, store, validatorTopupConfig, clock)
+              .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
+        }
+        res <- connection
+          .submit(
+            Seq(store.key.validatorParty),
+            Seq(),
+            cmd,
+            priority = commandPriority,
+          )
+          .noDedup
+          .yieldResult()
+      } yield {
+        TaskSuccess(s"Accepted transfer offer: $res")
+      }
+    } else {
+      Future.successful(
+        TaskSuccess(
+          s"Not configured to auto-accept transfer offers from sender: ${transferOffer.contract.payload.sender} "
         )
       )
-      // validatorTopupConfigO exist iff we are the validator party
-      commandPriority <- validatorTopupConfigO match {
-        case None => Future.successful(CommandPriority.Low)
-        case Some(validatorTopupConfig) =>
-          TopupUtil
-            .hasSufficientFundsForTopup(scanConnection, store, validatorTopupConfig, clock)
-            .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
-      }
-      _ <- connection
-        .submit(
-          Seq(store.key.validatorParty),
-          Seq(),
-          cmd,
-          priority = commandPriority,
-        )
-        .noDedup
-        .yieldResult()
-    } yield {
-      TaskSuccess(s"Accepted transfer offer")
     }
   }
-
-  override protected def isStaleTask(task: AutoAcceptTransferOffersTrigger.Task)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    store.multiDomainAcsStore
-      .lookupContractById(transferOffersCodegen.TransferOffer.COMPANION)(task.contractId)
-      .map(_.isEmpty)
 }
 
 object AutoAcceptTransferOffersTrigger {
