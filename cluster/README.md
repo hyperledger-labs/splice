@@ -296,6 +296,19 @@ The other stacks can be included through the use of env variables:
 - CN_DEPLOY_MULTI_VALIDATOR
 - CN_DEPLOY_SV_RUNBOOK
 
+#### Upgrading to a new release
+
+To upgrade a cluster controlled by the operator, you need to go
+through the following steps:
+
+1. Run the `publish-public-artifacts` job on CI.
+2. Make a PR to set `CHARTS_VERSION` and `IMAGE_TAG` in the
+   `.envrc.vars` file of the corresponding cluster. For CILR this PR
+   should be made against `main`. You can tag that commit with `[skip ci]`.
+3. Tag the merged commit with the tag specified in
+   `CN_DEPLOYMENT_FLUX_REF` of the corresponding cluster, e.g., `cilr`
+   for cilr.
+
 #### The operator
 
 The operator is deployed in each cluster in the `operator` namespace.
