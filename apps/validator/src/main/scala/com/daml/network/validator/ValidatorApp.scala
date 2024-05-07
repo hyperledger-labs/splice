@@ -1013,13 +1013,13 @@ object ValidatorApp {
             binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
             timeouts.shutdownNetwork,
           ),
+          participantAdminConnection,
           automation,
         ) ++ walletManager.toList ++ Seq(
           store,
           storage,
-          domainTimeAutomationService,
           scanConnection,
-          participantAdminConnection,
+          domainTimeAutomationService,
         ))*
       )(logger)
   }
