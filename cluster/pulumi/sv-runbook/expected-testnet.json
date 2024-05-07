@@ -331,6 +331,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": "26056"
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "labels": [

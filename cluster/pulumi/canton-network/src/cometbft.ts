@@ -42,6 +42,7 @@ export function installCometBftNode(
   },
   migrationId: DomainMigrationIndex,
   isActiveDomain: boolean,
+  logLevel: string,
   version: CnChartVersion = defaultVersion,
   syncSource?: Release,
   opts?: CustomResourceOptions
@@ -72,6 +73,7 @@ export function installCometBftNode(
         port: nodeConfig.istioPort,
       },
       node: nodeConfig,
+      logLevel,
       peers: Object.keys(configs.nodeConfigs)
         .filter(key => key !== nodename && key !== 'sv-1')
         .map(svName => {

@@ -1998,6 +1998,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26016
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2926,6 +2927,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26026
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3821,6 +3823,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26036
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4716,6 +4719,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26046
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "interval": "30s",

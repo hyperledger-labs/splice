@@ -55,6 +55,7 @@ const validatorKeyContent: ValidatorKeyContent = {
 export function installCometBftNode(
   xns: ExactNamespace,
   svName: string,
+  logLevel: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
@@ -103,6 +104,7 @@ export function installCometBftNode(
             gateway: 'cluster-ingress/cn-apps-gateway',
             port: `26${migrationId}56`,
           },
+          logLevel,
           genesis: {
             // for TestNet-like deployments on scratchnet, set the chainId to 'test'
             chainId:

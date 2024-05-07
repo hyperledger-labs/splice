@@ -1313,6 +1313,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26016
         },
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "interval": "30s",

@@ -59,6 +59,11 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     const sanitizedName = this.name.replaceAll('-', '_');
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
+    const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
+      ? nodeIdentifier !== svConfigs[0].onboardingName
+        ? 'INFO'
+        : 'DEBUG'
+      : 'DEBUG';
 
     const cometbftRelease = installCometBftNode(
       xns,
@@ -67,6 +72,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       cometbft.nodeConfigs,
       domainMigrationId,
       active,
+      logLevel.toLowerCase(),
       version,
       cometbft.syncSource,
       { parent: this }
@@ -79,11 +85,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       this.name,
       'cn-global-domain',
       {
-        logLevel: config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
-          ? nodeIdentifier !== svConfigs[0].onboardingName
-            ? 'INFO'
-            : 'DEBUG'
-          : 'DEBUG',
+        logLevel: logLevel,
         sequencer: {
           persistence: {
             databaseName: sequencerDbName,

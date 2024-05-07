@@ -23,9 +23,11 @@ export function installDecentralizedSynchronizerNode(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
+  const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') ? 'INFO' : 'DEBUG';
   const cometbft = installCometBftNode(
     svNamespace,
     svName,
+    logLevel.toLowerCase(),
     decentralizedSynchronizerMigrationConfig,
     dependencies
   );
@@ -85,7 +87,7 @@ export function installDecentralizedSynchronizerNode(
             },
           },
           enablePostgresMetrics: true,
-          logLevel: config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') ? 'INFO' : 'DEBUG',
+          logLevel: logLevel,
         },
         version,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])

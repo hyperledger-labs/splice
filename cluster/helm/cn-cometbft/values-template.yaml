@@ -91,3 +91,5 @@ metrics:
 # nodeSelector:
 
 enableAntiAffinity: true
+
+logLevel: debug

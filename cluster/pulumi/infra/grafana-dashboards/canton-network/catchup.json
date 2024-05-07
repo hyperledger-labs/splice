@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 54,
+  "id": 61,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -97,7 +97,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 1
@@ -112,11 +112,11 @@
           "placement": "right",
           "showLegend": true,
           "sortBy": "Last *",
-          "sortDesc": true
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "asc"
         }
       },
       "targets": [
@@ -131,7 +131,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{service}} {{sender}}",
+          "legendFormat": "{{namespace}} M$migration {{sender}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -202,10 +202,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
-        "w": 24,
+        "h": 10,
+        "w": 11,
         "x": 0,
-        "y": 17
+        "y": 11
       },
       "id": 13,
       "options": {
@@ -236,7 +236,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{service}} {{sender}}",
+          "legendFormat": "{{namespace}} M$migration {{sender}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -307,10 +307,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
-        "w": 24,
-        "x": 0,
-        "y": 33
+        "h": 10,
+        "w": 13,
+        "x": 11,
+        "y": 11
       },
       "id": 14,
       "options": {
@@ -341,7 +341,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{service}} {{sender}}",
+          "legendFormat": "{{namespace}} M$migration {{sender}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -415,7 +415,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 21
       },
       "id": 1,
       "options": {
@@ -446,7 +446,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{service}}",
+          "legendFormat": "{{namespace}} migration $migration",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -520,7 +520,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 32
       },
       "id": 3,
       "options": {
@@ -547,11 +547,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\",job=~\"participant-$migration\"}",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}}",
+          "legendFormat": "{{namespace}} {{node}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -625,7 +625,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 32
       },
       "id": 2,
       "options": {
@@ -671,7 +671,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 40
       },
       "id": 10,
       "panels": [],
@@ -744,7 +744,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 41
       },
       "hideTimeOverride": false,
       "id": 11,
@@ -851,7 +851,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 48
       },
       "hideTimeOverride": false,
       "id": 7,
@@ -941,8 +941,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -958,7 +957,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 55
       },
       "hideTimeOverride": false,
       "id": 6,
@@ -1045,8 +1044,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1061,7 +1059,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 61
       },
       "id": 8,
       "options": {
@@ -1144,8 +1142,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1160,7 +1157,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 61
       },
       "id": 4,
       "options": {
@@ -1258,7 +1255,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 96
+        "y": 68
       },
       "id": 5,
       "options": {
@@ -1383,13 +1380,13 @@
     ]
   },
   "time": {
-    "from": "now-12h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
