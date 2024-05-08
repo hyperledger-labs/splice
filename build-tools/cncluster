@@ -2539,10 +2539,10 @@ function subcmd_disaster_recovery_test() {
 }
 
 function take_sv_disaster_recovery_dump() {
-    timestamp="$1"
-    migration_id="$2"
-    output_directory="$3"
-    namespace="$4"
+    local timestamp="$1"
+    local migration_id="$2"
+    local output_directory="$3"
+    local namespace="$4"
     echo "Taking dump of SV $namespace"
     if [ "$namespace" = sv ]; then
         token="$SV_RUNBOOK_TOKEN"
@@ -2557,10 +2557,10 @@ function take_sv_disaster_recovery_dump() {
 }
 
 function take_validator_disaster_recovery_dump() {
-    timestamp="$1"
-    migration_id="$2"
-    output_directory="$3"
-    namespace="$4"
+    local timestamp="$1"
+    local migration_id="$2"
+    local output_directory="$3"
+    local namespace="$4"
     echo "Taking dump of validator $namespace"
     if [ "$namespace" = splitwell ]; then
         token="$SPLITWELL_TOKEN"
