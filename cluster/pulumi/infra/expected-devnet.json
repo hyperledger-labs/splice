@@ -1575,6 +1575,15 @@
           "ingress": {
             "enabled": false
           },
+          "persistence": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "enabled": true,
+            "size": "5Gi",
+            "storageClassName": "standard-rwo",
+            "type": "pvc"
+          },
           "sidecar": {
             "alerts": {
               "enabled": true

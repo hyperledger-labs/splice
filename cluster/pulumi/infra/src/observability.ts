@@ -341,6 +341,13 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             default_timezone: 'UTC',
           },
         },
+        persistence: {
+          enabled: true,
+          type: 'pvc',
+          accessModes: ['ReadWriteOnce'],
+          size: '5Gi',
+          storageClassName: 'standard-rwo',
+        },
         adminUser: 'cn-admin',
         adminPassword: grafanaKeysFromSecret().adminPassword,
       },
