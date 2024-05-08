@@ -3,14 +3,22 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.8
+-----
 
 * Deployment
 
   * The URL for the Digital-Asset-2 node is now compliant with the agreed upon URL formats: `*.sv-2.<dev|test>.global.canton.network.digitalasset.com`
 
   * All Digital-Asset-Eng-X nodes also change URLs with this release, from `*.sv-x.<hostname>` to `*.sv-x-eng.<dev|test>.global.canton.network.digitalasset.com`.
+
+* Bugfixes
+
+  * Reduced the frequency of ACS commitments to every 30min to avoid issues with validators running out of traffic.
+
+* Performance
+
+  * Sequencers now batch some of their writes which should improve performance.
 
 0.1.7
 -----
