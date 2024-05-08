@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, Auth0Fetch, config, infraStack } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, Auth0Fetch, config, infraStack, isMainNet } from 'cn-pulumi-common';
 
 import { installCluster } from './installCluster';
 import { scheduleLoadGenerator } from './scheduleLoadGenerator';
@@ -16,7 +16,16 @@ async function auth0CacheAndInstallCluster(auth0Fetch: Auth0Fetch) {
 
 async function main() {
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
+  if (isMainNet) {
+    throw new Error('Mainnet is not yet supported in canton-network stack');
+  }
+  if (!auth0ClusterCfg.cantonNetwork) {
+    throw new Error('missing cantonNetwork auth0 output');
+  }
   const auth0FetchOutput = auth0ClusterCfg.cantonNetwork.apply(cfg => {
+    if (!cfg) {
+      throw new Error('missing cantonNetwork auth0 output');
+    }
     cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
     return new Auth0Fetch(cfg);
   });

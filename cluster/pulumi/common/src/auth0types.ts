@@ -38,7 +38,8 @@ export interface Auth0Client {
 }
 
 export type Auth0ClusterConfig = {
-  cantonNetwork: Auth0Config;
-  svRunbook: Auth0Config;
-  validatorRunbook: Auth0Config;
+  cantonNetwork?: Auth0Config;
+  svRunbook?: Auth0Config;
+  validatorRunbook?: Auth0Config;
+  mainnet?: Auth0Config;
 };

@@ -41,7 +41,8 @@ export type ApprovedSvIdentity = {
   rewardWeightBps: number;
 };
 
-export const isDevNet = config.envFlag('IS_DEVNET', true);
+export const isMainNet = config.envFlag('IS_MAINNET', false);
+export const isDevNet = config.envFlag('IS_DEVNET', true) && !isMainNet;
 export const clusterSmallDisk = config.envFlag('CLUSTER_SMALL_DISK', false);
 export const publicPrometheusRemoteWrite = config.envFlag('PUBLIC_PROMETHEUS_REMOTE_WRITE', false);
 

@@ -37,7 +37,13 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
 
 async function main() {
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
+  if (!auth0ClusterCfg.svRunbook) {
+    throw new Error('missing sv runbook auth0 output');
+  }
   const auth0FetchOutput = auth0ClusterCfg.svRunbook.apply(cfg => {
+    if (!cfg) {
+      throw new Error('missing sv runbook auth0 output');
+    }
     cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
     return new Auth0Fetch(cfg);
   });

@@ -1,6 +1,6 @@
 import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, config } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, config, isMainNet } from 'cn-pulumi-common';
 
 function newUiApp(
   resourceName: string,
@@ -174,12 +174,21 @@ function cnAuth0(clusterBasename: string) {
     });
 }
 
-function svRunbookAuth0(clusterBasename: string) {
-  const auth0Domain = 'canton-network-sv-test.us.auth0.com';
-  const auth0MgtClientId = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
-
-  const provider = new auth0.Provider('sv', {
+function svRunbookAuth0(
+  clusterBasename: string,
+  auth0ProviderName: string,
+  auth0Domain: string,
+  auth0MgtClientId: string,
+  auth0MgtClientSecret: string,
+  svDescription: string,
+  svBackendClientId: string,
+  validatorBackendClientId: string,
+  ledgerApiAudience: string,
+  svApiAudience: string,
+  validatorApiAudience: string,
+  fixedTokenCacheName: string
+) {
+  const provider = new auth0.Provider(auth0ProviderName, {
     domain: auth0Domain,
     clientId: auth0MgtClientId,
     clientSecret: auth0MgtClientSecret,
@@ -188,7 +197,7 @@ function svRunbookAuth0(clusterBasename: string) {
   const walletUiApp = newUiApp(
     'SvWalletUi',
     'Wallet UI',
-    'Used for the Wallet UI for the SV runbook',
+    `Used for the Wallet UI for ${svDescription}`,
     ['wallet'],
     'sv',
     clusterBasename,
@@ -197,7 +206,7 @@ function svRunbookAuth0(clusterBasename: string) {
   const ansUiApp = newUiApp(
     'SvCnsUi',
     'ANS UI',
-    'Used for the ANS UI for the SV runbook',
+    `Used for the ANS UI for ${svDescription}`,
     ['cns'],
     'sv',
     clusterBasename,
@@ -206,7 +215,7 @@ function svRunbookAuth0(clusterBasename: string) {
   const svUiApp = newUiApp(
     'SvSvUi',
     'SV UI',
-    'Used for the SV UI for the SV runbook',
+    `Used for the SV UI for ${svDescription}`,
     ['sv'],
     'sv',
     clusterBasename,
@@ -218,8 +227,8 @@ function svRunbookAuth0(clusterBasename: string) {
     .apply(([walletUiAppId, ansUiAppId, svUiAppId]) => {
       return {
         appToClientId: {
-          sv: 'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn',
-          validator: 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr',
+          sv: svBackendClientId,
+          validator: validatorBackendClientId,
         },
 
         namespaceToUiToClientId: {
@@ -231,20 +240,20 @@ function svRunbookAuth0(clusterBasename: string) {
         },
 
         appToApiAudience: {
-          participant: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant
-          sv: 'https://sv.example.com/api', // The SV App API in the sv-test tenant
-          validator: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
+          participant: ledgerApiAudience,
+          sv: svApiAudience,
+          validator: validatorApiAudience,
         },
 
         appToClientAudience: {
-          sv: 'https://ledger_api.example.com',
-          validator: 'https://ledger_api.example.com',
+          sv: ledgerApiAudience,
+          validator: ledgerApiAudience,
         },
 
-        fixedTokenCacheName: 'auth0-fixed-token-cache-sv-test',
+        fixedTokenCacheName: fixedTokenCacheName,
 
-        auth0Domain: 'canton-network-sv-test.us.auth0.com',
-        auth0MgtClientId: config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
+        auth0Domain: auth0Domain,
+        auth0MgtClientId: auth0MgtClientId,
         auth0MgtClientSecret: '',
       };
     });
@@ -312,17 +321,53 @@ function validatorRunbookAuth0(clusterBasename: string) {
 }
 
 export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0ClusterConfig> {
-  const cnAuth0Cfg = cnAuth0(clusterBasename);
-  const svRunbookAuth0Cfg = svRunbookAuth0(clusterBasename);
-  const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename);
-  return pulumi
-    .all([cnAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
-    .apply(([cn, sv, validator]) => {
+  if (isMainNet) {
+    const auth0Cfg = svRunbookAuth0(
+      clusterBasename,
+      'main',
+      'canton-network-mainnet.us.auth0.com',
+      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID'),
+      config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET'),
+      'sv-1 (Digital-Asset 2)',
+      'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
+      'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
+      'https://ledger_api.main.digitalasset.com',
+      'https://sv.main.digitalasset.com',
+      'https://validator.main.digitalasset.com',
+      'DO_NOT_USE'
+    );
+    return auth0Cfg.apply(mainnetCfg => {
       const r: Auth0ClusterConfig = {
-        cantonNetwork: cn,
-        svRunbook: sv,
-        validatorRunbook: validator,
+        mainnet: mainnetCfg,
       };
       return r;
     });
+  } else {
+    const cnAuth0Cfg = cnAuth0(clusterBasename);
+    const svRunbookAuth0Cfg = svRunbookAuth0(
+      clusterBasename,
+      'sv',
+      'canton-network-sv-test.us.auth0.com',
+      config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
+      config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET'),
+      'the SV runbook',
+      'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn',
+      'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr',
+      'https://ledger_api.example.com',
+      'https://sv.example.com/api',
+      'https://validator.example.com/api',
+      'auth0-fixed-token-cache-sv-test'
+    );
+    const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename);
+    return pulumi
+      .all([cnAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
+      .apply(([cn, sv, validator]) => {
+        const r: Auth0ClusterConfig = {
+          cantonNetwork: cn,
+          svRunbook: sv,
+          validatorRunbook: validator,
+        };
+        return r;
+      });
+  }
 }
