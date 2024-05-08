@@ -181,7 +181,9 @@ class ParticipantAdminConnection(
               logger.info(s"Registering new domain with config $config")
               registerDomain(config, handshakeOnly = false)
             case Some(_) =>
-              modifyDomainConnectionConfig(config.domain, _ => Some(config)).map(_ => ())
+              modifyDomainConnectionConfigAndReconnect(config.domain, _ => Some(config)).map(_ =>
+                ()
+              )
           },
         logger,
       )
