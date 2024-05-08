@@ -13,6 +13,7 @@ import {
   publicPrometheusRemoteWrite,
   REPO_ROOT,
   config,
+  EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
 } from 'cn-pulumi-common';
 
 import { createGrafanaDashboards } from './grafana-dashboards';
@@ -425,7 +426,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
         ...{
           'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
           'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
-          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml'),
+          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml').replaceAll(
+            '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
+            EXPECTED_MAX_BLOCK_RATE_PER_SECOND
+          ),
           'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),

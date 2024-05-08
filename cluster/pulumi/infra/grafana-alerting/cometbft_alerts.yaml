@@ -438,3 +438,96 @@ groups:
         labels:
           gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A'
         isPaused: false
+      - uid: adl2npxte6u4gd
+        title: Reached Expected Maximum CometBFT Block Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: rate(cometbft_consensus_height[1h])
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $EXPECTED_MAX_BLOCK_RATE_PER_SECOND
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: UJyurCTWz
+        panelId: 68
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          __dashboardUid__: UJyurCTWz
+          __panelId__: "68"
+          description: This alert triggers when the expected maximum hourly-averaged block rate threshold is reached.
+          runbook_url: ""
+          severity: medium
+          summary: The expected maximum hourly-averaged block rate threshold was exceeded in {{ $labels.namespace }} with a value of {{ index $values "A" }} c/s.
+        labels:
+          "": ""
+        isPaused: false

@@ -17,6 +17,9 @@ export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
+export const EXPECTED_MAX_BLOCK_RATE_PER_SECOND =
+  config.optionalEnv('EXPECTED_MAX_BLOCK_RATE_PER_SECOND') || '2.5';
+
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
 
 const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
