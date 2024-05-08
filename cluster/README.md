@@ -1408,10 +1408,20 @@ The tls certificate is configured in the infrastructure pulumi chart
 1. Edit the dnsNames list, and exit the editor
 1. `kubectl delete secret -n cluster-ingress cn-<cluster>net-tls`
 1. Wait for the secret to reappear in `kubectl get secret -n cluster-ingress`
-1. Restart the external proxy, e.g. with `kubectl delete pod -n cluster-ingress external-proxy-<...>`
 
 Note that these manual changes update an existing cluster, but you should make sure to update the pulumi chart consistently
 for those changes to also persist for future cluster deployments.
+
+### Using Let's Encrypt staging issuer
+
+Let's Encrypt, our auth certificate provider, has a rate limit of 50 certificates per
+registerd domain on its production server. Repeatedly bringing down and up the pulumi
+infra stack can easily exhaust that, and block us for days. When developing in the
+infra stack, if you do need to bring that back and up for testing, please
+`export USE_LETSENCRYPT_STAGING=true` in order to use Let's Encrypt staging server
+instead. The certificates will not be fully signed, thus raise exceptions and browser
+alerts, but otherwise the flow is the same, so should suffice for developing the infra
+stack itself.
 
 ## Participant Admin User Configuration
 

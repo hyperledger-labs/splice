@@ -81,8 +81,17 @@ function clusterCertificate(
   manager: certmanager.CertManager,
   dnsEntries: gcp.dns.RecordSet[]
 ): k8s.apiextensions.CustomResource {
-  const issuerName = 'letsencrypt-production';
-  const issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
+  const useStaging = config.envFlag('USE_LETSENCRYPT_STAGING', false);
+
+  let issuerName, issuerServer;
+
+  if (useStaging) {
+    issuerName = 'letsencrypt-staging';
+    issuerServer = 'https://acme-staging-v02.api.letsencrypt.org/directory';
+  } else {
+    issuerName = 'letsencrypt-production';
+    issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
+  }
 
   const issuer = new k8s.apiextensions.CustomResource(
     'issuer',
@@ -187,7 +196,7 @@ function clusterCertificate(
       spec: {
         dnsNames: certDnsNames,
         issuerRef: {
-          name: 'letsencrypt-production',
+          name: issuerName,
         },
         secretName: `cn-${clusterName}net-tls`,
       },
