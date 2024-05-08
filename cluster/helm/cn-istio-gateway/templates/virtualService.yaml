@@ -6,7 +6,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-  - "{{ (.Values.cluster).hostname }}"
+  - "{{ (.Values.cluster).cantonHostname }}"
+  {{- if eq (.Values.cluster).hostname  (.Values.cluster).daHostname }}
+  - "{{ (.Values.cluster).daHostname }}"
+  {{- end }}
   gateways:
   - cn-http-gateway
   http:
