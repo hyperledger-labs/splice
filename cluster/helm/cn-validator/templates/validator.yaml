@@ -115,6 +115,9 @@ spec:
           value: |
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
+        {{- if (.Values.topup).reservedTraffic }}
+            canton.validator-apps.validator_backend.domains.global.reserved-traffic = {{ (.Values.topup).reservedTraffic }}
+        {{- end }}
         {{- end }}
         {{- with .Values.persistence }}
         - name: ADDITIONAL_CONFIG_PERSISTENCE
