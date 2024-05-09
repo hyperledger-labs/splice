@@ -700,7 +700,7 @@ Both Canton and Canton Coin also extensively use Daml SDK libraries and these ca
 
 To identify which Daml SDK library defines a particular class:
 - search for the class in the [daml OSS repo](https://github.com/digital-asset/daml?search=1)
-- identify the module directory and locate the `BUILD.bazel` file inside it
+- identify the module directory and locate the `BUILD.bazel` file inside it.
 - search for `maven_coordinates` within the `BUILD.bazel` file to get the name of the library.
 
 To add a new library as a dependency for some module:

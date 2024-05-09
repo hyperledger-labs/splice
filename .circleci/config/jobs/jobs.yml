@@ -843,3 +843,29 @@ jobs:
           root: /tmp/workspace
           paths:
               - cn_env_vars
+
+  notify_on_readme_changed:
+    parameters:
+      <<: *channel-notify-parameter
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Skip slack notification if no documentation has benn changed
+          when: always
+          command: |
+            commit=$(git rev-parse HEAD)
+            changed=$(git diff HEAD~ HEAD -- ./README.md)
+            if [ -n "$changed" ]; then
+              echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
+              echo "export GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$BASH_ENV"
+            else
+              echo "No document changes are detected."
+              circleci-agent step halt
+            fi
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          event: always
+          custom: |
+            { "text": "*📄Change to README.md is merged to main*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>" }

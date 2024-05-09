@@ -175,3 +175,8 @@ workflow:
           context:
             - artifactory
             - slack-context
+      - notify_on_readme_changed:
+          <<: *main-branch-only
+          context:
+            - slack-context
+          channel_notify: C03J6NCPSE4
