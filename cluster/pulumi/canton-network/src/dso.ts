@@ -7,15 +7,14 @@ import {
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
-  REPO_ROOT,
   SvIdKey,
   ValidatorTopupConfig,
-  loadYamlFromFile,
   svKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
   ApprovedSvIdentity,
   daSupportApprovedIdentities,
   config,
+  approvedSvIdentities,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
@@ -66,17 +65,9 @@ export class Dso extends pulumi.ComponentResource {
     isFounder = false,
     cometBftSyncSource?: k8s.helm.v3.Release
   ) {
-    const defaultApprovedSvIdentities = (
-      this.args.isDevNet
-        ? loadYamlFromFile(
-            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-          )
-        : loadYamlFromFile(
-            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-          )
-    ).approvedSvIdentities;
+    const defaultApprovedSvIdentities = approvedSvIdentities();
 
-    const approvedSvIdentities = _.uniqBy(
+    const identities = _.uniqBy(
       [
         ...defaultApprovedSvIdentities,
         ...extraApprovedSvIdentities,
@@ -98,7 +89,7 @@ export class Dso extends pulumi.ComponentResource {
         auth0SvAppName: svConf.auth0SvAppName,
         onboarding,
         auth0Client: this.args.auth0Client,
-        approvedSvIdentities,
+        approvedSvIdentities: identities,
         expectedValidatorOnboardings,
         isDevNet: this.args.isDevNet,
         periodicBackupConfig: this.args.periodicBackupConfig,

@@ -36,9 +36,8 @@ import {
   svOnboardingPollingInterval,
   defaultVersion,
   disableCantonAutoInit,
-  ApprovedSvIdentity,
-  daSupportApprovedIdentities,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
+  approvedSvIdentities,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -278,26 +277,6 @@ async function installSvAndValidator(
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
-  const sv234NameSet = new Set<string>([
-    'Digital-Asset-Eng-2',
-    'Digital-Asset-Eng-3',
-    'Digital-Asset-Eng-4',
-  ]);
-
-  const allApprovedSvIdentities = (
-    isDevNet
-      ? loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-        )
-      : loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-        )
-  ).approvedSvIdentities;
-
-  const approvedSvIdentities = singleSv
-    ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
-    : allApprovedSvIdentities.concat(daSupportApprovedIdentities);
-
   const valuesFromYamlFile = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
@@ -322,7 +301,7 @@ async function installSvAndValidator(
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
-    approvedSvIdentities,
+    approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,

@@ -171,11 +171,31 @@ export function loadIPRanges(): string[] {
     return extractIpRanges(externalIPRangesJson.devnet)
       .concat(extractIpRanges(internalIPRangesJson.devnet))
       .concat(daSupportNodeIpRanges);
+  } else if (isMainNet) {
+    return extractIpRanges(externalIPRangesJson.mainnet).concat(
+      extractIpRanges(internalIPRangesJson.mainnet)
+    );
   } else {
     return extractIpRanges(externalIPRangesJson.testnet)
       .concat(extractIpRanges(internalIPRangesJson.testnet))
       .concat(daSupportNodeIpRanges);
   }
+}
+
+export function approvedSvIdentities(): ApprovedSvIdentity[] {
+  return (
+    isDevNet
+      ? loadYamlFromFile(
+          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
+        )
+      : isMainNet
+        ? loadYamlFromFile(
+            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-main.yaml`
+          )
+        : loadYamlFromFile(
+            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
+          )
+  ).approvedSvIdentities;
 }
 
 // Typically used for overriding chart values.

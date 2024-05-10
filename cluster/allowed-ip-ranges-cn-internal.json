@@ -6,5 +6,6 @@
       ]
     }
   },
-  "testnet": {}
+  "testnet": {},
+  "mainnet": {}
 }
