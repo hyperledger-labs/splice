@@ -13,6 +13,7 @@ in pkgs.mkShell {
 
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
 
+    istioctl
     ammonite
     auth0-cli
     cabal2nix
