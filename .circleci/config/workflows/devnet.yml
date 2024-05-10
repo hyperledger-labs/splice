@@ -103,6 +103,9 @@ workflow:
                 - deployment/devnet
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          # We can't make a BFT connection for the self-hosted preflights since our vpn setup
+          # only is active towards our cluster.
+          extra_env_vars: GLOBAL_DOMAIN_URL=sequencer-2.sv-2.${GCP_CLUSTER_HOSTNAME}
           context:
             - artifactory
             - canton-network-vpn
