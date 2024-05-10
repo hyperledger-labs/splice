@@ -58,6 +58,7 @@ export async function installSplitwell(
     sharedPostgres,
     participantBootstrapDump,
     'splitwell',
+    auth0Client.getCfg(),
     dependsOn.concat([loopback])
   );
 

@@ -1538,7 +1538,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1577,7 +1577,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -1709,7 +1709,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1762,7 +1762,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -1818,6 +1818,9 @@
           }
         ],
         "appDars": [],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -1930,7 +1933,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2286,7 +2289,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2339,7 +2342,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2378,7 +2381,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -2513,7 +2516,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -2623,6 +2626,9 @@
             "rewardWeightBps": 120000
           }
         ],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -2752,6 +2758,9 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -2858,7 +2867,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -3210,7 +3219,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -3263,7 +3272,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -3302,7 +3311,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -3437,7 +3446,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -3547,6 +3556,9 @@
             "rewardWeightBps": 120000
           }
         ],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -3647,6 +3659,9 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -3753,7 +3768,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -4105,7 +4120,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -4158,7 +4173,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -4197,7 +4212,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -4332,7 +4347,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -4442,6 +4457,9 @@
             "rewardWeightBps": 120000
           }
         ],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -4542,6 +4560,9 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -4648,7 +4669,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -5000,7 +5021,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -5053,7 +5074,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -5092,7 +5113,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -5227,7 +5248,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -5337,6 +5358,9 @@
             "rewardWeightBps": 120000
           }
         ],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -5437,6 +5461,9 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,
@@ -5930,7 +5957,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -5969,7 +5996,7 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
-          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -6077,7 +6104,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": false,
-      "region": "mock-compute-region",
+      "region": "us-central1",
       "settings": {
         "backupConfiguration": {
           "enabled": true,
@@ -6119,6 +6146,9 @@
         "appDars": [
           "cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar"
         ],
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
         "cluster": {
           "dnsName": "cluster.mock.com",
           "fixedTokens": false,

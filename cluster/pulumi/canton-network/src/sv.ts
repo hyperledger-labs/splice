@@ -155,7 +155,7 @@ export async function installSvNode(
   );
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.nodeName),
+    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
@@ -405,7 +405,8 @@ function installMigrationIdSpecificComponents(
         auth0UserNameEnvVarSource('sv'),
         isParticipantRestoringFromDump || mustBeManuallyInitialized,
         svConfig.onboardingName,
-        version
+        version,
+        svConfig.auth0Client.getCfg()
       );
       const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(
         migrationId,
@@ -509,6 +510,10 @@ function installSvApp(
     participantAddress: participant.name,
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
+    auth: {
+      audience: config.auth0Client.getCfg().appToApiAudience['sv'],
+      jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+    },
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

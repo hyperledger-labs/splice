@@ -1,6 +1,6 @@
 import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, config, isMainNet } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, NamespaceToClientIdMapMap, config, isMainNet } from 'cn-pulumi-common';
 
 function newUiApp(
   resourceName: string,
@@ -181,6 +181,8 @@ function svRunbookAuth0(
   auth0MgtClientId: string,
   auth0MgtClientSecret: string,
   svDescription: string,
+  namespace: string,
+  ingressName: string,
   svBackendClientId: string,
   validatorBackendClientId: string,
   ledgerApiAudience: string,
@@ -199,7 +201,7 @@ function svRunbookAuth0(
     'Wallet UI',
     `Used for the Wallet UI for ${svDescription}`,
     ['wallet'],
-    'sv',
+    ingressName,
     clusterBasename,
     provider
   );
@@ -208,7 +210,7 @@ function svRunbookAuth0(
     'ANS UI',
     `Used for the ANS UI for ${svDescription}`,
     ['cns'],
-    'sv',
+    ingressName,
     clusterBasename,
     provider
   );
@@ -217,7 +219,7 @@ function svRunbookAuth0(
     'SV UI',
     `Used for the SV UI for ${svDescription}`,
     ['sv'],
-    'sv',
+    ingressName,
     clusterBasename,
     provider
   );
@@ -225,19 +227,20 @@ function svRunbookAuth0(
   return pulumi
     .all([walletUiApp.id, ansUiApp.id, svUiApp.id])
     .apply(([walletUiAppId, ansUiAppId, svUiAppId]) => {
+      const nsToUiToClientId: NamespaceToClientIdMapMap = {};
+      nsToUiToClientId[namespace] = {
+        wallet: walletUiAppId,
+        sv: svUiAppId,
+        cns: ansUiAppId,
+      };
+
       return {
         appToClientId: {
           sv: svBackendClientId,
           validator: validatorBackendClientId,
         },
 
-        namespaceToUiToClientId: {
-          sv: {
-            wallet: walletUiAppId,
-            sv: svUiAppId,
-            cns: ansUiAppId,
-          },
-        },
+        namespaceToUiToClientId: nsToUiToClientId,
 
         appToApiAudience: {
           participant: ledgerApiAudience,
@@ -329,6 +332,8 @@ export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0Clus
       config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID'),
       config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET'),
       'sv-1 (Digital-Asset 2)',
+      'sv-1',
+      'sv-2', // Ingress name of sv-1 is sv-2!
       'pC5Dw7qDWDfNREKgLwx2Vpz2Ns7j3cRK',
       'B4Ir9KiFqiCOHCpSDiPJN6PzkjKjDsbR',
       'https://ledger_api.main.digitalasset.com',
@@ -351,6 +356,8 @@ export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0Clus
       config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
       config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET'),
       'the SV runbook',
+      'sv',
+      'sv',
       'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn',
       'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr',
       'https://ledger_api.example.com',

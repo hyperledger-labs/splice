@@ -1,5 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import { config } from 'cn-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 import { ServiceAccount } from './serviceAccount';
@@ -24,18 +25,17 @@ class GcpProject extends pulumi.ComponentResource {
     );
   }
 
-  /*eslint no-process-env: "off"*/
   constructor(name: string, args: GcpProjectArgs, opts?: pulumi.CustomResourceOptions) {
     super('cn:gcp:project', name, args, opts);
 
     this.opts = opts;
 
     const { gcpProjectId } = args;
-    const keyringProjectId = process.env.PULUMI_BACKEND_GCPKMS_PROJECT;
+    const keyringProjectId = config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT');
     if (!keyringProjectId) {
       throw new Error('PULUMI_BACKEND_GCPKMS_PROJECT is undefined');
     }
-    const keyringRegion = process.env.CLOUDSDK_COMPUTE_REGION;
+    const keyringRegion = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
     if (!keyringRegion) {
       throw new Error('CLOUDSDK_COMPUTE_REGION is undefined');
     }

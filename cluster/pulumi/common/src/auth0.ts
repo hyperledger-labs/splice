@@ -100,12 +100,12 @@ export class Auth0Fetch implements Auth0Client {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
       }
 
+      this.auth0Cache = cacheMap;
       await pulumi.log.debug('Auth0 cache loaded...');
     } catch (e) {
+      this.auth0Cache = undefined;
       await pulumi.log.debug('No Auth0 cache secret found.');
     }
-
-    this.auth0Cache = cacheMap;
   }
 
   public async saveAuth0Cache(): Promise<void> {
@@ -113,8 +113,8 @@ export class Auth0Fetch implements Auth0Client {
     await pulumi.log.debug('Saving Auth0 cache');
 
     if (!this.auth0Cache) {
-      console.error('No auth0 cache loaded in Auth0Fetch');
-      process.exit(1);
+      await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
+      return;
     }
 
     for (const clientId in this.auth0Cache) {
@@ -235,7 +235,7 @@ export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): str
   const appClientId = clientIdMap[app];
 
   if (!appClientId) {
-    throw new Error(`Unknown Auth0 client ID for app: ${app}, JSON.stringify(clientIdMap)`);
+    throw new Error(`Unknown Auth0 client ID for app: ${app}, ${JSON.stringify(clientIdMap)}`);
   }
 
   return appClientId;

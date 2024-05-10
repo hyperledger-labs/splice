@@ -11,6 +11,7 @@ import {
   installMigrationIdSpecificComponent,
   jmxOptions,
   sanitizedForPostgres,
+  Auth0Config,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
@@ -23,6 +24,7 @@ export function installMigrationSpecificValidatorParticipant(
   defaultPostgres: postgres.Postgres | undefined,
   participantBootstrapDump: BootstrappingDumpConfig | undefined,
   nodeIdentifier: string,
+  auth0Cfg: Auth0Config,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   return installMigrationIdSpecificComponent(
@@ -43,6 +45,7 @@ export function installMigrationSpecificValidatorParticipant(
           decentralizedSynchronizerMigrationConfig.isRunningMigration(),
         nodeIdentifier,
         version,
+        auth0Cfg,
         dependsOn
       );
     }
@@ -57,6 +60,7 @@ export function installParticipant(
   disableAutoInit = false,
   nodeIdentifier: string,
   version: CnChartVersion,
+  auth0Cfg: Auth0Config,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
@@ -81,6 +85,10 @@ export function installParticipant(
       nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
+      auth: {
+        jwksUrl: `https://${auth0Cfg.auth0Domain}/.well-known/jwks.json`,
+        targetAudience: auth0Cfg.appToApiAudience['participant'],
+      },
     },
     version,
     {

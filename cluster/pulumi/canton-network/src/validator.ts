@@ -41,6 +41,7 @@ export type ValidatorSecrets = {
   validatorSecret: Secret;
   wallet: Secret;
   cns: Secret;
+  auth0Client: Auth0Client;
 };
 
 type BasicValidatorConfig = {
@@ -172,6 +173,11 @@ export async function installValidatorApp(
       additionalJvmOptions: jmxOptions(),
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
       enablePostgresMetrics: true,
+      auth: {
+        audience: config.secrets.auth0Client.getCfg().appToApiAudience['validator'],
+        ledgerApiAudience: config.secrets.auth0Client.getCfg().appToApiAudience['participant'],
+        jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+      },
     },
     defaultVersion,
     { dependsOn }
@@ -196,5 +202,6 @@ export async function installValidatorSecrets(
     ),
     wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
     cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
+    auth0Client: config.auth0Client,
   };
 }

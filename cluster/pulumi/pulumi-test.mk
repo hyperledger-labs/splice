@@ -23,14 +23,28 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
         env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
+.PHONY: $(dir)/test-mainnet.json
+$(dir)/test-mainnet.json: $(dir $(dir)).build
+	set -o pipefail \
+	&& cd $(@D); \
+	if [ -n "$$CI" ]; then \
+	    . "${REPO_ROOT}/cluster/deployment/mainnet/.envrc.vars"; \
+    	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+    else \
+        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="mainnet" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+    fi
+
 .PHONY: $(dir)/test
-$(dir)/test: $(dir)/test-devnet $(dir)/test-testnet
+$(dir)/test: $(dir)/test-devnet $(dir)/test-testnet $(dir)/test-mainnet
 
 .PHONY: $(dir)/test-devnet
 $(dir)/test-devnet: $(dir)/test-config-devnet $(dir)/lint
 
 .PHONY: $(dir)/test-testnet
 $(dir)/test-testnet: $(dir)/test-config-testnet $(dir)/lint
+
+.PHONY: $(dir)/test-mainnet
+$(dir)/test-mainnet: $(dir)/test-config-mainnet $(dir)/lint
 
 
 .PHONY: $(dir)/lint
@@ -53,9 +67,16 @@ $(dir)/test-config-testnet: $(dir)/test-testnet.json $(dir)/expected-testnet.jso
 	cp $(@D)/test-testnet.json $(@D)/expected-testnet.json; \
 	exit $$EXIT
 
+.PHONY: $(dir)/test-config-mainnet
+$(dir)/test-config-mainnet: $(dir)/test-mainnet.json $(dir)/expected-mainnet.json
+	diff -u $(@D)/expected-mainnet.json $(@D)/test-mainnet.json; \
+	EXIT=$$?; \
+	cp $(@D)/test-mainnet.json $(@D)/expected-mainnet.json; \
+	exit $$EXIT
+
 
 .PHONY: $(dir)/update-expected
-$(dir)/update-expected: $(dir)/update-expected-devnet $(dir)/update-expected-testnet
+$(dir)/update-expected: $(dir)/update-expected-devnet $(dir)/update-expected-testnet $(dir)/update-expected-mainnet
 
 .PHONY: $(dir)/update-expected-devnet
 $(dir)/update-expected-devnet: $(dir)/test-devnet.json
@@ -64,3 +85,7 @@ $(dir)/update-expected-devnet: $(dir)/test-devnet.json
 .PHONY: $(dir)/update-expected-testnet
 $(dir)/update-expected-testnet: $(dir)/test-testnet.json
 	@cp -v $^ $(@D)/expected-testnet.json
+
+.PHONY: $(dir)/update-expected-mainnet
+$(dir)/update-expected-mainnet: $(dir)/test-mainnet.json
+	@cp -v $^ $(@D)/expected-mainnet.json

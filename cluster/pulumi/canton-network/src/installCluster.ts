@@ -132,7 +132,10 @@ export async function installCluster(
       : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
 
-  const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
+  const bootstrapBucketSpec = await bootstrapDataBucketSpec(
+    config.optionalEnv('DATA_DUMPS_PROJECT') || 'da-cn-devnet',
+    config.optionalEnv('DATA_DUMPS_BUCKET') || 'da-cn-data-dumps'
+  );
 
   if (!isDevNet) {
     periodicBackupConfig = { backupInterval: '10m', location: { bucket: bootstrapBucketSpec } };

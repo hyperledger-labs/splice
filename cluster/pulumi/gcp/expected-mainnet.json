@@ -5,7 +5,7 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'da-cn-devnet'/locations/'us-central1'/keyRings/pulumi\")",
+        "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'da-cn-mainnet'/locations/'europe-west4'/keyRings/pulumi\")",
         "title": "Pulumi KMS"
       },
       "role": "roles/cloudkms.cryptoKeyEncrypterDecrypter"
@@ -238,11 +238,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.test",
+    "id": "organization/infra/infra.main",
     "inputs": {
-      "name": "organization/infra/infra.test"
+      "name": "organization/infra/infra.main"
     },
-    "name": "organization/infra/infra.test",
+    "name": "organization/infra/infra.main",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },

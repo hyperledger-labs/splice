@@ -20,6 +20,8 @@ async function main() {
       sv2_validator: 'sv2-validator-client-id',
       sv3_validator: 'sv3-validator-client-id',
       sv4_validator: 'sv4-validator-client-id',
+      sv: 'sv-client-id',
+      validator: 'sv-client-id',
     },
     namespaceToUiToClientId: {
       validator1: {

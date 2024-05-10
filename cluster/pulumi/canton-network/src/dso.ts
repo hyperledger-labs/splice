@@ -95,6 +95,7 @@ export class Dso extends pulumi.ComponentResource {
         cometBft: svConf.cometBft,
         validatorWalletUser: svConf.validatorWalletUser,
         auth0ValidatorAppName: svConf.auth0ValidatorAppName,
+        auth0SvAppName: svConf.auth0SvAppName,
         onboarding,
         auth0Client: this.args.auth0Client,
         approvedSvIdentities,

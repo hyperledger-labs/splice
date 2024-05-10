@@ -408,7 +408,7 @@
           },
           {
             "name": "CLOUDSDK_COMPUTE_REGION",
-            "value": "mock-compute-region"
+            "value": "us-central1"
           },
           {
             "name": "CLOUDSDK_COMPUTE_ZONE",

@@ -72,7 +72,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "main"
             },
             "type": "Literal"
           },
@@ -100,7 +100,7 @@
         },
         "refresh": false,
         "retryOnUpdateConflict": true,
-        "stack": "organization/canton-network/canton-network.test",
+        "stack": "organization/canton-network/canton-network.main",
         "useLocalStackOnly": true
       }
     },
@@ -120,7 +120,7 @@
       },
       "spec": {
         "eventMetadata": {
-          "cluster": "test"
+          "cluster": "main"
         },
         "eventSeverity": "info",
         "eventSources": [
@@ -323,7 +323,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "main"
             },
             "type": "Literal"
           },
@@ -351,7 +351,7 @@
         },
         "refresh": false,
         "retryOnUpdateConflict": true,
-        "stack": "organization/infra/infra.test",
+        "stack": "organization/infra/infra.main",
         "useLocalStackOnly": true
       }
     },
@@ -376,11 +376,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.test",
+    "id": "organization/infra/infra.main",
     "inputs": {
-      "name": "organization/infra/infra.test"
+      "name": "organization/infra/infra.main"
     },
-    "name": "organization/infra/infra.test",
+    "name": "organization/infra/infra.main",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -404,11 +404,11 @@
         "extraEnv": [
           {
             "name": "CLOUDSDK_CORE_PROJECT",
-            "value": "da-cn-devnet"
+            "value": "da-cn-mainnet"
           },
           {
             "name": "CLOUDSDK_COMPUTE_REGION",
-            "value": "us-central1"
+            "value": "europe-west4"
           },
           {
             "name": "CLOUDSDK_COMPUTE_ZONE",
