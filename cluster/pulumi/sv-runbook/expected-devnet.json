@@ -126,7 +126,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "cluster.mock.com",
+          "hostname": "dev.global.canton.network.digitalasset.com",
           "svNamespace": "sv"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -297,7 +297,7 @@
       "values": {
         "db": {},
         "founder": {
-          "externalAddress": "cluster.mock.com:26016"
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016"
         },
         "genesis": {
           "chainId": "dev-0",
@@ -320,7 +320,7 @@
           ]
         },
         "node": {
-          "externalAddress": "global-domain-0-cometbft.sv.cluster.mock.com:26056",
+          "externalAddress": "global-domain-0-cometbft.sv.dev.global.canton.network.digitalasset.com:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
@@ -328,7 +328,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-2.cluster.mock.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.cluster.mock.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
@@ -392,7 +392,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "cluster.mock.com"
+          "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -456,7 +456,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -507,13 +507,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "dnsName": "cluster.mock.com",
+          "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
-          "hostname": "cluster.mock.com",
+          "hostname": "dev.global.canton.network.digitalasset.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -630,7 +630,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -641,7 +641,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.cluster.mock.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -653,7 +653,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-2.cluster.mock.com"
+          "sponsorApiUrl": "https://sv.sv-2.dev.global.canton.network.digitalasset.com"
         },
         "metrics": {
           "enable": true
@@ -670,7 +670,7 @@
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
-          "publicUrl": "https://scan.sv.cluster.mock.com"
+          "publicUrl": "https://scan.sv.dev.global.canton.network.digitalasset.com"
         }
       }
     },
@@ -709,13 +709,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "dnsName": "cluster.mock.com",
+          "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
-          "hostname": "cluster.mock.com",
+          "hostname": "dev.global.canton.network.digitalasset.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -773,13 +773,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "dnsName": "cluster.mock.com",
+          "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
-          "hostname": "cluster.mock.com",
+          "hostname": "dev.global.canton.network.digitalasset.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -837,13 +837,13 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "dnsName": "cluster.mock.com",
+          "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
-          "hostname": "cluster.mock.com",
+          "hostname": "dev.global.canton.network.digitalasset.com",
           "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
@@ -902,8 +902,8 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "cluster.mock.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.cluster.mock.com",
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

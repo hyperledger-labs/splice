@@ -79,7 +79,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "cluster.mock.com",
+          "hostname": "global.canton.network.digitalasset.com",
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -145,7 +145,7 @@
       "timeout": 480,
       "values": {
         "cluster": {
-          "hostname": "cluster.mock.com"
+          "hostname": "global.canton.network.digitalasset.com"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
@@ -267,7 +267,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "cluster.mock.com",
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
@@ -297,8 +297,8 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.cluster.mock.com",
-        "svSponsorAddress": "https://sv.sv-2.cluster.mock.com",
+        "scanAddress": "https://scan.sv-2.global.canton.network.digitalasset.com",
+        "svSponsorAddress": "https://sv.sv-2.global.canton.network.digitalasset.com",
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

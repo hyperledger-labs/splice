@@ -2,12 +2,14 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
+import { RecordSet } from '@pulumi/gcp/dns/recordSet';
 import {
   btoa,
   config,
   exactNamespace,
   ExactNamespace,
   GCP_PROJECT,
+  isMainNet,
   publicPrometheusRemoteWrite,
 } from 'cn-pulumi-common';
 
@@ -262,6 +264,7 @@ class CantonNetwork extends pulumi.ComponentResource {
   publicIngressIp: gcp.compute.Address | undefined;
   egressIp: gcp.compute.Address;
   ingressNs: ExactNamespace;
+  dnsNames: string[];
 
   constructor(clusterName: string, opts: pulumi.ComponentResourceOptions | undefined = undefined) {
     super('canton:gcp:CantonNetwork', clusterName, {}, opts);
@@ -278,24 +281,41 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const ingressNs = exactNamespace('cluster-ingress');
 
-    const cantonGlobalDnsName = `${clusterName}.network.canton.global`;
-    const cantonGlobalDnsEntries = clusterDnsEntries(
-      cantonGlobalDnsName,
-      'canton-global',
-      ingressIp,
-      publicIngressIp
-    );
+    let cantonGlobalDnsName: string;
+    let cantonGlobalDnsEntries: RecordSet[];
 
-    const daDnsName = `${clusterName}.global.canton.network.digitalasset.com`;
-    const daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+    let daDnsName: string;
+    let daDnsEntries: RecordSet[];
+    if (isMainNet) {
+      cantonGlobalDnsName = `network.canton.global`;
+      cantonGlobalDnsEntries = clusterDnsEntries(
+        cantonGlobalDnsName,
+        'canton-global',
+        ingressIp,
+        publicIngressIp
+      );
 
-    clusterCertificate(
-      clusterName,
-      [cantonGlobalDnsName, daDnsName],
-      ingressNs.ns,
-      certManagerDeployment,
-      [...cantonGlobalDnsEntries, ...daDnsEntries]
-    );
+      daDnsName = `global.canton.network.digitalasset.com`;
+      daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+    } else {
+      cantonGlobalDnsName = `${clusterName}.network.canton.global`;
+      cantonGlobalDnsEntries = clusterDnsEntries(
+        cantonGlobalDnsName,
+        'canton-global',
+        ingressIp,
+        publicIngressIp
+      );
+
+      daDnsName = `${clusterName}.global.canton.network.digitalasset.com`;
+      daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+    }
+
+    this.dnsNames = [cantonGlobalDnsName, daDnsName];
+
+    clusterCertificate(clusterName, this.dnsNames, ingressNs.ns, certManagerDeployment, [
+      ...cantonGlobalDnsEntries,
+      ...daDnsEntries,
+    ]);
 
     natGateway(clusterName, egressIp, { parent: this });
 

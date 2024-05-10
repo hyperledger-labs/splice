@@ -10,14 +10,14 @@ function newUiApp(
   // TODO(#12169) Make ingressName the same as the namespace (and rename this argument back to namespace)
   ingressName: string,
   clusterBasename: string,
+  clusterDnsNames: string[],
   auth0DomainProvider: auth0.Provider
 ): auth0.Client {
   const urls = urlPrefixes
     .map(prefix => {
-      return [
-        `https://${prefix}.${ingressName}.${clusterBasename}.network.canton.global`,
-        `https://${prefix}.${ingressName}.${clusterBasename}.global.canton.network.digitalasset.com`,
-      ];
+      return clusterDnsNames.map(dnsName => {
+        return `https://${prefix}.${ingressName}.${dnsName}`;
+      });
     })
     .flat();
 
@@ -48,7 +48,7 @@ function newUiApp(
   return ret;
 }
 
-function cnAuth0(clusterBasename: string) {
+function cnAuth0(clusterBasename: string, dnsNames: string[]) {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
@@ -66,6 +66,7 @@ function cnAuth0(clusterBasename: string) {
     ['wallet', 'cns', 'splitwell'],
     'validator1',
     clusterBasename,
+    dnsNames,
     provider
   );
   const splitwellUiApp = newUiApp(
@@ -75,6 +76,7 @@ function cnAuth0(clusterBasename: string) {
     ['wallet', 'cns', 'splitwell'],
     'splitwell',
     clusterBasename,
+    dnsNames,
     provider
   );
   const svUiApps = [...Array(16).keys()].map(i => {
@@ -87,6 +89,7 @@ function cnAuth0(clusterBasename: string) {
       // TODO(#12169) Clean up this fun
       sv == 1 ? 'sv-2' : `sv-${sv}-eng`,
       clusterBasename,
+      dnsNames,
       provider
     );
     return uiApp;
@@ -176,6 +179,7 @@ function cnAuth0(clusterBasename: string) {
 
 function svRunbookAuth0(
   clusterBasename: string,
+  dnsNames: string[],
   auth0ProviderName: string,
   auth0Domain: string,
   auth0MgtClientId: string,
@@ -203,6 +207,7 @@ function svRunbookAuth0(
     ['wallet'],
     ingressName,
     clusterBasename,
+    dnsNames,
     provider
   );
   const ansUiApp = newUiApp(
@@ -212,6 +217,7 @@ function svRunbookAuth0(
     ['cns'],
     ingressName,
     clusterBasename,
+    dnsNames,
     provider
   );
   const svUiApp = newUiApp(
@@ -221,6 +227,7 @@ function svRunbookAuth0(
     ['sv'],
     ingressName,
     clusterBasename,
+    dnsNames,
     provider
   );
 
@@ -262,7 +269,7 @@ function svRunbookAuth0(
     });
 }
 
-function validatorRunbookAuth0(clusterBasename: string) {
+function validatorRunbookAuth0(clusterBasename: string, dnsNames: string[]) {
   const auth0Domain = 'canton-network-validator-test.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
@@ -280,6 +287,7 @@ function validatorRunbookAuth0(clusterBasename: string) {
     ['wallet'],
     'validator',
     clusterBasename,
+    dnsNames,
     provider
   );
   const ansUiApp = newUiApp(
@@ -289,6 +297,7 @@ function validatorRunbookAuth0(clusterBasename: string) {
     ['cns'],
     'validator',
     clusterBasename,
+    dnsNames,
     provider
   );
 
@@ -323,10 +332,14 @@ function validatorRunbookAuth0(clusterBasename: string) {
   });
 }
 
-export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0ClusterConfig> {
+export function configureAuth0(
+  clusterBasename: string,
+  dnsNames: string[]
+): pulumi.Output<Auth0ClusterConfig> {
   if (isMainNet) {
     const auth0Cfg = svRunbookAuth0(
       clusterBasename,
+      dnsNames,
       'main',
       'canton-network-mainnet.us.auth0.com',
       config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID'),
@@ -348,9 +361,10 @@ export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0Clus
       return r;
     });
   } else {
-    const cnAuth0Cfg = cnAuth0(clusterBasename);
+    const cnAuth0Cfg = cnAuth0(clusterBasename, dnsNames);
     const svRunbookAuth0Cfg = svRunbookAuth0(
       clusterBasename,
+      dnsNames,
       'sv',
       'canton-network-sv-test.us.auth0.com',
       config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_ID'),
@@ -365,7 +379,7 @@ export function configureAuth0(clusterBasename: string): pulumi.Output<Auth0Clus
       'https://validator.example.com/api',
       'auth0-fixed-token-cache-sv-test'
     );
-    const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename);
+    const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
     return pulumi
       .all([cnAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
       .apply(([cn, sv, validator]) => {

@@ -24,7 +24,7 @@ configureStorage();
 
 let configuredAuth0;
 if (config.envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
-  configuredAuth0 = configureAuth0(clusterBasename);
+  configuredAuth0 = configureAuth0(clusterBasename, network.dnsNames);
 }
 
 export const auth0 = configuredAuth0;

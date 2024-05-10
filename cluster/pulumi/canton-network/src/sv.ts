@@ -124,8 +124,6 @@ type InstalledMigrationSpecificSv = {
   participant: Release;
 };
 
-const clusterUrl = CLUSTER_HOSTNAME;
-
 export type InstalledSv = {
   validatorApp: Resource;
   svApp: Release;
@@ -482,7 +480,7 @@ function installSvApp(
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
-      publicUrl: `https://scan.${config.ingressName}.${clusterUrl}`,
+      publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
       internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -550,7 +548,7 @@ function installScan(
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
-    clusterUrl,
+    clusterUrl: CLUSTER_HOSTNAME,
     metrics: {
       enable: true,
     },

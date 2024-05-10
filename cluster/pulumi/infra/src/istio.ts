@@ -2,7 +2,13 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 
-import { defaultVersion, ExactNamespace, installCNHelmChart, loadIPRanges } from '../../common';
+import {
+  defaultVersion,
+  ExactNamespace,
+  installCNHelmChart,
+  isMainNet,
+  loadIPRanges,
+} from '../../common';
 import { clusterBasename } from './config';
 
 export const istioVersion = {
@@ -311,8 +317,12 @@ function configureGateway(
     'cn-istio-gateway',
     {
       cluster: {
-        cantonHostname: `${clusterBasename}.network.canton.global`,
-        daHostname: `${clusterBasename}.global.canton.network.digitalasset.com`,
+        cantonHostname: isMainNet
+          ? 'network.canton.global'
+          : `${clusterBasename}.network.canton.global`,
+        daHostname: isMainNet
+          ? 'global.canton.network.digitalasset.com'
+          : `${clusterBasename}.global.canton.network.digitalasset.com`,
         basename: clusterBasename,
       },
       enablePublicGateway: !!publicGwSvc,
