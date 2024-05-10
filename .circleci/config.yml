@@ -3056,10 +3056,12 @@ jobs:
           when: always
           command: |
             commit=$(git rev-parse HEAD)
-            changed=$(git diff HEAD~ HEAD -- ./README.md)
-            if [ -n "$changed" ]; then
+            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md')
+            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' | sed ':a;N;$!ba;s/\n/\\n/g')
+            if [ -n "$changed_files" ]; then
               echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
               echo "export GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$BASH_ENV"
+              echo "export CHANGED_DOC_FILES=\"${changed_files_list}\"" >> "$BASH_ENV"
             else
               echo "No document changes are detected."
               circleci-agent step halt
@@ -3068,7 +3070,7 @@ jobs:
           channel: << parameters.channel_notify >>
           event: always
           custom: |
-            { "text": "*📄Change to README.md is merged to main*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+            { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   deploy_operator:
     circleci_ip_ranges: true

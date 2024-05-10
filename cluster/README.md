@@ -573,7 +573,7 @@ Also consider initiating the writing of a [postmortem](https://drive.google.com/
 Changes to the `deploy-devnet` and `deploy-testnet` CircleCI workflows are dangerous, as they affect our coming production deployments.
 On the other hand, they are somewhat non-trivial to test directly. To test changes to these workflows, one can temporarily:
 
-1. Lock a scratchnet cluster
+1. Lock a scratchnet cluster.
 2. In `.circleci/config/workflows.yaml`, locate the workflow to be tested, and:
    a. Modify all "cluster" arguments to the different jobs to the required scratchnet. This is an important step!
       Make sure you do not miss any job, in order not to accidentally make any changes to the running production clusters.
