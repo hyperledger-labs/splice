@@ -19,7 +19,7 @@ Overview
 7. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`sv_backups`.
 8. All SVs upgrade theirs CN apps pods. See :ref:`sv-upgrades-deploying-apps`.
 9. Upon (re-)initialization, the SV node backend automatically consumes the migration dump and initializes all components based on the contents of this dump. The process is analogous for validators, where the validator app is tasked with importing the dump and initializing components. App databases are :ref:`preserved <sv-upgrades-state>`.
-10. Once a BFT majority (i.e., >⅔) of SVs have initialized their upgraded nodes, the new version of the synchronizer (with an incremented migration ID and, during a real upgrade, a new version of the core Canton components) becomes operational automatically. The end of the downtime window is therefore determined by the speed at which a sufficient number of SVs complete the necessary deployment and initialization steps.
+10. Once a BFT majority (i.e., >⅔) of SVs have initialized their upgraded nodes, the new version of the synchronizer (with an incremented migration ID and, typically, a new version of the core Canton components) becomes operational automatically. The end of the downtime window is therefore determined by the speed at which a sufficient number of SVs complete the necessary deployment and initialization steps.
 11. The remaining (Canton and CometBFT) components of the old synchronizer can be retired now. We recommend to only do so after (non-super) validators have had sufficient time to :ref:`catch up <validator-upgrades>` to the latest state from before the pause.
 
 Technical Details
@@ -86,7 +86,8 @@ While doing so, please note the following:
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
 * Please modify the files ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` and ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` so that ``disableAutoInit`` is set to ``true`` in each of them.
   This will ensure that the Canton components do not generate new :ref:`identities <sv-upgrades-state>` for themselves and instead remain ready to be initialized with the identities from the migration dump.
-* Please don't uninstall any helm charts installed as part of the original deployment run (with the smaller migration ID).
+* Please make sure that all new Helm charts you install as part of this step have the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
+* Please don't uninstall any Helm charts installed as part of the original deployment run (with the smaller migration ID).
   We deliberately keep SV participants and core synchronizer components running longer so that validators get a chance to sync up to the latest state from before the pause,
   which they need to do for successfully completing their part of the migration.
 * Note that repeating the process with the incremented migration ID will result in the deployment of new pods with new Canton components and a new CometBFT node.
@@ -97,7 +98,6 @@ While doing so, please note the following:
   Revisit :ref:`helm-sv-ingress` with the updated migration ID in mind.
 * Note that the exposed CometBFT port and CometBFT ``externalAddress`` are changed due to a limitation in CometBFT.
   There is no fundamental need to use the port numbers suggested in the runbook, the only requirement is that either the (external) host IP of the CometBFT pod must be different for each migration ID or its (external) port number.
-* Note that these instructions do not yet support an actual upgrade of the Canton software during a synchronizer migration. We will follow-up with instructions on configuring different Canton versions in a future iteration.
 
 .. _sv-upgrades-catching-up:
 
@@ -124,7 +124,8 @@ While doing so, please note the following:
 * Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` so that ``migration.migrating`` is set to ``true``.
   This will ensure that the SV app will consume the migration dump and initialize new components based on the contents of this dump.
 * Use ``helm upgrade`` in place of ``helm install`` for the ``sv``, ``scan`` and ``validator`` charts
-  and do not uninstall any helm charts installed as part of the original deployment run (with the smaller migration ID).
+  and do not uninstall any Helm charts installed as part of the original deployment run (with the smaller migration ID).
+* Please make sure that all Helm chart deployments you upgrade as part of this step are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
 * No ingress rules need to be updated as part of this step.
   Once the redeployment is complete the existing ingress rules will apply to the updated pods.
 

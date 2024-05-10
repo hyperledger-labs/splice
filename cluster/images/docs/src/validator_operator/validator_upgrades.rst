@@ -108,4 +108,4 @@ While doing so, please note the following:
   The updated Canton participant will use a new database on the PostgreSQL instance,
   whereas the validator app will reuse the existing state (see :ref:`validator-upgrades-state`).
 * Use ``helm upgrade`` in place of ``helm install`` for the ``participant`` and ``validator`` charts.
-* Note that these instructions do not yet support an actual upgrade of the Canton software during a synchronizer migration. We will follow-up with instructions on configuring different Canton versions in a future iteration.
+* Please make sure that Helm chart deployments are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.

@@ -12,6 +12,11 @@ Upcoming
     the Canton admin API. This change was made as the ledger API
     upload breaks under hard domain migrations.
 
+* Documentation
+
+  * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
+    for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
+
 0.1.8
 -----
 
