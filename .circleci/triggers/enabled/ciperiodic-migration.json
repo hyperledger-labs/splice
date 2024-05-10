@@ -1,0 +1,19 @@
+{
+    "name" : "CIPeriodic Migration Test",
+    "description" : "Tests a synchronizer migration with version upgrade from 0.1.8 to the version on main; TODO(#11659) don't hardcode version like that",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "deploy-ciperiodic-migration",
+      "base-version": "e44c79b34c9f8afc3bd71f1c7e4b8970e5e7e35d"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day": [
+        2, 6, 10, 14, 18, 22
+      ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
