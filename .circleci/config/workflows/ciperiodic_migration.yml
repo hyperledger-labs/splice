@@ -148,7 +148,7 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - prepare_sv_runbook_for_migration
-            - backup_cluster_before_migration
+            - migrate_cluster
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           <<: *main-branch-only
@@ -160,7 +160,7 @@ workflow:
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
-            - backup_cluster_before_migration
+            - migrate_cluster
       - hard_migration:
           name: "migrate_validator_runbook"
           context:
@@ -172,7 +172,7 @@ workflow:
           base_version: << pipeline.parameters.base-version >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
-            - backup_cluster_before_migration
+            - migrate_cluster
       - preflight_validator_check:
           <<: *main-branch-only
           name: "preflight_validator_check_migrated"
@@ -184,7 +184,7 @@ workflow:
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
-            - backup_cluster_before_migration
+            - migrate_cluster
       - restore_node:
           <<: *main-branch-only
           cluster: "ciperiodic"
