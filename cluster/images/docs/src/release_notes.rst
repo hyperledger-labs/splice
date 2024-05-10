@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* App Dev
+
+  * DARs can no longer be uploaded through the Ledger API. Instead use
+    the Canton admin API. This change was made as the ledger API
+    upload breaks under hard domain migrations.
+
 0.1.8
 -----
 
