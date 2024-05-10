@@ -201,6 +201,7 @@ workflow:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:
