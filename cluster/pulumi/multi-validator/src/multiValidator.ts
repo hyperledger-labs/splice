@@ -1,5 +1,9 @@
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence, numNodesPerInstance } from 'cn-pulumi-common';
+import {
+  DecentralizedSynchronizerMigrationConfig,
+  generatePortSequence,
+  numNodesPerInstance,
+} from 'cn-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
@@ -8,6 +12,9 @@ interface MultiValidatorArgs extends BaseMultiNodeArgs {
     address: pulumi.Output<string>;
   };
 }
+
+const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
+  DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 export class MultiValidator extends MultiNodeDeployment {
   constructor(name: string, args: MultiValidatorArgs, opts?: pulumi.ComponentResourceOptions) {
@@ -61,6 +68,10 @@ export class MultiValidator extends MultiNodeDeployment {
               valueFrom: {
                 secretKeyRef: args.postgres.secret,
               },
+            },
+            {
+              name: 'CN_APP_VALIDATOR_MIGRATION_ID',
+              value: decentralizedSynchronizerUpgradeConfig.active.migrationId.toString(),
             },
           ],
           ports: ports.map(port => ({

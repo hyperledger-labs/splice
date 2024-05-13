@@ -68,7 +68,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   name: args.imageName,
                   image: `us-central1-docker.pkg.dev/da-cn-shared/cn-images/${
                     args.imageName
-                  }:${config.requireEnv('IMAGE_TAG')}`,
+                  }:${config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('IMAGE_TAG')}`,
                   imagePullPolicy: 'Always',
                   ...args.container,
                   ports: args.container.ports.concat({
