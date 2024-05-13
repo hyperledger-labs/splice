@@ -283,10 +283,15 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "../../../cluster/helm/cn-istio-gateway/",
+      "chart": "cn-istio-gateway",
       "compat": "true",
       "name": "cluster-gateway",
       "namespace": "cluster-ingress",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
       "timeout": 480,
       "values": {
         "cluster": {
@@ -296,18 +301,14 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
+          "imageTag": "0.1.8",
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "cometbftPorts": {
-          "domains": 5,
-          "nodes": 10
-        },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "enablePublicGateway": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
-      }
+      },
+      "version": "0.1.8"
     },
     "name": "cluster-gateway",
     "provider": "",

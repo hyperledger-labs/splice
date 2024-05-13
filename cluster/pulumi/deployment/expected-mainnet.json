@@ -42,6 +42,20 @@
             },
             "type": "Secret"
           },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
@@ -156,6 +170,8 @@
           "ARTIFACTORY_USER": "art_user",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
@@ -289,6 +305,20 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
               "name": "env"
             },
             "type": "Secret"
@@ -451,7 +481,7 @@
           "pullPolicy": "Always",
           "registry": "us-central1-docker.pkg.dev",
           "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
-          "tag": "0.0.1-deadbeef"
+          "tag": "0.1.8"
         },
         "resources": {
           "limits": {
@@ -490,7 +520,7 @@
       },
       "spec": {
         "address": "https://slack.com/api/chat.postMessage",
-        "channel": "slack_channel",
+        "channel": "team-canton-network-mainnet-deployment",
         "secretRef": {
           "name": "slack"
         },
@@ -536,7 +566,7 @@
       "spec": {
         "interval": "5m",
         "ref": {
-          "name": "refs/heads/releases/0.1.x"
+          "name": "refs/heads/deployment/mainnet"
         },
         "secretRef": {
           "name": "github"

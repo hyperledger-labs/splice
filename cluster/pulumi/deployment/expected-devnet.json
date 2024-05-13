@@ -42,6 +42,20 @@
             },
             "type": "Secret"
           },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
@@ -156,6 +170,8 @@
           "ARTIFACTORY_USER": "art_user",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
@@ -293,6 +309,20 @@
             },
             "type": "Secret"
           },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
@@ -398,6 +428,20 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
               "name": "env"
             },
             "type": "Secret"

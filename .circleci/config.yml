@@ -3108,6 +3108,8 @@ jobs:
             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
           gce_authenticate: true

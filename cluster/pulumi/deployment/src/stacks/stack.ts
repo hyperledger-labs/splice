@@ -17,7 +17,12 @@ const requiredEnvs = Array.from([
   'ARTIFACTORY_USER',
   'ARTIFACTORY_PASSWORD',
 ]);
-const optionalEnvs = Array.from(['K6_USERS_PASSWORD', 'K6_VALIDATOR_ADMIN_PASSWORD']);
+const optionalEnvs = Array.from([
+  'K6_USERS_PASSWORD',
+  'K6_VALIDATOR_ADMIN_PASSWORD',
+  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET',
+  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID',
+]);
 
 const env: {
   [key: string]: string;

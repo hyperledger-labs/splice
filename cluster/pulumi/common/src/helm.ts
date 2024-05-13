@@ -37,14 +37,6 @@ const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } 
   imageTagsFile && loadJsonFromFile(imageTagsFile);
 export const imageTagOverride: string | undefined = config.optionalEnv('IMAGE_TAG');
 
-if (defaultVersion.type === 'remote') {
-  void pulumi.log.info(
-    `Using default version ${JSON.stringify(defaultVersion)}, with image overrides ${JSON.stringify(
-      jsonImageVersions
-    )} and image tag ${imageTagOverride} for CHARTS_VERSION ${CHARTS_VERSION}`
-  );
-}
-
 function getVersionOverrideFromVersionsFile(
   nsLogicalName: string,
   chartName: string
