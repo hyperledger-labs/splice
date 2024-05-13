@@ -14,12 +14,12 @@ jobs:
       - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
+          cmd_name: Install pulumi dependencies
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
-            make -j cluster/build
+            make -j cluster/pulumi/build
           cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply the deployment stack
@@ -41,5 +41,6 @@ jobs:
             --keep ARTIFACTORY_PASSWORD
           gce_authenticate: true
           cmd: |
+            export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
             cncluster pulumi deployment up --skip-preview

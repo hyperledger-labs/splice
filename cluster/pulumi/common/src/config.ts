@@ -27,6 +27,10 @@ class CnConfig {
       if (gcpclusterbasename?.includes('scratch')) {
         // fix difference between deployment folder name and cluster name
         gcpclusterbasename = gcpclusterbasename.replace('scratch', 'scratchnet');
+      } else {
+        if (!gcpclusterbasename?.includes('cilr')) {
+          gcpclusterbasename = gcpclusterbasename + 'net';
+        }
       }
       const overrideResult = expand(
         dotenvConfig({

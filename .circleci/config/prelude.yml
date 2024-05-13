@@ -138,6 +138,7 @@ cluster-parameter: &cluster-parameter
         "ciperiodic",
         "ciupgrade",
         "devnet",
+        "mainnet",
         "testnet",
         "testnet-preview",
         "observability",

@@ -631,6 +631,7 @@ commands:
               --keep GCP_DA_CN_CI_2_KEY \
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
+              --keep GCP_DA_CN_MAINNET_KEY \
               --keep CIRCLE_BRANCH \
               --keep TARGET_CLUSTER \
               $ADDITIONAL_NIX_ARGS \
@@ -674,6 +675,10 @@ commands:
 
                   da-cn-devnet)
                     export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_DEVNET_KEY}"
+                    ;;
+
+                  da-cn-mainnet)
+                    export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_MAINNET_KEY}"
                     ;;
 
                   *)

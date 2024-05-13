@@ -10,7 +10,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "backend": "gs://da-cn-main-pulumi-stacks",
         "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
@@ -277,7 +277,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "backend": "gs://da-cn-main-pulumi-stacks",
         "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
