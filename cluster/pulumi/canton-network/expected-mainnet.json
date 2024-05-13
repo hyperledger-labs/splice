@@ -374,7 +374,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "mock-compute-zone"
+          "zone": "europe-west4-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -717,7 +717,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "mock-compute-zone"
+          "zone": "europe-west4-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -770,7 +770,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "mock-compute-zone"
+          "zone": "europe-west4-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -944,7 +944,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "mock-compute-zone"
+          "zone": "europe-west4-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {

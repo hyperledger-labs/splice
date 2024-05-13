@@ -21,6 +21,8 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
 
 /*eslint no-process-env: "off"*/
 export async function initDumpConfig(): Promise<void> {
+  // DO NOT ADD NON SECRET VALUES HERE, ALL THE VALUES SHOULD BE DEFINED BY THE CLUSTER ENVIRONMENT in .envrc.vars
+  // THIS IS REQUIRED TO ENSURE THAT THE DEPLOYMENT OPERATOR HAS THE SAME ENV AS A LOCAL RUN
   process.env.IMAGE_TAG = '0.0.1-deadbeef';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
@@ -30,7 +32,6 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
-  process.env.CLOUDSDK_COMPUTE_ZONE = 'mock-compute-zone';
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon
