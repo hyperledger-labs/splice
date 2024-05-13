@@ -34,6 +34,9 @@
       "Global-Synchronizer-Foundation": ["34.252.112.220/32"]
     },
     "validators": {
+      "Digital Asset Wallet": [
+        "35.230.157.147/32"
+      ],
       "Digital Asset Test Validator": [
         "34.41.138.150/32"
       ],
@@ -90,6 +93,9 @@
       "Orb-1-LP": ["18.230.38.249/32"]
     },
     "validators": {
+      "Digital Asset Wallet": [
+        "35.189.125.104/32"
+      ],
       "Digital Asset Test Validator": [
         "35.184.224.113/32"
       ],
@@ -149,6 +155,9 @@
       ]
     },
     "validators": {
+      "Digital Asset Wallet": [
+        "34.147.239.137/32"
+      ],
       "Tradeweb": [
         "3.237.52.132/32",
         "23.20.124.101/32",
