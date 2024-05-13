@@ -2653,6 +2653,50 @@ function subcmd_list_sv_cometbft_addresses() {
   jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
 }
 
+###
+
+subcommand_whitelist[unprotect_dbs]='Unprotects all DB resources corresponding to the given migration id'
+
+function subcmd_unprotect_dbs() {
+  migration_id="${1:-}"
+
+  if [ "$#" -lt 2 ]; then
+    _error "Usage: $SCRIPTNAME unprotect_dbs <migration_id> <namespace1> [<namespace2> ...]"
+  fi
+
+  shift 1
+  namespaces=("$@")
+
+  if [[ "${ENABLE_CLOUD_SQL:-}" != "true" ]]; then
+    _error "This script is only supported with CloudSQL"
+  fi
+
+  _info "The following namespaces' DBs will be unprotected: ${namespaces[*]}"
+  _prompt_to_confirm
+
+  for ns in "${namespaces[@]}";
+  do
+    _info "Unprotecting $ns"
+    protected_dbs=(
+      "participant"
+    )
+    if [[ "$ns" =~ "sv-" ]]; then
+      protected_dbs+=(
+        "mediator"
+        "sequencer"
+      )
+    fi
+    for db in "${protected_dbs[@]}";
+    do
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-$migration_id-pg-cantonnet" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-$migration_id-pg-passwd" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/databaseInstance:DatabaseInstance::$ns-$db-$migration_id-pg" --yes || true
+    done
+  done
+}
+
 ################################
 ### Main
 ################################
