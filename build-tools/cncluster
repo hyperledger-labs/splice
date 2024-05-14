@@ -2243,9 +2243,17 @@ subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
 function subcmd_backup_nodes() {
     _cluster_must_exist
 
-    if [ $# -eq 0 ]; then
+    migration_id=$1
+
+    if [ "$#" -lt 1 ]; then
+       echo "Usage: $0 <migration_id> [node...]"
+       exit 1
+    fi
+
+    if [ $# -eq 1 ]; then
         nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
     else
+        shift
         nodes="$*"
     fi
 
@@ -2253,11 +2261,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4)
                 _info "Backing up sv node $node"
-                "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node"
+                "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node"
+                "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
                 ;;
             *)
                 _error "Unknown node $node"

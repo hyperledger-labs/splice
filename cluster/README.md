@@ -1600,9 +1600,9 @@ The following steps assume that:
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
-1. Backup our SVs and validators: `cncluster backup_nodes sv-1 sv-2 sv-3 sv-4 validator1 splitwell`.
+1. Backup our SVs and validators: `cncluster backup_nodes <migration_id> sv-1 sv-2 sv-3 sv-4 validator1 splitwell`.
    This processes the nodes list sequentially and can be very slow.
-   Consider running multiple `cncluster backup_nodes X Y Z` invocations in parallel.
+   Consider running multiple `cncluster backup_nodes <migration_id> X Y Z` invocations in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
@@ -2020,7 +2020,7 @@ node (where a "node" in this context is a single SV or a single validator). It p
 of backups of all relevant persistent storage, identified by a RUN_ID. These backups are
 guaranteed to be consistent in terms of ordering requirements.
 
-This script can also be invoked from `cncluster` through `cncluster backup_nodes <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
+This script can also be invoked from `cncluster` through `cncluster backup_nodes <migration_id> <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
 
 For every node, at the end of the backup process, the script will report something like:
 ```
@@ -2038,7 +2038,7 @@ command) can be used for recovery using the `node-restore.sh` command.
 
 To do that, run: `node-restore.sh <node> <run_id> <component...>`, where `component` can be one
 or more out of {validator, participant} for a validator and one or more out of
-{validator, scan, sv-app, participant-0, mediator, sequencer, cometbft-0} for an SV.
+{validator, scan, sv-app, participant-<migration_id>, mediator, sequencer, cometbft-<migration_id>} for an SV.
 
 Most components can, in general, be restored independently of others.
 

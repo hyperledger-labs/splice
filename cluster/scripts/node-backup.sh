@@ -58,10 +58,11 @@ function backup_pvc_postgres() {
   local description=$1
   local namespace=$2
   local instance=$3
+  local migration_id=$4
 
   _info "** Backup up pvc-based postgres $description **"
 
-  local pvc_name="pg-data-$instance-0"
+  local pvc_name="pg-data-$instance-$migration_id"
   backup_pvc "$description" "$namespace" "$pvc_name"
 }
 
@@ -146,13 +147,14 @@ function backup_postgres() {
   local description=$1
   local namespace=$2
   local instance=$3
+  local migration_id=$4
 
   local full_instance="$namespace-$instance"
 
   type=$(get_postgres_type "$full_instance")
 
   if [ "$type" == "canton:network:postgres" ]; then
-    backup_pvc_postgres "$description" "$namespace" "$instance"
+    backup_pvc_postgres "$description" "$namespace" "$instance" "$migration_id"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     backup_cloudsql "$description" "$full_instance"
   elif [ -z "$type" ]; then
@@ -166,13 +168,14 @@ function wait_for_postgres_backup() {
   local description=$1
   local namespace=$2
   local instance=$3
+  local migration_id=$4
 
   local full_instance="$namespace-$instance"
 
   type=$(get_postgres_type "$full_instance")
 
   if [ "$type" == "canton:network:postgres" ]; then
-    local pvc_name="pg-data-$instance-0"
+    local pvc_name="pg-data-$instance-$migration_id"
     wait_for_pvc_backup "$description" "$namespace" "$pvc_name"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     wait_for_cloudsql_backup "$description" "$full_instance"
@@ -186,12 +189,13 @@ function backup_component() {
   local namespace=$1
   local component=$2
   local requested_component=$3
+  local migration_id=$4
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
-    if [ "$component" == "cometbft-0" ]; then
-      backup_pvc "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
+    if [ "$component" == "cometbft-$migration_id" ]; then
+      backup_pvc "cometBFT" "$namespace" "global-domain-$migration_id-cometbft-cometbft-data"
     else
-      backup_postgres "$component" "$namespace" "$component-pg"
+      backup_postgres "$component" "$namespace" "$component-pg" "$migration_id"
     fi
   else
     _info "Skipping backup of $component, not requested"
@@ -202,12 +206,13 @@ function wait_for_backup() {
   local namespace=$1
   local component=$2
   local requested_component=$3
+  local migration_id=$4
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
-    if [ "$component" == "cometbft-0" ]; then
-      wait_for_pvc_backup "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
+    if [ "$component" == "cometbft-$migration_id" ]; then
+      wait_for_pvc_backup "cometBFT" "$namespace" "global-domain-$migration_id-cometbft-cometbft-data"
     else
-      wait_for_postgres_backup "$component" "$namespace" "$component-pg"
+      wait_for_postgres_backup "$component" "$namespace" "$component-pg" "$migration_id"
     fi
   else
     _info "Skipping waiting for backup of $component, not requested"
@@ -215,44 +220,45 @@ function wait_for_backup() {
 }
 
 function usage() {
-  echo "Usage: $0 <sv|validator> <namespace> [<component_name>]"
+  echo "Usage: $0 <sv|validator> <namespace> <migration id> [<component_name>]"
 }
 
 function main() {
-  if [ "$#" -lt 2 ]; then
+  if [ "$#" -lt 3 ]; then
       usage
       exit 1
   fi
 
   local namespace=$2
-  local requested_component="${3:-}"
+  local migration_id=$3
+  local requested_component="${4:-}"
 
   # TODO(#9361): support multiple domains / non-default-ID'd ones
 
   if [ "$1" == "validator" ]; then
     _info "Backing up validator $namespace"
-    backup_component "$namespace" "validator" "$requested_component"
-    wait_for_backup "$namespace" "validator" "$requested_component"
+    backup_component "$namespace" "validator" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "validator" "$requested_component" "$migration_id"
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant-0" "$requested_component"
-    wait_for_backup "$namespace" "participant-0" "$requested_component"
+    backup_component "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
-    backup_component "$namespace" "cn-apps" "$requested_component"
-    backup_component "$namespace" "mediator-0" "$requested_component"
-    backup_component "$namespace" "sequencer-0" "$requested_component"
-    backup_component "$namespace" "cometbft-0" "$requested_component"
+    backup_component "$namespace" "cn-apps" "$requested_component" "$migration_id"
+    backup_component "$namespace" "mediator-$migration_id" "$requested_component" "$migration_id"
+    backup_component "$namespace" "sequencer-$migration_id" "$requested_component" "$migration_id"
+    backup_component "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id"
 
-    wait_for_backup "$namespace" "cn-apps" "$requested_component"
+    wait_for_backup "$namespace" "cn-apps" "$requested_component" "$migration_id"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant-0" "$requested_component"
+    backup_component "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
 
-    wait_for_backup "$namespace" "participant-0" "$requested_component"
-    wait_for_backup "$namespace" "mediator-0" "$requested_component"
-    wait_for_backup "$namespace" "sequencer-0" "$requested_component"
-    wait_for_backup "$namespace" "cometbft-0" "$requested_component"
+    wait_for_backup "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "mediator-$migration_id" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "sequencer-$migration_id" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id"
   else
     usage
     exit 1

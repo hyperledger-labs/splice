@@ -2874,6 +2874,9 @@ jobs:
       parallelism:
         type: integer
         default: 3
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2918,9 +2921,9 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app
+              cncluster wait $ns validator-app << parameters.migration_id >>
             done
-            cncluster backup_nodes $(cat tests-to-run.txt)
+            cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
