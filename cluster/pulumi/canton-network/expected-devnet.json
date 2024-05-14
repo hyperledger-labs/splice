@@ -2397,6 +2397,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3327,6 +3328,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4228,6 +4230,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5129,6 +5132,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "interval": "30s",

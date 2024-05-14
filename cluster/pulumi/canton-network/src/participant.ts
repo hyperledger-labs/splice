@@ -12,6 +12,7 @@ import {
   jmxOptions,
   sanitizedForPostgres,
   Auth0Config,
+  LogLevel,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
@@ -25,6 +26,7 @@ export function installMigrationSpecificValidatorParticipant(
   participantBootstrapDump: BootstrappingDumpConfig | undefined,
   nodeIdentifier: string,
   auth0Cfg: Auth0Config,
+  logLevel?: LogLevel,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   return installMigrationIdSpecificComponent(
@@ -46,6 +48,7 @@ export function installMigrationSpecificValidatorParticipant(
         nodeIdentifier,
         version,
         auth0Cfg,
+        logLevel,
         dependsOn
       );
     }
@@ -61,6 +64,7 @@ export function installParticipant(
   nodeIdentifier: string,
   version: CnChartVersion,
   auth0Cfg: Auth0Config,
+  logLevel?: LogLevel,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
@@ -70,6 +74,7 @@ export function installParticipant(
     name,
     'cn-participant',
     {
+      logLevel,
       persistence: {
         databaseName: pgName,
         schema: 'participant',

@@ -2,20 +2,20 @@ import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
 import {
+  defaultVersion,
+  DomainMigrationIndex,
   ExactNamespace,
   installCNHelmChart,
-  DomainMigrationIndex,
   jmxOptions,
-  defaultVersion,
+  LogLevel,
   sequencerResources,
   sequencerTokenExpirationTime,
-  config,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
 import { Postgres } from '../../common/src/postgres';
 import { installCometBftNode } from './cometbft';
-import svConfigs, { StaticCometBftConfigWithNodeName } from './svConfigs';
+import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
 export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
@@ -47,6 +47,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     disableAutoInit: boolean,
     active: boolean,
     nodeIdentifier: string,
+    logLevel: LogLevel,
     version: CnChartVersion = defaultVersion
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainMigrationId}`);
@@ -59,12 +60,6 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     const sanitizedName = this.name.replaceAll('-', '_');
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
-      ? nodeIdentifier !== svConfigs[0].onboardingName
-        ? 'INFO'
-        : 'DEBUG'
-      : 'DEBUG';
-
     const cometbftRelease = installCometBftNode(
       xns,
       cometbft.name,

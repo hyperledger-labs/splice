@@ -59,6 +59,7 @@ export async function installSplitwell(
     participantBootstrapDump,
     'splitwell',
     auth0Client.getCfg(),
+    undefined,
     dependsOn.concat([loopback])
   );
 

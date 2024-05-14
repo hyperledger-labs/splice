@@ -65,6 +65,7 @@ export async function installValidator1(
     participantBootstrapDump,
     'validator1',
     auth0Client.getCfg(),
+    undefined,
     dependsOn.concat([loopback])
   );
 

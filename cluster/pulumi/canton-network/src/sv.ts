@@ -36,6 +36,7 @@ import {
   ValidatorTopupConfig,
   ApprovedSvIdentity,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
+  config,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -44,7 +45,7 @@ import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';
 import { DecentralizedSynchronizerNode } from './decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
-import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
+import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
@@ -380,6 +381,11 @@ function installMigrationIdSpecificComponents(
         defaultPostgres || postgres.installPostgres(xns, `mediator-${migrationId}-pg`, true);
       const participantPostgres =
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
+      const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
+        ? svConfig.onboardingName !== svConfigs[0].onboardingName
+          ? 'INFO'
+          : 'DEBUG'
+        : 'DEBUG';
 
       const mustBeManuallyInitialized =
         disableCantonAutoInit ||
@@ -404,7 +410,8 @@ function installMigrationIdSpecificComponents(
         isParticipantRestoringFromDump || mustBeManuallyInitialized,
         svConfig.onboardingName,
         version,
-        svConfig.auth0Client.getCfg()
+        svConfig.auth0Client.getCfg(),
+        logLevel
       );
       const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(
         migrationId,
@@ -415,6 +422,7 @@ function installMigrationIdSpecificComponents(
         mustBeManuallyInitialized,
         isActive,
         svConfig.onboardingName,
+        logLevel,
         version
       );
       return {
