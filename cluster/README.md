@@ -921,13 +921,18 @@ Prometheus may be configured to collect more metrics by deploying `ServiceMonito
 
 Grafana is used to visualize Prometheus metrics in various ways, aggregated into Dashboards. We deploy two types of dashboards in all clusters:
 
-- Those built by the platform-enablement team and are part of the
-open source observability
-example [here](https://github.com/digital-asset/daml-platform-observability-example/tree/main/grafana/dashboards). Check `grafana-dashboards.nix` to see how we get the dashboards. These are installed in the `platform` and `participant` folders in Grafana.
-
 - Custom dashboards built by us. To add a new dashboard, add its JSON definition to a file in `cluster/pulumi/infra/grafana-dashboards`. It will then be pushed to the cluster via the `infra` Pulumi stack, under the `canton-network` folder in Grafana.
+- Dashboards from the grafana public marketplace, installed using the dashboard id. Check `observability.ts` for example of such dashboards
+- Default k8s dashboards that are deployed by the prometheus/grafana helm chart
 
 To access Grafana on a given cluster, browse to `grafana.<CLUSTER_DNS>` and login with the credentials in [our shared passwords document](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true).
+
+Dashboards that we extended from other sources:
+- [canton-network/deployment.json](https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/metrics.md) The pulumi operator dashboard, heavily extended compared to the sample dashboard found in the README
+- [canton-network/cometbft.json](https://grafana.com/grafana/dashboards/11036-cosmos-blockchains/) Heavily extended version of the cosmos blockchains dashboard
+- [database/postgres_overview.json](https://grafana.com/grafana/dashboards/455-postgres-overview/) Modified version
+- [database/postgres_exporter.json](https://grafana.com/grafana/dashboards/12485-postgresql-exporter/) Modified version
+- [k8s/overview.json](https://grafana.com/grafana/dashboards/13332-kube-state-metrics-v2/) Modified version
 
 ##### The Observability Cluster
 
