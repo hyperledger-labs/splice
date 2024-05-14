@@ -104,6 +104,19 @@ The password can be setup with the following command, assuming you set the envir
 Preparing for Validator Onboarding
 ----------------------------------
 
+In order to become a validator, you need the sponsorship of an SV.
+Your SV will provide you with a required secret to authorize yourself towards their SV.
+
+.. admonition:: DevNet-only
+
+  On DevNet, you can obtain an onboarding secret automatically by
+  calling the following endpoint on any SV (Digital-Asset-2 used here for illustration):
+
+  .. parsed-literal::
+
+     curl -X POST https://sv.sv-2.\ |cn_cluster|.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare
+
+
 Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the namespace you created earlier. The value should be provided by the SV sponsoring the onboarding of your validator.
 
 .. code-block:: bash
