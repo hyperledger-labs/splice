@@ -19,6 +19,12 @@ Upcoming
   * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
     for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
 
+* Deployment
+
+  * The values `nodeId`, `publicKey` and `keyAddress` in the `founder` section of the cometbft helm chart are not set
+    in the chart defaults but must be explicitly provided. See the comments in the example `cometbft-values.yaml`
+    for the values to use for DevNet, TestNet or MainNet.
+
 0.1.8
 -----
 

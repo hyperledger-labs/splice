@@ -18,6 +18,7 @@ import {
   cometbftRetainBlocks,
   CLUSTER_HOSTNAME,
   CLUSTER_BASENAME,
+  isMainNet,
 } from 'cn-pulumi-common';
 
 type NodeKeyContent = { priv_key: { type: string; value: Output<string> | string } };
@@ -103,6 +104,18 @@ export function installCometBftNode(
           node: {
             retainBlocks: cometbftRetainBlocks,
           },
+          // TODO(#12361): Avoid duplicating these config values here by moving them into pulumi/common.
+          founder: isMainNet
+            ? {
+                nodeId: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
+                keyAddress: '9473617BBC80C12F68CC25B5A754D1ED9035886C',
+                publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
+              }
+            : {
+                nodeId: '5af57aa83abcec085c949323ed8538108757be9c',
+                publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+                keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
+              },
           istioVirtualService: {
             enabled: true,
             gateway: 'cluster-ingress/cn-apps-gateway',

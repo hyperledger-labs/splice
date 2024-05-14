@@ -371,7 +371,10 @@
       "values": {
         "db": {},
         "founder": {
-          "externalAddress": "global.canton.network.digitalasset.com:26016"
+          "externalAddress": "global.canton.network.digitalasset.com:26016",
+          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
+          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
+          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
         },
         "genesis": {
           "chainId": "main-0",

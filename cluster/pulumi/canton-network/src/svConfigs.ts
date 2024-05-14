@@ -69,7 +69,7 @@ const svConfigs: StaticSvConfig[] = isMainNet
         validatorWalletUser: 'auth0|663d6fd6902e3665a5dc1ad1',
         cometBft: {
           nodeIndex: 1,
-          id: 'f94014ada4c1d8d2ca45f16fd339604179d785f4',
+          id: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
           privateKey: svCometBftSecrets[0].nodePrivateKey,
           retainBlocks: cometbftRetainBlocks,
           validator: {

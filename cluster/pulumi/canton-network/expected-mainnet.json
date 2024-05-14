@@ -419,7 +419,7 @@
         "founder": {
           "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "f94014ada4c1d8d2ca45f16fd339604179d785f4",
+          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
           "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
         },
         "genesis": {
@@ -445,7 +445,7 @@
         },
         "node": {
           "externalAddress": "global.canton.network.digitalasset.com:26016",
-          "id": "f94014ada4c1d8d2ca45f16fd339604179d785f4",
+          "id": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
           "identifier": "global-domain-0-cometbft",
           "istioPort": 26016,
           "privateKey": "sv1-cometbft-keys-node-private-key",
