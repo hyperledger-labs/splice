@@ -6,6 +6,8 @@ Release Notes
 Upcoming
 --------
 
+* Default PVC sizes updated: 2800Gi for Postgres.
+
 * App Dev
 
   * DARs can no longer be uploaded through the Ledger API. Instead use

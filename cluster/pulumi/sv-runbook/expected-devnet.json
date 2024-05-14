@@ -783,7 +783,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "1300Gi",
+          "volumeSize": "2800Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -847,7 +847,7 @@
         "db": {
           "maxConnections": 300,
           "pvcTemplateName": "pg-data",
-          "volumeSize": "1300Gi",
+          "volumeSize": "2800Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
