@@ -3,31 +3,31 @@ groups:
   - orgId: 1
     name: sv status reports
     folder: canton-network
-    interval: 5m
+    interval: 1m
     rules:
-      - uid: ea207f34-68d0-4fbb-9ae5-08020ff8b17d
-        title: SV Status -  Node falling behind
-        condition: progress_too_low
+      - uid: adlmhpz5iv4sgc
+        title: Report Creation Time Lag
+        condition: No recent report
         data:
-          - refId: time_advance_per_second
+          - refId: Report time lag
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
-              disableTextWrap: false
-              editorMode: builder
-              exemplar: false
-              expr: max by(report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us[5m])) / 1000000
-              fullMetaSearch: false
-              includeNullMetadata: true
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: time() - max by (report_publisher) (cn_sv_status_report_creation_time_us{namespace=~".*", report_publisher=~".*", canton_version=~".*"}) / 1000000
               instant: false
-              intervalMs: 1000
-              legendFormat: __auto
+              interval: ""
+              intervalMs: 30000
+              legendFormat: '{{report_publisher}}'
               maxDataPoints: 43200
               range: true
-              refId: time_advance_per_second
-          - refId: avg_progress
+              refId: Report time lag
+          - refId: Latest report time lag
             relativeTimeRange:
               from: 600
               to: 0
@@ -35,31 +35,29 @@ groups:
             model:
               conditions:
                 - evaluator:
-                    params:
-                      - 0
-                      - 0
+                    params: []
                     type: gt
                   operator:
                     type: and
                   query:
-                    params: []
+                    params:
+                      - B
                   reducer:
                     params: []
-                    type: avg
+                    type: last
                   type: query
               datasource:
-                name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: time_advance_per_second
+              expression: Report time lag
               intervalMs: 1000
               maxDataPoints: 43200
-              reducer: mean
-              refId: avg_progress
+              reducer: last
+              refId: Latest report time lag
               settings:
                 mode: dropNN
               type: reduce
-          - refId: progress_too_low
+          - refId: No recent report
             relativeTimeRange:
               from: 600
               to: 0
@@ -68,85 +66,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 0.75
-                      - 0
-                    type: lt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: avg_progress
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: progress_too_low
-              type: threshold
-        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
-        panelId: 9
-        noDataState: OK
-        execErrState: Error
-        for: 30m
-        annotations:
-          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
-          __panelId__: "9"
-          description: The SVs' {{ $labels.report_publisher }} status reports for {{ $labels.target_node }}  shows that their node is falling behind wrt processing messages from the domain having an average catchup rate of {{ index $values "avg_progress" }} for the last 5 minutes, or they fail to submit status reports.
-          runbook_url: ""
-          summary: Domain Time progressing too slowly
-        labels:
-          topology_level: dso
-        isPaused: false
-      - uid: f60b1225-4458-483a-8168-240baac4f6fe
-        title: SV Status - Unexpected CometBFT Lag
-        condition: alert
-        data:
-          - refId: cometbft_height_per_publisher
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              exemplar: false
-              expr: max by (report_publisher) (cn_sv_status_report_cometbft_height)
-              instant: true
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: false
-              refId: cometbft_height_per_publisher
-          - refId: max_cometbft_height
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              exemplar: false
-              expr: max(cn_sv_status_report_cometbft_height)
-              hide: false
-              instant: true
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: false
-              refId: max_cometbft_height
-          - refId: alert
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 1000
+                      - 180
                     type: gt
                   operator:
                     type: and
@@ -160,202 +80,22 @@ groups:
               datasource:
                 type: __expr__
                 uid: __expr__
-              expression: lag_per_publisher
+              expression: Latest report time lag
               intervalMs: 1000
               maxDataPoints: 43200
-              refId: alert
+              refId: No recent report
               type: threshold
-          - refId: lag_per_publisher
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: '$max_cometbft_height - $cometbft_height_per_publisher '
-              hide: false
-              refId: lag_per_publisher
-              type: math
-        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
-        panelId: 15
-        noDataState: OK
+        dashboardUid: cdlm6c7fn7vuod
+        panelId: 18
+        noDataState: NoData
         execErrState: Error
-        for: 30m
+        for: 5m
         annotations:
-          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
-          __panelId__: "15"
-          description: |-
-            The SV status reports observed by the DSO report a lag of {{ index $values "alert" }}.
-            Reported maximum height {{ index $values "cometbft_height_per_publisher" }} for  {{ $labels.report_publisher }} and a global maximum of {{ index $values "max_cometbft_height" }}
+          __dashboardUid__: cdlm6c7fn7vuod
+          __panelId__: "18"
+          description: The SV {{ $labels.report_publisher }} has not submitted a status report recently
           runbook_url: ""
-          summary: '{{ index $values "alert" }} CometBFT lag in SV status reports for {{ $labels.report_publisher }}'
+          summary: Status report creation time lag too high
         labels:
           "": ""
-          topology_level: dso
-        isPaused: false
-      - uid: d28ac95d-4724-4a82-a848-49198c5c6d80
-        title: SV Status - Unexpected Mining Round Lag
-        condition: A
-        data:
-          - refId: open_round_per_publisher
-            relativeTimeRange:
-              from: 900
-              to: 0
-            datasourceUid: prometheus
-            model:
-              disableTextWrap: false
-              editorMode: code
-              expr: max by(report_publisher) (cn_sv_status_report_latest_open_round)
-              fullMetaSearch: false
-              includeNullMetadata: true
-              instant: false
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: true
-              refId: open_round_per_publisher
-              useBackend: false
-          - refId: open_round
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              disableTextWrap: false
-              editorMode: builder
-              expr: max(cn_sv_status_report_latest_open_round)
-              fullMetaSearch: false
-              hide: false
-              includeNullMetadata: true
-              instant: false
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: true
-              refId: open_round
-              useBackend: false
-          - refId: publisher_lag
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: $open_round - $open_round_per_publisher
-              hide: false
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: publisher_lag
-              type: math
-          - refId: max_publisher_lag
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: publisher_lag
-              hide: false
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: max
-              refId: max_publisher_lag
-              settings:
-                mode: dropNN
-              type: reduce
-          - refId: A
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 10
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: max_publisher_lag
-              hide: false
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: A
-              type: threshold
-        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
-        panelId: 5
-        noDataState: OK
-        execErrState: Error
-        for: 10m
-        annotations:
-          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
-          __panelId__: "5"
-          description: 'The SV status reports observed by one of the SVs exhibit an unexpectedly high lag in the latest open mining round number. Check the graphs for detailed metrics. '
-          runbook_url: ""
-          summary: 'Unexpected mining round lag {{ index $values "max_publisher_lag" }} in SV status reports for publisher {{ $labels.report_publisher }} '
-        labels:
-          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A'
-          topology_level: dso
         isPaused: false
