@@ -156,6 +156,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
+        "db": {},
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
@@ -246,6 +247,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "db": {},
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,

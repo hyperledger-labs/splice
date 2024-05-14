@@ -32,6 +32,7 @@ import {
   participantBootstrapDumpSecretName,
   config,
   preApproveValidatorRunbook,
+  clusterSmallDisk,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -189,6 +190,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       ...participantValues.persistence,
       postgresName: 'postgres',
     },
+    db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
   };
 
@@ -265,6 +267,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',
     },
+    db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
   };
 
