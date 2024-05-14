@@ -1294,7 +1294,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {
-          "volumeSize": "640Gi",
+          "volumeSize": "1000Gi",
           "volumeStorageClass": "premium-rwo"
         },
         "enableAntiAffinity": true,
