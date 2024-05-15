@@ -196,7 +196,7 @@ object SvUtil {
   def defaultDsoRulesConfig(domainId: DomainId): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
-    new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // actionConfirmationTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout

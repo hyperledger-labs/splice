@@ -326,7 +326,7 @@ export const dsoInfo: GetDsoInfoResponse = {
         },
         numUnclaimedRewardsThreshold: '10',
         actionConfirmationTimeout: {
-          microseconds: '300000000',
+          microseconds: '3600000000',
         },
         dsoDelegateInactiveTimeout: {
           microseconds: '70000000',

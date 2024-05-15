@@ -6,7 +6,11 @@ Release Notes
 Upcoming
 --------
 
-* Default PVC sizes updated: 2800Gi for Postgres.
+* Configuration
+
+    * Default actionConfirmationTimeout parameter in CoinRules was increased from 5 minutes to 1 hour.
+
+    * Default PVC sizes updated: 2800Gi for Postgres.
 
 * App Dev
 
