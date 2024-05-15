@@ -1,7 +1,7 @@
 package com.daml.network.sv.migration
 
 import cats.data.OptionT
-import com.daml.network.automation.TriggerContext
+import com.daml.network.automation.{TriggerContext, TriggerEnabledSynchronization}
 import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.{AcsExporter, DomainMigrationTrigger}
@@ -22,7 +22,7 @@ import scala.jdk.OptionConverters.*
 
 final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     domainAlias: DomainAlias,
     localSynchronizerNode: LocalSynchronizerNode,
     dsoStore: SvDsoStore,
@@ -34,6 +34,10 @@ final class DecentralizedSynchronizerMigrationTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
+
+  // Disabling domain time and domain paused sync, as it runs after the domain is paused
+  override protected lazy val context =
+    baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
   override val sequencerAdminConnection = Some(sequencerAdminConnection0)
 

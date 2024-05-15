@@ -1,9 +1,8 @@
 package com.daml.network.sv.automation.singlesv
 
-import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.automation.{PollingTrigger, TriggerContext, TriggerEnabledSynchronization}
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.store.DomainTimeSynchronization
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
@@ -35,9 +34,9 @@ class LocalSequencerConnectionsTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
-  // Disabling domain time sync since we might need to fix domain connections to allow for catchup.
+  // Disabling domain time and domain paused sync since we might need to fix domain connections to allow for catchup.
   override protected lazy val context =
-    baseContext.copy(domainTimeSync = DomainTimeSynchronization.Noop)
+    baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {

@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   UnassignTrigger,
 }
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.{splitwell as splitwellCodegen}
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{
   CNLedgerClient,
@@ -20,7 +20,7 @@ import com.daml.network.environment.{
   PackageIdResolver,
   RetryProvider,
 }
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.QualifiedName
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
@@ -46,9 +46,10 @@ class SplitwellAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
-      // splitwell does not have an admin connection to query the domain time
+      // splitwell does not have an admin connection to query the domain time and params,
       // and we care less about it behaving weirdly.
       DomainTimeSynchronization.Noop,
+      DomainUnpausedSynchronization.Noop,
       store,
       PackageIdResolver.inferFromAmuletRules(
         clock,

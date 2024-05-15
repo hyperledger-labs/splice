@@ -78,15 +78,19 @@ abstract class TaskbasedTrigger[T: Pretty](
 
       if (!quiet)
         logger.info(show"Processing\n$task")
-      context.domainTimeSync
-        .waitForDomainTimeSync()
+      waitForReadyToWork()
         .flatMap(_ =>
           context.retryProvider
             .retry(
               RetryFor.Automation,
               "processTaskWithRetry",
               "processTaskWithRetry",
-              processTaskWithStalenessCheck(),
+              // If the trigger is currently disabled, then this is delaying the retry until the trigger is enabled again.
+              // `waitForReadyToWork` is expected to abort waiting if the retry provider is shutting down.
+              // It does mean that the overall `processTaskWithRetry` call can take an arbitrarily long time to complete
+              // if the trigger is disabled in the middle of retrying.
+              waitForReadyToWork()
+                .flatMap(_ => processTaskWithStalenessCheck()),
               logger,
               additionalRetryableConditions,
               mc.labels,

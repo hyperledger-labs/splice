@@ -9,7 +9,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 
 import io.grpc.Status
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 
 abstract class DomainTimeSynchronization {
@@ -36,11 +35,12 @@ final class DomainTimeStore(
     extends DomainTimeSynchronization
     with AutoCloseable
     with NamedLogging {
-  private val stateVar: AtomicReference[DomainTimeStore.State] = new AtomicReference(
-    DomainTimeStore.State(
-      None,
-      None,
-    )
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  @volatile
+  private var state: DomainTimeStore.State = DomainTimeStore.State(
+    None,
+    None,
   )
 
   override def waitForDomainTimeSync()(implicit tc: TraceContext): Future[Unit] = {
@@ -62,7 +62,6 @@ final class DomainTimeStore(
 
   private def checkDomainTimeDelay()(implicit tc: TraceContext): Option[Promise[Unit]] = blocking {
     synchronized {
-      val state = stateVar.get()
       val now = clock.now
       state.lastDomainTime match {
         // If we are just starting up, try to submit something to not delay startup.
@@ -81,7 +80,7 @@ final class DomainTimeStore(
               case Some(promise) => Some(promise)
               case None =>
                 val promise = Promise[Unit]()
-                stateVar.set(state.copy(delayPromise = Some(promise)))
+                state = state.copy(delayPromise = Some(promise))
                 Some(promise)
             }
           }
@@ -92,12 +91,11 @@ final class DomainTimeStore(
   def ingestDomainTime(time: CantonTimestamp)(implicit tc: TraceContext): Future[Unit] = Future {
     blocking {
       synchronized {
-        val state = stateVar.get()
         val now = clock.now
         val newState = state.copy(lastDomainTime = Some(time))
         state.delayPromise match {
           case None =>
-            stateVar.set(newState)
+            state = newState
           case Some(promise) =>
             val delay = now - time
             if (delay.compareTo(allowedDomainTimeDelay.asJava) <= 0) {
@@ -105,12 +103,12 @@ final class DomainTimeStore(
                 show"Domain time delay is now $delay which is below the configured max delay ${allowedDomainTimeDelay}"
               )
               promise.success(())
-              stateVar.set(newState.copy(delayPromise = None))
+              state = newState.copy(delayPromise = None)
             } else {
               logger.info(
                 show"Domain time delay is now $delay which is still above the configured max delay ${allowedDomainTimeDelay}"
               )
-              stateVar.set(newState)
+              state = newState
             }
         }
       }

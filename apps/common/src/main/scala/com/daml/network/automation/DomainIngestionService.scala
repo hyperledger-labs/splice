@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.{DomainTimeSynchronization, DomainStore}
+import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.util.ShowUtil.*
@@ -14,7 +14,7 @@ class DomainIngestionService(
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends PeriodicTaskTrigger(
-      context.copy(domainTimeSync = DomainTimeSynchronization.Noop),
+      context.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop),
       quiet = true,
     ) {
 

@@ -1,10 +1,10 @@
 package com.daml.network.sv.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.{AutomationServiceCompanion, AutomationService}
+import com.daml.network.automation.{AutomationService, AutomationServiceCompanion}
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.automation.leaderbased.*
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -16,6 +16,7 @@ import scala.concurrent.ExecutionContext
 class LeaderBasedAutomationService(
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svTaskContext: SvTaskBasedTrigger.Context,
     retryProvider: RetryProvider,
@@ -28,6 +29,7 @@ class LeaderBasedAutomationService(
       config.automation,
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       retryProvider,
     ) {
 

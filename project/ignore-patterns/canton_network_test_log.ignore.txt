@@ -66,11 +66,6 @@ failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 # This might be logged between the test finishing and shutdown of the nodes (see #8991)
 Noticed an DsoRules epoch change.*DecentralizedSynchronizerMigrationIntegrationTest
 
-# Shows up during global domain migration test, when the domain is frozen
-DecentralizedSynchronizerMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded
-# TODO (#10085): remove if it no longer applies
-DecentralizedSynchronizerMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: SEQUENCER_REQUEST_FAILED.*: Failed to send command
-
 # TODO (#9979): this only applies to simtime.
 # In simtime tests where the rounds are advanced too quickly, this trigger might not have enough time to receive the coupon.
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.

@@ -2,7 +2,6 @@ package com.daml.network.automation
 
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.DomainTimeSynchronization
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
@@ -13,7 +12,7 @@ final case class TriggerContext(
     config: AutomationConfig,
     clock: Clock,
     pollingClock: Clock,
-    domainTimeSync: DomainTimeSynchronization,
+    triggerEnabledSync: TriggerEnabledSynchronization,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
     metricsFactory: CantonLabeledMetricsFactory,

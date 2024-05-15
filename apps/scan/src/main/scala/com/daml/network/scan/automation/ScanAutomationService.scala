@@ -4,7 +4,7 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{AutomationServiceCompanion, CNNodeAppAutomationService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -30,6 +30,7 @@ class ScanAutomationService(
       clock,
       // scan only does reads so no need to block anything.
       DomainTimeSynchronization.Noop,
+      DomainUnpausedSynchronization.Noop,
       store,
       PackageIdResolver.inferFromAmuletRules(clock, store, loggerFactory),
       ledgerClient,

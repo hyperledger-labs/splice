@@ -21,17 +21,16 @@ class DomainParametersStateTopologyConnection(connection: TopologyAdminConnectio
   ): OptionT[Future, TopologyAdminConnection.TopologyResult[
     DomainParametersStateX
   ]] = {
-    OptionT
-      .liftF(
-        connection
-          .listDomainParametersState(domain)
-          .map { domainParamsHistory =>
-            val latestState = domainParamsHistory.map(_.base.serial).maxOption
-            domainParamsHistory
-              .filter(state => latestState.contains(state.base.serial))
-              .minBy(_.base.validFrom)
-          }
-      )
+    OptionT(
+      connection
+        .listDomainParametersState(domain)
+        .map { domainParamsHistory =>
+          val latestState = domainParamsHistory.map(_.base.serial).maxOption
+          domainParamsHistory
+            .filter(state => latestState.contains(state.base.serial))
+            .minByOption(_.base.validFrom)
+        }
+    )
   }
 
 }

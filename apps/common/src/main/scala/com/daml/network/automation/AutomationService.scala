@@ -5,7 +5,7 @@ import cats.instances.seq.*
 import cats.instances.set.*
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -20,6 +20,7 @@ abstract class AutomationService(
     private val automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     override protected[this] val retryProvider: RetryProvider,
 ) extends HasHealth
     with FlagCloseableAsync
@@ -43,7 +44,10 @@ abstract class AutomationService(
       automationConfig,
       clock = clock,
       pollingClock = new WallClock(timeouts, loggerFactory),
-      domainTimeSync,
+      triggerEnabledSync = TriggerEnabledSynchronization.fromDomainTimeAndParams(
+        domainTimeSync,
+        domainUnpausedSync,
+      ),
       retryProvider,
       loggerFactory,
       retryProvider.metricsFactory,

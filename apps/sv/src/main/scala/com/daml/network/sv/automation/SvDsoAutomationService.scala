@@ -10,7 +10,7 @@ import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTr
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.http.CNHttpClient
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
@@ -44,6 +44,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvDsoAutomationService(
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
@@ -64,6 +65,7 @@ class SvDsoAutomationService(
       config.automation,
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       dsoStore,
       PackageIdResolver
         .inferFromAmuletRules(
@@ -82,6 +84,8 @@ class SvDsoAutomationService(
   private[network] val restartLeaderBasedAutomationTrigger =
     new RestartLeaderBasedAutomationTrigger(
       triggerContext,
+      domainTimeSync,
+      domainUnpausedSync,
       dsoStore,
       connection,
       clock,

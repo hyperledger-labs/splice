@@ -3,7 +3,7 @@ package com.daml.network.automation
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.store.{
-  DomainTimeStore,
+  DomainParamsStore,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
@@ -16,7 +16,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.ExecutionContext
 
 // This is a dedicated service because we want to run this once per app whereas apps often have multiple stores and automation services.
-final class DomainTimeAutomationService(
+final class DomainParamsAutomationService(
     domainAlias: DomainAlias,
     participantAdminConnection: ParticipantAdminConnection,
     config: AutomationConfig,
@@ -32,23 +32,23 @@ final class DomainTimeAutomationService(
       retryProvider,
     ) {
 
-  override val companion = DomainTimeAutomationService
+  override val companion = DomainParamsAutomationService
 
   private val store =
-    new DomainTimeStore(clock, config.maxAllowedDomainTimeDelay, retryProvider, loggerFactory)
+    new DomainParamsStore(retryProvider, loggerFactory)
 
-  def domainTimeSync: DomainTimeSynchronization = store
+  def domainUnpausedSync: DomainUnpausedSynchronization = store
 
   registerTrigger(
-    new DomainTimeIngestionTrigger(domainAlias, store, participantAdminConnection, triggerContext)
+    new DomainParamsIngestionTrigger(domainAlias, store, participantAdminConnection, triggerContext)
   )
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    super.closeAsync() :+ SyncCloseable("Domain Time Store", Lifecycle.close(store)(logger))
+    super.closeAsync() :+ SyncCloseable("Domain Params Store", Lifecycle.close(store)(logger))
 }
 
-object DomainTimeAutomationService extends AutomationServiceCompanion {
+object DomainParamsAutomationService extends AutomationServiceCompanion {
   override protected[this] def expectedTriggerClasses
       : Seq[AutomationServiceCompanion.TriggerClass] =
-    Seq(AutomationServiceCompanion.aTrigger[DomainTimeIngestionTrigger])
+    Seq(AutomationServiceCompanion.aTrigger[DomainParamsIngestionTrigger])
 }

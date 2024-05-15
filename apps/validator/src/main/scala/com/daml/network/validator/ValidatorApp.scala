@@ -5,7 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.automation.DomainTimeAutomationService
+import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
 import com.daml.network.auth.*
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
@@ -623,6 +623,14 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
+      domainParamsAutomationService = new DomainParamsAutomationService(
+        config.domains.global.alias,
+        participantAdminConnection,
+        config.automation,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       validatorTopupConfig = ValidatorTopupConfig(
         config.domains.global.buyExtraTraffic.targetThroughput,
         config.domains.global.buyExtraTraffic.minTopupInterval,
@@ -638,6 +646,7 @@ class ValidatorApp(
               config.automation,
               clock,
               domainTimeAutomationService.domainTimeSync,
+              domainParamsAutomationService.domainUnpausedSync,
               config.treasury,
               storage: Storage,
               retryProvider,
@@ -667,6 +676,7 @@ class ValidatorApp(
         config.svValidator,
         clock,
         domainTimeAutomationService.domainTimeSync,
+        domainParamsAutomationService.domainUnpausedSync,
         walletManagerOpt,
         store,
         scanConnection,
@@ -973,6 +983,7 @@ class ValidatorApp(
         participantAdminConnection,
         storage,
         domainTimeAutomationService,
+        domainParamsAutomationService,
         store,
         automation,
         walletManagerOpt,
@@ -994,6 +1005,7 @@ object ValidatorApp {
       participantAdminConnection: ParticipantAdminConnection,
       storage: Storage,
       domainTimeAutomationService: DomainTimeAutomationService,
+      domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
@@ -1020,6 +1032,7 @@ object ValidatorApp {
           storage,
           scanConnection,
           domainTimeAutomationService,
+          domainParamsAutomationService,
         ))*
       )(logger)
   }

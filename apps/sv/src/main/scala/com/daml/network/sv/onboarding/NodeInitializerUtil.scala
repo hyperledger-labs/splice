@@ -9,7 +9,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.CNHttpClient
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.{CometBftNode, CometBftRequestSigner}
@@ -37,6 +37,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val retryProvider: RetryProvider
   protected val clock: Clock
   protected val domainTimeSync: DomainTimeSynchronization
+  protected val domainUnpausedSync: DomainUnpausedSynchronization
   protected val participantAdminConnection: ParticipantAdminConnection
   protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: CNLedgerClient
@@ -70,6 +71,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     new SvSvAutomationService(
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       config,
       svStore,
       dsoStore,
@@ -112,6 +114,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     new SvDsoAutomationService(
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       config,
       svStore,
       dsoStore,

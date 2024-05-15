@@ -2,15 +2,15 @@ package com.daml.network.sv.automation
 
 import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
-  AutomationServiceCompanion,
   AssignTrigger,
+  AutomationServiceCompanion,
   CNNodeAppAutomationService,
 }
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
+import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -20,6 +20,7 @@ import scala.concurrent.ExecutionContextExecutor
 class SvSvAutomationService(
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
@@ -34,6 +35,7 @@ class SvSvAutomationService(
       config.automation,
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       svStore,
       PackageIdResolver
         .inferFromAmuletRules(

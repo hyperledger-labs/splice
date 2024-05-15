@@ -10,7 +10,11 @@ import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.http.CNHttpClient
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainTimeSynchronization}
+import com.daml.network.store.{
+  CNNodeAppStoreWithIngestion,
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.automation.singlesv.SvPackageVettingTrigger
@@ -66,6 +70,7 @@ class JoiningNodeInitializer(
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
+    override protected val domainUnpausedSync: DomainUnpausedSynchronization,
     override protected val storage: Storage,
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,

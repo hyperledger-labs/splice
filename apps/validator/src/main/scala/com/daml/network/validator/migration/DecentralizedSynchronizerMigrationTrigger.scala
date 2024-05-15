@@ -1,7 +1,7 @@
 package com.daml.network.validator.migration
 
 import cats.data.OptionT
-import com.daml.network.automation.TriggerContext
+import com.daml.network.automation.{TriggerContext, TriggerEnabledSynchronization}
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.migration.DomainMigrationTrigger
 import com.daml.network.migration.DomainMigrationTrigger.ScheduledMigration
@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val dumpPath: Path,
     scanConnection: ScanConnection,
@@ -26,6 +26,10 @@ final class DecentralizedSynchronizerMigrationTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
+
+  // Disabling domain time and domain paused sync, as it runs after the domain is paused
+  override protected lazy val context =
+    baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
   override protected val sequencerAdminConnection = None
 

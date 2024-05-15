@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.automation.DomainTimeAutomationService
+import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -264,6 +264,14 @@ class SvApp(
         retryProvider,
         loggerFactory,
       )
+      domainParamsAutomationService = new DomainParamsAutomationService(
+        config.domains.global.alias,
+        participantAdminConnection,
+        config.automation,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       newJoiningNodeInitializer = (
           joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
           cometBftNode: Option[CometBftNode],
@@ -280,6 +288,7 @@ class SvApp(
           participantAdminConnection,
           clock,
           domainTimeAutomationService.domainTimeSync,
+          domainParamsAutomationService.domainUnpausedSync,
           storage,
           loggerFactory,
           retryProvider,
@@ -328,6 +337,7 @@ class SvApp(
                 participantAdminConnection,
                 clock,
                 domainTimeAutomationService.domainTimeSync,
+                domainParamsAutomationService.domainUnpausedSync,
                 storage,
                 retryProvider,
                 loggerFactory,
@@ -367,6 +377,7 @@ class SvApp(
               participantAdminConnection,
               clock,
               domainTimeAutomationService.domainTimeSync,
+              domainParamsAutomationService.domainUnpausedSync,
               storage,
               loggerFactory,
               retryProvider,
@@ -574,6 +585,7 @@ class SvApp(
         localSynchronizerNode,
         storage,
         domainTimeAutomationService,
+        domainParamsAutomationService,
         svStore,
         dsoStore,
         svAutomation,
@@ -741,6 +753,7 @@ object SvApp {
       localSynchronizerNode: Option[LocalSynchronizerNode],
       storage: Storage,
       domainTimeAutomationService: DomainTimeAutomationService,
+      domainParamsAutomationService: DomainParamsAutomationService,
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
@@ -776,6 +789,7 @@ object SvApp {
         SyncCloseable("sv store", svStore.close()),
         SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("domain time automation", domainTimeAutomationService.close()),
+        SyncCloseable("domain params automation", domainParamsAutomationService.close()),
         SyncCloseable("storage", storage.close()),
       )
   }

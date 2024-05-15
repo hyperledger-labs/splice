@@ -12,7 +12,7 @@ import com.daml.network.environment.*
 import com.daml.network.http.CNHttpClient
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.DomainTimeSynchronization
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.domain.DomainConnector
@@ -45,6 +45,7 @@ class ValidatorAutomationService(
     isSvValidator: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
     scanConnection: BftScanConnection,
@@ -68,6 +69,7 @@ class ValidatorAutomationService(
       automationConfig,
       clock,
       domainTimeSync,
+      domainUnpausedSync,
       store,
       PackageIdResolver.inferFromAmuletRules(
         clock,

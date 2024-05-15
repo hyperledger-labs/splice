@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.AssignedContract
 import com.daml.network.sv.automation.LeaderBasedAutomationService
 import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
@@ -29,6 +30,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 class RestartLeaderBasedAutomationTrigger(
     override protected val context: TriggerContext,
+    domainTimeSync: DomainTimeSynchronization,
+    domainUnpausedSync: DomainUnpausedSynchronization,
     store: SvDsoStore,
     connection: CNLedgerConnection,
     clock: Clock,
@@ -141,7 +144,8 @@ class RestartLeaderBasedAutomationTrigger(
          )
        val leaderBasedAutomation = new LeaderBasedAutomationService(
          clock,
-         context.domainTimeSync,
+         domainTimeSync,
+         domainUnpausedSync,
          config,
          svTaskContext,
          retryProvider,

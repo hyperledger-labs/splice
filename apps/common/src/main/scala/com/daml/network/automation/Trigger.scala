@@ -4,7 +4,7 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,4 +41,7 @@ trait Trigger extends FlagCloseable with NamedLogging with Spanning with HasHeal
   /** Resumes the trigger */
   def resume(): Unit
 
+  /** Waits until the trigger is ready to execute the next unit of work */
+  protected def waitForReadyToWork()(implicit tc: TraceContext): Future[Unit] =
+    context.triggerEnabledSync.waitForTriggerEnabled()
 }
