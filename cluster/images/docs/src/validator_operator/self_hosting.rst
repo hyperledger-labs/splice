@@ -222,40 +222,12 @@ Open ``web-uis/ans/config.js`` and change ``TARGET_HOSTNAME`` in the Scan URL to
   The "ans" in ``web-uis/ans/config.js`` stands for "Amulet Name Service", which is the name of the
   code the implements the logic underlying CNS.
 
-.. _splitwell-user:
-
-Configuring the Splitwell UI
-----------------------------
-
-.. note::
-   This section only describes how to connect as an application user to the splitwell instance run by Digital Asset.
-   If you are interested in hosting your own instance as an application provider, take a
-   look at the :ref:`instructions for deploying splitwell <splitwell-provider>`.
-
-To use splitwell, you first need to upload the splitwell DAR.  Go to the terminal in which you
-are running the validator (the one using "validator.conf"), and type:
-
-.. parsed-literal::
-
-   @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-current.dar")
-
-As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_HOSTNAME`` to |cn_cluster_literal|.global.canton.network.digitalasset.com like you did earlier for the CNS and wallet UIs:
-
-.. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
-    :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
-    :end-before: END_SPLITWELL_CLUSTER_BACKEND_CONFIG
-
-If you are not connecting to the splitwell instance operated by
-digital asset, also edit the splitwell URL in the ``config.js`` file
-to point at the application backend. If you are unsure about the URL
-ask the application provider.
-
 .. _hosting-the-uis:
 
 Hosting the UIs
 ---------------
 
-Lastly, we have to host the frontend files for the wallet UI, the CNS UI and the splitwell UI.
+Lastly, we have to host the frontend files for the wallet UI and the CNS UI.
 We're going to use a standard NGINX Docker container to host all the frontends.
 If you don't have Docker installed, please install it now by following the `Docker installation documentation <https://docs.docker.com/get-docker/>`_.
 Please make sure to install version 20.10.0 or higher on Linux,which supports ``host.docker.internal``.
@@ -288,10 +260,6 @@ You will be redirected to your wallet to confirm the Canton Coin payment for you
 Once confirmed, you will be redirected back to the CNS UI, and should see your new entry listed.
 
 If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
-
-The Splitwell UI is now accessible at http://splitwell.localhost:3000. You can now log in and start creating groups and split payments with
-other users on the Canton Network. Note that you need to onboard your
-user through the wallet first before you can use it in splitwell.
 
 Enabling Authentication
 -----------------------

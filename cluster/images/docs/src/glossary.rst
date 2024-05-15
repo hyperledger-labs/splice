@@ -82,7 +82,3 @@ Glossary
 
       * The name of the HyperLedger lab project that will host the code for Amulet, DSO governance,
         Amulet Name Service, SV nodes, and validator nodes.
-
-    Splitwell
-
-      * Example application that allows users to split payments and then settle their debts to each other.

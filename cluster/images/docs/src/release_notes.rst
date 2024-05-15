@@ -23,6 +23,11 @@ Upcoming
   * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
     for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
 
+  * Updated ``Preparing for Validator Onboarding`` sections to include what validator Onboarding is
+    and how Validator operator can obtain an onboarding secret via API.validator.
+
+  * Removed splitwell related documentation.
+
 * Deployment
 
   * The values `nodeId`, `publicKey` and `keyAddress` in the `founder` section of the cometbft helm chart are not set
