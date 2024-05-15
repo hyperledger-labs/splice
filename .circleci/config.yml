@@ -5242,6 +5242,8 @@ workflows:
           parallelism: 1
           requires:
             - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_upgrade"
           <<: *main-branch-only
@@ -5252,6 +5254,8 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
       - preflight_validator_check:
           name: "preflight_validator_runbook_after_upgrade"
           <<: *main-branch-only
@@ -5262,6 +5266,8 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
       - deploy_sv_runbook:
           name: "redeploy_sv_runbook_after_daml_upgrade"
           # by resetting the SV runbook, it's as if a new SV was onboarded,
