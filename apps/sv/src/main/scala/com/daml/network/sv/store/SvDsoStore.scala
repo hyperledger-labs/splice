@@ -586,16 +586,13 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
             domain,
             PageLimit.tryCreate(1),
           )
-          validatorFaucetCoupons <- listValidatorFaucetCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
           svRewardCoupons <- listSvRewardCouponsOnDomain(
             round.payload.round.number,
             domain,
             PageLimit.tryCreate(1),
           )
+          // Note: We ignore validator faucet coupons because we cannot run
+          // expiry automation for them because they have the owner as a signatory.
           action = new ARC_AmuletRules(
             new CRARC_MiningRound_Archive(
               new AmuletRules_MiningRound_Archive(
@@ -609,7 +606,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
             // archivable if ...
             if (
               // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorFaucetCoupons.isEmpty && svRewardCoupons.isEmpty &&
+              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && svRewardCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
             ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))

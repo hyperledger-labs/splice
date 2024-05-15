@@ -708,6 +708,9 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
+          _ <- dummyDomain.create(validatorFaucetCoupon(userParty(1), round = 3))(
+            store.multiDomainAcsStore
+          )
           _ <- dummyDomain.create(validatorRewardCoupon(round = 4, userParty(1)))(
             store.multiDomainAcsStore
           )
