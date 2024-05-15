@@ -117,10 +117,13 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     { dependsOn }
   );
   const namespaceName = namespace.metadata.name;
+  // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+  const stackVersion = '58.5.1';
+  const prometheusStackCrdVersion = '0.73.2';
   const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
-    version: '57.1.1',
+    version: stackVersion,
     namespace: namespaceName,
     repositoryOpts: {
       repo: 'https://prometheus-community.github.io/helm-charts',
@@ -341,6 +344,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             default_timezone: 'UTC',
           },
         },
+        deploymentStrategy: {
+          // required for the pvc
+          type: 'Recreate',
+        },
         persistence: {
           enabled: true,
           type: 'pvc',
@@ -353,6 +360,107 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
       },
       'kube-state-metrics': {
         fullnameOverride: 'ksm',
+        customResourceState: {
+          enabled: true,
+          config: {
+            spec: {
+              resources: [
+                // flux config from https://github.com/fluxcd/flux2-monitoring-example/blob/main/monitoring/controllers/kube-prometheus-stack/kube-state-metrics-config.yaml
+                {
+                  groupVersionKind: {
+                    group: 'source.toolkit.fluxcd.io',
+                    version: 'v1',
+                    kind: 'GitRepository',
+                  },
+                  metricNamePrefix: 'cn_deployment_flux',
+                  metrics: [
+                    {
+                      name: 'resource_info',
+                      help: 'The current state of a Flux GitRepository resource.',
+                      each: {
+                        type: 'Gauge',
+                        gauge: {
+                          labelsFromPath: {
+                            name: ['metadata', 'name'],
+                          },
+                        },
+                      },
+                      labelsFromPath: {
+                        exported_namespace: ['metadata', 'namespace'],
+                        ready: ['status', 'conditions', '[type=Ready]', 'status'],
+                        suspended: ['spec', 'suspend'],
+                        revision: ['status', 'artifact', 'revision'],
+                        url: ['spec', 'url'],
+                      },
+                    },
+                  ],
+                },
+                // pulumi resources
+                {
+                  groupVersionKind: {
+                    group: 'pulumi.com',
+                    version: 'v1',
+                    kind: 'Stack',
+                  },
+                  metricNamePrefix: 'cn_deployment_pulumi',
+                  labelsFromPath: {
+                    stack: ['spec', 'stack'],
+                    state: ['status', 'lastUpdate', 'state'],
+                    // condition_type: ['status', 'conditions', '[status=True]', 'type'],
+                    // condition_reason: ['status', 'conditions', '[status=True]', 'reason'],
+                    generation: ['status', 'observedGeneration'],
+                  },
+                  metrics: [
+                    // from https://github.com/kubernetes/kube-state-metrics/blob/main/docs/metrics/extend/customresourcestate-metrics.md#example-for-status-conditions-on-kubernetes-controllers
+                    {
+                      name: 'stack_condition',
+                      help: 'The current conditions of a Pulumi Stack resource.',
+                      each: {
+                        type: 'Gauge',
+                        gauge: {
+                          path: ['status', 'conditions'],
+                          labelsFromPath: {
+                            type: ['type'],
+                            reason: ['reason'],
+                          },
+                          valueFrom: ['status'],
+                        },
+                      },
+                    },
+                    {
+                      name: 'stack_status',
+                      help: 'The current state of a Pulumi Stack resource.',
+                      each: {
+                        type: 'Gauge',
+                        gauge: {
+                          path: ['status'],
+                          labelsFromPath: {
+                            state: ['lastUpdate', 'state'],
+                          },
+                          valueFrom: ['observedGeneration'],
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        rbac: {
+          extraRules: [
+            {
+              apiGroups: ['source.toolkit.fluxcd.io', 'notification.toolkit.fluxcd.io'],
+              resources: ['gitrepositories', 'alerts', 'providers', 'receivers'],
+              verbs: ['list', 'watch'],
+            },
+            {
+              apiGroups: ['pulumi.com'],
+              resources: ['stacks'],
+              verbs: ['list', 'watch'],
+            },
+          ],
+        },
       },
       'prometheus-node-exporter': {
         fullnameOverride: 'node-exporter',
@@ -360,8 +468,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     },
   });
 
-  // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const prometheusStackCrdVersion = '0.68.0';
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {

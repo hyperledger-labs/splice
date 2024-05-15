@@ -1564,6 +1564,9 @@
               }
             }
           },
+          "deploymentStrategy": {
+            "type": "Recreate"
+          },
           "fullnameOverride": "grafana",
           "grafana.ini": {
             "date_formats": {
@@ -1600,7 +1603,168 @@
           }
         },
         "kube-state-metrics": {
-          "fullnameOverride": "ksm"
+          "customResourceState": {
+            "config": {
+              "spec": {
+                "resources": [
+                  {
+                    "groupVersionKind": {
+                      "group": "source.toolkit.fluxcd.io",
+                      "kind": "GitRepository",
+                      "version": "v1"
+                    },
+                    "metricNamePrefix": "cn_deployment_flux",
+                    "metrics": [
+                      {
+                        "each": {
+                          "gauge": {
+                            "labelsFromPath": {
+                              "name": [
+                                "metadata",
+                                "name"
+                              ]
+                            }
+                          },
+                          "type": "Gauge"
+                        },
+                        "help": "The current state of a Flux GitRepository resource.",
+                        "labelsFromPath": {
+                          "exported_namespace": [
+                            "metadata",
+                            "namespace"
+                          ],
+                          "ready": [
+                            "status",
+                            "conditions",
+                            "[type=Ready]",
+                            "status"
+                          ],
+                          "revision": [
+                            "status",
+                            "artifact",
+                            "revision"
+                          ],
+                          "suspended": [
+                            "spec",
+                            "suspend"
+                          ],
+                          "url": [
+                            "spec",
+                            "url"
+                          ]
+                        },
+                        "name": "resource_info"
+                      }
+                    ]
+                  },
+                  {
+                    "groupVersionKind": {
+                      "group": "pulumi.com",
+                      "kind": "Stack",
+                      "version": "v1"
+                    },
+                    "labelsFromPath": {
+                      "generation": [
+                        "status",
+                        "observedGeneration"
+                      ],
+                      "stack": [
+                        "spec",
+                        "stack"
+                      ],
+                      "state": [
+                        "status",
+                        "lastUpdate",
+                        "state"
+                      ]
+                    },
+                    "metricNamePrefix": "cn_deployment_pulumi",
+                    "metrics": [
+                      {
+                        "each": {
+                          "gauge": {
+                            "labelsFromPath": {
+                              "reason": [
+                                "reason"
+                              ],
+                              "type": [
+                                "type"
+                              ]
+                            },
+                            "path": [
+                              "status",
+                              "conditions"
+                            ],
+                            "valueFrom": [
+                              "status"
+                            ]
+                          },
+                          "type": "Gauge"
+                        },
+                        "help": "The current conditions of a Pulumi Stack resource.",
+                        "name": "stack_condition"
+                      },
+                      {
+                        "each": {
+                          "gauge": {
+                            "labelsFromPath": {
+                              "state": [
+                                "lastUpdate",
+                                "state"
+                              ]
+                            },
+                            "path": [
+                              "status"
+                            ],
+                            "valueFrom": [
+                              "observedGeneration"
+                            ]
+                          },
+                          "type": "Gauge"
+                        },
+                        "help": "The current state of a Pulumi Stack resource.",
+                        "name": "stack_status"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "enabled": true
+          },
+          "fullnameOverride": "ksm",
+          "rbac": {
+            "extraRules": [
+              {
+                "apiGroups": [
+                  "source.toolkit.fluxcd.io",
+                  "notification.toolkit.fluxcd.io"
+                ],
+                "resources": [
+                  "gitrepositories",
+                  "alerts",
+                  "providers",
+                  "receivers"
+                ],
+                "verbs": [
+                  "list",
+                  "watch"
+                ]
+              },
+              {
+                "apiGroups": [
+                  "pulumi.com"
+                ],
+                "resources": [
+                  "stacks"
+                ],
+                "verbs": [
+                  "list",
+                  "watch"
+                ]
+              }
+            ]
+          }
         },
         "kubeControllerManager": {
           "enabled": false
@@ -1665,7 +1829,7 @@
           }
         }
       },
-      "version": "57.1.1"
+      "version": "58.5.1"
     },
     "name": "observability-metrics",
     "provider": "",
@@ -2745,9 +2909,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "bash prometheus-crd-update.sh 0.68.0"
+      "create": "bash prometheus-crd-update.sh 0.73.2"
     },
-    "name": "update-prometheus-crd-0.68.0",
+    "name": "update-prometheus-crd-0.73.2",
     "provider": "",
     "type": "command:local:Command"
   },
