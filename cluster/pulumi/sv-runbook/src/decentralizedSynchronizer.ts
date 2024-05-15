@@ -58,6 +58,10 @@ export function installDecentralizedSynchronizerNode(
         ),
         metrics: {
           enable: true,
+          migration: {
+            id: migrationId,
+            active: isActive,
+          },
         },
         disableAutoInit: decentralizedSynchronizerMigrationConfig.isRunningMigration() || !isActive,
       };

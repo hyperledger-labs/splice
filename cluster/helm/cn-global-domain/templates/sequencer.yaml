@@ -17,6 +17,10 @@ spec:
       labels:
         app: {{ .Release.Name }}-sequencer
         cn-component: sequencer
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
     spec:
       {{- if $.Values.enableAntiAffinity }}
       affinity:
@@ -153,6 +157,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}-sequencer
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
 spec:
   selector:
     app: {{ .Release.Name }}-sequencer

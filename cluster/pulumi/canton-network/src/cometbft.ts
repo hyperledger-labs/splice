@@ -99,6 +99,10 @@ export function installCometBftNode(
       },
       metrics: {
         enable: true,
+        migration: {
+          id: migrationId,
+          active: isActiveDomain,
+        },
         labels: isActiveDomain ? [{ key: 'active_migration', value: 'true' }] : [],
       },
       db: {

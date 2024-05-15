@@ -245,6 +245,10 @@ async function installSvAndValidator(
         ),
         metrics: {
           enable: true,
+          migration: {
+            id: migrationId,
+            active: isActive,
+          },
         },
         disableAutoInit:
           disableCantonAutoInit ||

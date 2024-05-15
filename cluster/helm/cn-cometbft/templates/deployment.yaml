@@ -19,6 +19,10 @@ spec:
       labels:
         app: {{ $.Values.node.identifier }}
         cn-component: cometbft
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
     spec:
       {{- if $.Values.enableAntiAffinity }}
       affinity:

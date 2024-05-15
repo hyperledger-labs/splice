@@ -13,6 +13,7 @@ import {
   sanitizedForPostgres,
   Auth0Config,
   LogLevel,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
@@ -48,6 +49,8 @@ export function installMigrationSpecificValidatorParticipant(
         nodeIdentifier,
         version,
         auth0Cfg,
+        migrationId,
+        isActive,
         logLevel,
         dependsOn
       );
@@ -64,6 +67,8 @@ export function installParticipant(
   nodeIdentifier: string,
   version: CnChartVersion,
   auth0Cfg: Auth0Config,
+  migrationId: DomainMigrationIndex,
+  isActiveDomain: boolean,
   logLevel?: LogLevel,
   dependsOn: pulumi.Resource[] = []
 ): Release {
@@ -86,6 +91,10 @@ export function installParticipant(
       disableAutoInit,
       metrics: {
         enable: true,
+        migration: {
+          id: migrationId,
+          active: isActiveDomain,
+        },
       },
       nodeIdentifier,
       additionalJvmOptions: jmxOptions(),

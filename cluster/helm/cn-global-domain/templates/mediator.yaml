@@ -16,6 +16,11 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-mediator
+        cn-component: mediator
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
     spec:
       containers:
       - name: mediator
@@ -118,6 +123,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}-mediator
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
 spec:
   selector:
     app: {{ .Release.Name }}-mediator

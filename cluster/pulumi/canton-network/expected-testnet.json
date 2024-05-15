@@ -899,6 +899,10 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "migration": {
+            "active": true,
+            "id": 0
+          },
           "release": "prometheus-grafana-monitoring"
         },
         "nodeIdentifier": "splitwell",
@@ -1325,6 +1329,10 @@
               "value": "true"
             }
           ],
+          "migration": {
+            "active": true,
+            "id": 0
+          },
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
@@ -1451,6 +1459,10 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "migration": {
+            "active": true,
+            "id": 0
+          },
           "release": "prometheus-grafana-monitoring"
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -1703,6 +1715,10 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "migration": {
+            "active": true,
+            "id": 0
+          },
           "release": "prometheus-grafana-monitoring"
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -2434,6 +2450,10 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "migration": {
+            "active": true,
+            "id": 0
+          },
           "release": "prometheus-grafana-monitoring"
         },
         "nodeIdentifier": "validator1",

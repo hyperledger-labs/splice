@@ -22,6 +22,11 @@ spec:
   selector:
     matchLabels:
       name: {{ $fullRpcHostName }}
+  {{- if .Values.metrics.migration }}
+  targetLabels:
+    - active_migration
+    - migration_id
+  {{- end }}
 
   namespaceSelector:
     matchNames:

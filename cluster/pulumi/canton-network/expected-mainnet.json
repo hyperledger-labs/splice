@@ -441,7 +441,11 @@
               "key": "active_migration",
               "value": "true"
             }
-          ]
+          ],
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "node": {
           "externalAddress": "global.canton.network.digitalasset.com:26016",
@@ -552,7 +556,11 @@
           }
         },
         "metrics": {
-          "enable": true
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "nodeIdentifier": "Digital-Asset-2",
         "sequencer": {
@@ -784,7 +792,11 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "metrics": {
-          "enable": true
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {

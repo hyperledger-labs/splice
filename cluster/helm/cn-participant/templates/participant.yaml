@@ -16,6 +16,10 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
     spec:
       containers:
       - name: participant
@@ -126,6 +130,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
 spec:
   selector:
     app: {{ .Release.Name }}

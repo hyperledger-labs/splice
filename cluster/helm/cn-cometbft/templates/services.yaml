@@ -26,6 +26,10 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     name: {{ $fullRpcHostName }}
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
 spec:
   type: ClusterIP
   ports:

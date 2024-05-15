@@ -320,7 +320,11 @@
               "key": "active_migration",
               "value": true
             }
-          ]
+          ],
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "node": {
           "externalAddress": "global-domain-0-cometbft.sv.dev.global.canton.network.digitalasset.com:26056",
@@ -362,7 +366,11 @@
           }
         },
         "metrics": {
-          "enable": true
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "sequencer": {
@@ -433,7 +441,11 @@
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
-          "enable": true
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 0
+          }
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {

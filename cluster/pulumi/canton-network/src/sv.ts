@@ -411,6 +411,8 @@ function installMigrationIdSpecificComponents(
         svConfig.onboardingName,
         version,
         svConfig.auth0Client.getCfg(),
+        migrationId,
+        isActive,
         logLevel
       );
       const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(

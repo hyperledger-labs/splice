@@ -106,6 +106,10 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
         },
         metrics: {
           enable: true,
+          migration: {
+            id: domainMigrationId,
+            active: active,
+          },
         },
         additionalJvmOptions: jmxOptions(),
         disableAutoInit: disableAutoInit,
