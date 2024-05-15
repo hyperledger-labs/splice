@@ -8,9 +8,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.tests.auth.PreflightAuthUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import io.circe.*
-import io.circe.parser.*
-
 import java.net.{InetSocketAddress, Socket}
 import scala.util.Using
 
@@ -50,40 +47,6 @@ class CometBftPreflightIntegrationTest
       eventuallySucceeds() {
         sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
       }
-    }
-  }
-
-  if (sys.env.getOrElse("ENABLE_COMETBFT_PRUNING", "false") == "true") {
-
-    val RetainBlocks = sys.env("COMETBFT_RETAIN_BLOCKS").toInt
-
-    "SVs prune their CometBFT stack" in { implicit env =>
-      Seq("sv1", "sv2", "sv3", "sv4").foreach(svName => {
-
-        val sv = svClientWithToken(svName)
-
-        eventuallySucceeds() {
-          val status = parse(
-            sv
-              .cometBftNodeDebugDump()
-              .status
-              .toString()
-          ).getOrElse(Json.Null)
-
-          val syncInfo = status.hcursor.downField("sync_info")
-
-          val latestBlockHeight = syncInfo
-            .get[Int]("latest_block_height")
-            .value
-
-          val earliestBlockHeight = syncInfo
-            .get[Int]("earliest_block_height")
-            .value
-
-          (latestBlockHeight - earliestBlockHeight) should be < (RetainBlocks * 1.05).toInt
-        }
-
-      })
     }
   }
 

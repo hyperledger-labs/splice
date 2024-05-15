@@ -33,7 +33,7 @@ import io.grpc.Status
 /** A handle to a CometBFT node.
   */
 class CometBftNode(
-    cometBftClient: CometBftClient,
+    val cometBftClient: CometBftClient,
     val cometBftRequestSigner: CometBftRequestSigner,
     val cometBftConfig: CometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
@@ -299,6 +299,12 @@ class CometBftNode(
     cometBftClient
       .nodeStatus()
       .map(_.syncInfo.latestBlockHeight)
+  }
+
+  def getEarliestBlockHeight()(implicit tc: TraceContext): Future[Long] = {
+    cometBftClient
+      .nodeStatus()
+      .map(_.syncInfo.earliestBlockHeight)
   }
 }
 

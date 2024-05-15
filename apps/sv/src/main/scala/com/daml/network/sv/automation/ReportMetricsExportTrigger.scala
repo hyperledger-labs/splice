@@ -11,7 +11,11 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
 import com.daml.network.environment.CNMetrics
-import com.daml.network.sv.automation.SvStatusReportMetricsExportTrigger.SvStatusMetrics
+import com.daml.network.sv.automation.ReportMetricsExportTrigger.{
+  SvCometBftMetrics,
+  SvStatusMetrics,
+}
+import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
@@ -28,9 +32,10 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** A trigger to export the SvStatus reports as metrics. */
-class SvStatusReportMetricsExportTrigger(
+class ReportMetricsExportTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
+    cometBftNode: Option[CometBftNode],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -40,30 +45,32 @@ class SvStatusReportMetricsExportTrigger(
       SvStatusReport.COMPANION,
     ) {
 
-  private val perSvMetrics: TrieMap[SvStatusReportMetricsExportTrigger.SvId, SvStatusMetrics] =
+  private val svCometBftMetrics = new SvCometBftMetrics(context.metricsFactory)
+
+  private val perSvStatusMetrics: TrieMap[ReportMetricsExportTrigger.SvId, SvStatusMetrics] =
     TrieMap.empty
 
-  private def getSvMetrics(svId: SvStatusReportMetricsExportTrigger.SvId): SvStatusMetrics =
-    perSvMetrics.getOrElse(
+  private def getSvStatusMetrics(svId: ReportMetricsExportTrigger.SvId): SvStatusMetrics =
+    perSvStatusMetrics.getOrElse(
       svId,
       // We must synchronize here to avoid allocating the metrics for the same sv multiple times, which would lead to
       // duplicate metric labels being reported by OpenTelemetry.
       blocking {
         synchronized {
-          perSvMetrics.getOrElseUpdate(svId, SvStatusMetrics(svId, context.metricsFactory))
+          perSvStatusMetrics.getOrElseUpdate(svId, SvStatusMetrics(svId, context.metricsFactory))
         }
       },
     )
 
   private def closeAllOffboardedSvMetrics(
-      svIdsFromDsoRules: Set[SvStatusReportMetricsExportTrigger.SvId]
+      svIdsFromDsoRules: Set[ReportMetricsExportTrigger.SvId]
   )(implicit tc: TraceContext): Unit = {
 
-    val svIdsToClose = perSvMetrics.keySet.toSet -- svIdsFromDsoRules
-    perSvMetrics.view.filterKeys(svIdsToClose.contains).foreach(_._2.close())
+    val svIdsToClose = perSvStatusMetrics.keySet.toSet -- svIdsFromDsoRules
+    perSvStatusMetrics.view.filterKeys(svIdsToClose.contains).foreach(_._2.close())
     blocking {
       synchronized {
-        perSvMetrics --= svIdsToClose: Unit
+        perSvStatusMetrics --= svIdsToClose: Unit
       }
     }
     if (svIdsToClose.nonEmpty)
@@ -78,21 +85,31 @@ class SvStatusReportMetricsExportTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
     svIdsFromDsoRules = dsoRules.payload.svs.asScala.map { case (svParty, svInfo) =>
-      SvStatusReportMetricsExportTrigger.SvId(svParty, svInfo.name)
+      ReportMetricsExportTrigger.SvId(svParty, svInfo.name)
     }.toSet
     // Note: We rely on there always being other SVs that still update their status reports. This is a reasonable assumption:
     // If no status reports go through the domain, we get alerts anyway so it doesn't matter much whether one SV is
     // removed or not.
     _ = closeAllOffboardedSvMetrics(svIdsFromDsoRules)
     report = task.payload
-    svId = SvStatusReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
+    svId = ReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
+    (earliestBlockHeight, latestBlockHeight) <- cometBftNode match {
+      case None => Future.successful((0L, 0L))
+      case Some(cometBftNode) =>
+        for {
+          earliestBlockHeight <- cometBftNode.getEarliestBlockHeight()
+          latestBlockHeight <- cometBftNode.getLatestBlockHeight()
+        } yield (earliestBlockHeight, latestBlockHeight)
+    }
   } yield {
+    svCometBftMetrics.cometBftEarliestBlockHeight.updateValue(earliestBlockHeight)
+    svCometBftMetrics.cometBftLatestBlockHeight.updateValue(latestBlockHeight)
     report.status.toScala match {
       case None => TaskNoop
       case _ if !svIdsFromDsoRules.contains(svId) =>
         TaskSuccess(s"$svId is off-boarded. Not updating SvStatusReport metrics")
       case Some(status) =>
-        val metrics = getSvMetrics(svId)
+        val metrics = getSvStatusMetrics(svId)
         metrics.reportNumber.updateValue(task.payload.number)
         metrics.creationTime.updateValue(
           CantonTimestamp.assertFromInstant(task.payload.status.get().createdAt).toMicros
@@ -105,10 +122,8 @@ class SvStatusReportMetricsExportTrigger(
         )
         metrics.cometBftHeight.updateValue(status.cometBftHeight)
         metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
-
-        TaskSuccess(show"Updated SvStatusReport metrics")
+        TaskSuccess(show"Updated metrics")
     }
-
   }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
@@ -117,14 +132,43 @@ class SvStatusReportMetricsExportTrigger(
       .appended(
         SyncCloseable(
           "per-sv status report metrics",
-          perSvMetrics.values.foreach(_.close()),
+          perSvStatusMetrics.values.foreach(_.close()),
+        )
+      )
+      .appended(
+        SyncCloseable(
+          "per-sv cometbft metrics", {
+            svCometBftMetrics.close()
+          },
         )
       )
 }
 
-object SvStatusReportMetricsExportTrigger {
+object ReportMetricsExportTrigger {
 
   private case class SvId(svParty: String, svName: String)
+
+  private case class SvCometBftMetrics(
+      metricsFactory: CantonLabeledMetricsFactory
+  ) extends AutoCloseable {
+
+    private implicit val mc: MetricsContext =
+      MetricsContext.Empty
+
+    private val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_cometbft"
+
+    private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
+      metricsFactory.gauge(prefix :+ name, initial = initial)
+
+    val cometBftEarliestBlockHeight: Gauge[Long] = gauge("earliest_block_height", initial = 0L)
+    val cometBftLatestBlockHeight: Gauge[Long] = gauge("latest_block_height", initial = 0L)
+
+    override def close(): Unit = {
+      cometBftEarliestBlockHeight.close()
+      cometBftLatestBlockHeight.close()
+    }
+  }
+
   private case class SvStatusMetrics(
       svId: SvId,
       metricsFactory: CantonLabeledMetricsFactory,

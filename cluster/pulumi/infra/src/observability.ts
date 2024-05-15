@@ -14,6 +14,8 @@ import {
   REPO_ROOT,
   config,
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
+  ENABLE_COMETBFT_PRUNING,
+  COMETBFT_RETAIN_BLOCKS,
 } from 'cn-pulumi-common';
 
 import { createGrafanaDashboards } from './grafana-dashboards';
@@ -539,10 +541,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
         ...{
           'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
           'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
-          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml').replaceAll(
-            '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
-            EXPECTED_MAX_BLOCK_RATE_PER_SECOND
-          ),
+          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
+            .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
+            .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
+            .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
           'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),

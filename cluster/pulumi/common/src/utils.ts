@@ -20,6 +20,12 @@ export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const EXPECTED_MAX_BLOCK_RATE_PER_SECOND =
   config.optionalEnv('EXPECTED_MAX_BLOCK_RATE_PER_SECOND') || '2.5';
 
+export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
+
+export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
+  ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
+  : 0;
+
 export type LogLevel = 'INFO' | 'DEBUG';
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
