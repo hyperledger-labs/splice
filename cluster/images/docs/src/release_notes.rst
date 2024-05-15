@@ -28,6 +28,8 @@ Upcoming
 
   * Removed splitwell related documentation.
 
+  * Removed Self-Hosted Validator documentation.
+
 * Deployment
 
   * The values `nodeId`, `publicKey` and `keyAddress` in the `founder` section of the cometbft helm chart are not set
@@ -991,7 +993,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
 
   This UI currently allows the SV operator to see information about their SV party, and the rest of the SV collective.
   It allows allows the SV operator to onboard a validator by generating a validator onboarding secret
-  (see the :ref:`Self-Hosted Validator runbook <self_hosted_validator>` for how that secret is then used by the validator operator).
+  (see the Self-Hosted Validator runbook for how that secret is then used by the validator operator).
 
 * Fix a bug where ``cn-node`` sometimes failed to start with a ``ClassNotFoundException``.
 

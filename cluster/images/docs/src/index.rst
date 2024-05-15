@@ -27,7 +27,6 @@ Canton Network Documentation
    :maxdepth: 2
    :caption: Validator Operators
 
-   validator_operator/self_hosting.rst
    validator_operator/validator_helm.rst
    validator_operator/validator_upgrades.rst
    validator_operator/validator_backups.rst
