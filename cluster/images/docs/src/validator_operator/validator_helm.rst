@@ -101,6 +101,8 @@ The password can be setup with the following command, assuming you set the envir
         --from-literal=postgresPassword=${POSTGRES_PASSWORD} \
         -n validator
 
+.. _validator-onboarding:
+
 Preparing for Validator Onboarding
 ----------------------------------
 

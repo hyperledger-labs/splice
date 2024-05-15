@@ -9,7 +9,7 @@ as well as general information useful to SV node operators.
 .. _generate_onboarding_secret:
 
 Generate a validator onboarding secret
----------------------------------------
+--------------------------------------
 
 If you want to onboard a new validator, you can obtain an onboarding secret directly from the SV web UI.
 
@@ -21,25 +21,7 @@ and copy the last generated `onboarding secret`.
   :width: 600
   :alt: Generate an onboarding secret in the SV UI.
 
-Using the secret, you can now create ``validator-onboarding-conf`` by replacing it in the template below and specifying the URL of
-your SV there, as it will be the onboarding sponsor of the new validator (e.g. *https://sv.sv.your_domain.com/*):
-
-::
-
-    canton {
-      validator-apps {
-        validatorApp {
-          onboarding = {
-            sv-client.admin-api.url = "http://<SV_API_URL>"
-            secret = "<ONBOARDING_SECRET>"
-          }
-        }
-      }
-    }
-
-Save that configuration file as ``validator-conboarding.conf`` in the
-root of the extracted release and follow the self-hosted
-:ref:`validator instructions to spin up another validator <self_hosted_validator>`.
+Using the secret, the validator operator can follow :ref:`this instruction to prepare for validator onboarding <validator-onboarding>`.
 
 .. _sv-identities-overview:
 

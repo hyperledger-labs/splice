@@ -12,7 +12,7 @@ Deployment
     on your host machine(s) (we use k8s for :term:`CC`)
   * More concretely, for the default application topology
 
-    * deploy a :ref:`self_hosted_validator`
+    * deploy a :ref:`validator node <k8s_validator>`:
 
       * you can host multiple applications on the same validator node provided
         there is no resource contention
