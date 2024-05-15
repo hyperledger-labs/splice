@@ -574,6 +574,7 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "enablePostgresMetrics": true,
         "metrics": {
           "enable": true
         },
@@ -582,7 +583,8 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "host": "apps-pg",
+          "host": "apps-pg.sv.svc.cluster.local",
+          "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
         "sequencerAddress": "global-domain-0-sequencer"

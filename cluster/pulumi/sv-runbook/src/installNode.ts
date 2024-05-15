@@ -364,11 +364,16 @@ async function installSvAndValidator(
     SV_APP_HELM_CHART_TIMEOUT_SEC
   );
 
-  const scanValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
+  const defaultScanValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`,
+    {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
-    }),
+    }
+  );
+  const scanValues: ChartValues = {
+    ...defaultScanValues,
+    ...persistenceForPostgres(appsPg, defaultScanValues),
     metrics: {
       enable: true,
     },
@@ -376,7 +381,6 @@ async function installSvAndValidator(
 
   const scanValuesWithFixedTokens = {
     ...scanValues,
-    ...persistenceForPostgres(appsPg, scanValues),
     ...fixedTokensValue,
   };
 

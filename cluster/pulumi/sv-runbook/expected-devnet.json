@@ -460,6 +460,7 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
@@ -469,7 +470,8 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "host": "apps-pg",
+          "host": "apps-pg.sv.svc.cluster.local",
+          "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
         "sequencerAddress": "global-domain-0-sequencer"
