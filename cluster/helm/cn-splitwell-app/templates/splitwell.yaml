@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: splitwell-app
+    migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
   selector:
@@ -102,6 +103,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: splitwell-app
+    migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
     app: splitwell-app
