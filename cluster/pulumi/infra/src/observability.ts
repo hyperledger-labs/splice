@@ -547,6 +547,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
             .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
           'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+          'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
           'templates.yaml': readGrafanaAlertingFile('templates.yaml')
             .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
