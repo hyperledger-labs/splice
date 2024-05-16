@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.automation.Trigger
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs
 import com.daml.network.environment.{BaseLedgerConnection, CNNodeEnvironmentImpl}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.CNNodeUtil.ccToDollars
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.automation.AutoAcceptTransferOffersTrigger
 import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -22,7 +22,8 @@ import scala.concurrent.duration.DurationInt
 
 class WalletSweepIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with WalletTestUtil {
+    with WalletTestUtil
+    with TriggerTestUtil {
 
   val maxBalanceUsd: BigDecimal = BigDecimal(10)
   val minBalanceUsd: BigDecimal = BigDecimal(2)
@@ -124,20 +125,29 @@ class WalletSweepIntegrationTest
           }
         }
         val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
+        def sv1Balance() = BigDecimal(
+          ccToDollars(
+            sv1WalletClient.balance().unlockedQty.bigDecimal,
+            amuletPrice.bigDecimal,
+          )
+        )
 
-        bracket(
-          aliceAutoAcceptTransferOffersTrigger.pause().futureValue,
-          aliceAutoAcceptTransferOffersTrigger.resume(),
+        setTriggersWithin(
+          triggersToPauseAtStart = autoAcceptTransferOffersTriggers,
+          Seq.empty,
         ) {
-          actAndCheck(
+          val (_, firstTransferAmountUsd) = actAndCheck(
             "SV1 receives funds and exceeds the maximum balance",
             sv1WalletClient.tap(maxBalanceUsd + 2),
           )(
             "Alice sees exactly one transfer offer",
             { _ =>
               eventually() {
-                aliceValidatorWalletClient.listTransferOffers() should have size 1
+                sv1Balance() shouldBe >(maxBalanceUsd)
+                val txOffers = aliceValidatorWalletClient.listTransferOffers()
+                txOffers should have size 1
                 aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
+                ccToDollars(txOffers.headOption.value.payload.amount.amount, amuletPrice.bigDecimal)
               }
             },
           )
@@ -147,6 +157,7 @@ class WalletSweepIntegrationTest
           )(
             "Alice sees a second transfer offer",
             { _ =>
+              sv1Balance() - firstTransferAmountUsd shouldBe >(maxBalanceUsd)
               eventually() {
                 aliceValidatorWalletClient.listTransferOffers() should have size 2
                 aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
@@ -158,13 +169,7 @@ class WalletSweepIntegrationTest
           eventually(40.seconds) {
             aliceValidatorWalletClient.listTransferOffers() shouldBe empty
             aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-            val newSv1Balance = BigDecimal(
-              ccToDollars(
-                sv1WalletClient.balance().unlockedQty.bigDecimal,
-                amuletPrice.bigDecimal,
-              )
-            )
-            newSv1Balance should beWithin(minBalanceUsd, maxBalanceUsd)
+            sv1Balance() should beWithin(minBalanceUsd, maxBalanceUsd)
             aliceValidatorWalletClient
               .balance()
               .unlockedQty
@@ -185,10 +190,7 @@ class WalletSweepIntegrationTest
     }
     val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
 
-    bracket(
-      aliceAutoAcceptTransferOffersTrigger.pause().futureValue,
-      aliceAutoAcceptTransferOffersTrigger.resume(),
-    ) {
+    setTriggersWithin(triggersToPauseAtStart = autoAcceptTransferOffersTriggers, Seq.empty) {
       actAndCheck(
         "SV1 receives funds and exceeds the maximum balance",
         sv1WalletClient.tap(maxBalanceUsd + 2),
@@ -226,12 +228,15 @@ class WalletSweepIntegrationTest
     }
   }
 
-  def aliceAutoAcceptTransferOffersTrigger(implicit
+  // triggers relevant to outstanding sweep transfer offers
+  def autoAcceptTransferOffersTriggers(implicit
       environment: CNNodeTestConsoleEnvironment
-  ): AutoAcceptTransferOffersTrigger = {
+  ): Seq[Trigger] = {
     val aliceUserName = aliceValidatorWalletClient.config.ledgerApiUser
-    aliceValidatorBackend
-      .userWalletAutomation(aliceUserName)
-      .trigger[AutoAcceptTransferOffersTrigger]
+    Seq(
+      aliceValidatorBackend
+        .userWalletAutomation(aliceUserName)
+        .trigger[AutoAcceptTransferOffersTrigger]
+    )
   }
 }

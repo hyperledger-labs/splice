@@ -60,6 +60,13 @@ class WalletSweepTrigger(
         val trackingId = UUID.randomUUID.toString
         Seq(WalletSweepTrigger.Task(trackingId))
       } else {
+        // TODO (#12289) remove this log after flakes yield some samples
+        logger.debug {
+          if (balanceUsd > config.maxBalanceUsd.value)
+            s"Wallet funds not swept from balance $balanceUsd as transfers of $sumOfOutstandingTransfersOffersUsd already outstanding"
+          else
+            s"Wallet funds not swept from balance $balanceUsd as within maximum balance"
+        }
         Seq.empty
       }
     }
