@@ -11,13 +11,14 @@ import com.daml.network.http.v0.definitions.{
   ReleaseConfiguration,
   Timespan,
 }
+import com.daml.network.http.UrlValidator
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
-  SplitwellSynchronizerConfig,
   SplitwellDomains,
+  SplitwellSynchronizerConfig,
 }
 import com.daml.network.sv.config.*
 import com.daml.network.sv.SvAppClientConfig
@@ -440,7 +441,15 @@ object CNNodeConfig {
       deriveReader[ApprovedSvIdentityConfig]
     implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
     implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] =
-      deriveReader[SvSequencerConfig]
+      deriveReader[SvSequencerConfig].emap { sequencerConfig =>
+        UrlValidator
+          .isValid(sequencerConfig.externalPublicApiUrl)
+          .bimap(
+            invalidUrl =>
+              ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
+            _ => sequencerConfig,
+          )
+      }
     implicit val sequencerPruningConfig: ConfigReader[SequencerPruningConfig] =
       deriveReader[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =

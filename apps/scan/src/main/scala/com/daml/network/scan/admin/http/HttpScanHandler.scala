@@ -41,6 +41,7 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   Mint,
   Transfer,
 }
+import com.daml.network.http.UrlValidator
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -524,8 +525,22 @@ class HttpScanHandler(
           )
         }
         .map(list =>
-          definitions.ListDsoSequencersResponse(list.map { case (domainId, scans) =>
-            definitions.DomainSequencers(domainId, scans.toVector)
+          list.map { case (domainId, sequencers) =>
+            domainId -> sequencers.filter { sequencer =>
+              UrlValidator.isValid(sequencer.url) match {
+                case Left(failure) =>
+                  logger.warn(
+                    s"Not serving sequencer $sequencer for domain $domainId as it has an invalid url: $failure"
+                  )
+                  false
+                case Right(_) => true
+              }
+            }
+          }
+        )
+        .map(list =>
+          definitions.ListDsoSequencersResponse(list.map { case (domainId, sequencers) =>
+            definitions.DomainSequencers(domainId, sequencers.toVector)
           })
         )
     }
