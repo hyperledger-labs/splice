@@ -114,6 +114,46 @@ testUnclaimedRewards_withCoupons = do
   mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
   pure ()
 
+testNoUnclaimedRewards : Script ()
+testNoUnclaimedRewards = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- bare-create enough rewards that there are no unclaimed rewards
+  _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = provider1.primaryParty
+    amount = 4000.0
+    round = Round 0
+    featured = True
+
+  _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = provider1.primaryParty
+    amount = 1000.0
+    round = Round 0
+    featured = False
+
+  _ <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+    dso = app.dso
+    user = alice.primaryParty
+    amount = 30000000.0
+    round = Round 0
+
+  _ <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
+    dso = app.dso
+    sv = provider2.primaryParty
+    beneficiary = provider2.primaryParty
+    round = Round 0
+    weight = 15
+
+  -- -- start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  unclaimedRewards <- query @UnclaimedReward app.dso
+  unclaimedRewards === []
+  pure ()
+
 mergeAndCheckUnclaimedRewardAmount : AmuletApp -> Decimal -> Script ()
 mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
   mergeUnclaimedRewards app

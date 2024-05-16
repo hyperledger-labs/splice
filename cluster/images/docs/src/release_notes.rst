@@ -36,6 +36,12 @@ Upcoming
     in the chart defaults but must be explicitly provided. See the comments in the example `cometbft-values.yaml`
     for the values to use for DevNet, TestNet or MainNet.
 
+* Daml
+
+  Fixed a bug that prevented a round from moving to the issuing state if there are no unclaimed rewards for that round.
+  This requires upgrading ``splice-amulet``, ``splice-amulet-name-service``, ``splice-dso-governance`` and ``splice-wallet``
+  to version ``0.1.1`` through a governance vote on AmuletConfig.
+
 0.1.8
 -----
 

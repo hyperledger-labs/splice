@@ -111,12 +111,21 @@ object BuildCommon {
     Seq(
       Compile / resourceGenerators += Def.task {
         val Seq(versionedDar, currentDar) = (Compile / damlBuild).value
+        val darName = currentDar.getName.stripSuffix("-current.dar")
+        val dars =
+          java.nio.file.Paths.get("daml").resolve("dars").toFile.listFiles(s"$darName-*.dar").toSeq
         val dstVersionedFile = (Compile / resourceDirectory).value / "dar" / versionedDar.getName()
         IO.copyFile(versionedDar, dstVersionedFile)
         val dstCurrentFile = (Compile / resourceDirectory).value / "dar" / currentDar.getName()
         IO.copyFile(currentDar, dstCurrentFile)
 
-        Seq(dstVersionedFile, dstCurrentFile)
+        val targets = dars.filter(_.getName != versionedDar.getName).map { dar =>
+          val target = (Compile / resourceDirectory).value / dar.getName
+          IO.copyFile(dar, target)
+          target
+        }
+
+        Seq(dstVersionedFile, dstCurrentFile) ++ targets
       }.taskValue,
       cleanFiles += {
         (Compile / resourceDirectory).value / "dar"

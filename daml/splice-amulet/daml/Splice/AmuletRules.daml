@@ -364,9 +364,11 @@ template AmuletRules
               miningRound.tickDuration miningRound.amuletPrice miningRound.issuanceConfig summary
 
         -- record unclaimed reward contract
-        create UnclaimedReward with
-          dso
-          amount = params.unclaimedValidatorRewards + params.unclaimedAppRewards + params.unclaimedSvRewards
+        let totalUnclaimedRewards = params.unclaimedValidatorRewards + params.unclaimedAppRewards + params.unclaimedSvRewards
+        when (totalUnclaimedRewards > 0.0) $
+          void $ create UnclaimedReward with
+            dso
+            amount = totalUnclaimedRewards
 
         -- create issuing round
         now <- getTime
