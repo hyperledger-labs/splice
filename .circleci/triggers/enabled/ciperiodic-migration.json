@@ -1,11 +1,11 @@
 {
     "name" : "CIPeriodic Migration Test",
-    "description" : "Tests a synchronizer migration with version upgrade from 0.1.9-snapshot.20240514.5928.0.v93efff76 to the version on main; TODO(#11659) don't the hardcode version like that",
+    "description" : "Tests a synchronizer migration with version upgrade from 0.1.9-snapshot.20240516.5948.0.v181a62a8 to the version on main; TODO(#11659) don't the hardcode version like that",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
       "run-job": "deploy-ciperiodic-migration",
-      "base-version": "93efff76e1ed72d9404cc3de2a5c71d9e6a5d929"
+      "base-version": "181a62a824ed5fd9db8603a2e999ecb6e652ccb6"
     },
     "timetable" : {
       "per-hour" : 1,
