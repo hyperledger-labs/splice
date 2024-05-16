@@ -42,6 +42,7 @@ parameters:
         healthcheck-devnet,
         healthcheck-testnet,
         redeploy-sv-runbook-cidaily,
+        redeploy-validator-runbook-cidaily,
         redeploy-sv-runbook-devnet,
         reset-sv-runbook-cilr,
         backup-cidaily,
