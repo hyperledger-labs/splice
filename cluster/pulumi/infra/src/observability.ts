@@ -104,7 +104,7 @@ const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
 const disablePrometheusAlerts = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
-const shouldIgnoreDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
+const shouldIgnoreNoDataOrDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
 const slackAlertNotificationChannel =
   config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 
@@ -568,10 +568,12 @@ function readGrafanaAlertingFile(file: string) {
     `${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
     'utf-8'
   );
-  // Ignore data source error if the cluster is reset periodically
-  return shouldIgnoreDataSourceError
-    ? fileContent.replace(/execErrState: .+/g, 'execErrState: OK')
-    : fileContent.replace(/execErrState: .+/g, 'execErrState: Error');
+  // Ignore no data or data source error if the cluster is reset periodically
+  return shouldIgnoreNoDataOrDataSourceError
+    ? fileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
+    : fileContent
+        .replace(/noDataState: .+/g, 'noDataState: NoData')
+        .replace(/execErrState: .+/g, 'execErrState: Error');
 }
 
 function readAlertingManagerFile(file: string) {
