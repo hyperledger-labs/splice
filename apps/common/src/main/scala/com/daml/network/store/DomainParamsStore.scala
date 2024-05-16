@@ -1,8 +1,12 @@
 package com.daml.network.store
 
-import com.daml.network.environment.{RetryProvider, TopologyAdminConnection}
+import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
+import com.daml.metrics.api.MetricDoc.MetricQualification.Traffic
+import com.daml.metrics.api.MetricHandle.Gauge
+import com.daml.network.environment.{CNMetrics, RetryProvider, TopologyAdminConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.topology.transaction.DomainParametersStateX
 import com.digitalasset.canton.tracing.TraceContext
@@ -32,6 +36,9 @@ final class DomainParamsStore(
     extends DomainUnpausedSynchronization
     with AutoCloseable
     with NamedLogging {
+
+  private val metrics: DomainParamsStore.Metrics =
+    new DomainParamsStore.Metrics(retryProvider.metricsFactory)
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile
@@ -90,6 +97,9 @@ final class DomainParamsStore(
       ]
   )(implicit tc: TraceContext): Future[Unit] = Future {
     val unpaused = isDomainUnpaused(params)
+    metrics.confirmationRequestsMaxRate.updateValue(
+      params.mapping.parameters.confirmationRequestsMaxRate.value
+    )
     blocking {
       synchronized {
         val newState = state.copy(lastParams = Some(params))
@@ -114,7 +124,9 @@ final class DomainParamsStore(
       params: TopologyAdminConnection.TopologyResult[DomainParametersStateX]
   ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero
 
-  override def close(): Unit = ()
+  override def close(): Unit = {
+    metrics.close()
+  }
 }
 
 object DomainParamsStore {
@@ -123,4 +135,22 @@ object DomainParamsStore {
       lastParams: Option[TopologyAdminConnection.TopologyResult[DomainParametersStateX]],
       domainUnpausedPromise: Option[Promise[Unit]],
   )
+
+  class Metrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
+
+    val prefix: MetricName = CNMetrics.MetricsPrefix :+ "domain_params_store"
+
+    @MetricDoc.Tag(
+      summary = "DynamicDomainParameters.confirmationRequestsMaxRate",
+      description =
+        "Last known value of DynamicDomainParameters.confirmationRequestsMaxRate on the configured global domain.",
+      qualification = Traffic,
+    )
+    val confirmationRequestsMaxRate: Gauge[Int] =
+      metricsFactory.gauge(prefix :+ "confirmation-requests-max-rate", -1)(MetricsContext.Empty)
+
+    override def close() = {
+      confirmationRequestsMaxRate.close()
+    }
+  }
 }
