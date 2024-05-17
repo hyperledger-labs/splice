@@ -155,15 +155,23 @@ export async function installCluster(
       end,
     };
   }
+  const expectedValidatorOnboardings: ExpectedValidatorOnboarding[] = [];
+  if (mustInstallSplitwell) {
+    expectedValidatorOnboardings.push(splitwellOnboarding);
+  }
+  if (mustInstallValidator1) {
+    expectedValidatorOnboardings.push(validator1Onboarding);
+  }
+  if (standaloneValidatorOnboarding) {
+    expectedValidatorOnboardings.push(standaloneValidatorOnboarding);
+  }
 
   const dso = new Dso('dso', {
     dsoSize: getDsoSize(),
 
     auth0Client,
     approvedSvIdentities: approveSvRunbook ? svRunbookApprovedSvIdentities : [],
-    expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding].concat(
-      standaloneValidatorOnboarding ? [standaloneValidatorOnboarding] : []
-    ),
+    expectedValidatorOnboardings,
     isDevNet,
     periodicBackupConfig,
     identitiesBackupLocation,

@@ -224,50 +224,6 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "c3BsaXR3ZWxsc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-onboarding-splitwell",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-validator-onboarding-splitwell",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-onboarding-validator1",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-validator-onboarding-validator1",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
@@ -1009,28 +965,7 @@
           "sequencerPublicUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
-        "expectedValidatorOnboardings": [
-          {
-            "expiresIn": "24h",
-            "secretFrom": {
-              "secretKeyRef": {
-                "key": "secret",
-                "name": "cn-app-validator-onboarding-splitwell",
-                "optional": false
-              }
-            }
-          },
-          {
-            "expiresIn": "24h",
-            "secretFrom": {
-              "secretKeyRef": {
-                "key": "secret",
-                "name": "cn-app-validator-onboarding-validator1",
-                "optional": false
-              }
-            }
-          }
-        ],
+        "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
           "bucket": {
