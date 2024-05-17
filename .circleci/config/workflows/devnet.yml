@@ -9,7 +9,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_devnet devnet_health_check"
+          workflow_names: "deploy_devnet devnet_health_check redeploy_validator_runbook_devnet redeploy_sv_runbook_devnet"
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -173,6 +173,66 @@ workflow:
           cluster: "devnet"
           requires:
             - deploy_sv_runbook
+
+  redeploy_validator_runbook_devnet:
+    when:
+      equal: [ redeploy-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet redeploy_validator_runbook_devnet"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
+          # because the branch is not yet updated.
+          workflow_names: "deploy_devnet"
+      - artifacts_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          skip_if_exists: true
+      - deploy_validator_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          cluster: "devnet"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_validator_check:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          cluster: "devnet"
+          requires:
+            - deploy_validator_runbook
 
   backup_devnet:
     when:
