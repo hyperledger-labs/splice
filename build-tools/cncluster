@@ -2710,6 +2710,29 @@ function subcmd_unprotect_dbs() {
   done
 }
 
+###
+
+subcommand_whitelist[unprotect_all]='Unprotects ALL resources in given stack'
+
+function subcmd_unprotect_all() {
+  stack="${1:-}"
+
+  if [ -z "${stack:-}" ]; then
+    _error "Usage: $SCRIPTNAME unprotect_all <stack>"
+  fi
+
+  _info "ALL resources in the pulumi stack $stack will be unprotected."
+  _prompt_to_confirm
+
+  # ignore "Running pulumi command..."
+  export=$(subcmd_pulumi "$stack" stack export | tail -n +2)
+
+  # find all the protected urns
+  jq -r '.deployment.resources[] | select(.protect == true) | .urn' <<< "$export" | while read -r urn; do
+    subcmd_pulumi "$stack" state unprotect "$urn" --yes || true
+  done
+}
+
 ################################
 ### Main
 ################################
