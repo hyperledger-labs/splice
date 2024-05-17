@@ -3137,7 +3137,7 @@ jobs:
         default: true
       test_names_file:
         type: string
-        default: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log,test-full-class-names-validator1-preflight.log"
+        default: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
       parallelism:
         type: integer
         default: 3

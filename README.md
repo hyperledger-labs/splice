@@ -955,7 +955,6 @@ cncluster preflight
 ```
 
 Note:
-- The preflight command automatically starts & stops the self-hosted frontends needed for `SelfHostedPreflightIntegrationTest`.
 - The preflight check will fail if your branch is sufficiently divergent from the main branch (in particular, if you made any changes to the Daml model).
 
 You can also launch an SBT shell that is configured to run the

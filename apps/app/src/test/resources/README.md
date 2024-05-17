@@ -47,12 +47,8 @@ all network indices must be odd numbers.
 
 - `5`: Default for integration tests
   - See `simple-topology.conf`, `simple-topology-canton.conf`.
-- `5`: Self-hosted validator for preflight check
-  - See `validator.conf`, `validator-participant.conf`
-- `7`: Local runbook integration test, self-hosted validator
-  - See `LocalRunbookIntegrationTest.scala`
 - `9`: Local runbook integration test and participant identities dump test, `sv1Local`, `aliceValidatorLocal`
-  - See `LocalRunbookIntegrationTest.scala`, `local-sv-node`, `local-validator-node`
+  - See `local-sv-node`, `local-validator-node`
 - `11`: Ports forwarded from remote participant as part of `cncluster [participant|sequencer|mediator]_console`
 - `15`: Simulated time
   - See `simple-topology.conf` with ports bumped by 10k, `simple-topology-canton-simtime.conf`

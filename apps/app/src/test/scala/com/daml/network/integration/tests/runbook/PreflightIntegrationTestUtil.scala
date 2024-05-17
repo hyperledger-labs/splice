@@ -1,22 +1,12 @@
 package com.daml.network.integration.tests.runbook
 
-import org.apache.pekko.http.scaladsl.model.Uri
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.util.{Auth0Util, K8sUtil}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.typesafe.scalalogging.Logger
-import monocle.macros.syntax.lens.*
 
 import scala.concurrent.duration.*
-import java.io.IOException
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-import java.net.{HttpURLConnection, URI}
 
 trait PreflightIntegrationTestUtil extends CNNodeTestCommon {
-
-  // We cache this because we only need it for one test case in each suite
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  var validatorOnboardingSecret: Option[String] = None
 
   // Give more time to the checks in cluster preflights on devnet only, to account for slower domains
   private def preflightTimeUntilSuccess: FiniteDuration = {
@@ -59,44 +49,4 @@ trait PreflightIntegrationTestUtil extends CNNodeTestCommon {
       token
     }.accessToken
   }
-
-  protected def insertValidatorOnboardingSecret(conf: CNNodeConfig): CNNodeConfig = {
-    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
-      val oc = vc.onboarding.value
-
-      // obtain an onboarding secret
-      val secret = validatorOnboardingSecret match {
-        case Some(s) => s
-        case None => {
-          val s = prepareValidatorOnboarding(oc.svClient.adminApi.url)
-          validatorOnboardingSecret = Some(s)
-          s
-        }
-      }
-      // insert it
-      vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
-    })(conf)
-  }
-
-  // We invoke the API via a basic HTTP request, just like we expect runbook users to do for now.
-  private def prepareValidatorOnboarding(url: Uri): String = {
-    val client = HttpClient
-      .newBuilder()
-      .connectTimeout(java.time.Duration.ofSeconds(20))
-      .build()
-
-    val request = HttpRequest
-      .newBuilder()
-      .uri(URI.create(s"$url/api/sv/v0/devnet/onboard/validator/prepare"))
-      .header("content-type", "text/plain")
-      .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
-      .build()
-
-    val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-    if (response.statusCode() == HttpURLConnection.HTTP_OK)
-      response.body
-    else
-      throw new IOException(response.body)
-  }
-
 }

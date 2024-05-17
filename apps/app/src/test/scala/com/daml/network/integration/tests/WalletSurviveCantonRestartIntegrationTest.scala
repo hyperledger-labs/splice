@@ -19,12 +19,10 @@ class WalletSurviveCantonRestartIntegrationTest
     with ProcessTestUtil
     with WalletTestUtil {
 
-  val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val includeTestResourcesPath: File = testResourcesPath / "include"
-  val validatorPath: File = examplesPath / "validator"
 
   val cantonArgs: Seq[File] = Seq(
-    validatorPath / "validator-participant.conf",
+    includeTestResourcesPath / "validator-participant.conf",
     includeTestResourcesPath / "self-hosted-validator-disable-json-api.conf",
     includeTestResourcesPath / "self-hosted-validator-participant-postgres-storage.conf",
     includeTestResourcesPath / "storage-postgres.conf",

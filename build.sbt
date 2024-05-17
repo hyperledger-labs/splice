@@ -1291,8 +1291,6 @@ printTests := {
 
   def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
     name
-  ) && !isSplitwellDeploymentPreflightIntegrationTest(
-    name
   ) && !isValidator1DeploymentPreflightIntegrationTest(
     name
   ) && !isRunbookValidatorPreflightIntegrationTest(name) && !isRunbookSvPreflightIntegrationTest(
@@ -1302,10 +1300,6 @@ printTests := {
     isPreflightIntegrationTest(
       name
     ) && name.contains("Validator1PreflightIntegrationTest")
-  def isSplitwellDeploymentPreflightIntegrationTest(name: String): Boolean =
-    isPreflightIntegrationTest(
-      name
-    ) && name.contains("SelfHostedSplitwellPreflightIntegrationTest")
   def isRunbookSvPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("RunbookSv")
   def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
@@ -1370,11 +1364,6 @@ printTests := {
       "Preflight tests against core nodes",
       "test-full-class-names-core-preflight.log",
       (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
-    ),
-    (
-      "Preflight tests against splitwell",
-      "test-full-class-names-splitwell-preflight.log",
-      (t: String) => isSplitwellDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Preflight tests against validator1",
