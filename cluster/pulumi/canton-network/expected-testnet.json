@@ -1887,7 +1887,7 @@
           {
             "name": "Liberty-City-Ventures",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw==",
-            "rewardWeightBps": 30000
+            "rewardWeightBps": 100000
           },
           {
             "name": "Digital-Asset-1",
@@ -1912,7 +1912,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 120000
+            "rewardWeightBps": 210000
           },
           {
             "name": "Orb-1-LP",
