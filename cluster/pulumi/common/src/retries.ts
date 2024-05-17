@@ -9,10 +9,11 @@ export async function retry<T>(
   try {
     return await action();
   } catch (e) {
+    const maxRetryDelayMs = 10_000;
     await pulumi.log.error(`Failed '${name}'. Error: ${JSON.stringify(e)}.`);
-    if (retries > 0) {
+    if (0 < retries) {
       await new Promise(resolve => setTimeout(resolve, delayMs));
-      return await retry(name, delayMs, retries - 1, action);
+      return await retry(name, Math.min(delayMs * 2 - 1, maxRetryDelayMs), retries - 1, action);
     } else {
       return Promise.reject(`Exhausted retries. Last error: ${e}.`);
     }
