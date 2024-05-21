@@ -3,12 +3,14 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.9
+-----
 
 * Configuration
 
-    * Default actionConfirmationTimeout parameter in CoinRules was increased from 5 minutes to 1 hour.
+    * Default ``actionConfirmationTimeout`` parameter in CoinRules was increased from 5 minutes to 1 hour.
+      This increases robustness if some nodes are temporarily unavailable or slow.
+      Note that this requires a governance vote to change the ``DsoConfig`` on existing clusters.
 
     * Default PVC sizes updated: 2800Gi for Postgres.
 
@@ -23,17 +25,17 @@ Upcoming
   * Add notes about (Helm chart) version upgrades to the Synchronizer Upgrades with Downtime documentation sections
     for :ref:`SVs <sv-upgrades>` and :ref:`validators <validator-upgrades>`.
 
-  * Updated ``Preparing for Validator Onboarding`` sections to include what validator Onboarding is
-    and how Validator operator can obtain an onboarding secret via API.validator.
+  * Updated ``Preparing for Validator Onboarding`` sections to describe the steps a validator operator needs to take
+    to onboard a new node.
 
-  * Removed splitwell related documentation.
+  * Removed Self-Hosted Validator documentation in favor of the Helm docs for validator deployments.
 
-  * Removed Self-Hosted Validator documentation.
+  * Removed Splitwell-related documentation as Splitwell is not actively maintained as a production-ready app.
 
 * Deployment
 
-  * The values `nodeId`, `publicKey` and `keyAddress` in the `founder` section of the cometbft helm chart are not set
-    in the chart defaults but must be explicitly provided. See the comments in the example `cometbft-values.yaml`
+  * The values ``nodeId``, ``publicKey`` and ``keyAddress`` in the ``founder`` section of the cometbft helm chart are not set
+    in the chart defaults but must be explicitly provided. See the comments in the example ``cometbft-values.yaml``
     for the values to use for DevNet, TestNet or MainNet.
 
 * Daml
