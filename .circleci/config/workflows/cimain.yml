@@ -18,7 +18,6 @@ workflow:
           workflow_names: "deploy_cimain"
           wait_type: "wait_workflow"
       - deploy_cluster:
-          name: "deploy_cluster_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -43,7 +42,6 @@ workflow:
             - wait_for_previous_pipeline
             - artifacts_push
       - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -52,9 +50,8 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           requires:
-            - deploy_cluster_for_migration
+            - deploy_cluster
       - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
            <<: *main-branch-only
            context:
              - artifactory
@@ -62,18 +59,16 @@ workflow:
              - slack-context
            cluster: "cimain"
            requires:
-             - deploy_cluster_for_migration
+             - deploy_cluster
       - deploy_validator_runbook:
-          name: "deploy_validator_runbook_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           cluster: "cimain"
           requires:
-            - deploy_cluster_for_migration
+            - deploy_cluster
       - preflight_validator_check:
-          name: "preflight_validator_check_before_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -81,9 +76,8 @@ workflow:
             - slack-context
           cluster: "cimain"
           requires:
-            - deploy_cluster_for_migration
+            - deploy_cluster
       - backup_cluster:
-          name: "backup_cluster_before_migration"
           <<: *main-branch-only
           cluster: "cimain"
           context:
@@ -91,140 +85,19 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cimain"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check
-            - preflight_sv_check_before_migration
-            - preflight_validator_check_before_migration
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "prepare_cluster_for_migration"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          send_deployment_notification: false
-          update_deployment_branch: false  # No need to create a deployment branch for cimain
-          cancel_workflow_on_failure: true
-          reset_cluster: false
-          global_domain_active_migration_id: 0
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - deploy_cluster_for_migration
-      - deploy_sv_runbook:
-          name: "prepare_sv_runbook_for_migration"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cimain"
-          send_deployment_notification: false
-          requires:
-            - deploy_sv_runbook_for_migration
-          global_domain_active_migration_id: 0
-          global_domain_upgrade_migration_id: 1
-          reset_cluster: false
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          send_deployment_notification: false
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-            - prepare_cluster_for_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cimain"
-          migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cimain"
-          send_deployment_notification: false
-          requires:
-            - trigger_global_domain_migration
-            - prepare_sv_runbook_for_migration
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          reset_cluster: false
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cimain"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "migrate_validator_runbook"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          reset_cluster: false
-          requires:
-            - trigger_global_domain_migration
-      - preflight_validator_check:
-          <<: *main-branch-only
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cimain"
-          requires:
-            - trigger_global_domain_migration
+            - deploy_cluster
+            - deploy_sv_runbook
+            - deploy_validator_runbook
       - restore_node:
           <<: *main-branch-only
           cluster: "cimain"
           namespace_name: "sv-3"
-          expected_migration_id: 1
+          expected_migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check
