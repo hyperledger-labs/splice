@@ -12,10 +12,6 @@
         sha256 = "008f8afbe723cc38ac5f557031dadc6324435d1c8dcb4037f32be856d87d0425";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.2-linux-amd64.tar.gz";
-        sha256 = "f9175cc253c4db42dac07a2a8242f036f248af9981cff2d9700ca3e33f70be9d";
-      }
-      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-linux-amd64.tar.gz";
         sha256 = "1fb8955dabbe81a767791e9769a32bd895dfee68d2bcc8ffd3dbd560cd5bcf0d";
       }
@@ -26,10 +22,6 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-linux-amd64.tar.gz";
         sha256 = "2c5f29ac9bc058bb9377b906e7630947add587b69040c63af5a8fd4ff95c9e52";
-      }
-      {
-        url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-linux-amd64.tar.gz";
-        sha256 = "ad6675574e75c6984ab79a2ff9f4ee6c4859d46a41a7d73ef35c84f05a00b407";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-linux-amd64.tar.gz";
@@ -58,10 +50,6 @@
         sha256 = "c02df58f6a43d18fd7d275d28d46bf527a087d290a62b252a1da74e129ddc90c";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.2-darwin-amd64.tar.gz";
-        sha256 = "f3518d84aa024fabba4e4ed6757c5a1349814792d798ca43262245978269991b";
-      }
-      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-amd64.tar.gz";
         sha256 = "0b33689487f8297642336bab2e7fe6c83813d2f694a21ba397e851a5a3215696";
       }
@@ -72,10 +60,6 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-darwin-amd64.tar.gz";
         sha256 = "08ee93595be215736c834d75012704713738b6a1452cc21813a84612c950e424";
-      }
-      {
-        url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-darwin-amd64.tar.gz";
-        sha256 = "f4d065bd98b30b0f1ea2185ccb2f4c447c80f71992779ad820fc524f011d403d";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-darwin-amd64.tar.gz";
@@ -104,10 +88,6 @@
         sha256 = "c2b1d68b75ad613a7ed01c322609d03a9fa727d5833a0f4bb8ab037578502a82";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.2-linux-arm64.tar.gz";
-        sha256 = "c78c7b172940b43098dae3235a4606cae7fc37795e79f0b5620569258a59eb9b";
-      }
-      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-linux-arm64.tar.gz";
         sha256 = "0ef3b81713728d17c9d55e894c66d2c51658ce3bbe682559d1517fdd49ba126e";
       }
@@ -118,10 +98,6 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-linux-arm64.tar.gz";
         sha256 = "4cddd536e4e28caba68919ba2d051442595ef0c0c139a7779108b579bf596901";
-      }
-      {
-        url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-linux-arm64.tar.gz";
-        sha256 = "dbf59982dcd94e50b9241e9501dc531bad2a9faac47aa5ecce8e5bb1bfc2e9ff";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-linux-arm64.tar.gz";
@@ -150,10 +126,6 @@
         sha256 = "35f76da2d17846c5772b55195c7ace2bd889f03b4b66dfbe78eb910c3e024549";
       }
       {
-        url = "https://api.pulumi.com/releases/plugins/pulumi-resource-auth0-v3.3.2-darwin-arm64.tar.gz";
-        sha256 = "240ae83b53065d15c41990ade21284d4c64c1915559d5b2ed2c0fcea0f415b9b";
-      }
-      {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-arm64.tar.gz";
         sha256 = "15b1f11b1d7329733337605f78eaf1612e2c3bf8bb4afbb43146f418dd6f4526";
       }
@@ -164,10 +136,6 @@
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-gcp-v7.2.1-darwin-arm64.tar.gz";
         sha256 = "4bb52f6d510772d53e0ed88153bd237703610cb1ff7b4e40558c493c45405991";
-      }
-      {
-        url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-darwin-arm64.tar.gz";
-        sha256 = "76ff2462fa5b85023948f5e7139b28a08af4a50ae80077e3c24ff8723203a603";
       }
       {
         url = "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v4.11.0-darwin-arm64.tar.gz";

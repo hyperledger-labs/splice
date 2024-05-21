@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -123,7 +122,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '58.5.1';
   const prometheusStackCrdVersion = '0.73.2';
-  const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
@@ -360,7 +358,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           storageClassName: 'standard-rwo',
         },
         adminUser: 'cn-admin',
-        adminPassword: adminPassword,
+        adminPassword: grafanaKeysFromSecret().adminPassword,
       },
       'kube-state-metrics': {
         fullnameOverride: 'ksm',
@@ -499,43 +497,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     createGrafanaContactPoints(namespaceName);
   }
   createGrafanaAlerting(namespaceName);
-  createGrafanaServiceAccount(namespaceName, adminPassword);
-}
-
-function createGrafanaServiceAccount(
-  namespace: Input<string>,
-  adminPassword: pulumi.Output<string>
-) {
-  const grafanaProvider = new grafana.Provider('grafana', {
-    auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
-    url: grafanaExternalUrl,
-  });
-  const serviceAccountResource = new grafana.ServiceAccount(
-    'grafanaSA',
-    {
-      role: 'Editor',
-    },
-    {
-      provider: grafanaProvider,
-    }
-  );
-  const serviceAccountToken = new grafana.ServiceAccountToken(
-    'grafanaSAToken',
-    {
-      serviceAccountId: serviceAccountResource.id,
-      name: 'grafana-sa-token',
-    },
-    {
-      provider: grafanaProvider,
-    }
-  );
-  new k8s.core.v1.Secret('grafana-service-account-token-secret', {
-    metadata: {
-      namespace: namespace,
-      name: 'grafana-service-account-token-secret',
-    },
-    stringData: serviceAccountToken.key.apply(key => ({ token: key })),
-  });
 }
 
 function createGrafanaContactPoints(namespace: Input<string>) {
