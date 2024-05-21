@@ -964,12 +964,9 @@ preflight check:
 
 ```
 cd cluster/deployment/devnet
-cncluster start_frontends # optional: sbt_for_preflight will not automatically manage the self-hosted frontends
 cncluster sbt_for_preflight
 sbt:amulet> testOnly *Preflight* -- -z validator1 # only run the tests against validator1
 ```
-
-After the test, you have to manually stop the frontends using the typical `stop-frontends.sh` script in the repo root.
 
 #### Configure Auth0 Environment
 

@@ -898,30 +898,6 @@ commands:
           cmd_name: "Stop canton"
           cmd: ./stop-canton.sh || true
 
-  start_cn_apps_postgres_in_background:
-    description: Start postgres in the background for self hosted preflight checks
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Pull postgres image"
-          cmd: |
-            ./scripts/postgres.sh docker pull
-          # docker pull doesn't retry, so we do it here
-          cmd_retry_count: 5
-      - run_bash_command_in_nix:
-          cmd_name: "Start postgres for cn_apps"
-          cmd: |
-            ./scripts/postgres.sh docker start
-            ./scripts/postgres.sh docker createdb cn_apps
-          background: true
-
-  stop_cn_apps_postgres_in_background:
-    description: Stop postgres for self hosted preflight checks
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Stop postgres for cn_apps"
-          cmd: |
-            ./scripts/postgres.sh docker stop || true
-
   run_splitted_scala_tests:
     description: run splitted scala tests
     parameters:

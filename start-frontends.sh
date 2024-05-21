@@ -76,7 +76,6 @@ function usage() {
   echo "  -h        display this help message"
   echo "  -d        start in detached mode"
   echo "  -a        run all frontends with canton-network-test auth0 tenant and no test auth"
-  echo "  -p        run the frontends needed for the preflight self-hosted ANS UI test"
   echo "  -v        run frontends with a shared validator for all users"
   echo "  -s        run frontends with two super validators for Sv*IntegrationTest in CI"
   echo "  -l        run frontends with four super validators for local testing"
@@ -87,7 +86,6 @@ function usage() {
 # default values
 daemon=0
 enable_test_auth="true"
-use_preflight_frontends=0
 shared_validator_for_users=0
 two_svs=0
 four_svs=0
@@ -105,9 +103,6 @@ while getopts "hdapvsmtl" arg; do
       ;;
     a)
       enable_test_auth="false"
-      ;;
-    p)
-      use_preflight_frontends=1
       ;;
     v)
       shared_validator_for_users=1
@@ -217,13 +212,6 @@ function start_local_frontends() {
 
 }
 
-# The set of frontends we want to start for the preflight self-hosted ANS UI test
-function start_preflight_frontends() {
-  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-protocol> <cluster-address>
-  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
-  start_frontend   ans       3004 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
-}
-
 # The set of tests we want to start for local unit testing
 function start_local_tests() {
   start_test app-manager
@@ -236,14 +224,6 @@ function start_local_tests() {
 
 if [ $run_tests -eq 1 ]; then
   start_local_tests
-elif [ $use_preflight_frontends -eq 1 ]; then
-  if [ "$enable_test_auth" == "true" ]; then
-    start_preflight_frontends
-    echo "$NETWORK_APPS_ADDRESS" > start-frontends-network-address
-  else
-    echo "enable_test_auth was set to false, -p is incompatible with -a"
-    exit 1
-  fi
 else
   start_local_frontends
 fi

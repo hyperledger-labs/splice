@@ -32,7 +32,6 @@ target
 canton.ports
 canton-simtime.ports
 canton-release
-start-frontends-network-address
 start-frontends-http-ledger-api-port
 .disable-unused-warnings
 todo-out

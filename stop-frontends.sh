@@ -15,7 +15,3 @@ if tmux has-session -t $tmux_session 2>/dev/null; then
   # but to be on the safe side we still kill it.
   tmux kill-session -t $tmux_session 2>/dev/null || true
 fi
-
-if [ -f start-frontends-network-address ]; then
-  rm start-frontends-network-address
-fi
