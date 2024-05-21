@@ -208,7 +208,8 @@
       "DA Utility Validator": ["34.65.145.61/32"],
       "Cumberland-Labs": [
         "54.251.116.26/32"
-      ]
+      ],
+      "The Tie Validator": ["52.6.67.212/32"]
     }
   }
 }
