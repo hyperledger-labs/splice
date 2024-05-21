@@ -21,7 +21,6 @@ Canton Network Documentation
    :caption: Network Users
 
    cc_user/wallet.rst
-   cc_user/app_management.rst
 
 .. toctree::
    :maxdepth: 2
