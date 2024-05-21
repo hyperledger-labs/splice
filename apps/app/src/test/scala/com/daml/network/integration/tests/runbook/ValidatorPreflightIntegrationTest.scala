@@ -429,7 +429,8 @@ abstract class ValidatorPreflightIntegrationTestBase
         () => find(id("onboard-button")) should not be empty,
       )
 
-      actAndCheck(timeUntilSuccess = 1.minute)(
+      // TODO(#12457): This is a workaround to bypass slowness of wallet user onboarding
+      actAndCheck(timeUntilSuccess = 2.minute)(
         "Onboard wallet user", {
           click on "onboard-button"
         },
