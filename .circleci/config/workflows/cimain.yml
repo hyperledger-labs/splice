@@ -98,6 +98,7 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
+            - backup_cluster
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
