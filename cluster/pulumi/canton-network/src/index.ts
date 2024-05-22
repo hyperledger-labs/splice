@@ -3,13 +3,12 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0ClusterConfig,
   Auth0Fetch,
-  CHARTS_VERSION,
   config,
   exactNamespace,
-  imageTagOverride,
   infraStack,
   isMainNet,
 } from 'cn-pulumi-common';
+import exec from 'node:child_process';
 
 import { installCluster } from './installCluster';
 import { scheduleLoadGenerator } from './scheduleLoadGenerator';
@@ -39,7 +38,7 @@ function installClusterVersion(): k8s.apiextensions.CustomResource {
             ],
             directResponse: {
               status: 200,
-              body: { string: CHARTS_VERSION || imageTagOverride },
+              body: { string: exec.execSync('get-snapshot-version').toString() },
             },
           },
         ],
