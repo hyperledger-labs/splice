@@ -1461,10 +1461,11 @@ function subcmd_apply() {
     done
     set -- "${POSITIONAL_ARGS[@]}"
 
+    local -x IMAGE_TAG
+    IMAGE_TAG=$(get-snapshot-version)
     if [ -n "${1-}" ]; then
-        VERSION_NUMBER=$(get-snapshot-version)
+        _warning "Overriding image tag: ${1-} (was: ${IMAGE_TAG})"
         local -x IMAGE_TAG=$1
-        _warning "Overriding image tag: ${IMAGE_TAG} (was: ${VERSION_NUMBER})"
     fi
 
     subcmd_install_data_export_bucket_key

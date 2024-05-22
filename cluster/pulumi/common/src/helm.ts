@@ -28,7 +28,7 @@ export type CNCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'depend
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
 export type CnInput<T> = T | pulumi.OutputInstance<T>;
 
-const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
+export const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
 
 export const defaultVersion: CnChartVersion = parsedVersion(CHARTS_VERSION);
 
