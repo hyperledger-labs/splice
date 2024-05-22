@@ -242,7 +242,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.0.1-deadbeef",
@@ -352,6 +352,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "resources": {
@@ -494,6 +498,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -618,7 +626,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.0.1-deadbeef",
@@ -728,6 +736,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "resources": {
@@ -870,6 +882,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -994,7 +1010,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.0.1-deadbeef",
@@ -1104,6 +1120,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "resources": {
@@ -1246,6 +1266,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -1370,7 +1394,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.0.1-deadbeef",
@@ -1480,6 +1504,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "resources": {
@@ -1622,6 +1650,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -1746,7 +1778,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.0.1-deadbeef",
@@ -1856,6 +1888,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "resources": {
@@ -1998,6 +2034,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -2142,7 +2182,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
@@ -2215,6 +2255,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "readinessProbe": {
@@ -2330,6 +2374,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -2474,7 +2522,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
@@ -2547,6 +2595,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "readinessProbe": {
@@ -2662,6 +2714,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -2806,7 +2862,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
@@ -2879,6 +2935,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "readinessProbe": {
@@ -2994,6 +3054,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -3138,7 +3202,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
@@ -3211,6 +3275,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "readinessProbe": {
@@ -3326,6 +3394,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {
@@ -3470,7 +3542,7 @@
                   },
                   {
                     "name": "JAVA_TOOL_OPTIONS",
-                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16"
+                    "value": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
@@ -3543,6 +3615,10 @@
                   {
                     "containerPort": 10013,
                     "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
                   }
                 ],
                 "readinessProbe": {
@@ -3658,6 +3734,10 @@
           {
             "name": "metrics",
             "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
           }
         ],
         "selector": {

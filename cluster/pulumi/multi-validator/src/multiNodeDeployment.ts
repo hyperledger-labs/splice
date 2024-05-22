@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { config, numNodesPerInstance } from 'cn-pulumi-common';
+import { config, jmxOptions, numNodesPerInstance } from 'cn-pulumi-common';
 import { ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 import _ from 'lodash';
 
@@ -71,10 +71,16 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   }:${config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('IMAGE_TAG')}`,
                   imagePullPolicy: 'Always',
                   ...args.container,
-                  ports: args.container.ports.concat({
-                    name: 'metrics',
-                    containerPort: 10013,
-                  }),
+                  ports: args.container.ports.concat([
+                    {
+                      name: 'metrics',
+                      containerPort: 10013,
+                    },
+                    {
+                      name: 'jmx',
+                      containerPort: 9010,
+                    },
+                  ]),
                   env: [
                     ...(args.container.env || []),
                     {
@@ -92,7 +98,8 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     {
                       name: 'JAVA_TOOL_OPTIONS',
                       value:
-                        '-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16',
+                        '-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 ' +
+                        jmxOptions(),
                     },
                   ],
                 },
@@ -168,8 +175,14 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   name: 'metrics',
                   port: 10013,
                 },
+                {
+                  name: 'jmx',
+                  port: 9010,
+                },
               ])
-              .apply(([ports, metricPort]) => (ports ? ports.concat(metricPort) : [metricPort])),
+              .apply(([ports, metricPort, jmxPort]) =>
+                ports ? ports.concat([metricPort, jmxPort]) : [metricPort, jmxPort]
+              ),
           },
         },
       },
