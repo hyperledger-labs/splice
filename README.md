@@ -665,10 +665,9 @@ Current Canton commit: `382728dd8ec53cd119acc6030e361b0692a85f8c`
 7. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
    Note that you might need to fix the file formatting or dars.lock files (see the next points), due to the usage of `--no-verify` when committing in steps 1-4.
 8. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
-9. Run `sbt cantonDarsLockFileUpdate` and commit the changes to `canton/dars.lock`.
-10. Make a PR with your changes, so CI starts churning.
-11. If there are any, remove all `*.rej` files.
-12. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
+9. Make a PR with your changes, so CI starts churning.
+10. If there are any, remove all `*.rej` files.
+11. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 

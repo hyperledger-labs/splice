@@ -338,9 +338,9 @@ commands:
           # - The branch name
           # - The build configuration (build.properties, BuildCommon.scala, DamlPlugin.scala, build.sbt)
           # - The CN dars lock file
-          # - The Canton dars lock file, since we cache also artifacts for those dars
+          # - The Canton sources versions/hash, since we cache also artifacts for canton dars
           # - rev: to allow for updating the cache when sources have changed
-          key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }} rev:{{ .Revision }}
+          key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonSources:{{ checksum "nix/canton-sources.json" }} rev:{{ .Revision }}
           paths:
             - /tmp/daml
             - apps/common/frontend/daml.js
@@ -351,8 +351,8 @@ commands:
           name: Downloading archive of Daml compilation artifacts
           keys:
             - *daml_artifacts
-            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }}
-            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }}
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonSources:{{ checksum "nix/canton-sources.json" }}
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonSources:{{ checksum "nix/canton-sources.json" }}
       - run:
           name: Extracting Daml compilation artifacts
           command: |
