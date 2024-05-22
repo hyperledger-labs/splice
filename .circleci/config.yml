@@ -4792,6 +4792,33 @@ workflows:
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
+      - deploy_sv_runbook:
+          name: "deploy_fresh_sv_runbook_after_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          send_deployment_notification: false
+          deploy_version: << pipeline.parameters.upgrade-version >>
+          global_domain_active_migration_id: 1
+          reset_cluster: true # it's the default, but to make it explicit
+          requires:
+            - restore_node
+      - preflight_sv_check:
+          name: "preflight_sv_check_redeployed"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            # We wait for the runbook to redeploy to make sure we're not testing the original deployment
+            - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
@@ -4799,7 +4826,7 @@ workflows:
           context:
             - canton-network-vpn
           requires:
-            - restore_node
+            - preflight_sv_check_redeployed
 
   deploy_ciperiodic_sv_reonboard:
     when:
