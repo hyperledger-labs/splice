@@ -77,4 +77,8 @@ DB_CONNECTION_LOST.*Database health check failed to establish a valid connection
 # The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
 The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response
 
+# TODO (#9979): this only applies to simtime.
+# Simtime failure, see https://github.com/DACH-NY/canton-network-node/issues/11998#issuecomment-2086304594
+INVALID_ARGUMENT.*SequencerTimeoutError
+
 # Make sure to have a trailing newline
