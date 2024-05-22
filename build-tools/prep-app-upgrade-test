@@ -40,15 +40,11 @@ mkdir -p "${BUNDLE_DIR}"
 tar zxf "${ALL_BUNDLES_DIR}/$tarball" -C "$BUNDLE_DIR"
 
 _info "Copying dar files into the respective daml directories"
-dars=$(find "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/dars -name "*-0.1.0.dar" -exec basename {} \;)
-for dar in $dars; do
-  module=${dar//-0.1.0.dar/}
-  mkdir -p "daml/${module}/src/main/resources/dar/"
-  cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/${dar}" "daml/${module}/src/main/resources/dar"
-  mkdir -p "daml/${module}/.daml/dist/"
-  cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/${dar}" "daml/${module}/.daml/dist"
-done
 
-# Otherwise it uses the "current" that is compiled in the current branch
-sed -i 's/splitwell-current.dar/splitwell-0.1.0.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/examples/splitwell/splitwell-validator.conf
-sed -i 's/splitwell-current.dar/splitwell-0.1.0.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/testResources/include/validators/splitwell-validator.conf
+# Make sure the base Splitwell uses the base dars, and not "current" from the local repo
+mkdir -p "daml/splitwell/src/main/resources/dar/"
+cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar" "daml/splitwell/src/main/resources/dar/splitwell-base.dar"
+mkdir -p "daml/splitwell/.daml/dist/"
+cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar" "daml/splitwell/.daml/dist/splitwell-base.dar"
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/examples/splitwell/splitwell-validator.conf
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/testResources/include/validators/splitwell-validator.conf

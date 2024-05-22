@@ -34,7 +34,7 @@ class AppUpgradeIntegrationTest
     with WalletTestUtil {
 
   private val splitwellDarPathV1 =
-    s"daml/splitwell/.daml/dist/splitwell-${DarResources.splitwell.others.head.metadata.version}.dar"
+    s"daml/splitwell/.daml/dist/splitwell-base.dar"
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
