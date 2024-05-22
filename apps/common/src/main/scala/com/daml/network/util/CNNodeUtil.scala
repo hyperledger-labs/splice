@@ -142,16 +142,34 @@ object CNNodeUtil {
 
   val defaultInitialTickDuration = NonNegativeFiniteDuration.ofMinutes(10)
 
-  lazy val defaultHoldingFee = // ~= 1.9290123456790123E-5 ~= 1.9E-5
-    new splice.fees.RatePerRound(
-      damlDecimal(
-        1.0 / 360.0 / (24.0 * 60.0 * 60.0 / defaultInitialTickDuration.duration.toSeconds)
+  private val decimalScale = Numeric.Scale.assertFromInt(10)
+
+  private val roundsPerYear: Numeric =
+    com.daml.lf.data.assertRight(
+      Numeric.divide(
+        decimalScale,
+        damlNumeric(365.0 * 24 * 60),
+        damlNumeric(BigDecimal(defaultInitialTickDuration.duration.toMinutes)),
       )
     )
 
-  // TODO (#6285) surely there's a better way to define Daml Numeric values in Scala
-  def damlDecimal(x: Double): java.math.BigDecimal =
-    BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+  lazy val defaultHoldingFee = // ~= 1.9290123456790123E-5 ~= 1.9E-5
+    new splice.fees.RatePerRound(
+      com.daml.lf.data.assertRight(
+        Numeric.divide(
+          decimalScale,
+          damlNumeric(1.0),
+          roundsPerYear,
+        )
+      )
+    )
+
+  // Dedicated helper because Scala doesn't always do automatic downcasting
+  def damlDecimal(x: BigDecimal): java.math.BigDecimal =
+    damlNumeric(x)
+
+  def damlNumeric(x: BigDecimal): Numeric =
+    Numeric.assertFromBigDecimal(decimalScale, x)
 
   // Using the issuance config for the 10+ years segment of the curve
   def issuanceConfig(
@@ -436,20 +454,18 @@ object CNNodeUtil {
       usd: java.math.BigDecimal,
       amuletPrice: java.math.BigDecimal,
   ): java.math.BigDecimal = {
-    val scale = Numeric.Scale.assertFromInt(10)
-    val usdN = Numeric.assertFromBigDecimal(scale, usd)
-    val amuletPriceN = Numeric.assertFromBigDecimal(scale, amuletPrice)
-    com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, amuletPriceN))
+    val usdN = damlNumeric(usd)
+    val amuletPriceN = damlNumeric(amuletPrice)
+    com.daml.lf.data.assertRight(Numeric.divide(decimalScale, usdN, amuletPriceN))
   }
 
   def ccToDollars(
       cc: java.math.BigDecimal,
       amuletPrice: java.math.BigDecimal,
   ): java.math.BigDecimal = {
-    val scale = Numeric.Scale.assertFromInt(10)
-    val ccN = Numeric.assertFromBigDecimal(scale, cc)
-    val amuletPriceN = Numeric.assertFromBigDecimal(scale, amuletPrice)
-    com.daml.lf.data.assertRight(Numeric.multiply(scale, amuletPriceN, ccN))
+    val ccN = damlNumeric(cc)
+    val amuletPriceN = damlNumeric(amuletPrice)
+    com.daml.lf.data.assertRight(Numeric.multiply(decimalScale, amuletPriceN, ccN))
   }
 
   def synchronizerFees(
@@ -459,14 +475,13 @@ object CNNodeUtil {
   ): (BigDecimal, BigDecimal) = {
 
     def tryCompute() = for {
-      scale <- Numeric.Scale.fromInt(10)
-      extraTrafficPriceN <- Numeric.fromBigDecimal(scale, extraTrafficPrice)
-      amuletPriceN <- Numeric.fromBigDecimal(scale, amuletPrice)
-      topupAmountN <- Numeric.fromLong(scale, topupAmount)
-      bytesInMB <- Numeric.fromLong(scale, 1_000_000L)
-      topupAmountMB <- Numeric.divide(scale, topupAmountN, bytesInMB)
-      trafficCostUsd <- Numeric.multiply(scale, extraTrafficPriceN, topupAmountMB)
-      trafficCostCc <- Numeric.divide(scale, trafficCostUsd, amuletPriceN)
+      extraTrafficPriceN <- Numeric.fromBigDecimal(decimalScale, extraTrafficPrice)
+      amuletPriceN <- Numeric.fromBigDecimal(decimalScale, amuletPrice)
+      topupAmountN <- Numeric.fromLong(decimalScale, topupAmount)
+      bytesInMB <- Numeric.fromLong(decimalScale, 1_000_000L)
+      topupAmountMB <- Numeric.divide(decimalScale, topupAmountN, bytesInMB)
+      trafficCostUsd <- Numeric.multiply(decimalScale, extraTrafficPriceN, topupAmountMB)
+      trafficCostCc <- Numeric.divide(decimalScale, trafficCostUsd, amuletPriceN)
     } yield (BigDecimal(trafficCostUsd), BigDecimal(trafficCostCc))
 
     com.daml.lf.data.assertRight(tryCompute())
