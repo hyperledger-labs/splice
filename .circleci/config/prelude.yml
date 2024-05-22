@@ -44,6 +44,7 @@ parameters:
         redeploy-sv-runbook-cidaily,
         redeploy-validator-runbook-cidaily,
         redeploy-sv-runbook-devnet,
+        redeploy-validator-runbook-devnet,
         reset-sv-runbook-cilr,
         backup-cidaily,
         restore-sv-cidaily,
