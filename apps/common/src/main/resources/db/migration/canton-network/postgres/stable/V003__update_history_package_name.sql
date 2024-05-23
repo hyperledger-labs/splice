@@ -1,0 +1,15 @@
+ALTER TABLE update_history_exercises ADD COLUMN package_name text;
+UPDATE update_history_exercises SET package_name = 'splice-wallet-payments' WHERE template_id_package_id = '50f762c0e3c94db34ccb4fb38e95c190479ee95f1aea4ebce4406a71d4e395e9';
+UPDATE update_history_exercises SET package_name = 'splice-wallet' WHERE template_id_package_id = '5f384fba007e8b93c8ff1ac151cdc2d035ae1e0506f5e5770de469048713024c';
+UPDATE update_history_exercises SET package_name = 'splice-validator-lifecycle' WHERE template_id_package_id = 'cef96fac957362f1fc097120bd13686cac7f84fbc8053afa994a1f9214d9570c';
+UPDATE update_history_exercises SET package_name = 'splitwell' WHERE template_id_package_id = 'ccb1a0215053062202052e1a052f9214da3fdae5253a6d43e2e155ff4f57fe75';
+UPDATE update_history_exercises SET package_name = 'splice-amulet-name-service' WHERE template_id_package_id = '2598a415893cd496306499d4d0a29614621e0ef2ceeed55a63d3bdbb0f57830a';
+UPDATE update_history_exercises SET package_name = 'splice-wallet' WHERE template_id_package_id = 'e276113de450c2bb4bf8cf2d2991dd0b397fe7fe8103fe1b5377b8ab6622edec';
+UPDATE update_history_exercises SET package_name = 'splice-amulet' WHERE template_id_package_id = '48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351';
+UPDATE update_history_exercises SET package_name = 'splice-amulet-name-service' WHERE template_id_package_id = '9e785f2ea6c2faea6bc5f1445482cafaff5a58acf4e83a3afc26b49b9dbce5d5';
+UPDATE update_history_exercises SET package_name = 'splice-dso-governance' WHERE template_id_package_id = '332087889d9643fa24961edde7459a08d9edfb4fb737929cd4c79b952bc5819f';
+UPDATE update_history_exercises SET package_name = 'splice-amulet' WHERE template_id_package_id = '67bc95402ad7b08fcdff0ed478308d39c70baca2238c35c5d425a435a8a9e7f7';
+UPDATE update_history_exercises SET package_name = 'splitwell' WHERE template_id_package_id = '075c76de553ab88383a7c69de134afa82aacfdf8ea8fcfe8852c4b199c3b2669';
+UPDATE update_history_exercises SET package_name = 'splice-app-manager' WHERE template_id_package_id = 'e3605e0112595187ec963700d28f17fe042f3b80c862363e299003b9423a1844';
+UPDATE update_history_exercises SET package_name = 'splice-dso-governance' WHERE template_id_package_id = '7e0e82bdbe3941ebd13d029b86bb60640ddc9b7287012d6274194f26cd7b858c';
+UPDATE update_history_exercises SET package_name = 'splice-wallet-payments' WHERE template_id_package_id = '4ef1d8f6aba6f791311ff3c2322bc1220ed81fa7f125891d6d02726c6c7b787a';

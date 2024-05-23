@@ -421,6 +421,7 @@ final class UpdateHistory(
         val templateIdModuleName = lengthLimited(templateId.getModuleName)
         val templateIdEntityName = lengthLimited(templateId.getEntityName)
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
+        val safePackageName = lengthLimited(event.getPackageName)
         val choiceArguments = serializeValue(event.getChoiceArgument)
         val exerciseResult = serializeValue(event.getExerciseResult)
 
@@ -430,14 +431,14 @@ final class UpdateHistory(
             child_event_ids, choice,
             template_id_package_id, template_id_module_name, template_id_entity_name,
             contract_id, consuming,
-            argument, result
+            package_name, argument, result
           )
           values (
             $historyId, $safeEventId, $updateRowId,
             $safeChildEventIds, $safeChoice,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
             $safeContractId, ${event.isConsuming},
-            $choiceArguments::jsonb, $exerciseResult::jsonb
+            $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb
           )
         """
       }
@@ -584,6 +585,7 @@ final class UpdateHistory(
         template_id_entity_name,
         contract_id,
         consuming,
+        package_name,
         argument,
         result
       from update_history_exercises
@@ -762,7 +764,10 @@ final class UpdateHistory(
             row.templateModuleName,
             row.templateEntityName,
           ),
-          /*packageName = */ "dummyPackageName", // TODO(#10925): pipe this value through the update history
+          // Note: due to a bug, the package name was not stored initially.
+          // Exercise events for choices from 3rd party packages recorded shorty after MainNet launch
+          // will have a missing package name.
+          /*packageName = */ row.packageName.getOrElse("???"),
           /*interfaceId = */ java.util.Optional.empty(),
           /*contractId = */ row.contractId,
           /*choice = */ row.choice,
@@ -918,6 +923,7 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[Boolean],
+          <<[Option[String]],
           <<[String],
           <<[String],
         )
@@ -1009,6 +1015,7 @@ object UpdateHistory {
       templateEntityName: String,
       contractId: String,
       consuming: Boolean,
+      packageName: Option[String],
       argument: String,
       result: String,
   )

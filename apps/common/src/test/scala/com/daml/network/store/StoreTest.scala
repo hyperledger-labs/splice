@@ -64,8 +64,7 @@ import scala.jdk.OptionConverters.*
 
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
-  private val dummyPackageName =
-    "dummyPackageName" // TODO(#10925): remove all usages of this value and instead use an appropriate value derived from a contract's template
+  private val dummyPackageName = "dummyPackageName"
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
 

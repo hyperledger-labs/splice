@@ -268,14 +268,23 @@ class UpdateHistoryIntegrationTest
   private def withoutLostData(tree: TransactionTree): TransactionTree = {
     new TransactionTree(
       /*updateId = */ tree.getUpdateId,
+
+      // Command ids are only visible to the participant that submitted the command.
+      // Command ids are only used for command deduplication.
       /*commandId = */ "", // Not preserved
+
+      // Workflow ids are deprecated in general. They are not used in Canton Network.
       /*workflowId = */ "", // Not preserved
+
       /*effectiveAt = */ tree.getEffectiveAt,
       /*offset = */ tree.getOffset,
       /*eventsById = */ tree.getEventsById.asScala.view.mapValues(withoutLostData).toMap.asJava,
       /*rootEventIds = */ tree.getRootEventIds,
       /*domainId = */ tree.getDomainId,
+
+      // We don't care about tracing information in the update history.
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
+
       /*recordTime = */ tree.getRecordTime,
     )
   }
@@ -292,33 +301,62 @@ class UpdateHistoryIntegrationTest
 
   private def withoutLostData(created: CreatedEvent): CreatedEvent = {
     new CreatedEvent(
+      // The witnesses returned by the API is the intersection of actual witnesses according
+      // to the daml model with the subscribing parties, and we're always subscribing as a single party,
+      // so this would always end up being the operator party of our own application which is not very useful.
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
+
       /*eventId = */ created.getEventId,
       /*templateId = */ created.getTemplateId,
-      /* packageName = */ created.getPackageName,
+      /*packageName = */ created.getPackageName,
       /*contractId = */ created.getContractId,
       /*arguments = */ created.getArguments,
+
+      // Binary data used for explicit disclosure of active contracts. Not useful for historical data.
       /*createdEventBlob = */ ByteString.EMPTY, // Not preserved
+
+      // None of our daml models use interfaces.
+      // Interface views can be computed from the contract payload if you know the daml model.
+      // The ledger API only returns interface views that the application has subscribed to, i.e.,
+      // our applications will not see interface views of 3rd party daml code.
       /*interfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
       /*failedInterfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
+
+      // Contract keys are not currently supported in Canton Network as non-unique contract keys are not fully functional.
+      // None of our daml models use contract keys.
       /*contractKey = */ java.util.Optional.empty(), // Not preserved
+
+      // All of these parties can be computed from the contract payload if you know the daml model.
+      // Update history doesn't care about the generic privacy model
       /*signatories = */ java.util.Collections.emptyList(), // Not preserved
       /*observers = */ java.util.Collections.emptyList(), // Not preserved
+
       /*createdAt = */ created.getCreatedAt,
     )
   }
 
   private def withoutLostData(exercised: ExercisedEvent): ExercisedEvent = {
     new ExercisedEvent(
+      // The witnesses returned by the API is the intersection of actual witnesses according
+      // to the daml model with the subscribing parties, and we're always subscribing as a single party,
+      // so this would always end up being the operator party of our own application which is not very useful.
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
+
       /*eventId = */ exercised.getEventId,
       /*templateId = */ exercised.getTemplateId,
-      /*packageName = */ "dummyPackageName", // TODO(#10925): preserve package name via store, if required
+      /*packageName = */ exercised.getPackageName,
+
+      // None of our daml models use interfaces.
       /*interfaceId = */ java.util.Optional.empty(), // Not preserved
+
       /*contractId = */ exercised.getContractId,
       /*choice = */ exercised.getChoice,
       /*choiceArgument = */ exercised.getChoiceArgument,
+
+      // All of these parties can be computed from the argument and result payloads if you know the daml model.
+      // Update history doesn't care about the generic privacy model.
       /*actingParties = */ java.util.Collections.emptyList(), // Not preserved
+
       /*consuming = */ exercised.isConsuming,
       /*childEventIds = */ exercised.getChildEventIds,
       /*exerciseResult = */ exercised.getExerciseResult,
