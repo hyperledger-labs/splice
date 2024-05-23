@@ -237,6 +237,9 @@ data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
 data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficContractsResult with
     memberTraffic : ContractId MemberTraffic
 
+data DsoRules_MergeSvRewardStateResult = DsoRules_MergeSvRewardStateResult with
+    svRewardState : ContractId SvRewardState
+
 
 -- Workflow templates
 ---------------------
@@ -1127,6 +1130,22 @@ template DsoRules with
         result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
         return DsoRules_MergeMemberTrafficContractsResult with
           memberTraffic = result.mergedTrafficCid
+
+
+    -- | Note this choice only exists to clean up duplicate contracts caused by the bug in #12495.
+    -- There should never be duplicates going forward.
+    nonconsuming choice DsoRules_MergeSvRewardState : DsoRules_MergeSvRewardStateResult
+      with
+        svName : Text
+        rewardStateCids : [ContractId SvRewardState]
+      controller dsoDelegate
+      do require "Number of SvRewardState contracts to merge is >= 2" (length rewardStateCids >= 2)
+         rewardStates <- forA rewardStateCids $ fetchAndArchive (ForSv this.dso svName)
+         -- We don't attempt to merge the fields in the reward state since there is no good
+         -- way to do so and none of the fields other than lastRoundCollected are crucial and for that
+         -- taking the max is the correct merge.
+         cid <- create $ maximumOn (\state -> state.state.lastRoundCollected) rewardStates
+         pure $ DsoRules_MergeSvRewardStateResult cid
 
 summarizeDso : DsoRules -> DsoSummary
 summarizeDso dsoRules = DsoSummary with
