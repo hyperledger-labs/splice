@@ -16,6 +16,9 @@ import { scheduleLoadGenerator } from './scheduleLoadGenerator';
 function installClusterVersion(): k8s.apiextensions.CustomResource {
   const ns = exactNamespace('cluster-version', true);
   const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
+  const version = exec
+    .execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`)
+    .toString();
   return new k8s.apiextensions.CustomResource(
     `cluster-version-virtual-service`,
     {
@@ -38,7 +41,7 @@ function installClusterVersion(): k8s.apiextensions.CustomResource {
             ],
             directResponse: {
               status: 200,
-              body: { string: exec.execSync('get-snapshot-version').toString() },
+              body: { string: version },
             },
           },
         ],
