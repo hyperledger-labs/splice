@@ -106,42 +106,49 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       domainId: DomainId,
       trafficLimitOffset: Long,
   )(implicit tc: TraceContext): Future[TaskSuccess] = {
-    for {
-      // Compute new extra traffic limit
-      totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
-      newExtraTrafficLimit = NonNegativeLong.tryCreate(trafficLimitOffset + totalPurchasedTraffic)
-
-      // Fetch current extra traffic limit
-      trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(memberId)
-      currentExtraTrafficLimit = trafficState.extraTrafficLimit
-
-      // Get current sequencer domain state
-      sequencerDomainState <- sequencerAdminConnection.getSequencerDomainState()
-
-      // Compare and reconcile old and new limits
-      taskOutcome <-
-        if (currentExtraTrafficLimit < newExtraTrafficLimit) {
-          sequencerAdminConnection
-            .setSequencerTrafficControlState(
-              trafficState,
-              sequencerDomainState,
-              newExtraTrafficLimit,
-              context.pollingClock,
-              trafficBalanceReconciliationDelay,
-            )
-            .map(_ =>
-              TaskSuccess(
-                s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
-              )
-            )
-        } else {
-          Future(
-            TaskSuccess(
-              s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
-            )
+    sequencerAdminConnection.lookupSequencerTrafficControlState(memberId).flatMap {
+      case None =>
+        Future.successful(
+          TaskSuccess(
+            s"No traffic state found for member $memberId. It is likely that the member has been disabled as it was lagging behind and prevented sequencer pruning."
           )
-        }
-    } yield taskOutcome
+        )
+      case Some(trafficState) =>
+        for {
+          // Compute new extra traffic limit
+          totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
+          newExtraTrafficLimit = NonNegativeLong
+            .tryCreate(trafficLimitOffset + totalPurchasedTraffic)
+
+          // Get current sequencer domain state
+          sequencerDomainState <- sequencerAdminConnection.getSequencerDomainState()
+          currentExtraTrafficLimit = trafficState.extraTrafficLimit
+
+          // Compare and reconcile old and new limits
+          taskOutcome <-
+            if (currentExtraTrafficLimit < newExtraTrafficLimit) {
+              sequencerAdminConnection
+                .setSequencerTrafficControlState(
+                  trafficState,
+                  sequencerDomainState,
+                  newExtraTrafficLimit,
+                  context.pollingClock,
+                  trafficBalanceReconciliationDelay,
+                )
+                .map(_ =>
+                  TaskSuccess(
+                    s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
+                  )
+                )
+            } else {
+              Future(
+                TaskSuccess(
+                  s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
+                )
+              )
+            }
+        } yield taskOutcome
+    }
   }
 
   private def sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
