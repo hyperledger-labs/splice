@@ -118,7 +118,8 @@ workflow:
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >> # the /version endpoint is not served by sv1 nor validator1
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
@@ -133,6 +134,7 @@ workflow:
           name: "preflight_sv_check_partial_upgrade"
           <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
@@ -145,6 +147,7 @@ workflow:
           name: "preflight_validator_partial_upgrade"
           <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn

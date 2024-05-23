@@ -3136,6 +3136,9 @@ jobs:
       cluster_version:
         type: string
         default: ""
+      check_cluster_version:
+        type: boolean
+        default: true
       migration_id:
         type: integer
         default: 0
@@ -3197,8 +3200,10 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version)
-                  cncluster wait_version $VERSION
+                  if [[ << parameters.check_cluster_version >> == true ]]; then
+                    VERSION=$(get-snapshot-version)
+                    cncluster wait_version $VERSION
+                  fi
                   validator_app="validator-app"
                   # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
                   if [[ << parameters.wait_for_splitwell >> == true ]]; then
@@ -3261,6 +3266,9 @@ jobs:
       cluster_version:
         type: string
         default: ""
+      check_cluster_version:
+        type: boolean
+        default: true
       migration_id:
         type: integer
         default: 0
@@ -3312,8 +3320,10 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version)
-                  cncluster wait_version $VERSION
+                  if [[ << parameters.check_cluster_version >> == true ]]; then
+                    VERSION=$(get-snapshot-version)
+                    cncluster wait_version $VERSION
+                  fi
                   # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
                   cncluster wait sv validator-app << parameters.migration_id >>
                   echo "Done waiting. All pods in the cluster are:"
@@ -3365,6 +3375,9 @@ jobs:
       cluster_version:
         type: string
         default: ""
+      check_cluster_version:
+        type: boolean
+        default: true
       migration_id:
         type: integer
         default: 0
@@ -3416,8 +3429,10 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
-                  VERSION=$(get-snapshot-version)
-                  cncluster wait_version $VERSION
+                  if [[ << parameters.check_cluster_version >> == true ]]; then
+                    VERSION=$(get-snapshot-version)
+                    cncluster wait_version $VERSION
+                  fi
                   # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
                   cncluster wait validator validator-app << parameters.migration_id >>
                   echo "Done waiting. All pods in the cluster are:"
@@ -5066,7 +5081,8 @@ workflows:
       - preflight_check:
           name: "preflight_check_partial_upgrade"
           <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >> # the /version endpoint is not served by sv1 nor validator1
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
@@ -5081,6 +5097,7 @@ workflows:
           name: "preflight_sv_check_partial_upgrade"
           <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
@@ -5093,6 +5110,7 @@ workflows:
           name: "preflight_validator_partial_upgrade"
           <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
