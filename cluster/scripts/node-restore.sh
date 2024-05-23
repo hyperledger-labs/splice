@@ -129,7 +129,7 @@ function await_confirmation() {
 
 function restore_cloudsql_postgres() {
   local -r component=$1
-  MAX_RETRIES=10
+  MAX_RETRIES=20
   retry_count=0
 
   cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
@@ -154,12 +154,12 @@ function restore_cloudsql_postgres() {
 
     if [ $restore_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then
-        echo "Restore failed due to another operation in progress, retrying: $output"
-        retry_count=$((retry_count+1))
+        _error_msg "Restore failed due to another operation in progress, retrying: $output"
       else
-        _error "$output"
+        _error_msg "$output"
       fi
-      sleep 25
+      retry_count=$((retry_count+1))
+      sleep 10
     else
       echo "Restore succeeded"
       return 0

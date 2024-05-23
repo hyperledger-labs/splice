@@ -71,7 +71,7 @@ function backup_pvc_postgres() {
 function backup_cloudsql() {
   local description=$1
   local instance=$2
-  MAX_RETRIES=10
+  MAX_RETRIES=20
   retry_count=0
 
   _info "** Backing up $description **"
@@ -98,12 +98,12 @@ function backup_cloudsql() {
 
     if [ $backup_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then
-        echo "Backup failed due to another operation in progress, retrying: $output"
-        retry_count=$((retry_count+1))
+        _error_msg "Backup failed due to another operation in progress, retrying: $output"
       else
-        _error "$output"
+        _error_msg "$output"
       fi
-      sleep 25
+      retry_count=$((retry_count+1))
+      sleep 10
     else
       echo "Backup succeeded"
       return 0
