@@ -57,7 +57,7 @@ genesis:
   chainId: ""
 
 db:
-  volumeSize: 1000Gi
+  volumeSize: 1250Gi
   volumeStorageClass: premium-rwo
 
 resources:
