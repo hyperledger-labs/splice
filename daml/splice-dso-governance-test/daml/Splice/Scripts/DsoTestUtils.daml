@@ -28,6 +28,7 @@ import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
 import Splice.Scripts.AnsRulesParameters
+import Splice.Util
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
 bpsMultiplier : Int
@@ -124,7 +125,7 @@ initDecentralizedSynchronizer isDevNet = do
       joinedAsOfRound = earliestOpenRound.round
 
   -- check that the SvStatusReports are present
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
   pure (app, dso, (sv1, sv2, sv3, sv4))
 
@@ -330,6 +331,25 @@ updateAgreedAmuletPrice dso amuletPrice = do
         submit dso $ archiveCmd voteCid
         submit dso $ createCmd $ vote with amuletPrice = Some amuletPrice
 
+checkSvContractInvariants : AmuletApp -> Script ()
+checkSvContractInvariants app = do
+  checkSvStatusReports app
+  checkSvRewardStates app
+
+checkSvRewardStates : AmuletApp -> Script ()
+checkSvRewardStates app = do
+  rewardStates <- query @SvRewardState app.dso
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  forA_ (Map.values dsoRules.svs) $ \info ->
+    require "Each onboarded andSV name has one SvRewardState contract" $
+      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
+  forA_ (Map.values dsoRules.offboardedSvs) $ \info ->
+    require "Each offboarded and SV name has one SvRewardState contract" $
+      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
+  let offAndOnboardedSvs = Set.fromList (map (\info -> info.name) (Map.values dsoRules.svs) <> map (\info -> info.name) (Map.values dsoRules.offboardedSvs))
+  Set.fromList [state.svName | (_, state) <- rewardStates] === offAndOnboardedSvs
+  require "No duplicate SvRewardstate contracts" $
+    length rewardStates == Set.size offAndOnboardedSvs
 
 -- | Check that there's exactly one status report per SV both off-boarded and onboarded.
 checkSvStatusReports : AmuletApp -> Script ()

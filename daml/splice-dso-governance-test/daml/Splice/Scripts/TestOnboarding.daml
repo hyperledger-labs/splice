@@ -128,7 +128,7 @@ testSvOnboarding = do
     latestRoundCid
     amuletRulesCid
 
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
   [(_, dsoRules)] <- query @DsoRules dso
   case Map.lookup svX dsoRules.svs of
@@ -247,7 +247,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
     DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- check status report invaraints
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
 
 testSvOnboardingConfirmedExpiry : Script ()
@@ -336,13 +336,13 @@ testSvOverwriteInDevNet = do
     ]
 
   -- status reports are OK
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
   pure ()
 
 testSvReonboarding : Script ()
 testSvReonboarding = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
   [(_, dsoRules)] <- query @DsoRules dso
 
@@ -358,21 +358,21 @@ testSvReonboarding = do
   [(_, dsoRules)] <- query @DsoRules dso
   Map.keys dsoRules.svs === [sv1, sv2, sv3]
   Map.keys dsoRules.offboardedSvs === [sv4]
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
   -- reonboard sv4
   let token = "mock-token"
   sv4New <- allocateParty "sv4New"
 
   svSubmits app sv1 $ \cid -> exerciseCmd cid $
-    DsoRules_StartSvOnboarding "sv4New" sv4New "sv4New-participant-id" token sv1
+    DsoRules_StartSvOnboarding "sv4" sv4New "sv4New-participant-id" token sv1
   forA_ [sv1,sv2,sv3] $ \sv ->
     svSubmits app sv $ \cid -> exerciseCmd cid $ DsoRules_ConfirmAction with
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
           newSvParty = sv4New
-          newSvName = "sv4New"
+          newSvName = "sv4"
           newParticipantId = "sv4New-participant-id"
           reason = "because the sv4 owner still has the right to operate a node"
           newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
@@ -399,6 +399,6 @@ testSvReonboarding = do
   Map.keys dsoRules.offboardedSvs === [sv4]
 
   -- check status reports
-  checkSvStatusReports app
+  checkSvContractInvariants app
 
   pure ()

@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Daml
+
+  Fixed a bug that resulted in duplicate ``SvRewardState`` contracts when an SV got reonboarded
+  which allowed them to receive rewards corresponding to a multiple of their actual weight. This
+  requires upgrading ``dso-governance`` to ``0.1.2`` through a governance vote on ``AmuletConfig``.
+
 0.1.9
 -----
 

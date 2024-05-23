@@ -416,9 +416,8 @@ template DsoRules with
         case Map.lookup sv svs of
           None -> fail "Not a sv"
           Some info -> do
-            -- NOTE: this immediate deletion also slashes that sv's share of the current round's issuance
-            -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining svs
-            -- revoking that sv's rights in the CometBFT network.
+            -- NOTE: this immediate deletion will lead to the SV apps of the remaining svs
+            -- revoking that sv's rights in the CometBFT network and the topology state.
             let newSvs = Map.delete sv svs
             -- We optimize for prompt removal of a sv if the vote said so. We can thus not wait for a DSO delegate-election
             -- and instead just choose the sv with the lexicographically smallest name.
@@ -1290,6 +1289,12 @@ lookupSvInfoByName : Text -> DsoRules -> Optional (Party, SvInfo)
 lookupSvInfoByName svName DsoRules{..} =
   find (\info -> info._2.name == svName) $ Map.toList svs
 
+-- | Returns True if an SV with that name is either currently onboarded
+-- or an SV with that name has been onboarded before and is now in offboardedSvs.
+svHasBeenOnboardedBefore : Text -> DsoRules -> Bool
+svHasBeenOnboardedBefore svName this =
+  isSome (lookupSvInfoByName svName this) || any (\info -> info.name == svName) (Map.values this.offboardedSvs)
+
 ensureNeverOperatedNode : Party -> DsoRules -> Update ()
 ensureNeverOperatedNode newSvParty this = do
   require "SV party has not yet operated a node" $
@@ -1318,7 +1323,7 @@ dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
         pure this0
 
   -- create per-sv contracts if they have never been onboarded
-  unless (newSvParty `Map.member` this.offboardedSvs) $
+  unless (svHasBeenOnboardedBefore newSvName this) $
     createPerSvContracts this arg
   -- create per SV party contracts
   let initialAmuletPriceVote = None

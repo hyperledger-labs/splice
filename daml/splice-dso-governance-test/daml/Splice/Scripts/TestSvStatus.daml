@@ -12,7 +12,7 @@ import Splice.DSO.SvState
 
 
 -- test status report submission, as status report invariants are tested
--- in the onboarding tests using 'checkSvStatusReports'
+-- in the onboarding tests using 'checkSvContractInvariants'
 testStatusReportSubmission : Script ()
 testStatusReportSubmission = do
 
