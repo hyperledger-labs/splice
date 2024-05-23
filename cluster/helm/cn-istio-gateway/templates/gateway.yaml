@@ -63,7 +63,6 @@ spec:
   {{- end }}
   {{- end }}
 ---
-{{- if .Values.enablePublicGateway }}
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
@@ -91,4 +90,3 @@ spec:
       credentialName: cn-{{ (.Values.cluster).basename }}net-tls
     hosts:
     - "public.{{ (.Values.cluster).hostname }}"
-{{- end }}

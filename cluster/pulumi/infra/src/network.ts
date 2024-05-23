@@ -10,7 +10,6 @@ import {
   ExactNamespace,
   GCP_PROJECT,
   isMainNet,
-  publicPrometheusRemoteWrite,
 } from 'cn-pulumi-common';
 
 import { gcpDnsProject } from './config';
@@ -26,7 +25,7 @@ function clusterDnsEntries(
   dnsName: string,
   managedZone: string,
   ingressIp: gcp.compute.Address,
-  publicIngressIp?: gcp.compute.Address
+  publicIngressIp: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
   return [
     new gcp.dns.RecordSet(dnsName, {
@@ -45,20 +44,15 @@ function clusterDnsEntries(
       managedZone: managedZone,
       rrdatas: [ingressIp.address],
     }),
-  ].concat(
-    publicIngressIp
-      ? [
-          new gcp.dns.RecordSet(dnsName + '-public', {
-            name: `public.${dnsName}.`,
-            ttl: 60,
-            type: 'A',
-            project: gcpDnsProject,
-            managedZone: managedZone,
-            rrdatas: [publicIngressIp.address],
-          }),
-        ]
-      : []
-  );
+    new gcp.dns.RecordSet(dnsName + '-public', {
+      name: `public.${dnsName}.`,
+      ttl: 60,
+      type: 'A',
+      project: gcpDnsProject,
+      managedZone: managedZone,
+      rrdatas: [publicIngressIp.address],
+    }),
+  ];
 }
 
 function certManager(certManagerNamespaceName: string): certmanager.CertManager {
@@ -261,7 +255,7 @@ function natGateway(
 
 class CantonNetwork extends pulumi.ComponentResource {
   ingressIp: gcp.compute.Address;
-  publicIngressIp: gcp.compute.Address | undefined;
+  publicIngressIp: gcp.compute.Address;
   egressIp: gcp.compute.Address;
   ingressNs: ExactNamespace;
   dnsNames: string[];
@@ -271,9 +265,7 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
 
-    const publicIngressIp = publicPrometheusRemoteWrite
-      ? ipAddress(`cn-${clusterName}net-pub-ip`)
-      : undefined;
+    const publicIngressIp = ipAddress(`cn-${clusterName}net-pub-ip`);
 
     const egressIp = ipAddress(`cn-${clusterName}-out`);
 

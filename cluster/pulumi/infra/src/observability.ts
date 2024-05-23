@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -60,11 +61,13 @@ function istioVirtualService(
   );
 }
 
-function istioPrometheusRemoteWriteVirtualService(
+function istioPublicVirtualService(
   ns: k8s.core.v1.Namespace,
   name: string,
   serviceName: string,
-  servicePort: number
+  servicePort: number,
+  urlPrefix: string,
+  rewriteUri?: string
 ) {
   new k8s.apiextensions.CustomResource(
     `${name}-virtual-service`,
@@ -80,7 +83,8 @@ function istioPrometheusRemoteWriteVirtualService(
         gateways: ['cluster-ingress/cn-public-http-gateway'],
         http: [
           {
-            match: [{ uri: { prefix: '/api/v1/write' }, port: 443 }],
+            match: [{ uri: { prefix: urlPrefix }, port: 443 }],
+            rewrite: rewriteUri ? { uri: rewriteUri } : undefined,
             route: [
               {
                 destination: {
@@ -100,6 +104,7 @@ function istioPrometheusRemoteWriteVirtualService(
 }
 
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
+const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
@@ -122,6 +127,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
   const stackVersion = '58.5.1';
   const prometheusStackCrdVersion = '0.73.2';
+  const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
@@ -358,7 +364,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           storageClassName: 'standard-rwo',
         },
         adminUser: 'cn-admin',
-        adminPassword: grafanaKeysFromSecret().adminPassword,
+        adminPassword: adminPassword,
       },
       'kube-state-metrics': {
         fullnameOverride: 'ksm',
@@ -480,13 +486,15 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
   if (publicPrometheusRemoteWrite) {
-    istioPrometheusRemoteWriteVirtualService(
+    istioPublicVirtualService(
       namespace,
       'prometheus-remote-write',
       'prometheus-prometheus',
-      9090
+      9090,
+      '/api/v1/write'
     );
   }
+  istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -497,6 +505,45 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     createGrafanaContactPoints(namespaceName);
   }
   createGrafanaAlerting(namespaceName);
+  createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn);
+}
+
+function createGrafanaServiceAccount(
+  namespace: Input<string>,
+  adminPassword: pulumi.Output<string>,
+  dependsOn: pulumi.Resource[]
+) {
+  const grafanaProvider = new grafana.Provider('grafana', {
+    auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
+    url: grafanaPublicUrl,
+  });
+  const serviceAccountResource = new grafana.ServiceAccount(
+    'grafanaSA',
+    {
+      role: 'Editor',
+    },
+    {
+      provider: grafanaProvider,
+      dependsOn: dependsOn,
+    }
+  );
+  const serviceAccountToken = new grafana.ServiceAccountToken(
+    'grafanaSAToken',
+    {
+      serviceAccountId: serviceAccountResource.id,
+      name: 'grafana-sa-token',
+    },
+    {
+      provider: grafanaProvider,
+    }
+  );
+  new k8s.core.v1.Secret('grafana-service-account-token-secret', {
+    metadata: {
+      namespace: namespace,
+      name: 'grafana-service-account-token-secret',
+    },
+    stringData: serviceAccountToken.key.apply(key => ({ token: key })),
+  });
 }
 
 function createGrafanaContactPoints(namespace: Input<string>) {

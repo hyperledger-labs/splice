@@ -8,17 +8,18 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 declare -a plugins
 plugins=(
-  "auth0=3.1.0"
-  "auth0=3.3.1"
-  "command=0.9.2"
-  "kubernetes-cert-manager=0.0.5"
-  "gcp=6.67.0"
-  "kubernetes=4.7.1"
+  "pulumi/auth0=3.1.0"
+  "pulumi/auth0=3.3.1"
+  "pulumi/command=0.9.2"
+  "pulumi/kubernetes-cert-manager=0.0.5"
+  "pulumi/gcp=6.67.0"
+  "pulumi/kubernetes=4.7.1"
   # currently used
-  "kubernetes=4.11.0"
-  "random=4.14.0"
-  "gcp=7.2.1"
-  "auth0=3.3.2"
+  "pulumi/kubernetes=4.11.0"
+  "pulumi/random=4.14.0"
+  "pulumi/gcp=7.2.1"
+  "pulumi/auth0=3.3.2"
+  "pulumiverse/grafana=0.4.2"
 )
 
 function genSrc() {
@@ -46,11 +47,20 @@ function genSrcs() {
   tmpdir="$(mktemp -d)"
 
   for plugVers in "${plugins[@]}"; do
-    local plug=${plugVers%=*}
+    local srcplug=${plugVers%=*}
+    local src=${srcplug%/*}
+    local plug=${srcplug#*/}
     local version=${plugVers#*=}
     # url as defined here
     # https://github.com/pulumi/pulumi/blob/06d4dde8898b2a0de2c3c7ff8e45f97495b89d82/pkg/workspace/plugins.go#L197
-    local url="https://api.pulumi.com/releases/plugins/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
+    if [ "$src" == "pulumi" ]; then
+      local url="https://api.pulumi.com/releases/plugins/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
+    elif [ "$src" == "pulumiverse" ]; then
+      local url="https://github.com/pulumiverse/pulumi-${plug}/releases/download/v${version}/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
+    else
+      echo "Unknown source: $src" >&2
+      exit 1
+    fi
     genSrc "${url}" "${plug}-${version}" "${tmpdir}" &
   done
 

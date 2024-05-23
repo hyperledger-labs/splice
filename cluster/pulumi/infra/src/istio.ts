@@ -218,6 +218,16 @@ function configurePublicGatewayService(
             },
           ],
         },
+        {
+          to: [
+            {
+              // Paths that do not require authentication at Istio.
+              operation: {
+                paths: ['/grafana/api/serviceaccounts', '/grafana/api/serviceaccounts/*'],
+              },
+            },
+          ],
+        },
       ],
     },
   });
@@ -309,7 +319,7 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
-  publicGwSvc?: k8s.helm.v3.Release
+  publicGwSvc: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
   return installCNHelmChart(
     ingressNs,
@@ -325,11 +335,10 @@ function configureGateway(
           : `${clusterBasename}.global.canton.network.digitalasset.com`,
         basename: clusterBasename,
       },
-      enablePublicGateway: !!publicGwSvc,
     },
     defaultVersion,
     {
-      dependsOn: [gwSvc].concat(publicGwSvc ? [publicGwSvc] : []),
+      dependsOn: [gwSvc, publicGwSvc],
     },
     false
   );
@@ -338,7 +347,7 @@ function configureGateway(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  publicIngressIp?: pulumi.Output<string>
+  publicIngressIp: pulumi.Output<string>
 ): k8s.helm.v3.Release {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
@@ -349,8 +358,6 @@ export function configureIstio(
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
-  const publicGwSvc = publicIngressIp
-    ? configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod)
-    : undefined;
+  const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
   return configureGateway(ingressNs, gwSvc, publicGwSvc);
 }
