@@ -3,8 +3,15 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.10
+------
+
+* SV App
+
+  The default transfer config set by the founding node has been changed from
+  ``"0.0000192901`` to ``0.0000190259`` corresponding to changing the computation to be
+  performaned in fixed point decimals and 365 days. This matches the change already applied to
+  devnet through a governance vote.
 
 * Daml
 
