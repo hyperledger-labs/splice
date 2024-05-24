@@ -12,6 +12,12 @@ Upcoming
   which allowed them to receive rewards corresponding to a multiple of their actual weight. This
   requires upgrading ``dso-governance`` to ``0.1.2`` through a governance vote on ``AmuletConfig``.
 
+* SV UI
+
+  Fixed a bug in pretty printing of the JSON object in ``DSO Info``
+  that printed maps differently from the API response and some other
+  parts of the UI.
+
 0.1.9
 -----
 

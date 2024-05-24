@@ -6,7 +6,7 @@ import {
 import { z } from 'zod';
 
 import { DisclosedContract } from '@daml/ledger';
-import { ContractId, ContractTypeCompanion, Template } from '@daml/types';
+import { ContractId, ContractTypeCompanion, Serializable, Template } from '@daml/types';
 
 export interface Contract<T> {
   templateId: string;
@@ -64,6 +64,12 @@ export const Contract = {
     const contract = contractSchema.parse(data);
 
     return { ...contract, payload: payloadSchema.parse(contract.payload) };
+  },
+  encode: <T>(tmpl: Serializable<T>, c: Contract<T>): unknown => {
+    return {
+      ...c,
+      payload: tmpl.encode(c.payload),
+    };
   },
 };
 

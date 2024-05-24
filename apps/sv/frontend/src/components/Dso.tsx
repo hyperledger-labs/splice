@@ -18,7 +18,7 @@ import TableCell from '@mui/material/TableCell';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 
-import { useDsoInfos } from '../contexts/SvContext';
+import { SvUiState, useDsoInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { useMediatorStatus } from '../hooks/useMediatorStatus';
 import { useSequencerStatus } from '../hooks/useSequencerStatus';
@@ -251,7 +251,11 @@ const DsoViewPrettyJSON = () => {
         <GeneralInformationView />
       </TabPanel>
       <TabPanel value={value} index={1}>
-        <JSONPretty id="dso-rules-information" style={{ fontSize: '10pt' }} data={dsoInfoData} />
+        <JSONPretty
+          id="dso-rules-information"
+          style={{ fontSize: '10pt' }}
+          data={SvUiState.encode(dsoInfoData)}
+        />
       </TabPanel>
       <TabPanel value={value} index={2}>
         <JSONPretty
