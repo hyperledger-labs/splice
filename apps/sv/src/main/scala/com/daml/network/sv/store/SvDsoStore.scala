@@ -193,6 +193,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[Option[AssignedContract[SvRewardState.ContractId, SvRewardState]]]
 
+  def listSvRewardStates(svName: String, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvRewardState.ContractId, SvRewardState]]]
+
   def lookupAmuletRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
       AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]

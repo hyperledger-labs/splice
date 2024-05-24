@@ -1339,6 +1339,25 @@ class DbSvDsoStore(
   ): Future[Option[AssignedContract[SvRewardState.ContractId, SvRewardState]]] =
     lookupContractBySvName(SvRewardState.COMPANION, svName)
 
+  override def listSvRewardStates(svName: String, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvRewardState.ContractId, SvRewardState]]] =
+    for {
+      result <- storage
+        .query(
+          selectFromAcsTable(
+            DsoTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(SvRewardState.TEMPLATE_ID)}
+              AND sv_name = ${lengthLimited(svName)}
+            """,
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
+          "listSvRewardStates",
+        )
+    } yield result.map(contractFromRow(SvRewardState.COMPANION)(_))
+
   private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
       companion: C,
       svPartyId: PartyId,

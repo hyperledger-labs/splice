@@ -1101,6 +1101,29 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "listSvRewardState" should {
+      "list SvRewardState" in {
+
+        val sv1RewardState1 = svRewardState("sv1")
+        val sv1RewardState2 = svRewardState("sv1")
+        val sv2RewardState = svRewardState("sv2")
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(Seq(sv1RewardState1, sv1RewardState2, sv2RewardState))(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          sv1RewardStates <- store.listSvRewardStates("sv1", Limit.DefaultLimit)
+          sv2RewardStates <- store.listSvRewardStates("sv2", Limit.DefaultLimit)
+        } yield {
+          sv1RewardStates.map(_.contractId).toSet shouldBe Set(
+            sv1RewardState1.contractId,
+            sv1RewardState2.contractId,
+          )
+          sv2RewardStates.map(_.contractId).toSet shouldBe Set(sv2RewardState.contractId)
+        }
+      }
+    }
+
   }
 
   lazy val addUser666Action = new ARC_DsoRules(

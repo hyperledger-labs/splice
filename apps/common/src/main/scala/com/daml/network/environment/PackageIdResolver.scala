@@ -202,6 +202,7 @@ object PackageIdResolver {
     "Splice.DsoBootstrap" -> Package.SpliceDsoGovernance,
     "Splice.DsoRules" -> Package.SpliceDsoGovernance,
     "Splice.DSO.AmuletPrice" -> Package.SpliceDsoGovernance,
+    "Splice.DSO.SvState" -> Package.SpliceDsoGovernance,
     "Splice.SvOnboarding" -> Package.SpliceDsoGovernance,
     "Splice.ValidatorOnboarding" -> Package.SpliceValidatorLifecycle,
     "Splice.Wallet.Install" -> Package.SpliceWallet,

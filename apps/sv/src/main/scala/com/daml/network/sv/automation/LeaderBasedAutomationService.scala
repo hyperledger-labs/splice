@@ -64,6 +64,7 @@ class LeaderBasedAutomationService(
     registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
+    registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
   }
 
 }
@@ -92,5 +93,6 @@ object LeaderBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredAnsEntryTrigger],
     aTrigger[ExpiredAnsSubscriptionTrigger],
     aTrigger[TerminatedSubscriptionTrigger],
+    aTrigger[MergeSvRewardStateContractsTrigger],
   )
 }
