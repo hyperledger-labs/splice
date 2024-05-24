@@ -28,8 +28,9 @@ assignees: ''
    - [ ] adjust the versions in `cluster/deployment/devnet/.envrc.vars` to match our new version
 - [ ] from this branch (**while pairing with someone!**): do `cncluster pulumi ... preview --diff` and (if preview makes sense) `cncluster pulumi ... up --yes --skip-preview`
   - [ ] `canton-network` stack
-  - [ ] `sv-runbook` stack
-  - [ ] `validator-runbook` stack
+  - [ ] `sv-runbook` stack (if deployed)
+  - [ ] `validator-runbook` stack (if deployed)
+  - [ ] `multi-validator` stack (if deployed)
   - [ ] `infra` stack
 - [ ] confirm that we didn't break anything (e.g., via the grafana dashboards and a manually triggered preflight check)
 - [ ] force push the temp branch we're on to `deployment/devnet` (**while pairing with someone!** note that you might need someone to change the branch config so you can do this; try asking Martin, Itai, Moritz, or Nicu)
