@@ -1,6 +1,6 @@
 {
     "name" : "CIPeriodic Migration Test",
-    "description" : "Tests a synchronizer migration with version upgrade from 0.1.9-snapshot.20240516.5948.0.v181a62a8 to the version on main; TODO(#11659) don't the hardcode version like that",
+    "description" : "Tests a synchronizer migration with version upgrade from 0.1.10-snapshot.20240523.5991.0.v9129fc1a to the version on main; TODO(#11659) don't the hardcode version like that",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",

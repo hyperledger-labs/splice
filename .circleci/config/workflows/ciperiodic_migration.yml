@@ -65,6 +65,7 @@ workflow:
           parallelism: 1
           wait_for_sv: false
           cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false
           requires:
             - prepare_cluster_for_migration
             - prepare_sv_runbook_for_migration
