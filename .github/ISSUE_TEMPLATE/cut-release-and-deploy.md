@@ -17,6 +17,7 @@ assignees: ''
   - [ ] Create a non-snapshot release
   - [ ] Trigger CI job `publish-public-artifacts` on release branch
   - [ ] bump `VERSION` and `LATEST_RELEASE` on main
+- [ ] Open source any Daml changes, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
 
 ## Upgrade our own nodes on DevNet
 
