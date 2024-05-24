@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.CNNodeUtil.ccToDollars
-import com.daml.network.util.{TriggerTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.automation.AutoAcceptTransferOffersTrigger
 import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -28,6 +28,8 @@ class WalletSweepIntegrationTest
   val maxBalanceUsd: BigDecimal = BigDecimal(10)
   val minBalanceUsd: BigDecimal = BigDecimal(2)
   val amuletPrice: BigDecimal = BigDecimal(1)
+
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.bigDecimal)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -118,19 +120,8 @@ class WalletSweepIntegrationTest
       implicit env =>
         onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
 
-        clue("There are no outstanding transfer offers to accept or complete") {
-          eventually() {
-            aliceValidatorWalletClient.listTransferOffers() shouldBe empty
-            aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-          }
-        }
+        sweepAndTransfersAreIdle()
         val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
-        def sv1Balance() = BigDecimal(
-          ccToDollars(
-            sv1WalletClient.balance().unlockedQty.bigDecimal,
-            amuletPrice.bigDecimal,
-          )
-        )
 
         setTriggersWithin(
           triggersToPauseAtStart = autoAcceptTransferOffersTriggers,
@@ -182,12 +173,7 @@ class WalletSweepIntegrationTest
   "check that the sweep is completed even if an offer is rejected" in { implicit env =>
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
 
-    clue("There are no outstanding transfer offers to accept or complete") {
-      eventually() {
-        aliceValidatorWalletClient.listTransferOffers() shouldBe empty
-        aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-      }
-    }
+    sweepAndTransfersAreIdle()
     val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
 
     setTriggersWithin(triggersToPauseAtStart = autoAcceptTransferOffersTriggers, Seq.empty) {
@@ -228,8 +214,24 @@ class WalletSweepIntegrationTest
     }
   }
 
+  private def sv1Balance()(implicit env: FixtureParam) = BigDecimal(
+    ccToDollars(
+      sv1WalletClient.balance().unlockedQty.bigDecimal,
+      amuletPrice.bigDecimal,
+    )
+  )
+
+  private def sweepAndTransfersAreIdle()(implicit env: FixtureParam) =
+    clue("There are no outstanding transfer offers to accept or complete") {
+      eventually() {
+        sv1Balance() shouldBe <(maxBalanceUsd)
+        aliceValidatorWalletClient.listTransferOffers() shouldBe empty
+        aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
+      }
+    }
+
   // triggers relevant to outstanding sweep transfer offers
-  def autoAcceptTransferOffersTriggers(implicit
+  private def autoAcceptTransferOffersTriggers(implicit
       environment: CNNodeTestConsoleEnvironment
   ): Seq[Trigger] = {
     val aliceUserName = aliceValidatorWalletClient.config.ledgerApiUser
