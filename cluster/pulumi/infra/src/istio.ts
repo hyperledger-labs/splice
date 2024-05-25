@@ -223,7 +223,11 @@ function configurePublicGatewayService(
             {
               // Paths that do not require authentication at Istio.
               operation: {
-                paths: ['/grafana/api/serviceaccounts', '/grafana/api/serviceaccounts/*'],
+                paths: [
+                  '/grafana/api/serviceaccounts',
+                  '/grafana/api/serviceaccounts/*',
+                  '/grafana/api/alertmanager/grafana/api/v2/silences',
+                ],
               },
             },
           ],

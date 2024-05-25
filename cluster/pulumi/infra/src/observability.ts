@@ -69,7 +69,7 @@ function istioPublicVirtualService(
   urlPrefix: string,
   rewriteUri?: string
 ) {
-  new k8s.apiextensions.CustomResource(
+  return new k8s.apiextensions.CustomResource(
     `${name}-virtual-service`,
     {
       apiVersion: 'networking.istio.io/v1alpha3',
@@ -119,6 +119,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     {
       metadata: {
         name: 'observability',
+        labels: { 'istio-injection': 'enabled' },
       },
     },
     { dependsOn }
@@ -128,353 +129,359 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   const stackVersion = '58.5.1';
   const prometheusStackCrdVersion = '0.73.2';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
-  const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
-    name: 'prometheus-grafana-monitoring',
-    chart: 'kube-prometheus-stack',
-    version: stackVersion,
-    namespace: namespaceName,
-    repositoryOpts: {
-      repo: 'https://prometheus-community.github.io/helm-charts',
-    },
-    values: {
-      fullnameOverride: 'prometheus',
-      commonLabels: {
-        'digitalasset.com/scope': 'ci',
-        'digitalasset.com/component': 'prometheus-stack',
+  const prometheusStack = new k8s.helm.v3.Release(
+    'observability-metrics',
+    {
+      name: 'prometheus-grafana-monitoring',
+      chart: 'kube-prometheus-stack',
+      version: stackVersion,
+      namespace: namespaceName,
+      repositoryOpts: {
+        repo: 'https://prometheus-community.github.io/helm-charts',
       },
-      defaultRules: {
-        // enable recording rules for all the k8s metrics
-        create: true,
-      },
-      kubeControllerManager: {
-        enabled: false,
-      },
-      kubeEtcd: {
-        enabled: false,
-      },
-      kubeScheduler: {
-        enabled: false,
-      },
-      kubeDns: {
-        enabled: true,
-      },
-      kubeProxy: {
-        enabled: false,
-      },
-      alertmanager: {
-        enabled: true,
-        config: {
-          route: {
-            receiver: enableAlerts && !disablePrometheusAlerts ? 'slack' : 'null',
-            group_by: ['namespace'],
-            continue: false,
-            routes: [
-              {
-                receiver: 'null',
-                matchers: ['alertname="Watchdog"'],
-                continue: false,
-              },
-            ],
-          },
-          receivers: [
-            {
-              name: 'null',
-            },
-            ...(enableAlerts && !disablePrometheusAlerts
-              ? [
-                  {
-                    name: 'slack',
-                    slack_configs: [
-                      {
-                        api_url: 'https://slack.com/api/chat.postMessage',
-                        channel: slackAlertNotificationChannel,
-                        send_resolved: true,
-                        http_config: {
-                          authorization: {
-                            credentials: config.requireEnv('SLACK_ACCESS_TOKEN'),
-                          },
-                        },
-                        title: '{{ template "slack_title" . }}',
-                        text: '{{ template "slack_message" . }}',
-                      },
-                    ],
-                  },
-                ]
-              : []),
-          ],
+      values: {
+        fullnameOverride: 'prometheus',
+        commonLabels: {
+          'digitalasset.com/scope': 'ci',
+          'digitalasset.com/component': 'prometheus-stack',
         },
-        alertmanagerSpec: {
-          externalUrl: alertManagerExternalUrl,
+        defaultRules: {
+          // enable recording rules for all the k8s metrics
+          create: true,
         },
-        templateFiles: {
-          'template.tmpl': readAlertingManagerFile('slack-notification.tmpl').replaceAll(
-            '$CLUSTER_BASENAME',
-            CLUSTER_BASENAME
-          ),
-        },
-      },
-      coreDns: {
-        enabled: false,
-      },
-      prometheusOperator: {
-        admissionWebhooks: {
+        kubeControllerManager: {
           enabled: false,
         },
-        tls: {
-          enabled: false, // because `admissionWebhooks` are disabled, see: https://github.com/prometheus-community/helm-charts/issues/418
-        },
-      },
-      prometheus: {
-        prometheusSpec: {
-          // discover all pod/service monitors across all namespaces
-          podMonitorSelectorNilUsesHelmValues: false,
-          serviceMonitorSelectorNilUsesHelmValues: false,
-          enableFeatures: [
-            'native-histograms',
-            'memory-snapshot-on-shutdown',
-            'promql-experimental-functions',
-          ],
-          enableRemoteWriteReceiver: true,
-          retention: '1y',
-          retentionSize: '100GB',
-          resources: {
-            requests: {
-              memory: '12Gi',
-              cpu: '4',
-            },
-          },
-          storageSpec: {
-            volumeClaimTemplate: {
-              spec: {
-                storageClassName: 'premium-rwo',
-                accessModes: ['ReadWriteOnce'],
-                resources: {
-                  requests: {
-                    storage: '200Gi',
-                  },
-                },
-              },
-            },
-          },
-          externalUrl: prometheusExternalUrl,
-        },
-      },
-      grafana: {
-        fullnameOverride: 'grafana',
-        ingress: {
+        kubeEtcd: {
           enabled: false,
         },
-        dashboardProviders: {
-          'dashboardproviders.yaml': {
-            apiVersion: 1,
-            providers: [
-              {
-                name: 'istio',
-                orgId: 1,
-                folder: 'Istio',
-                type: 'file',
-                disableDeletion: false,
-                editable: true,
-                options: {
-                  path: '/var/lib/grafana/dashboards/istio',
-                },
-              },
-              {
-                name: 'gid-testing',
-                orgId: 1,
-                folder: 'testing',
-                type: 'file',
-                disableDeletion: false,
-                editable: true,
-                options: {
-                  path: '/var/lib/grafana/dashboards/k6s',
-                },
-              },
-            ],
-          },
+        kubeScheduler: {
+          enabled: false,
         },
-        dashboards: {
-          k6s: {
-            native_prometheus: {
-              gnetId: 18030,
-              datasource: 'Prometheus',
-              revision: 8,
-            },
-          },
-          istio: {
-            control_plane: {
-              gnetId: 7645,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.general,
-            },
-            mesh: {
-              gnetId: 7639,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.general,
-            },
-            performance: {
-              gnetId: 11829,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.general,
-            },
-            service: {
-              gnetId: 7636,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.general,
-            },
-            workload: {
-              gnetId: 7630,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.general,
-            },
-            wasm: {
-              gnetId: 13277,
-              datasource: 'Prometheus',
-              revision: istioVersion.dashboards.wasm,
-            },
-          },
-        },
-        sidecar: {
-          dashboards: {
-            enabled: true,
-            folderAnnotation: 'folder',
-            provider: { foldersFromFilesStructure: true, allowUiUpdates: true },
-          },
-          alerts: {
-            enabled: true,
-          },
-        },
-        'grafana.ini': {
-          server: {
-            root_url: grafanaExternalUrl,
-          },
-          date_formats: {
-            default_timezone: 'UTC',
-          },
-        },
-        deploymentStrategy: {
-          // required for the pvc
-          type: 'Recreate',
-        },
-        persistence: {
+        kubeDns: {
           enabled: true,
-          type: 'pvc',
-          accessModes: ['ReadWriteOnce'],
-          size: '5Gi',
-          storageClassName: 'standard-rwo',
         },
-        adminUser: 'cn-admin',
-        adminPassword: adminPassword,
-      },
-      'kube-state-metrics': {
-        fullnameOverride: 'ksm',
-        customResourceState: {
+        kubeProxy: {
+          enabled: false,
+        },
+        alertmanager: {
           enabled: true,
           config: {
-            spec: {
-              resources: [
-                // flux config from https://github.com/fluxcd/flux2-monitoring-example/blob/main/monitoring/controllers/kube-prometheus-stack/kube-state-metrics-config.yaml
+            route: {
+              receiver: enableAlerts && !disablePrometheusAlerts ? 'slack' : 'null',
+              group_by: ['namespace'],
+              continue: false,
+              routes: [
                 {
-                  groupVersionKind: {
-                    group: 'source.toolkit.fluxcd.io',
-                    version: 'v1',
-                    kind: 'GitRepository',
-                  },
-                  metricNamePrefix: 'cn_deployment_flux',
-                  metrics: [
-                    {
-                      name: 'resource_info',
-                      help: 'The current state of a Flux GitRepository resource.',
-                      each: {
-                        type: 'Gauge',
-                        gauge: {
-                          labelsFromPath: {
-                            name: ['metadata', 'name'],
-                          },
-                        },
-                      },
-                      labelsFromPath: {
-                        exported_namespace: ['metadata', 'namespace'],
-                        ready: ['status', 'conditions', '[type=Ready]', 'status'],
-                        suspended: ['spec', 'suspend'],
-                        revision: ['status', 'artifact', 'revision'],
-                        url: ['spec', 'url'],
-                      },
-                    },
-                  ],
+                  receiver: 'null',
+                  matchers: ['alertname="Watchdog"'],
+                  continue: false,
                 },
-                // pulumi resources
+              ],
+            },
+            receivers: [
+              {
+                name: 'null',
+              },
+              ...(enableAlerts && !disablePrometheusAlerts
+                ? [
+                    {
+                      name: 'slack',
+                      slack_configs: [
+                        {
+                          api_url: 'https://slack.com/api/chat.postMessage',
+                          channel: slackAlertNotificationChannel,
+                          send_resolved: true,
+                          http_config: {
+                            authorization: {
+                              credentials: config.requireEnv('SLACK_ACCESS_TOKEN'),
+                            },
+                          },
+                          title: '{{ template "slack_title" . }}',
+                          text: '{{ template "slack_message" . }}',
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+            ],
+          },
+          alertmanagerSpec: {
+            externalUrl: alertManagerExternalUrl,
+          },
+          templateFiles: {
+            'template.tmpl': readAlertingManagerFile('slack-notification.tmpl').replaceAll(
+              '$CLUSTER_BASENAME',
+              CLUSTER_BASENAME
+            ),
+          },
+        },
+        coreDns: {
+          enabled: false,
+        },
+        prometheusOperator: {
+          admissionWebhooks: {
+            enabled: false,
+          },
+          tls: {
+            enabled: false, // because `admissionWebhooks` are disabled, see: https://github.com/prometheus-community/helm-charts/issues/418
+          },
+        },
+        prometheus: {
+          prometheusSpec: {
+            // discover all pod/service monitors across all namespaces
+            podMonitorSelectorNilUsesHelmValues: false,
+            serviceMonitorSelectorNilUsesHelmValues: false,
+            enableFeatures: [
+              'native-histograms',
+              'memory-snapshot-on-shutdown',
+              'promql-experimental-functions',
+            ],
+            enableRemoteWriteReceiver: true,
+            retention: '1y',
+            retentionSize: '100GB',
+            resources: {
+              requests: {
+                memory: '12Gi',
+                cpu: '4',
+              },
+            },
+            storageSpec: {
+              volumeClaimTemplate: {
+                spec: {
+                  storageClassName: 'premium-rwo',
+                  accessModes: ['ReadWriteOnce'],
+                  resources: {
+                    requests: {
+                      storage: '200Gi',
+                    },
+                  },
+                },
+              },
+            },
+            externalUrl: prometheusExternalUrl,
+          },
+        },
+        grafana: {
+          fullnameOverride: 'grafana',
+          ingress: {
+            enabled: false,
+          },
+          dashboardProviders: {
+            'dashboardproviders.yaml': {
+              apiVersion: 1,
+              providers: [
                 {
-                  groupVersionKind: {
-                    group: 'pulumi.com',
-                    version: 'v1',
-                    kind: 'Stack',
+                  name: 'istio',
+                  orgId: 1,
+                  folder: 'Istio',
+                  type: 'file',
+                  disableDeletion: false,
+                  editable: true,
+                  options: {
+                    path: '/var/lib/grafana/dashboards/istio',
                   },
-                  metricNamePrefix: 'cn_deployment_pulumi',
-                  labelsFromPath: {
-                    stack: ['spec', 'stack'],
-                    state: ['status', 'lastUpdate', 'state'],
-                    // condition_type: ['status', 'conditions', '[status=True]', 'type'],
-                    // condition_reason: ['status', 'conditions', '[status=True]', 'reason'],
-                    generation: ['status', 'observedGeneration'],
+                },
+                {
+                  name: 'gid-testing',
+                  orgId: 1,
+                  folder: 'testing',
+                  type: 'file',
+                  disableDeletion: false,
+                  editable: true,
+                  options: {
+                    path: '/var/lib/grafana/dashboards/k6s',
                   },
-                  metrics: [
-                    // from https://github.com/kubernetes/kube-state-metrics/blob/main/docs/metrics/extend/customresourcestate-metrics.md#example-for-status-conditions-on-kubernetes-controllers
-                    {
-                      name: 'stack_condition',
-                      help: 'The current conditions of a Pulumi Stack resource.',
-                      each: {
-                        type: 'Gauge',
-                        gauge: {
-                          path: ['status', 'conditions'],
-                          labelsFromPath: {
-                            type: ['type'],
-                            reason: ['reason'],
-                          },
-                          valueFrom: ['status'],
-                        },
-                      },
-                    },
-                    {
-                      name: 'stack_status',
-                      help: 'The current state of a Pulumi Stack resource.',
-                      each: {
-                        type: 'Gauge',
-                        gauge: {
-                          path: ['status'],
-                          labelsFromPath: {
-                            state: ['lastUpdate', 'state'],
-                          },
-                          valueFrom: ['observedGeneration'],
-                        },
-                      },
-                    },
-                  ],
                 },
               ],
             },
           },
-        },
-        rbac: {
-          extraRules: [
-            {
-              apiGroups: ['source.toolkit.fluxcd.io', 'notification.toolkit.fluxcd.io'],
-              resources: ['gitrepositories', 'alerts', 'providers', 'receivers'],
-              verbs: ['list', 'watch'],
+          dashboards: {
+            k6s: {
+              native_prometheus: {
+                gnetId: 18030,
+                datasource: 'Prometheus',
+                revision: 8,
+              },
             },
-            {
-              apiGroups: ['pulumi.com'],
-              resources: ['stacks'],
-              verbs: ['list', 'watch'],
+            istio: {
+              control_plane: {
+                gnetId: 7645,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.general,
+              },
+              mesh: {
+                gnetId: 7639,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.general,
+              },
+              performance: {
+                gnetId: 11829,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.general,
+              },
+              service: {
+                gnetId: 7636,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.general,
+              },
+              workload: {
+                gnetId: 7630,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.general,
+              },
+              wasm: {
+                gnetId: 13277,
+                datasource: 'Prometheus',
+                revision: istioVersion.dashboards.wasm,
+              },
             },
-          ],
+          },
+          sidecar: {
+            dashboards: {
+              enabled: true,
+              folderAnnotation: 'folder',
+              provider: { foldersFromFilesStructure: true, allowUiUpdates: true },
+            },
+            alerts: {
+              enabled: true,
+            },
+          },
+          'grafana.ini': {
+            server: {
+              root_url: grafanaExternalUrl,
+            },
+            date_formats: {
+              default_timezone: 'UTC',
+            },
+          },
+          deploymentStrategy: {
+            // required for the pvc
+            type: 'Recreate',
+          },
+          persistence: {
+            enabled: true,
+            type: 'pvc',
+            accessModes: ['ReadWriteOnce'],
+            size: '5Gi',
+            storageClassName: 'standard-rwo',
+          },
+          adminUser: 'cn-admin',
+          adminPassword: adminPassword,
         },
-      },
-      'prometheus-node-exporter': {
-        fullnameOverride: 'node-exporter',
+        'kube-state-metrics': {
+          fullnameOverride: 'ksm',
+          customResourceState: {
+            enabled: true,
+            config: {
+              spec: {
+                resources: [
+                  // flux config from https://github.com/fluxcd/flux2-monitoring-example/blob/main/monitoring/controllers/kube-prometheus-stack/kube-state-metrics-config.yaml
+                  {
+                    groupVersionKind: {
+                      group: 'source.toolkit.fluxcd.io',
+                      version: 'v1',
+                      kind: 'GitRepository',
+                    },
+                    metricNamePrefix: 'cn_deployment_flux',
+                    metrics: [
+                      {
+                        name: 'resource_info',
+                        help: 'The current state of a Flux GitRepository resource.',
+                        each: {
+                          type: 'Gauge',
+                          gauge: {
+                            labelsFromPath: {
+                              name: ['metadata', 'name'],
+                            },
+                          },
+                        },
+                        labelsFromPath: {
+                          exported_namespace: ['metadata', 'namespace'],
+                          ready: ['status', 'conditions', '[type=Ready]', 'status'],
+                          suspended: ['spec', 'suspend'],
+                          revision: ['status', 'artifact', 'revision'],
+                          url: ['spec', 'url'],
+                        },
+                      },
+                    ],
+                  },
+                  // pulumi resources
+                  {
+                    groupVersionKind: {
+                      group: 'pulumi.com',
+                      version: 'v1',
+                      kind: 'Stack',
+                    },
+                    metricNamePrefix: 'cn_deployment_pulumi',
+                    labelsFromPath: {
+                      stack: ['spec', 'stack'],
+                      state: ['status', 'lastUpdate', 'state'],
+                      // condition_type: ['status', 'conditions', '[status=True]', 'type'],
+                      // condition_reason: ['status', 'conditions', '[status=True]', 'reason'],
+                      generation: ['status', 'observedGeneration'],
+                    },
+                    metrics: [
+                      // from https://github.com/kubernetes/kube-state-metrics/blob/main/docs/metrics/extend/customresourcestate-metrics.md#example-for-status-conditions-on-kubernetes-controllers
+                      {
+                        name: 'stack_condition',
+                        help: 'The current conditions of a Pulumi Stack resource.',
+                        each: {
+                          type: 'Gauge',
+                          gauge: {
+                            path: ['status', 'conditions'],
+                            labelsFromPath: {
+                              type: ['type'],
+                              reason: ['reason'],
+                            },
+                            valueFrom: ['status'],
+                          },
+                        },
+                      },
+                      {
+                        name: 'stack_status',
+                        help: 'The current state of a Pulumi Stack resource.',
+                        each: {
+                          type: 'Gauge',
+                          gauge: {
+                            path: ['status'],
+                            labelsFromPath: {
+                              state: ['lastUpdate', 'state'],
+                            },
+                            valueFrom: ['observedGeneration'],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          rbac: {
+            extraRules: [
+              {
+                apiGroups: ['source.toolkit.fluxcd.io', 'notification.toolkit.fluxcd.io'],
+                resources: ['gitrepositories', 'alerts', 'providers', 'receivers'],
+                verbs: ['list', 'watch'],
+              },
+              {
+                apiGroups: ['pulumi.com'],
+                resources: ['stacks'],
+                verbs: ['list', 'watch'],
+              },
+            ],
+          },
+        },
+        'prometheus-node-exporter': {
+          fullnameOverride: 'node-exporter',
+        },
       },
     },
-  });
+    {
+      dependsOn: [namespace],
+    }
+  );
 
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
@@ -494,7 +501,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
       '/api/v1/write'
     );
   }
-  istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
+  const grafanaPublicVirtualService = istioPublicVirtualService(
+    namespace,
+    'grafana-public',
+    'grafana',
+    80,
+    '/grafana/',
+    '/'
+  );
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -505,7 +519,74 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     createGrafanaContactPoints(namespaceName);
   }
   createGrafanaAlerting(namespaceName);
-  createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn);
+  createGrafanaServiceAccount(
+    namespaceName,
+    adminPassword,
+    dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
+  );
+  createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
+}
+
+// Even though the AuthorizationPolicy explicitly allows all traffic to Grafana api
+// to not go through istio authentication, the RequestAuthentication still rejects
+// requests with an Authorization header that is not a jwt!
+// We work around that by putting the authorization for Grafana in a custom header,
+// x-non-jwt-auth, and using an EnvoyFilter to copy that header to the Authorization header
+// before it hits the pod.
+function createGrafanaEnvoyFilter(namespace: Input<string>, dependsOn: pulumi.Resource[]) {
+  new k8s.apiextensions.CustomResource(
+    'grafana-envoy-filter',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'EnvoyFilter',
+      metadata: {
+        name: 'grafana-authorization-header-filter',
+        namespace: namespace,
+      },
+      spec: {
+        workloadSelector: {
+          labels: {
+            'app.kubernetes.io/name': 'grafana',
+          },
+        },
+        configPatches: [
+          {
+            applyTo: 'HTTP_FILTER',
+            match: {
+              context: 'SIDECAR_INBOUND',
+              listener: {
+                filterChain: {
+                  filter: {
+                    name: 'envoy.filters.network.http_connection_manager',
+                    subFilter: {
+                      name: 'envoy.filters.http.router',
+                    },
+                  },
+                },
+              },
+            },
+            patch: {
+              operation: 'INSERT_BEFORE',
+              value: {
+                name: 'envoy.lua',
+                typed_config: {
+                  '@type': 'type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua',
+                  inlineCode:
+                    'function envoy_on_request(request_handle)\n' +
+                    '  headers = request_handle: headers()\n' +
+                    '  request_handle: headers(): add("Authorization", headers: get("x-non-jwt-auth"))\n' +
+                    'end',
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      dependsOn: dependsOn,
+    }
+  );
 }
 
 function createGrafanaServiceAccount(

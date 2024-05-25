@@ -675,6 +675,56 @@
     "id": "",
     "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "EnvoyFilter",
+      "metadata": {
+        "name": "grafana-authorization-header-filter",
+        "namespace": "observability"
+      },
+      "spec": {
+        "configPatches": [
+          {
+            "applyTo": "HTTP_FILTER",
+            "match": {
+              "context": "SIDECAR_INBOUND",
+              "listener": {
+                "filterChain": {
+                  "filter": {
+                    "name": "envoy.filters.network.http_connection_manager",
+                    "subFilter": {
+                      "name": "envoy.filters.http.router"
+                    }
+                  }
+                }
+              }
+            },
+            "patch": {
+              "operation": "INSERT_BEFORE",
+              "value": {
+                "name": "envoy.lua",
+                "typed_config": {
+                  "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua",
+                  "inlineCode": "function envoy_on_request(request_handle)\n  headers = request_handle: headers()\n  request_handle: headers(): add(\"Authorization\", headers: get(\"x-non-jwt-auth\"))\nend"
+                }
+              }
+            }
+          }
+        ],
+        "workloadSelector": {
+          "labels": {
+            "app.kubernetes.io/name": "grafana"
+          }
+        }
+      }
+    },
+    "name": "grafana-envoy-filter",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:EnvoyFilter"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "VirtualService",
       "metadata": {
         "name": "grafana-public",
@@ -2087,6 +2137,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "observability"
       }
     },
@@ -2207,7 +2260,8 @@
                 "operation": {
                   "paths": [
                     "/grafana/api/serviceaccounts",
-                    "/grafana/api/serviceaccounts/*"
+                    "/grafana/api/serviceaccounts/*",
+                    "/grafana/api/alertmanager/grafana/api/v2/silences"
                   ]
                 }
               }

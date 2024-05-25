@@ -2287,6 +2287,13 @@ function subcmd_restore_node() {
 
     case "$node" in
         sv-1|sv-2|sv-3|sv-4)
+            if [ "$node" == "sv-1" ]; then
+                sv_name="Digital-Asset-2"
+            else
+                sv_name=${node/sv/Digital-Asset-Eng}
+            fi
+            _info "Silencing SV report creation alerts for $sv_name for 1 hour"
+            subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
             "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer-0 participant-0 mediator-0 cn-apps
             ;;
@@ -2677,6 +2684,57 @@ function subcmd_unprotect_dbs() {
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/databaseInstance:DatabaseInstance::$ns-$db-$migration_id-pg" --yes || true
     done
   done
+}
+
+###
+
+subcommand_whitelist[silence_grafana_alerts]='Silence grafana alerts'
+
+function subcmd_silence_grafana_alerts() {
+
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: cncluster silence_grafana_alerts <duration> <matcher1> [<matcher2> ...]"
+        echo ""
+        echo "Example:"
+        echo "  cncluster silence_grafana_alerts \"2 minutes\" \"alertname=Report Creation Time Lag\" \"report_publisher=Digital-Asset-Eng-3\""
+        exit 1
+    fi
+
+    duration=$1
+    shift 1
+
+    matchers="[]"
+    for matcher in "$@"; do
+        name=${matcher%=*}
+        value=${matcher#*=}
+        matchers=$(echo "$matchers" | jq ". +=  [{\"name\":\"${name}\",\"value\":\"${value}\",\"isEqual\":true,\"isRegex\":false}]")
+    done
+
+    now=$(date -u '+%FT%TZ')
+    until=$(date -u -d "+${duration}" '+%FT%TZ')
+    _info "Fetching token"
+    token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
+    _info "Adding silence"
+    curl -sSL --fail-with-body \
+        "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
+        -H 'content-type: application/json' \
+        --request POST \
+        -H "x-non-jwt-auth: Bearer ${token}" \
+         --data "{
+            \"startsAt\":\"${now}\",\
+            \"endsAt\":\"${until}\",\
+            \"createdBy\":\"Automation\",\
+            \"comment\":\"Silence while restoring from backup\",\
+            \"matchers\":$matchers
+            }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
+    # If the above fails with a 401 Unauthorized:
+    # - Confirm that the observability namespace has a label: istio-injection=enabled
+    # - Restart the grafana pod so that the sidecar is injected (the pod should have 5 containers including the istio-proxy sidecar):
+    #   `kubectl delete pod -n observability -l 'app.kubernetes.io/name=grafana'`
+    # - Delete the grafana-authorization-header-filter EnvoyFilter if one exists:
+    #   `kubectl delete envoyfilter -n observability grafana-authorization-header-filter`
+    # - Refresh and `up` the pulumi infra stack:
+    #   `cncluster pulumi infra refresh && cncluster pulumi infra up`
 }
 
 ###
