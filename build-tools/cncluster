@@ -1586,8 +1586,13 @@ function subcmd_prefresh() {
     fi
     _cluster_must_exist
 
-    _uses_pulumi_stack canton-network
-    subcmd_pulumi canton-network refresh --yes --skip-preview
+    stacks="canton-network multi-validator sv-runbook validator-runbook infra"
+
+    for stack in $stacks; do
+      _info "Refreshing $stack stack"
+      _uses_pulumi_stack "$stack"
+      subcmd_pulumi "$stack" refresh --yes --skip-preview
+    done
 }
 
 ###
