@@ -42,8 +42,10 @@ function _indent(){
 
 # issue a user friendly red error and die
 function _error(){
+  local RC=$?
+  ((RC)) || RC=1
   _error_msg "$@"
-  exit $?
+  exit ${RC}
 }
 
 # Issue a log message
@@ -53,10 +55,7 @@ function _log() {
 
 # issue a user friendly red error
 function _error_msg(){
-  local RC=$?
-  ((RC)) || RC=1
   echo -e "\e[1;31mERROR: $@\e[0m" >&2
-  return ${RC}
 }
 
 # issue a user friendly green informational message
