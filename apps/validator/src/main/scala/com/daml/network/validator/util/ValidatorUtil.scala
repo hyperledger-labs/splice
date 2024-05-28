@@ -146,84 +146,90 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       validatorWalletUserName: Option[String],
-      walletManagerOpt: Option[UserWalletManager],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
     val validatorParty = store.key.validatorParty
-    val endUserPartyFromWalletManager =
-      walletManagerOpt.flatMap(_.lookupUserWallet(endUserName)).map(_.store.key.endUserParty)
-    for {
-      endUserParty <- endUserPartyFromWalletManager
-        .map(Future.successful(_))
-        .getOrElse(storeWithIngestion.connection.getPrimaryParty(endUserName))
-      _ <-
-        if (
-          endUserParty == validatorParty ||
-          endUserName == validatorUserName ||
-          validatorWalletUserName.exists(_ == endUserName)
-        ) {
-          val msg = s"Tried to offboard the validator's user: $endUserName"
-          logger.warn(msg)
-          Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
-        } else {
-          Future.unit
-        }
-      _ <- retryProvider.retryForClientCalls(
-        "offboard_validator",
-        "Remove install contract and validator right",
-        Future
-          .traverse(
-            Seq(
-              "install contract" ->
-                store.lookupWalletInstallByNameWithOffset(endUserName),
-              "validator right" ->
-                store.lookupValidatorRightByPartyWithOffset(endUserParty),
-            )
-          ) { case (explanation, qocws) =>
-            qocws
-              .map(_.value.map(_.exercise(_.exerciseArchive())).orElse {
-                logger.debug(s"No $explanation found for user $endUserName, skipping")
-                None
-              })
-          }
-          .flatMap(_.collect { case Some(archive) => archive } match {
-            case archives @ (headArchive +: tailArchives) =>
-              val domainId = headArchive.origin.state match {
-                case assigned @ Assigned(domainId)
-                    if tailArchives forall (_.origin.state == assigned) =>
-                  domainId
-                case _ =>
-                  throw Status.FAILED_PRECONDITION
-                    .withDescription(
-                      s"install and validator right for $endUserName not ready for archival, in states ${archives
-                          .map(_.origin.state)}"
-                    )
-                    .asRuntimeException()
-              }
-              storeWithIngestion.connection
-                .submit(
-                  actAs = Seq(
-                    store.key.validatorParty,
-                    endUserParty,
-                  ),
-                  readAs = Seq.empty,
-                  archives.map(_.update),
+    store.lookupInstallByName(endUserName).flatMap {
+      case None =>
+        // Note: it's OK to skip off-boarding in this case, as on-boarding always creates an install contract first,
+        // and off-boarding archives the install contract jointly with the validator right. Thus we can't end up in a
+        // situation where there is a stray validator right.
+        // TODO(#12556): revisit the above statement in the context of removing the data races wrt validator user rights that do exist
+        logger
+          .info(s"Skipping off-boarding of $endUserName, as no wallet install contract was found.")
+        Future.unit
+      case Some(install) =>
+        val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
+        for {
+          _ <-
+            if (
+              endUserParty == validatorParty ||
+              endUserName == validatorUserName ||
+              validatorWalletUserName.contains(endUserName)
+            ) {
+              val msg = s"Tried to offboard the validator's user: $endUserName"
+              logger.warn(msg)
+              Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
+            } else {
+              Future.unit
+            }
+          _ <- retryProvider.retryForClientCalls(
+            "offboard_validator",
+            "Remove install contract and validator right",
+            Future
+              .traverse(
+                Seq(
+                  "install contract" ->
+                    store.lookupWalletInstallByNameWithOffset(endUserName),
+                  "validator right" ->
+                    store.lookupValidatorRightByPartyWithOffset(endUserParty),
                 )
-                .withDomainId(domainId)
-                .noDedup
-                .yieldUnit()
-            case _ => Future.unit
-          }),
-        logger,
-        // once the validator's actAs and readAs rights have been revoked,
-        // these commands could fail with PERMISSION_DENIED errors (#4425).
-        Seq(Status.Code.PERMISSION_DENIED),
-      )
-    } yield {
-      logger.debug(s"User $endUserParty offboarded")
-      ()
+              ) { case (explanation, qocws) =>
+                qocws
+                  .map(_.value.map(_.exercise(_.exerciseArchive())).orElse {
+                    logger.debug(s"No $explanation found for user $endUserName, skipping")
+                    None
+                  })
+              }
+              .flatMap(_.collect { case Some(archive) => archive } match {
+                case archives @ (headArchive +: tailArchives) =>
+                  val domainId = headArchive.origin.state match {
+                    case assigned @ Assigned(domainId)
+                        if tailArchives forall (_.origin.state == assigned) =>
+                      domainId
+                    case _ =>
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"install and validator right for $endUserName not ready for archival, in states ${archives
+                              .map(_.origin.state)}"
+                        )
+                        .asRuntimeException()
+                  }
+                  storeWithIngestion.connection
+                    .submit(
+                      actAs = Seq(
+                        store.key.validatorParty,
+                        endUserParty,
+                      ),
+                      readAs = Seq.empty,
+                      archives.map(_.update),
+                    )
+                    .withDomainId(domainId)
+                    .noDedup
+                    .yieldUnit()
+                case _ => Future.unit
+              }),
+            logger,
+            // once the validator's actAs and readAs rights have been revoked,
+            // these commands could fail with PERMISSION_DENIED errors (#4425).
+            Seq(Status.Code.PERMISSION_DENIED),
+          )
+        } yield {
+          logger.debug(s"User $endUserParty offboarded")
+          ()
+        }
     }
   }
 

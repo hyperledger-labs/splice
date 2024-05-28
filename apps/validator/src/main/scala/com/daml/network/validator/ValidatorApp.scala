@@ -754,7 +754,6 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
-          walletManagerOpt = walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           participantAdminConnection,
           config,

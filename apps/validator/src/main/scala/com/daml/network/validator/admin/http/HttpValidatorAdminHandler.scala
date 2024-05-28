@@ -10,7 +10,6 @@ import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -25,7 +24,6 @@ class HttpValidatorAdminHandler(
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
     validatorWalletUserName: Option[String],
-    walletManagerOpt: Option[UserWalletManager],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
     config: ValidatorAppBackendConfig,
@@ -76,7 +74,7 @@ class HttpValidatorAdminHandler(
   ] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.offboardUser") { _ => _ =>
-      offboardUser(username, walletManagerOpt)
+      offboardUser(username)
         .map(_ => v0.ValidatorAdminResource.OffboardUserResponse.OK)
         .recover({
           case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
@@ -180,15 +178,13 @@ class HttpValidatorAdminHandler(
   }
 
   private def offboardUser(
-      user: String,
-      walletManagerOpt: Option[UserWalletManager],
+      user: String
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     ValidatorUtil.offboard(
       user,
       storeWithIngestion,
       validatorUserName,
       validatorWalletUserName,
-      walletManagerOpt,
       retryProvider,
       logger,
     )
