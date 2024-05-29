@@ -23,7 +23,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cimain"
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           cancel_workflow_on_failure: true
           requires:
@@ -48,7 +47,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "cimain"
-          send_deployment_notification: false
           requires:
             - deploy_cluster
       - preflight_sv_check:

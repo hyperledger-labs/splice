@@ -24,7 +24,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: "ciperiodic"
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciperiodic
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
@@ -39,7 +38,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
@@ -207,7 +205,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit

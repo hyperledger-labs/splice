@@ -1304,30 +1304,6 @@ commands:
           custom: |
             { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
-  notify-cluster-deployment:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-    steps:
-      - slack/notify:
-          channel: << parameters.channel_notify >>
-          branch_pattern: (deployment\/.*|main|release-line.*)
-          event: pass
-          custom: |
-            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
-
-  notify-cluster-reset:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-    steps:
-      - slack/notify:
-          channel: << parameters.channel_notify >>
-          branch_pattern: (deployment\/.*|main|release-line.*)
-          event: pass
-          custom: |
-            { "text": "*✅Job '${CIRCLE_JOB}' reset on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
-
   docker_build:
     steps:
       - run_bash_command_in_nix:
@@ -1434,9 +1410,6 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      send_deployment_notification:
-        type: boolean
-        default: true
       reset_cluster:
         type: boolean
         default: true
@@ -1525,12 +1498,6 @@ jobs:
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-deployment:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
 
   deploy_validator_runbook:
     circleci_ip_ranges: true
@@ -1836,7 +1803,7 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            
+
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
             else
@@ -1861,12 +1828,6 @@ jobs:
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-deployment:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
@@ -3526,9 +3487,6 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      send_deployment_notification:
-        type: boolean
-        default: true
     steps:
       - checkout_with_retry
       - setup_nix
@@ -3551,12 +3509,6 @@ jobs:
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-reset:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
 
   deploy_validator_to_recover_sv_amulets:
     machine:
@@ -4540,7 +4492,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cimain"
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           cancel_workflow_on_failure: true
           requires:
@@ -4565,7 +4516,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "cimain"
-          send_deployment_notification: false
           requires:
             - deploy_cluster
       - preflight_sv_check:
@@ -4645,7 +4595,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: "ciperiodic"
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciperiodic
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
@@ -4660,7 +4609,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
@@ -4828,7 +4776,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
@@ -4885,7 +4832,6 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
-          send_deployment_notification: false
           requires:
             - artifacts_push
       - deploy_sv_runbook:
@@ -4895,7 +4841,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           requires:
             - deploy_cluster
       - preflight_check:
@@ -4932,7 +4877,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          send_deployment_notification: false
           requires:
             - deploy_validator_to_recover_sv_amulets
       - preflight_check:
@@ -4998,7 +4942,6 @@ workflows:
           cluster: "ciupgrade"
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
@@ -5026,7 +4969,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
@@ -5131,7 +5073,6 @@ workflows:
             - slack-context
           cluster: "ciupgrade"
           reset_cluster: false
-          send_deployment_notification: false
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
@@ -5174,7 +5115,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - preflight_daml_upgrade
       - deploy_validator_runbook:
@@ -5244,7 +5184,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade

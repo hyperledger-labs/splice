@@ -50,9 +50,6 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      send_deployment_notification:
-        type: boolean
-        default: true
     steps:
       - checkout_with_retry
       - setup_nix
@@ -75,9 +72,3 @@ jobs:
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-reset:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>

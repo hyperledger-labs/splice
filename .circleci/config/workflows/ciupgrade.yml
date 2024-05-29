@@ -31,7 +31,6 @@ workflow:
           cluster: "ciupgrade"
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
-          send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
@@ -59,7 +58,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
@@ -164,7 +162,6 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           reset_cluster: false
-          send_deployment_notification: false
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
@@ -207,7 +204,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - preflight_daml_upgrade
       - deploy_validator_runbook:
@@ -277,7 +273,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciupgrade"
-          send_deployment_notification: false
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade
