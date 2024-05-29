@@ -42,6 +42,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 final class UpdateHistory(
     storage: DbStorage,
@@ -311,7 +312,10 @@ final class UpdateHistory(
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
         val safePackageName = lengthLimited(event.createdEvent.getPackageName)
         val createArguments = serializeValue(event.createdEvent.getArguments)
+        val contractKey = event.createdEvent.getContractKey.toScala.map(serializeValue)
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
+        val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
+        val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
 
         sqlu"""
         insert into update_history_assignments(
@@ -321,7 +325,8 @@ final class UpdateHistory(
           reassignment_id,submitter,
           contract_id, event_id, created_at,
           template_id_package_id, template_id_module_name, template_id_entity_name,
-          package_name, create_arguments
+          package_name, create_arguments,
+          signatories, observers, contract_key
         )
         values (
           $historyId, $safeUpdateId, $safeRecordTime,
@@ -330,7 +335,9 @@ final class UpdateHistory(
           $safeUnassignId, ${event.submitter},
           $safeContractId, $safeEventId, $safeCreatedAt,
           $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-          $safePackageName, $createArguments::jsonb
+          $safePackageName, $createArguments::jsonb,
+          $safeSignatories, $safeObservers, $contractKey::jsonb
+
         )
       """
       }
@@ -363,17 +370,19 @@ final class UpdateHistory(
         val safeDomainId = lengthLimited(tree.getDomainId)
         val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
         val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
+        val safeWorkflowId = lengthLimited(tree.getWorkflowId)
+        val safeCommandId = lengthLimited(tree.getCommandId)
 
         (sql"""
           insert into update_history_transactions(
             history_id, update_id, record_time,
             participant_offset, domain_id, migration_id,
-            effective_at, root_event_ids
+            effective_at, root_event_ids, workflow_id, command_id
           )
           values (
             $historyId, $safeUpdateId, $safeRecordTime,
             $safeParticipantOffset, $safeDomainId, $domainMigrationId,
-            $safeEffectiveAt, $safeRootEventIds
+            $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
           )
           returning row_id
         """.asUpdateReturning[Long].head)
@@ -391,20 +400,25 @@ final class UpdateHistory(
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
         val safePackageName = lengthLimited(event.getPackageName)
         val createArguments = serializeValue(event.getArguments)
+        val contractKey = event.getContractKey.toScala.map(serializeValue)
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
+        val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
+        val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)
 
         sqlu"""
           insert into update_history_creates(
             history_id, event_id, update_row_id,
             contract_id, created_at,
             template_id_package_id, template_id_module_name, template_id_entity_name,
-            package_name, create_arguments
+            package_name, create_arguments, signatories, observers,
+            contract_key
           )
           values (
             $historyId, $safeEventId, $updateRowId,
             $safeContractId, $safeCreatedAt,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-            $safePackageName, $createArguments::jsonb
+            $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
+            $contractKey::jsonb
           )
         """
       }
@@ -424,6 +438,13 @@ final class UpdateHistory(
         val safePackageName = lengthLimited(event.getPackageName)
         val choiceArguments = serializeValue(event.getChoiceArgument)
         val exerciseResult = serializeValue(event.getExerciseResult)
+        val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
+        val interfaceIdModuleName =
+          event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
+        val interfaceIdEntityName =
+          event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
+        val interfaceIdPackageId =
+          event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
 
         sqlu"""
           insert into update_history_exercises(
@@ -431,14 +452,18 @@ final class UpdateHistory(
             child_event_ids, choice,
             template_id_package_id, template_id_module_name, template_id_entity_name,
             contract_id, consuming,
-            package_name, argument, result
+            package_name, argument, result,
+            acting_parties,
+            interface_id_package_id, interface_id_module_name, interface_id_entity_name
           )
           values (
             $historyId, $safeEventId, $updateRowId,
             $safeChildEventIds, $safeChoice,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
             $safeContractId, ${event.isConsuming},
-            $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb
+            $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
+            $safeActingParties,
+            $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName
           )
         """
       }
@@ -531,7 +556,9 @@ final class UpdateHistory(
         domain_id,
         migration_id,
         effective_at,
-        root_event_ids
+        root_event_ids,
+        workflow_id,
+        command_id
       from update_history_transactions
       where
         history_id = $historyId and
@@ -562,7 +589,11 @@ final class UpdateHistory(
         template_id_module_name,
         template_id_entity_name,
         package_name,
-        create_arguments
+        create_arguments,
+        signatories,
+        observers,
+        contract_key
+
       from update_history_creates
       where update_row_id = $transactionRowId
     """.as[SelectFromCreateEvents],
@@ -587,7 +618,11 @@ final class UpdateHistory(
         consuming,
         package_name,
         argument,
-        result
+        result,
+        acting_parties,
+        interface_id_package_id,
+        interface_id_module_name,
+        interface_id_entity_name
       from update_history_exercises
       where update_row_id = $transactionRowId
     """.as[SelectFromExerciseEvents],
@@ -623,7 +658,10 @@ final class UpdateHistory(
         template_id_module_name,
         template_id_entity_name,
         package_name,
-        create_arguments
+        create_arguments,
+        signatories,
+        observers,
+        contract_key
       from update_history_assignments
       where
         history_id = $historyId and
@@ -725,6 +763,23 @@ final class UpdateHistory(
   private def tid(packageName: String, moduleName: String, entityName: String) =
     new Identifier(packageName, moduleName, entityName)
 
+  private def tid(
+      packageNameOpt: Option[String],
+      moduleNameOpt: Option[String],
+      entityNameOpt: Option[String],
+  ): Option[Identifier] = for {
+    packageName <- packageNameOpt
+    moduleName <- moduleNameOpt
+    entityName <- entityNameOpt
+  } yield new Identifier(packageName, moduleName, entityName)
+
+  // Some fields were not stored initially in UpdateHistory tables, but were added to the schema before MainNet launch.
+  // Missing values for such fields should only exist in databases for clusters that were started before MainNet launch.
+  // We don't care much about these missing values and they are non-optional in the Java API classes,
+  // so we read them back as an arbitrary value.
+  private def missingString: String = ""
+  private def missingStringSeq: Seq[String] = Seq.empty
+
   private def decodeTransaction(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
@@ -747,9 +802,9 @@ final class UpdateHistory(
           /*createdEventBlob = */ ByteString.EMPTY,
           /*interfaceViews = */ java.util.Collections.emptyMap(),
           /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-          /*contractKey = */ java.util.Optional.empty(),
-          /*signatories = */ java.util.Collections.emptyList(),
-          /*observers = */ java.util.Collections.emptyList(),
+          /*contractKey = */ row.contractKey.map(deserializeValue).toJava,
+          /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
+          /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ row.createdAt.toInstant,
         )
       )
@@ -764,15 +819,16 @@ final class UpdateHistory(
             row.templateModuleName,
             row.templateEntityName,
           ),
-          // Note: due to a bug, the package name was not stored initially.
-          // Exercise events for choices from 3rd party packages recorded shorty after MainNet launch
-          // will have a missing package name.
-          /*packageName = */ row.packageName.getOrElse("???"),
-          /*interfaceId = */ java.util.Optional.empty(),
+          /*packageName = */ row.packageName.getOrElse(missingString),
+          /*interfaceId = */ tid(
+            row.interfacePackageId,
+            row.interfaceModuleName,
+            row.interfaceEntityName,
+          ).toJava,
           /*contractId = */ row.contractId,
           /*choice = */ row.choice,
           /*choiceArgument = */ deserializeValue(row.argument),
-          /*actingParties = */ java.util.Collections.emptyList(),
+          /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
           /*consuming = */ row.consuming,
           /*childEventIds = */ row.childEventIds.asJava,
           /*exerciseResult = */ deserializeValue(row.result),
@@ -786,11 +842,12 @@ final class UpdateHistory(
       update = TransactionTreeUpdate(
         new TransactionTree(
           /*updateId = */ updateRow.updateId,
-          /*commandId = */ "UpdateHistory does not store commandId",
-          /*workflowId = */ "UpdateHistory does not store workflowId",
+          /*commandId = */ updateRow.commandId.getOrElse(missingString),
+          /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
           /*offset = */ updateRow.participantOffset,
           /*eventsById = */ eventsById.asJava,
+
           /*rootEventIds = */ rootEventsIds.asJava,
           /*domainId = */ updateRow.domainId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
@@ -830,8 +887,8 @@ final class UpdateHistory(
               /*interfaceViews = */ java.util.Collections.emptyMap(),
               /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
               /*contractKey = */ java.util.Optional.empty(),
-              /*signatories = */ java.util.Collections.emptyList(),
-              /*observers = */ java.util.Collections.emptyList(),
+              /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
+              /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
               /*createdAt = */ row.createdAt.toInstant,
             ),
             counter = row.reassignmentCounter,
@@ -889,6 +946,8 @@ final class UpdateHistory(
           <<[Long],
           <<[CantonTimestamp],
           <<[Seq[String]],
+          <<[Option[String]],
+          <<[Option[String]],
         )
       )
     }
@@ -906,6 +965,9 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[String],
+          <<[Option[Seq[String]]],
+          <<[Option[Seq[String]]],
+          <<[Option[String]],
         )
       )
     }
@@ -926,6 +988,10 @@ final class UpdateHistory(
           <<[Option[String]],
           <<[String],
           <<[String],
+          <<[Option[Seq[String]]],
+          <<[Option[String]],
+          <<[Option[String]],
+          <<[Option[String]],
         )
       )
     }
@@ -952,6 +1018,9 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[String],
+          <<[Option[Seq[String]]],
+          <<[Option[Seq[String]]],
+          <<[Option[String]],
         )
       )
     }
@@ -993,6 +1062,8 @@ object UpdateHistory {
       migrationId: Long,
       effectiveAt: CantonTimestamp,
       rootEventIds: Seq[String],
+      workflowId: Option[String],
+      commandId: Option[String],
   )
 
   private case class SelectFromCreateEvents(
@@ -1004,6 +1075,9 @@ object UpdateHistory {
       templateEntityName: String,
       packageName: String,
       createArguments: String,
+      signatories: Option[Seq[String]],
+      observers: Option[Seq[String]],
+      contractKey: Option[String],
   )
 
   private case class SelectFromExerciseEvents(
@@ -1018,6 +1092,10 @@ object UpdateHistory {
       packageName: Option[String],
       argument: String,
       result: String,
+      actingParties: Option[Seq[String]],
+      interfacePackageId: Option[String],
+      interfaceModuleName: Option[String],
+      interfaceEntityName: Option[String],
   )
 
   private case class SelectFromAssignments(
@@ -1038,6 +1116,9 @@ object UpdateHistory {
       templateEntityName: String,
       packageName: String,
       createArguments: String,
+      signatories: Option[Seq[String]],
+      observers: Option[Seq[String]],
+      contractKey: Option[String],
   )
 
   private case class SelectFromUnassignments(

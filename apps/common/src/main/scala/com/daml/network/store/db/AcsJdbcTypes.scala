@@ -87,8 +87,29 @@ trait AcsJdbcTypes {
       })
     }
 
+  protected implicit lazy val stringArrayOptGetResult: GetResult[Option[Array[String]]] =
+    (r: PositionedResult) => {
+      if (r.rs.wasNull()) {
+        None
+      } else {
+        (r.rs
+          .getArray(r.skip.currentPos)
+          .getArray match {
+          case arr: Array[String] =>
+            Some(arr)
+          case x =>
+            throw new IllegalStateException(
+              s"Expected an optional array of strings, but got $x. Are you sure you selected a text array column?"
+            )
+        })
+      }
+    }
+
   protected implicit lazy val stringSeqGetResult: GetResult[Seq[String]] =
     stringArrayGetResult.andThen(_.toSeq)
+
+  protected implicit lazy val stringSeqOptGetResult: GetResult[Option[Seq[String]]] =
+    stringArrayOptGetResult.andThen(_.map(_.toSeq))
 
   private val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>

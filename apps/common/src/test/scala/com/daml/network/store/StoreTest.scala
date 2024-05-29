@@ -64,7 +64,7 @@ import scala.jdk.OptionConverters.*
 
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
-  private val dummyPackageName = "dummyPackageName"
+  protected val dummyPackageName = "dummyPackageName"
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
 
@@ -873,6 +873,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
       workflowId: String = "",
+      commandId: String = "",
+      recordTime: Instant = defaultEffectiveAt,
   ): TransactionTree = {
     val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
@@ -882,7 +884,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val rootEventIds = eventsWithId.map(_.getEventId)
     new TransactionTree(
       updateId,
-      "",
+      commandId,
       workflowId,
       effectiveAt,
       offset,
@@ -890,7 +892,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
-      effectiveAt, // we equate record time and effectiveAt for simplicity
+      recordTime,
     )
   }
 
