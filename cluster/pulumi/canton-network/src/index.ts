@@ -1,55 +1,9 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import {
-  Auth0ClusterConfig,
-  Auth0Fetch,
-  config,
-  exactNamespace,
-  infraStack,
-  isMainNet,
-} from 'cn-pulumi-common';
-import exec from 'node:child_process';
+import { Auth0ClusterConfig, Auth0Fetch, config, infraStack, isMainNet } from 'cn-pulumi-common';
 
+import { installClusterVersion } from './clusterVersion';
 import { installCluster } from './installCluster';
 import { scheduleLoadGenerator } from './scheduleLoadGenerator';
-
-function installClusterVersion(): k8s.apiextensions.CustomResource {
-  const ns = exactNamespace('cluster-version', true);
-  const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
-  const version = exec
-    .execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`)
-    .toString();
-  return new k8s.apiextensions.CustomResource(
-    `cluster-version-virtual-service`,
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'VirtualService',
-      metadata: {
-        name: 'cluster-version',
-        namespace: ns.ns.metadata.name,
-      },
-      spec: {
-        hosts: [host],
-        gateways: ['cluster-ingress/cn-http-gateway'],
-        http: [
-          {
-            match: [
-              {
-                port: 443,
-                uri: { exact: '/version' },
-              },
-            ],
-            directResponse: {
-              status: 200,
-              body: { string: version },
-            },
-          },
-        ],
-      },
-    },
-    { deleteBeforeReplace: true }
-  );
-}
 
 async function auth0CacheAndInstallCluster(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();

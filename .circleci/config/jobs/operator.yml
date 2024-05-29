@@ -39,6 +39,9 @@ jobs:
             --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
           gce_authenticate: true
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
