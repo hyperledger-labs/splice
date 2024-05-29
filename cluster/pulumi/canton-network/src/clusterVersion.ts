@@ -4,7 +4,7 @@ import exec from 'node:child_process';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const ns = exactNamespace('cluster-version', true);
-  const host = config.requireEnv('GCPCLUSTER_HOSTNAME');
+  const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
   const remoteVersion = defaultVersion.type == 'remote' ? defaultVersion.version : undefined;
   const version =
     imageTagOverride ||
