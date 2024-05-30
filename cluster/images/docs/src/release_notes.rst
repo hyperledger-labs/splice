@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Include Grafana dashboards and a README on network health in the release bundle.
+
+
 0.1.10
 ------
 

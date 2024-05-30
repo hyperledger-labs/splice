@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# This script is used mostly for the app manager. If you are not sure you need this one,
+# then most chances are you are looking for the `create-bundle.sh` script in the repo root.
+
 # This is a shell script to allow for easily building custom bundles
 # outside of tests, e.g, for manual testing.
 

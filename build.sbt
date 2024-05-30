@@ -848,7 +848,7 @@ lazy val `apps-splitwell` =
           baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-1.0.0.tar.gz"
         val output2_0 =
           baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-2.0.0.tar.gz"
-        val createBundle = baseDirectory.value / "../../scripts/create-bundle.sh"
+        val createBundle = baseDirectory.value / "../../scripts/create-bundle-for-app-mgr.sh"
         val cacheDir = streams.value.cacheDirectory
         val cache = FileFunction.cached(cacheDir) { _ =>
           runCommand(
@@ -1051,6 +1051,14 @@ lazy val bundleTask = {
     val testResources = Seq("-r", "apps/app/src/test/resources", "testResources")
     val transformConfig =
       Seq("-r", "scripts/transform-config.sc", "testResources/transform-config.sc")
+    val dashboards = Seq(
+      "-r",
+      "cluster/pulumi/infra/grafana-dashboards",
+      "grafana-dashboards",
+      "-r",
+      "network-health",
+      "grafana-dashboards/docs",
+    )
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
@@ -1075,14 +1083,14 @@ lazy val bundleTask = {
 
     val committedDarFiles = getCommittedDarFiles
     val args: Seq[String] =
-      license ++ examples ++ testResources ++ transformConfig ++ webUis.flatMap({
-        case ((source, _), name) =>
+      license ++ examples ++ testResources ++ transformConfig ++ dashboards ++
+        webUis.flatMap({ case ((source, _), name) =>
           Seq[String]("-r", source.toString, s"web-uis/$name")
-      }) ++ dars.flatten.flatMap({ dar =>
-        Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
-      }) ++ committedDarFiles.flatMap { dar =>
-        Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
-      }
+        }) ++ dars.flatten.flatMap({ dar =>
+          Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
+        }) ++ committedDarFiles.flatMap({ dar =>
+          Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
+        })
     val cacheDir = streams.value.cacheDirectory
     val main = (assembly / mainClass).value.get
     val cache = FileFunction.cached(cacheDir) { _ =>
