@@ -611,6 +611,18 @@ Update the version in the `nix/cometbft-driver-sources.json` file
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
 
+#### Bumping Daml Compiler version
+
+1. Update the `version` in `nix/daml-compiler-sources.json` to the new daml compiler version.
+   The compiler version is then used in two places:
+   1. To build all daml packages using `sbt damlBuild`
+   2. To generate daml docs using `cluster/images/docs/gen-daml-docs.sh`
+
+Note that changing the compiler version changes all package ids and should not be done
+without a good reason to do so as changing Daml code requires a governance vote.
+One option that often helps is upgrading the compiler if the Daml code is changed anyway
+and the package ids change. That way there is no dedicated vote required.
+
 #### Bumping Our Canton fork
 
 Current Canton commit: `382728dd8ec53cd119acc6030e361b0692a85f8c`

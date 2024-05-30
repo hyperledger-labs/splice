@@ -3,6 +3,7 @@ let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
+  damlCompilerSources = builtins.fromJSON (builtins.readFile ./daml-compiler-sources.json);
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
@@ -73,7 +74,7 @@ in pkgs.mkShell {
   ] ++ linuxOnly;
 
   CANTON = "${pkgs.canton}";
-  DAML_VERSION = "${sources.sdk_version}";
+  DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
