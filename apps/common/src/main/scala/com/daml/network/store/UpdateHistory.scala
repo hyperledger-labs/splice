@@ -23,6 +23,7 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
+import com.daml.network.util.ValueJsonCodecProtobuf as ProtobufCodec
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -31,7 +32,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import com.google.protobuf.util.JsonFormat
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -305,8 +305,12 @@ final class UpdateHistory(
         val templateIdEntityName = lengthLimited(templateId.getEntityName)
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
         val safePackageName = lengthLimited(event.createdEvent.getPackageName)
-        val createArguments = serializeValue(event.createdEvent.getArguments)
-        val contractKey = event.createdEvent.getContractKey.toScala.map(serializeValue)
+        val createArguments =
+          String256M.tryCreate(ProtobufCodec.serializeValue(event.createdEvent.getArguments))
+        val contractKey =
+          event.createdEvent.getContractKey.toScala
+            .map(ProtobufCodec.serializeValue)
+            .map(s => String256M.tryCreate(s))
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
         val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
         val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
@@ -393,8 +397,10 @@ final class UpdateHistory(
         val templateIdEntityName = lengthLimited(templateId.getEntityName)
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
         val safePackageName = lengthLimited(event.getPackageName)
-        val createArguments = serializeValue(event.getArguments)
-        val contractKey = event.getContractKey.toScala.map(serializeValue)
+        val createArguments = String256M.tryCreate(ProtobufCodec.serializeValue(event.getArguments))
+        val contractKey = event.getContractKey.toScala
+          .map(ProtobufCodec.serializeValue)
+          .map(s => String256M.tryCreate(s))
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
         val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
         val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)
@@ -430,8 +436,10 @@ final class UpdateHistory(
         val templateIdEntityName = lengthLimited(templateId.getEntityName)
         val templateIdPackageId = lengthLimited(templateId.getPackageId)
         val safePackageName = lengthLimited(event.getPackageName)
-        val choiceArguments = serializeValue(event.getChoiceArgument)
-        val exerciseResult = serializeValue(event.getExerciseResult)
+        val choiceArguments =
+          String256M.tryCreate(ProtobufCodec.serializeValue(event.getChoiceArgument))
+        val exerciseResult =
+          String256M.tryCreate(ProtobufCodec.serializeValue(event.getExerciseResult))
         val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
         val interfaceIdModuleName =
           event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
@@ -851,11 +859,11 @@ final class UpdateHistory(
           ),
           /* packageName = */ row.packageName,
           /*contractId = */ row.contractId,
-          /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
+          /*arguments = */ ProtobufCodec.deserializeValue(row.createArguments).asRecord().get(),
           /*createdEventBlob = */ ByteString.EMPTY,
           /*interfaceViews = */ java.util.Collections.emptyMap(),
           /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-          /*contractKey = */ row.contractKey.map(deserializeValue).toJava,
+          /*contractKey = */ row.contractKey.map(ProtobufCodec.deserializeValue).toJava,
           /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
           /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ row.createdAt.toInstant,
@@ -880,11 +888,11 @@ final class UpdateHistory(
           ).toJava,
           /*contractId = */ row.contractId,
           /*choice = */ row.choice,
-          /*choiceArgument = */ deserializeValue(row.argument),
+          /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
           /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
           /*consuming = */ row.consuming,
           /*childEventIds = */ row.childEventIds.asJava,
-          /*exerciseResult = */ deserializeValue(row.result),
+          /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
         )
       )
       .toMap
@@ -935,7 +943,7 @@ final class UpdateHistory(
               ),
               /*packageName = */ row.packageName,
               /*contractId = */ row.contractId,
-              /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
+              /*arguments = */ ProtobufCodec.deserializeValue(row.createArguments).asRecord().get(),
               /*createdEventBlob = */ ByteString.EMPTY,
               /*interfaceViews = */ java.util.Collections.emptyMap(),
               /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
@@ -973,17 +981,6 @@ final class UpdateHistory(
       ),
       row.domainId,
     )
-  }
-
-  private def serializeValue(x: com.daml.ledger.javaapi.data.Value): String256M = {
-    val proto = x.toProto
-    val protoString = JsonFormat.printer.print(proto)
-    String256M.tryCreate(protoString)
-  }
-  private def deserializeValue(x: String): com.daml.ledger.javaapi.data.Value = {
-    val builder = com.daml.ledger.api.v2.ValueOuterClass.Value.newBuilder()
-    JsonFormat.parser().merge(x, builder)
-    com.daml.ledger.javaapi.data.Value.fromProto(builder.build())
   }
 
   private implicit lazy val GetResultSelectFromTransactions: GetResult[SelectFromTransactions] =
@@ -1104,6 +1101,7 @@ object UpdateHistory {
   case class State(
       historyId: Option[Long]
   ) {}
+
   object State {
     def empty(): State = State(None)
   }
@@ -1190,5 +1188,4 @@ object UpdateHistory {
       submitter: PartyId,
       contractId: String,
   )
-
 }

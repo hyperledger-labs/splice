@@ -159,6 +159,9 @@ lazy val `splice-util-daml` =
     .settings(
       BuildCommon.damlSettings
     )
+    .dependsOn(
+      `canton-bindings-java`
+    )
 
 lazy val `splice-amulet-daml` =
   project

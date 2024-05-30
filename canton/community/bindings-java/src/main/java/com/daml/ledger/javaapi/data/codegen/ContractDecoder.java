@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public class ContractDecoder {
-  private final Map<
+  public final Map<
           Identifier,
           ? extends ContractCompanion<? extends Contract<?, ?>, ?, ? extends DamlRecord<?>>>
       companions;

@@ -19,4 +19,5 @@ build-options:
 codegen:
   java:
     package-prefix: com.daml.network.codegen.java
+    decoderClass: com.daml.network.codegen.java.DecoderSpliceWalletTest
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
