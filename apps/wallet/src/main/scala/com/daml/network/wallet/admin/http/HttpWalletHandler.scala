@@ -484,19 +484,24 @@ class HttpWalletHandler(
   )(contractId: String)(tuser: TracedUser): Future[r0.CancelSubscriptionRequestResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.cancelSubscriptionRequest") { implicit traceContext => _ =>
-      exerciseWalletAction((installCid, _) => {
-        val requestCid =
-          Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
-            contractId
-          )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
-              requestCid
-            )
-            .map(_ => r0.CancelSubscriptionRequestResponseOK)
+      val requestCid =
+        Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
+          contractId
         )
-      })(user)
+      retryProvider.retryForClientCalls(
+        "cancel_subscription",
+        "Cancel subscription",
+        exerciseWalletAction((installCid, _) =>
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
+                requestCid
+              )
+              .map(_ => r0.CancelSubscriptionRequestResponseOK)
+          )
+        )(user),
+        logger,
+      )
     }
   }
 
@@ -505,16 +510,21 @@ class HttpWalletHandler(
   )(contractId: String)(tuser: TracedUser): Future[r0.RejectSubscriptionRequestResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.rejectSubscriptionRequest") { implicit traceContext => _ =>
-      exerciseWalletAction((installCid, _) => {
-        val requestCid = Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
-          contractId
-        )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_SubscriptionRequest_Reject(requestCid)
-            .map(_ => r0.RejectSubscriptionRequestResponseOK)
-        )
-      })(user)
+      val requestCid = Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
+        contractId
+      )
+      retryProvider.retryForClientCalls(
+        "reject_subscription",
+        "Reject subscription",
+        exerciseWalletAction((installCid, _) =>
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_SubscriptionRequest_Reject(requestCid)
+              .map(_ => r0.RejectSubscriptionRequestResponseOK)
+          )
+        )(user),
+        logger,
+      )
     }
   }
 
@@ -613,13 +623,18 @@ class HttpWalletHandler(
             logger.info(s"No featured app right found for user ${user} - nothing to cancel")
             Future.successful(r0.CancelFeaturedAppRightsResponseOK)
           case Some(cid) =>
-            exerciseWalletAction((installCid, _) => {
-              Future.successful(
-                installCid
-                  .exerciseWalletAppInstall_FeaturedAppRights_Cancel(cid.contractId)
-                  .map(_ => r0.CancelFeaturedAppRightsResponseOK)
-              )
-            })(user)
+            retryProvider.retryForClientCalls(
+              "cancel_featured_app_rights",
+              "Cancel featured app rights",
+              exerciseWalletAction((installCid, _) => {
+                Future.successful(
+                  installCid
+                    .exerciseWalletAppInstall_FeaturedAppRights_Cancel(cid.contractId)
+                    .map(_ => r0.CancelFeaturedAppRightsResponseOK)
+                )
+              })(user),
+              logger,
+            )
         }
       } yield result
     }
