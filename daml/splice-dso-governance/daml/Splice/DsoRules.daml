@@ -37,12 +37,12 @@ import Splice.Util
 -- There are two processes for executing such actions:
 -- 1. Any SV can request a vote to execute such an action upon which the other SV's
 --    can respond with their votes for whether they accept the execution or not.
---    This process requires 2 * f + 1 votes* for the action to be considered definitive
+--    This process requires votes from 2/3 of all SVs* for the action to be considered definitive
 --    and it can be used for all actions that require confirmation.
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2 * f + 1 confirmations* are visible to the DSO delegate it executes them.
+--    Once 2/3 of all SV'ss confirmations* are visible to the DSO delegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
