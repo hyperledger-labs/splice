@@ -3336,6 +3336,9 @@ jobs:
       run: # CircleCI workaround... only used for ciupgrade's partial upgrade.
         type: boolean
         default: true
+      delay_mins:
+        type: integer
+        default: 0
       cluster_version:
         type: string
         default: ""
@@ -3406,6 +3409,19 @@ jobs:
                 cmd_before_retry: |-
                   echo "VPN connection seems to have died, restarting VPN and retrying..."
                   /tmp/vpn-scripts/restart-vpn.sh
+            - when:
+                condition: << parameters.delay_mins >>
+                steps:
+                  - run:
+                      name: Wait for initial top-up
+                      command: |
+                        echo "Waiting for << parameters.delay_mins >> minutes to allow validator to top-up for the first time."
+                        sleep 60
+                        # This loop is needed because CCI kills any task that sleeps for too long with no output
+                        for (( i = 1; i < << parameters.delay_mins >>; i += 1 )); do
+                          echo "Still waiting ($i min(s) elapsed)"
+                          sleep 60
+                        done
             - run_bash_command_in_nix:
                 cmd_name: Run Validator preflight tests
                 additional_nix_args: "--keep VALIDATOR_WEB_UI_PASSWORD \
@@ -6057,6 +6073,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          delay_mins: 30
           requires:
             - deploy_validator_runbook
 

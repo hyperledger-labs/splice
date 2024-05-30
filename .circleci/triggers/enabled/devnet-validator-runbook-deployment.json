@@ -1,6 +1,6 @@
 {
     "name": "DevNet Validator Runbook Redeployment",
-    "description": "DevNet Validator Runbook Periodic Redeployment every 4 hours",
+    "description": "DevNet Validator Runbook Periodic Redeployment every 6 hours",
     "attribution-actor": "system",
     "parameters" : {
       "branch": "deployment/devnet",

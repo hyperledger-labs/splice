@@ -228,6 +228,7 @@ workflow:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          delay_mins: 30
           requires:
             - deploy_validator_runbook
 
