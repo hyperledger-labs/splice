@@ -418,7 +418,7 @@ class SvOnboardingAddlIntegrationTest
           _.errorMessage should (include(
             s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"
           ) or include(
-            s"This participant can not submit as the given submitter on any connected domain"
+            s"Not connected to a domain on which this participant can submit for all submitters"
           )),
         )
       }
