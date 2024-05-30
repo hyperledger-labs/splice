@@ -518,8 +518,8 @@ groups:
               type: threshold
         dashboardUid: UJyurCTWz
         panelId: 68
-        noDataState: NoData
-        execErrState: Error
+        noDataState: OK
+        execErrState: OK
         for: 5m
         annotations:
           __dashboardUid__: UJyurCTWz
@@ -609,8 +609,8 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: NoData
-        execErrState: Error
+        noDataState: OK
+        execErrState: OK
         for: 5m
         annotations:
           description: The block height difference of {{ index $values "latest_height_difference" }} is larger than the expected number of retained blocks ($COMETBFT_RETAIN_BLOCKS) in {{ $labels.namespace }}

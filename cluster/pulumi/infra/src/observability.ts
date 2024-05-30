@@ -700,9 +700,7 @@ function readGrafanaAlertingFile(file: string) {
   // Ignore no data or data source error if the cluster is reset periodically
   return shouldIgnoreNoDataOrDataSourceError
     ? fileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
-    : fileContent
-        .replace(/noDataState: .+/g, 'noDataState: NoData')
-        .replace(/execErrState: .+/g, 'execErrState: Error');
+    : fileContent;
 }
 
 function readAlertingManagerFile(file: string) {
