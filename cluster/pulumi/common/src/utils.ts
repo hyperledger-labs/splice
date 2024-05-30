@@ -193,16 +193,10 @@ export function loadIPRanges(): string[] {
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
   return (
     isDevNet
-      ? loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-        )
+      ? loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-dev.yaml`)
       : isMainNet
-        ? loadYamlFromFile(
-            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-main.yaml`
-          )
-        : loadYamlFromFile(
-            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-          )
+        ? loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-main.yaml`)
+        : loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-test.yaml`)
   ).approvedSvIdentities;
 }
 

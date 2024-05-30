@@ -617,12 +617,9 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVs. The bundled artifacts consist of the lists of recommended values as follows:
+Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVs. The lists of recommended values can be obtained from the `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs/>`_
 
-- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently DSO-approved identities for `TestNet`
-- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on `DevNet`. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
-
-Please identify the file out of the above corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
+Please identify the file corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
 
 .. _helm-install:
 

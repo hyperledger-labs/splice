@@ -31,6 +31,8 @@ Upcoming
   once per onboarded wallet user. This enables setups where multiple wallet users have access to
   the same coin holdings for the same Daml party.
 
+* The `approved-sv-id-values-*.yaml` files have been removed from the release bundle. The approved SV identities for
+  each network instance can now exclusively be obtained from the `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs>`_ .
 
 0.1.10
 ------
