@@ -34,6 +34,7 @@ import com.google.rpc.status.Status.toJavaProto
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.scalatest.Assertion
 
+import java.time.Instant
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -150,15 +151,21 @@ class UpdateHistoryTest
         val c = appRewardCoupon(1, party1, contractId = cid1)
         for {
           _ <- initStore(store)
-          _ <- domain1.create(c)
-          _ <- domain1.unassign(c -> domain2, reassignmentId1, 1)
-          _ <- domain2.assign(c -> domain1, reassignmentId1, 1)
+          _ <- domain1.create(c, txEffectiveAt = CantonTimestamp.Epoch.plusMillis(1).toInstant)
+          _ <- domain1.unassign(
+            c -> domain2,
+            reassignmentId1,
+            1,
+            CantonTimestamp.Epoch.plusMillis(2),
+          )
+          _ <- domain2.assign(c -> domain1, reassignmentId1, 1, CantonTimestamp.Epoch.plusMillis(3))
           _ <- domain2.exercise(
             c,
             None,
             "Archive",
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             com.daml.ledger.javaapi.data.Unit.getInstance(),
+            txEffectiveAt = CantonTimestamp.Epoch.plusMillis(4).toInstant,
           )
           updates <- updates(store)
         } yield checkUpdates(
@@ -185,7 +192,7 @@ class UpdateHistoryTest
             mkCreateTx(
               validOffset(i),
               Seq(appRewardCoupon(1, party1, contractId = validContractId(i))),
-              defaultEffectiveAt,
+              defaultEffectiveAt.plusMillis(i.toLong),
               Seq(party1),
               domain1,
               "workflowId",
@@ -247,8 +254,8 @@ class UpdateHistoryTest
         for {
           _ <- initStore(store1)
           _ <- initStore(store2)
-          _ <- create(domain1, cid1, offset1, party1, store1)
-          _ <- create(domain1, cid2, offset2, party2, store2)
+          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
+          _ <- create(domain1, cid2, offset2, party2, store2, Instant.EPOCH.plusMillis(2))
           updates1 <- updates(store1)
           updates2 <- updates(store2)
         } yield {
@@ -275,8 +282,8 @@ class UpdateHistoryTest
           _ <- initStore(store1)
           _ <- initStore(store2)
           // Note: same offset (offsets are participant-specific)
-          _ <- create(domain1, cid1, offset1, party1, store1)
-          _ <- create(domain1, cid2, offset1, party1, store2)
+          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
           updates1 <- updates(store1)
           updates2 <- updates(store2)
         } yield {
@@ -303,10 +310,10 @@ class UpdateHistoryTest
           _ <- initStore(store1)
           _ <- initStore(store2)
           // Note: same offset (offsets are not preserved across hard domain migrations)
-          _ <- create(domain1, cid1, offset1, party1, store1)
-          _ <- create(domain1, cid2, offset1, party1, store2)
-          updates1 <- updates(store1)
-          updates2 <- updates(store2)
+          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
+          updates1 <- updates(store1, migration1)
+          updates2 <- updates(store2, migration2)
         } yield {
           checkUpdates(
             updates1,
@@ -329,8 +336,8 @@ class UpdateHistoryTest
         for {
           _ <- initStore(store1)
           // Note: the two contracts can share a record time (record times are not unique across domains)
-          _ <- create(domain1, cid1, offset1, party1, store1)
-          _ <- create(domain2, cid2, offset2, party1, store1)
+          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
+          _ <- create(domain2, cid2, offset2, party1, store1, Instant.EPOCH.plusMillis(2))
           updates1 <- updates(store1)
         } yield {
           checkUpdates(
@@ -343,6 +350,64 @@ class UpdateHistoryTest
         }
       }
 
+      "pagination works" in {
+        val store = mkStore(party1, migration1, participant1)
+
+        val updates = (1 to 10).toList.map(i =>
+          TransactionTreeUpdate(
+            mkCreateTx(
+              validOffset(i),
+              Seq(appRewardCoupon(1, party1, contractId = validContractId(i))),
+              defaultEffectiveAt.plusMillis(i.toLong),
+              Seq(party1),
+              domain1,
+              s"workflowId#$i",
+              recordTime = defaultEffectiveAt.plusMillis(i.toLong),
+            )
+          )
+        )
+
+        def allHistoryPaginated(
+            afterRecordTime: Option[Instant],
+            acc: Seq[TransactionTreeUpdate],
+        ): Seq[TransactionTreeUpdate] = {
+          val result =
+            store
+              .getUpdates(
+                afterRecordTime.map(CantonTimestamp.assertFromInstant),
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+          result.lastOption match {
+            case None => acc // done
+            case Some((last, _)) =>
+              last.update match {
+                case tree: TransactionTreeUpdate =>
+                  allHistoryPaginated(Some(tree.tree.getRecordTime), acc :+ tree)
+                case ReassignmentUpdate(transfer) =>
+                  allHistoryPaginated(Some(transfer.recordTime.toInstant), acc)
+              }
+          }
+        }
+
+        for {
+          _ <- initStore(store)
+          _ <- withoutRepeatedIngestionWarning(
+            MonadUtil.sequentialTraverse(updates) { update =>
+              store.ingestionSink
+                .ingestUpdate(
+                  domain1,
+                  update,
+                )
+            },
+            maxCount = updates.size,
+          )
+          all <- store.getUpdates(None, PageLimit.tryCreate(1000))
+        } yield {
+          allHistoryPaginated(None, Seq.empty) should be(all.map(_._1.update))
+        }
+      }
+
     }
   }
 
@@ -352,6 +417,7 @@ class UpdateHistoryTest
       offset: String,
       party: PartyId,
       store: UpdateHistory,
+      txEffectiveAt: Instant = defaultEffectiveAt,
   ) = {
     DomainSyntax(domain).create(
       c = appRewardCoupon(
@@ -360,7 +426,7 @@ class UpdateHistoryTest
         contractId = contractId,
       ),
       offset = offset,
-      txEffectiveAt = defaultEffectiveAt,
+      txEffectiveAt = txEffectiveAt,
       createdEventSignatories = Seq(party),
     )(
       store
@@ -374,7 +440,7 @@ class UpdateHistoryTest
 
   // Universal begin offset (strictly smaller than any offset used in this suite)
   private val beginOffset = "0".repeat(16)
-  // Universal begin offset (strictly larger than any offset used in this suite)
+  // Universal end offset (strictly larger than any offset used in this suite)
   private val endOffset = "9".repeat(16)
 
   private def singleRootEvent(tree: TransactionTree): TreeEvent = {
@@ -421,12 +487,24 @@ class UpdateHistoryTest
 
   private def updates(
       store: UpdateHistory,
-      begin: String = beginOffset,
-      end: String = endOffset,
-  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = store
-    .updateStream(begin, end)
-    .toMat(Sink.seq)(Keep.right)
-    .run()
+      migrationId: Long = migration1,
+  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+    // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
+    for {
+      fromStream <- store
+        .updateStream(beginOffset, endOffset)
+        .toMat(Sink.seq)(Keep.right)
+        .run()
+      fromGetTransactions <- store.getUpdates(None, PageLimit.tryCreate(1000))
+    } yield {
+      fromStream
+        .filter(_.update match {
+          case TransactionTreeUpdate(_) => true
+          case ReassignmentUpdate(_) => false
+        }) should be(fromGetTransactions.filter(_._2 == migrationId).map(_._1))
+      fromStream
+    }
+  }
 
   private def initStore(implicit store: UpdateHistory): Future[Unit] = {
     store.testIngestionSink.initialize().map(_ => ())

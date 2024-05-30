@@ -588,12 +588,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createdEventSignatories: Seq[PartyId],
       domainId: DomainId,
       workflowId: String,
+      recordTime: Instant = defaultEffectiveAt,
   ) = mkTx(
     offset,
     createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories)),
     domainId,
     effectiveAt,
     workflowId,
+    recordTime = recordTime,
   )
 
   protected def acs(
@@ -797,6 +799,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         contractAndDomain: (Contract[TCid, T], DomainId),
         reassignmentId: String,
         counter: Long,
+        recordTime: CantonTimestamp = CantonTimestamp.Epoch,
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
         nextOffset(),
@@ -807,6 +810,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           contractAndDomain._2,
           counter,
         ),
+        recordTime,
       )
 
       store.testIngestionSink
@@ -821,6 +825,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         contractAndDomain: (Contract[TCid, T], DomainId),
         reassignmentId: String,
         counter: Long,
+        recordTime: CantonTimestamp = CantonTimestamp.Epoch,
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
         nextOffset(),
@@ -831,6 +836,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           domain,
           counter,
         ),
+        recordTime,
       )
 
       store.testIngestionSink
@@ -925,11 +931,15 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def mkReassignment[T <: ReassignmentEvent](offset: String, event: T): Reassignment[T] =
+  protected def mkReassignment[T <: ReassignmentEvent](
+      offset: String,
+      event: T,
+      recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+  ): Reassignment[T] =
     Reassignment(
       updateId = "",
       offset = new ParticipantOffset.Absolute(offset),
-      recordTime = CantonTimestamp.Epoch,
+      recordTime = recordTime,
       event = event,
     )
 

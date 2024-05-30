@@ -12,6 +12,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerDomainStateThreshold,
+  UpdateHistorySanityCheckPlugin,
   WaitForPorts,
 }
 import com.daml.network.metrics.CNNodeMetricsFactory
@@ -36,7 +37,7 @@ import org.apache.pekko.http.scaladsl.Http
 import org.scalactic.source
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{Matcher, MatchResult}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -105,6 +106,7 @@ object CNNodeTests extends LazyLogging {
 
     protected lazy val resetRequiredTopologyState: Boolean = true
 
+    registerPlugin(new UpdateHistorySanityCheckPlugin(loggerFactory))
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
     if (resetRequiredTopologyState) {
       registerPlugin(new ResetDecentralizedNamespace())

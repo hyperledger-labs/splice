@@ -9,7 +9,6 @@ import com.daml.ledger.javaapi.data.{
   ParticipantOffset,
   TransactionTree,
 }
-import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -23,7 +22,7 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
-import com.daml.network.store.db.AcsJdbcTypes
+import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -38,6 +37,7 @@ import org.apache.pekko.stream.scaladsl.Source
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -55,6 +55,7 @@ final class UpdateHistory(
     closeContext: CloseContext,
 ) extends HasIngestionSink
     with AcsJdbcTypes
+    with AcsQueries
     with NamedLogging {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
@@ -242,19 +243,12 @@ final class UpdateHistory(
 
       private def ingestUpdate_(
           update: TreeUpdate
-      )(implicit tc: TraceContext): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+      ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
         update match {
           case ReassignmentUpdate(reassignment) =>
             ingestReassignment(reassignment)
           case TransactionTreeUpdate(tree) =>
-            if (tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX)) {
-              logger.debug(
-                s"Skipping update ${tree.getUpdateId} at offset ${tree.getOffset} for ${description()} because it is an ACS import workflow update."
-              )
-              DBIOAction.successful(())
-            } else {
-              ingestTransactionTree(tree)
-            }
+            ingestTransactionTree(tree)
         }
       }
 
@@ -575,13 +569,59 @@ final class UpdateHistory(
     }
   }
 
-  private def queryCreateEvents(
-      transactionRowId: Long
-  )(implicit tc: TraceContext) = {
-    storage
-      .query(
-        sql"""
+  // TODO (#12552): include reassignments
+  def getUpdates(
+      afterRecordTime: Option[CantonTimestamp],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
+    for {
+      rows <- storage
+        .query(
+          sql"""
       select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id
+      from update_history_transactions
+      where
+        history_id = $historyId and
+        record_time > ${afterRecordTime.getOrElse(CantonTimestamp.MinValue)}
+      order by record_time, domain_id
+      limit ${limit.limit}
+    """.as[SelectFromTransactions],
+          "getUpdates",
+        )
+      creates <- queryCreateEvents(rows.map(_.rowId))
+      exercises <- queryExerciseEvents(rows.map(_.rowId))
+    } yield {
+      rows.map { row =>
+        decodeTransaction(
+          row,
+          creates.getOrElse(row.rowId, Seq.empty),
+          exercises.getOrElse(row.rowId, Seq.empty),
+        ) -> row.migrationId
+      }
+    }
+  }
+
+  private def queryCreateEvents(
+      transactionRowIds: Seq[Long]
+  )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromCreateEvents]]] = {
+    if (transactionRowIds.isEmpty) {
+      Future.successful(Map.empty)
+    } else {
+      storage
+        .query(
+          (sql"""
+      select
+        update_row_id,
         event_id,
         contract_id,
         created_at,
@@ -595,19 +635,25 @@ final class UpdateHistory(
         contract_key
 
       from update_history_creates
-      where update_row_id = $transactionRowId
-    """.as[SelectFromCreateEvents],
-        "queryCreateEvents",
-      )
+      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+            .as[SelectFromCreateEvents],
+          "queryCreateEvents",
+        )
+        .map(_.groupBy(_.updateRowId))
+    }
   }
 
   private def queryExerciseEvents(
-      transactionRowId: Long
-  )(implicit tc: TraceContext) = {
-    storage
-      .query(
-        sql"""
+      transactionRowIds: Seq[Long]
+  )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromExerciseEvents]]] = {
+    if (transactionRowIds.isEmpty) {
+      Future.successful(Map.empty)
+    } else {
+      storage
+        .query(
+          (sql"""
       select
+        update_row_id,
         event_id,
         child_event_ids,
         choice,
@@ -624,10 +670,12 @@ final class UpdateHistory(
         interface_id_module_name,
         interface_id_entity_name
       from update_history_exercises
-      where update_row_id = $transactionRowId
-    """.as[SelectFromExerciseEvents],
-        "queryExerciseEvents",
-      )
+      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+            .as[SelectFromExerciseEvents],
+          "queryExerciseEvents",
+        )
+        .map(_.groupBy(_.updateRowId))
+    }
   }
 
   private def queryAssignments(
@@ -716,6 +764,7 @@ final class UpdateHistory(
     }
   }
 
+  // TODO (#12552): this method should be unnecessary once getTransactions includes reassignments
   def updateStream(
       beginOffset: String,
       endOffset: String,
@@ -729,9 +778,13 @@ final class UpdateHistory(
       // For each transaction, fetch all corresponding events
       .mapAsync(parallelism = 4)(updateRow =>
         for {
-          creates <- queryCreateEvents(updateRow.rowId)
-          exercises <- queryExerciseEvents(updateRow.rowId)
-        } yield decodeTransaction(updateRow, creates, exercises)
+          creates <- queryCreateEvents(Seq(updateRow.rowId))
+          exercises <- queryExerciseEvents(Seq(updateRow.rowId))
+        } yield decodeTransaction(
+          updateRow,
+          creates.getOrElse(updateRow.rowId, Seq.empty),
+          exercises.getOrElse(updateRow.rowId, Seq.empty),
+        )
       )
 
     val assignments = Source
@@ -957,6 +1010,7 @@ final class UpdateHistory(
       import prs.*
       (SelectFromCreateEvents.apply _).tupled(
         (
+          <<[Long],
           <<[String],
           <<[String],
           <<[CantonTimestamp],
@@ -977,6 +1031,7 @@ final class UpdateHistory(
       import prs.*
       (SelectFromExerciseEvents.apply _).tupled(
         (
+          <<[Long],
           <<[String],
           <<[Seq[String]],
           <<[String],
@@ -1067,6 +1122,7 @@ object UpdateHistory {
   )
 
   private case class SelectFromCreateEvents(
+      updateRowId: Long,
       eventId: String,
       contractId: String,
       createdAt: CantonTimestamp,
@@ -1081,6 +1137,7 @@ object UpdateHistory {
   )
 
   private case class SelectFromExerciseEvents(
+      updateRowId: Long,
       eventId: String,
       childEventIds: Seq[String],
       choice: String,

@@ -322,6 +322,14 @@ abstract class ScanAppReference(
         HttpScanAppClient.ListRoundPartyTotals(start, end)
       )
     }
+
+  def getUpdateHistory(count: Int, afterRecordTime: Option[String]) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateHistory(count, afterRecordTime)
+      )
+    }
+  }
 }
 
 final class ScanAppBackendReference(

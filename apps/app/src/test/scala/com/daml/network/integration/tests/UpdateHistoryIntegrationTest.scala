@@ -23,7 +23,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.store.{UpdateHistory, UpdateHistoryTest}
+import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTest}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
   TransactionTreeWrapper,
@@ -243,6 +243,23 @@ class UpdateHistoryIntegrationTest
         .toMat(Sink.seq)(Keep.right)
         .run()
         .futureValue
+
+    // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
+    val transactionsOnly = updateHistory
+      .getUpdates(
+        Some((recordedUpdates.head.update match {
+          case TransactionTreeUpdate(tree) => CantonTimestamp.assertFromInstant(tree.getRecordTime)
+          case ReassignmentUpdate(transfer) => transfer.recordTime
+        }).minusMillis(1L)), // include the first element, as otherwise it's excluded
+        PageLimit.tryCreate(recordedUpdates.size),
+      )
+      .futureValue
+    val recordedUpdatesTxOnly = recordedUpdates
+      .filter(_.update match {
+        case TransactionTreeUpdate(_) => true
+        case ReassignmentUpdate(_) => false
+      })
+    recordedUpdatesTxOnly should be(transactionsOnly.map(_._1))
 
     // Note: UpdateHistory does not preserve all information in updates,
     // so remove fields that are not preserved before comparing.

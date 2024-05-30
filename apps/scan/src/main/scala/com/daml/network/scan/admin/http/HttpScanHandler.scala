@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import com.digitalasset.canton.data.CantonTimestamp
 import cats.data.OptionT
 import cats.syntax.either.*
 import com.daml.lf.data.Time.Timestamp
@@ -588,6 +589,30 @@ class HttpScanHandler(
       } yield definitions.TransactionHistoryResponse(
         txs.map(TxLogEntry.Http.toResponseItem).toVector
       )
+    }
+  }
+
+  override def getUpdateHistory(respond: v0.ScanResource.GetUpdateHistoryResponse.type)(
+      request: definitions.UpdateHistoryRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
+      store.updateHistory.fold[Future[v0.ScanResource.GetUpdateHistoryResponse]](
+        Future.failed(new IllegalStateException("UpdateHistory not available."))
+      ) { updateHistory =>
+        updateHistory
+          .getUpdates(
+            request.afterRecordTime.map(t => CantonTimestamp(Timestamp.assertFromString(t))),
+            PageLimit.tryCreate(request.pageSize),
+          )
+          .map { txs =>
+            definitions.UpdateHistoryResponse(
+              txs.map { case (tx, migrationId) =>
+                ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
+              }.toVector
+            )
+          }
+      }
     }
   }
 

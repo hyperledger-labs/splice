@@ -412,6 +412,31 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/updates:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "getUpdateHistory"
+      description: |
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/ans-entries:
     get:
       tags: [ scan ]
@@ -969,6 +994,198 @@ components:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
           $ref: "#/components/schemas/AmuletAmount"
+    UpdateHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        after_record_time:
+          type: string
+          description: |
+            A ISO-8601 formatted date-time string, with microsecond precision.
+            The transactions returned will have a record_time greater than this value.
+            Omit this parameter to start reading from the beginning of the ledger.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+    UpdateHistoryResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItem:
+      type: object
+      description: |
+        Currently only includes transactions.
+      # TODO (#12552): include reassignments
+      oneOf:
+        - $ref: '#/components/schemas/UpdateHistoryTransaction'
+    UpdateHistoryTransaction:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - workflow_id
+        - record_time
+        - synchronizer_id
+        - effective_at
+        - offset
+        - root_event_ids
+        - events_by_id
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        migration_id:
+          description: |
+            The id of the update.
+          type: integer
+          format: int64
+        workflow_id:
+          description: |
+            The id of the update.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        synchronizer_id:
+          description: |
+            The id of the synchronizer through which this transaction was sequenced.
+          type: string
+        effective_at:
+          description: |
+            Ledger effective time.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+          type: string
+        root_event_ids:
+          description: |
+            Roots of the transaction tree.
+          type: array
+          items:
+            type: string
+        events_by_id:
+          description: |
+            Changes to the ledger that were caused by this transaction. Nodes of the transaction tree.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/TreeEvent'
+    TreeEvent:
+      type: object
+      description: |
+        Either a creation or an exercise of a contract.
+      oneOf:
+        - $ref: '#/components/schemas/CreatedEvent'
+        - $ref: '#/components/schemas/ExercisedEvent'
+      discriminator:
+        propertyName: event_type
+        mapping:
+          created_event: '#/components/schemas/CreatedEvent'
+          exercised_event: '#/components/schemas/ExercisedEvent'
+    CreatedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - create_arguments
+        - created_at
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        create_arguments:
+          description: |
+            The arguments that have been used to create the contract.
+          type: object
+        created_at:
+          description: |
+            Ledger effective time of the transaction that created the contract.
+          type: string
+          format: date-time
+    ExercisedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - choice
+        - choice_argument
+        - child_event_ids
+        - exercise_result
+        - consuming
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        choice:
+          description: |
+            The choice that was exercised on the target contract.
+          type: string
+        choice_argument:
+          description: |
+            The argument of the exercised choice.
+          type: object
+        child_event_ids:
+          description: |
+            References to further events in the same transaction that appeared as a result of this ExercisedEvent.
+            It contains only the immediate children of this event, not all members of the subtree rooted at this node.
+            The order of the children is the same as the event order in the transaction.
+          type: array
+          items:
+              type: string
+        exercise_result:
+          description: |
+            The result of exercising the choice.
+          type: object
+        consuming:
+          description: |
+            If true, the target contract may no longer be exercised.
+          type: boolean
     ListActivityRequest:
       type: object
       required:
