@@ -59,6 +59,7 @@ import java.time.Instant
 import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.wallet.store.TxLogEntry.{
@@ -71,7 +72,6 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
     endUserParty: PartyId,
-    endUserName: String,
 ) extends TxLogStore.Parser[TxLogEntry]
     with NamedLogging {
   import UserWalletTxLogParser.*
@@ -179,47 +179,55 @@ class UserWalletTxLogParser(
             outputsWithChildEvent.zipWithIndex.foldMap {
               // All errors are handled by producing a notification (if applicable)
               case ((op, _: COO_Error, Left(reason)), idx) =>
-                // Only show notifications if the batch was submitted by the end user associated with this TxLog.
-                // We do not want the validator user (who is also signatory on the WalletAppInstall contract)
-                // to see the notifications of all other end-users hosted on the same participant.
-                now(if (node.result.value.endUserName == endUserName) {
-                  val details = reason match {
-                    case r: ITR_InsufficientFunds =>
-                      s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
-                    case r: ITR_UnknownSynchronizer =>
-                      s"ITR_UnknownSynchronizer: domainId ${r.synchronizerId}"
-                    case r: ITR_InsufficientTopupAmount =>
-                      s"ITR_InsufficientTopupAmount: requested ${r.requestedTopupAmount}, minimum required ${r.minTopupAmount}"
-                    case r: ITR_Other => s"ITR_Other: ${r.description}"
-                    case _ => throw new RuntimeException(s"Invalid reason $reason")
+                // Only show notifications if the batch was submitted for the end-user party of this TxLog. We do not
+                // want the validator party's tx log  (who is also signatory on the WalletAppInstall contract) to
+                // generate notifications for actions of all other end-user parties.
+                val actingEndUserParty = node.result.value.optEndUserParty.toScala
+                now(
+                  if (
+                    // Err on the safe side when parsing log entries before the upgrade that introduced the optEndUserParty
+                    // annotation in the batch result.
+                    actingEndUserParty.isEmpty || actingEndUserParty
+                      .contains(endUserParty.toProtoPrimitive)
+                  ) {
+                    val details = reason match {
+                      case r: ITR_InsufficientFunds =>
+                        s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
+                      case r: ITR_UnknownSynchronizer =>
+                        s"ITR_UnknownSynchronizer: domainId ${r.synchronizerId}"
+                      case r: ITR_InsufficientTopupAmount =>
+                        s"ITR_InsufficientTopupAmount: requested ${r.requestedTopupAmount}, minimum required ${r.minTopupAmount}"
+                      case r: ITR_Other => s"ITR_Other: ${r.description}"
+                      case _ => throw new RuntimeException(s"Invalid reason $reason")
+                    }
+                    // Necessary because COO_Error does not produce any child event
+                    val syntheticEventId = s"${root.getEventId}_err_$idx"
+                    op match {
+                      case _: CO_CompleteAcceptedTransfer =>
+                        State.fromNotification(
+                          tree,
+                          syntheticEventId,
+                          TxLogEntry.NotificationTransactionSubtype.DirectTransferFailed,
+                          details,
+                        )
+                      case _: CO_SubscriptionMakePayment =>
+                        State.fromNotification(
+                          tree,
+                          syntheticEventId,
+                          TxLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed,
+                          details,
+                        )
+                      // The errors below should not produce notifications
+                      case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
+                          _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
+                          _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtAmuletOperation =>
+                        State.empty
+                      case _ => throw new RuntimeException(s"Invalid operation $op")
+                    }
+                  } else {
+                    State.empty
                   }
-                  // Necessary because COO_Error does not produce any child event
-                  val syntheticEventId = s"${root.getEventId}_err_$idx"
-                  op match {
-                    case _: CO_CompleteAcceptedTransfer =>
-                      State.fromNotification(
-                        tree,
-                        syntheticEventId,
-                        TxLogEntry.NotificationTransactionSubtype.DirectTransferFailed,
-                        details,
-                      )
-                    case _: CO_SubscriptionMakePayment =>
-                      State.fromNotification(
-                        tree,
-                        syntheticEventId,
-                        TxLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed,
-                        details,
-                      )
-                    // The errors below should not produce notifications
-                    case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
-                        _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
-                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtAmuletOperation =>
-                      State.empty
-                    case _ => throw new RuntimeException(s"Invalid operation $op")
-                  }
-                } else {
-                  State.empty
-                })
+                )
               // Tag wallet automation (amulet merging, reward collection) as such, to distinguish from
               // explicit self-transfers
               case ((_, _: COO_MergeTransferInputs, Right(Seq(childEvent))), _) =>

@@ -1,6 +1,5 @@
 package com.daml.network.validator.util
 
-import cats.data.EitherT
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.{
   BaseLedgerConnection,
@@ -11,8 +10,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
@@ -196,7 +194,7 @@ private[validator] object ValidatorUtil {
               .flatMap(_.collect { case Some(archive) => archive } match {
                 case archives @ (headArchive +: tailArchives) =>
                   val domainId = headArchive.origin.state match {
-                    case assigned @ Assigned(domainId)
+                    case assigned @ ContractState.Assigned(domainId)
                         if tailArchives forall (_.origin.state == assigned) =>
                       domainId
                     case _ =>
@@ -233,35 +231,20 @@ private[validator] object ValidatorUtil {
     }
   }
 
-  private def getValidatorWalletOrError(
+  def getValidatorWallet(
       validatorStore: ValidatorStore,
       walletManager: UserWalletManager,
-  )(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[Future, String, UserWalletService] = for {
-    walletInstall <- EitherT.liftF(
-      validatorStore
-        .lookupInstallByParty(validatorStore.key.validatorParty)
-        .map(
-          _.toRight(
-            s"No wallet install contract for validator ${validatorStore.key.validatorParty}."
-          )
-        )
-    )
-    validatorWalletUser <- EitherT.fromEither[Future](walletInstall.map(_.payload.endUserName))
-    validatorWallet <- EitherT.fromOption[Future](
-      walletManager.lookupUserWallet(validatorWalletUser),
-      s"No wallet found for validator user $validatorWalletUser",
-    )
-  } yield validatorWallet
-
-  def getValidatorWallet(validatorStore: ValidatorStore, walletManager: UserWalletManager)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
   ): Future[UserWalletService] =
-    getValidatorWalletOrError(validatorStore, walletManager).value.map(
-      _.fold(err => throw Status.NOT_FOUND.withDescription(err).asRuntimeException(), identity)
-    )
+    walletManager.lookupEndUserPartyWallet(validatorStore.key.validatorParty) match {
+      case None =>
+        Future.failed(
+          Status.NOT_FOUND
+            .withDescription(
+              s"No wallet found for validator party ${validatorStore.key.validatorParty}"
+            )
+            .asRuntimeException()
+        )
+      case Some(wallet) => Future.successful(wallet)
+    }
 
 }

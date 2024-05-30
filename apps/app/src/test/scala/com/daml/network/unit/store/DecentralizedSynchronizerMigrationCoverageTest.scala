@@ -134,7 +134,7 @@ object DecentralizedSynchronizerMigrationCoverageTest {
       (
         UserWalletStore,
         UserWalletStore.contractFilter(
-          UserWalletStore.Key(dummyParty, dummyParty, "irrelevant username", dummyParty),
+          UserWalletStore.Key(dummyParty, dummyParty, dummyParty),
           domainMigrationId,
         ),
         UserWalletStore.templatesMovedByMyAutomation,

@@ -147,6 +147,7 @@ class ScanIntegrationTest
     def aliceMergeAmuletsTrigger =
       aliceValidatorBackend
         .userWalletAutomation(aliceUserName)
+        .futureValue
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
     aliceMergeAmuletsTrigger.pause().futureValue
@@ -217,6 +218,7 @@ class ScanIntegrationTest
       def aliceMergeAmuletsTrigger =
         aliceValidatorBackend
           .userWalletAutomation(aliceUserName)
+          .futureValue
           .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
       aliceMergeAmuletsTrigger.pause().futureValue
@@ -224,6 +226,7 @@ class ScanIntegrationTest
       def bobMergeAmuletsTrigger =
         bobValidatorBackend
           .userWalletAutomation(bobUserName)
+          .futureValue
           .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
       bobMergeAmuletsTrigger.pause().futureValue
@@ -475,6 +478,7 @@ class ScanIntegrationTest
     def bobValidatorRewardsTrigger =
       bobValidatorBackend
         .userWalletAutomation(bobValidatorUserName)
+        .futureValue
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
     bobValidatorRewardsTrigger.resume()
 

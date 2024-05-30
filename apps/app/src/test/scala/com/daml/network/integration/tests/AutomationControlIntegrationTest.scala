@@ -168,6 +168,7 @@ class AutomationControlIntegrationTest
     def aliceMergeAmuletsTrigger =
       aliceValidatorBackend
         .userWalletAutomation(aliceUserName)
+        .futureValue
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
     // ------------------------------------------------------------------------

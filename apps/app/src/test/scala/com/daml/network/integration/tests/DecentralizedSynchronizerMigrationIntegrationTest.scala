@@ -797,11 +797,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               clue("Pause expiration so we can catch the contract") {
                 aliceValidatorLocal
                   .userWalletAutomation(aliceUser)
+                  .futureValue
                   .trigger[ExpireTransferOfferTrigger]
                   .pause()
                   .futureValue
                 aliceValidatorLocal
                   .userWalletAutomation(charlieUser)
+                  .futureValue
                   .trigger[ExpireTransferOfferTrigger]
                   .pause()
                   .futureValue
@@ -823,6 +825,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 "Unpause Charlie's expiration automation",
                 aliceValidatorLocal
                   .userWalletAutomation(charlieUser)
+                  .futureValue
                   .trigger[ExpireTransferOfferTrigger]
                   .resume(),
               )(

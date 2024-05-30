@@ -1,6 +1,5 @@
 package com.daml.network.wallet.store
 
-import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.install as installCodegen
 import com.daml.network.store.CNNodeAppStoreWithoutHistory
@@ -38,15 +37,6 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   ): Future[
     Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
   ]
-
-  def listUsersWithArchivedWalletInstalls(
-      usernames: Seq[String],
-      limit: Integer,
-  )(implicit tc: TraceContext): Future[Seq[String]] = {
-    usernames.toList
-      .filterA(lookupInstallByName(_).map(!_.isDefined))
-      .map(_.take(limit))
-  }
 }
 
 object WalletStore {

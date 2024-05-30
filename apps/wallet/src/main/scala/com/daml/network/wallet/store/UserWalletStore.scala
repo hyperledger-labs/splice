@@ -52,8 +52,9 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       ContractWithState[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
     ]
   ] =
-    // Note: there is nothing that prevents a party from having multiple WalletAppInstall contracts
+    // Note: a party can have WalletAppInstall contracts if there are multiple end-users that share the same party
     // here we just take the first one, preferring an assigned one if available
+    // TODO(#12550): remove this confusing behavior and create only one WalletAppInstall per user-party
     lookupArbitraryPreferAssigned(installCodegen.WalletAppInstall.COMPANION)
 
   final def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
@@ -391,7 +392,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
 
   override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser =
-      new UserWalletTxLogParser(loggerFactory, key.endUserParty, key.endUserName)
+      new UserWalletTxLogParser(loggerFactory, key.endUserParty)
     override def entryToRow = WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
     override def encodeEntry = TxLogEntry.encode
     override def decodeEntry = TxLogEntry.decode
@@ -489,17 +490,12 @@ object UserWalletStore {
       /** The party-id of the wallet's validator */
       validatorParty: PartyId,
 
-      // TODO (#6385): this shouldn't be required anymore.
-      // The implication is that we're running more than one ingestion for the same party with different stores.
-      /** The participant user name of the end-user */
-      endUserName: String,
-
       /** The party-id of the end-user, which is the primary party of its participant user */
       endUserParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("endUserName", _.endUserName.singleQuoted),
       param("endUserParty", _.endUserParty),
+      param("validatorParty", _.validatorParty),
       param("dsoParty", _.dsoParty),
     )
   }

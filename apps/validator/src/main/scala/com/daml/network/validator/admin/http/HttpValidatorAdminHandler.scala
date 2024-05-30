@@ -12,6 +12,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -52,7 +53,9 @@ class HttpValidatorAdminHandler(
     withSpan(s"$workflowId.onboardUser") { _ => span =>
       val name = body.name
       span.setAttribute("name", name)
-      onboard(name).map(p => definitions.OnboardUserResponse(p))
+      onboard(name, body.partyId.map(PartyId.tryFromProtoPrimitive)).map(p =>
+        definitions.OnboardUserResponse(p)
+      )
     }
   }
 
@@ -63,6 +66,7 @@ class HttpValidatorAdminHandler(
   ] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.listUsers") { _ => _ =>
+      // TODO(#12550): move away from tracking onboarded users via on-ledger contracts, and create only one WalletAppInstall per user-party
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
     }
   }
@@ -162,11 +166,13 @@ class HttpValidatorAdminHandler(
     }
   }
 
-  private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
+  private def onboard(name: String, partyId: Option[PartyId])(implicit
+      traceContext: TraceContext
+  ): Future[String] = {
     ValidatorUtil
       .onboard(
         name,
-        None,
+        partyId,
         storeWithIngestion,
         validatorUserName,
         getAmuletRulesDomain,

@@ -69,6 +69,7 @@ class WalletExpirationsIntegrationTest
         Seq(
           aliceValidatorBackend
             .userWalletAutomation(aliceUserName)
+            .futureValue
             .trigger[ExpireAppPaymentRequestsTrigger]
         ),
         Seq.empty,
@@ -103,6 +104,7 @@ class WalletExpirationsIntegrationTest
         Seq(
           aliceValidatorBackend
             .userWalletAutomation(aliceUserName)
+            .futureValue
             .trigger[ExpireTransferOfferTrigger]
         ),
         Seq.empty,

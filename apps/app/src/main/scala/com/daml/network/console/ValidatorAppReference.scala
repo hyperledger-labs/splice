@@ -28,8 +28,11 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
+
 import java.time.Instant
 import com.daml.network.validator.migration.DomainMigrationDump
+
+import scala.concurrent.Future
 
 /** Console commands that can be executed either through client or backend reference.
   */
@@ -57,19 +60,19 @@ abstract class ValidatorAppReference(
     getValidatorUserInfo().primaryParty
 
   @Help.Summary("Onboard a new user")
-  @Help.Description("""Onboard individual canton-amulet user for the given validator party.
-                      |Return the newly set up partyId.""".stripMargin)
-  def onboardUser(user: String): PartyId = {
+  @Help.Description("""Onboard individual canton-amulet user with a fresh or existing party-id.
+                      |Return the user's partyId.""".stripMargin)
+  def onboardUser(user: String, existingPartyId: Option[PartyId] = None): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.OnboardUser(user)
+        HttpValidatorAdminAppClient.OnboardUser(user, existingPartyId)
       )
     }
   }
 
   @Help.Summary("Register a new user identified by token")
   @Help.Description(
-    """Register individual canton-amulet user for the given validator party, as identified by token.
+    """Register the authenticated canton-amulet user with a fresh party-id.
       |Return the newly set up partyId.""".stripMargin
   )
   def register(): PartyId = {
@@ -303,12 +306,15 @@ final class ValidatorAppBackendReference(
   @Help.Summary(
     "Returns the automation service for the wallet of the given user. May only be called while the app is running."
   )
-  def userWalletAutomation(userName: String): UserWalletAutomationService = {
+  def userWalletAutomation(
+      userName: String
+  ): Future[UserWalletAutomationService] = {
     appState.walletManager
       .getOrElse(throw new RuntimeException(s"Wallet is disabled"))
       .lookupUserWallet(userName)
-      .getOrElse(throw new RuntimeException(s"User ${userName} doesn't exist"))
-      .automation
+      .map(_.getOrElse(throw new RuntimeException(s"User ${userName} doesn't exist")).automation)(
+        executionContext
+      )
   }
 
   @Help.Summary(

@@ -93,6 +93,7 @@ class WalletTransferOfferStatusIntegrationTest
       def acceptedTransferOfferTrigger =
         aliceValidatorBackend
           .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+          .futureValue
           .trigger[AcceptedTransferOfferTrigger]
 
       // Pause AcceptedTransferOfferTrigger so the offer doesn't immediately move from Accepted to Completed

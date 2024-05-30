@@ -8,6 +8,29 @@ Upcoming
 
 * Include Grafana dashboards and a README on network health in the release bundle.
 
+* Configuration
+
+  The  ``wallet-sweep`` and ``auto-accept`` configuration values for a validator app
+  were changed to map party-ids to configurations instead of mapping participant user-names to configurations.
+
+* Daml
+
+  The ``WalletAppInstall_ExecuteBatch`` choice in ``splice-wallet.dar`` was changed to also record the wallet user party when executing
+  batches of operations on a user's coin holdings to improve disambuiguation of log entries
+  in the wallet transaction log.
+
+* Validator admin API
+
+  Simplified creating users that share the same party-id and wallet. For that purpose
+  ``POST /v0/admin/users`` accepts an optional ``party_id`` field in its JSON body,
+  which can be set to an already allocated party.
+
+* Bugfixes
+
+  The wallet automation for collecting rewards is started only once per Daml party instead of
+  once per onboarded wallet user. This enables setups where multiple wallet users have access to
+  the same coin holdings for the same Daml party.
+
 
 0.1.10
 ------

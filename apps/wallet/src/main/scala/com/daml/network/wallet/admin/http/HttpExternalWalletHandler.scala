@@ -48,66 +48,67 @@ class HttpExternalWalletHandler(
   )(tuser: TracedUser): Future[r0.CreateTransferOfferResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createTransferOffer") { _ => _ =>
-      val userWalletStore = getUserWallet(user).store
-      userWalletStore
-        .getLatestTransferOfferEventByTrackingId(request.trackingId)
-        .flatMap {
-          case QueryResult(_, Some(_)) =>
-            Future.failed(
-              io.grpc.Status.ALREADY_EXISTS
-                .withDescription(
-                  s"Transfer offer with trackingId ${request.trackingId} already exists."
-                )
-                .asRuntimeException()
-            )
-          case QueryResult(dedupOffset, None) =>
-            val sender = userWalletStore.key.endUserParty
-            // TODO(#8300) revisit if we want to retry here.
-            retryProvider.retryForClientCalls(
-              "createTransferOffer",
-              "createTransferOffer",
-              exerciseWalletAction((installCid, _) => {
-                val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
-                val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-                val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
-                Future.successful(
-                  installCid
-                    .exerciseWalletAppInstall_CreateTransferOffer(
-                      receiver.toProtoPrimitive,
-                      new PaymentAmount(amount, Unit.AMULETUNIT),
-                      request.description,
-                      expiresAt.toInstant,
-                      request.trackingId,
-                    )
-                    .map { cid =>
-                      r0.CreateTransferOfferResponse.OK(
-                        d0.CreateTransferOfferResponse(
-                          Codec.encodeContractId(cid.exerciseResult.transferOffer)
-                        )
-                      )
-                    }
-                )
-              })(
-                user,
-                dedup = Some(
-                  (
-                    CNLedgerConnection.CommandId(
-                      "com.daml.network.wallet.createTransferOffer",
-                      Seq(
-                        sender,
-                        Codec.tryDecode(Codec.Party)(request.receiverPartyId),
-                      ),
-                      request.trackingId,
-                    ),
-                    DedupOffset(dedupOffset),
+      getUserStore(user).flatMap(userWalletStore =>
+        userWalletStore
+          .getLatestTransferOfferEventByTrackingId(request.trackingId)
+          .flatMap {
+            case QueryResult(_, Some(_)) =>
+              Future.failed(
+                io.grpc.Status.ALREADY_EXISTS
+                  .withDescription(
+                    s"Transfer offer with trackingId ${request.trackingId} already exists."
                   )
+                  .asRuntimeException()
+              )
+            case QueryResult(dedupOffset, None) =>
+              val sender = userWalletStore.key.endUserParty
+              // TODO(#8300) revisit if we want to retry here.
+              retryProvider.retryForClientCalls(
+                "createTransferOffer",
+                "createTransferOffer",
+                exerciseWalletAction((installCid, _) => {
+                  val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
+                  val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+                  val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
+                  Future.successful(
+                    installCid
+                      .exerciseWalletAppInstall_CreateTransferOffer(
+                        receiver.toProtoPrimitive,
+                        new PaymentAmount(amount, Unit.AMULETUNIT),
+                        request.description,
+                        expiresAt.toInstant,
+                        request.trackingId,
+                      )
+                      .map { cid =>
+                        r0.CreateTransferOfferResponse.OK(
+                          d0.CreateTransferOfferResponse(
+                            Codec.encodeContractId(cid.exerciseResult.transferOffer)
+                          )
+                        )
+                      }
+                  )
+                })(
+                  user,
+                  dedup = Some(
+                    (
+                      CNLedgerConnection.CommandId(
+                        "com.daml.network.wallet.createTransferOffer",
+                        Seq(
+                          sender,
+                          Codec.tryDecode(Codec.Party)(request.receiverPartyId),
+                        ),
+                        request.trackingId,
+                      ),
+                      DedupOffset(dedupOffset),
+                    )
+                  ),
                 ),
-              ),
-              logger,
-              HttpExternalWalletHandler.CreateTransferOfferRetryable(_),
-            )
-        }
-        .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
+                logger,
+                HttpExternalWalletHandler.CreateTransferOfferRetryable(_),
+              )
+          }
+          .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
+      )
     }
   }
 
@@ -151,7 +152,6 @@ class HttpExternalWalletHandler(
   )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createBuyTrafficRequest") { _ => _ =>
-      val userWalletStore = getUserWallet(user).store
       val domainId = Codec.tryDecode(Codec.DomainId)(request.domainId)
       val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
       val trafficAmount = PositiveLong
@@ -162,6 +162,7 @@ class HttpExternalWalletHandler(
             .asRuntimeException()
         )
       for {
+        userWalletStore <- getUserStore(user)
         participantId <- participantAdminConnection
           .getPartyToParticipant(
             domainId,

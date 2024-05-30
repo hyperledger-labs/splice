@@ -15,6 +15,7 @@ import java.nio.file.{Path, Paths}
 import better.files.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.{BuildInfo, DarResources}
+import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -119,11 +120,25 @@ class AppUpgradeIntegrationTest
             sv2Wallet.balance().unlockedQty should be > BigDecimal(1_000_000)
           }
 
+          val bobTxsBeforeUpgrade =
+            clue("Check that bob validator can see the tap in the wallet tx history") {
+              val txs = bobValidatorWalletClient.listTransactions(None, 10)
+              inside(txs(0)) { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.amount shouldBe walletUsdToAmulet(BigDecimal(1_000_001))
+              }
+              txs
+            }
+
           clue("Upgrading bob's and splitwell validator") {
             cnProcs.stopBundledCN("bobSplitwellValidators")
             bobValidatorBackend.startSync()
             splitwellValidatorBackend.startSync()
             splitwellBackend.startSync()
+          }
+
+          clue("Check that bob still sees the same wallet tx history") {
+            val txsAfter = bobValidatorWalletClient.listTransactions(None, bobTxsBeforeUpgrade.size)
+            txsAfter shouldBe bobTxsBeforeUpgrade
           }
 
           clue("Validating that the balance is visible in the upgraded validator") {

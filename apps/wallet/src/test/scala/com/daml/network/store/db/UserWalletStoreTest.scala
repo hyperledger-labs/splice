@@ -919,7 +919,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   protected def storeKey(endUserParty: PartyId) = UserWalletStore.Key(
     dsoParty = dsoParty,
     validatorParty = validator,
-    endUserName = endUserParty.toProtoPrimitive,
     endUserParty = endUserParty,
   )
 

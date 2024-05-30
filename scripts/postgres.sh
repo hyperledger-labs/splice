@@ -106,6 +106,12 @@ function docker_createdb() {
     >> "$LOG_FILE"
 }
 
+function docker_psql_shell () {
+  echo "Starting PSQL shell for dockerized Postgres"
+  docker exec -it -e PGPASSWORD="$POSTGRES_PASSWORD" $DOCKER_POSTGRES_CONTAINER_NAME \
+    psql -U "$POSTGRES_USER"
+}
+
 function psql_createdb() {
   echo "Creating database $1"
   export PGPASSWORD="$POSTGRES_PASSWORD"
@@ -183,6 +189,9 @@ case "$1_$2" in
     docker_stop)
         docker_stop
     ;;
+    docker_psql)
+        docker_psql_shell
+    ;;
     local_stop)
         pgctl_stop
     ;;
@@ -206,5 +215,6 @@ case "$1_$2" in
         echo "    dropdb   <name>  drops an existing database with the given name"
         echo "    stop             removes the postgres instance along with all data"
         echo "    pull             (docker mode only) makes sure the postgres image is available locally"
+        echo "    psql             (docker mode only) starts an interactive psql session for the dockerized postgres"
     ;;
 esac

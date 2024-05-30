@@ -248,6 +248,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         def aliceSubscriptionReadyForPaymentTrigger =
           aliceValidatorBackend
             .userWalletAutomation(aliceUserName)
+            .futureValue
             .trigger[SubscriptionReadyForPaymentTrigger]
 
         aliceSubscriptionReadyForPaymentTrigger.pause().futureValue
@@ -318,6 +319,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       def aliceSubscriptionReadyForPaymentTrigger =
         aliceValidatorBackend
           .userWalletAutomation(aliceUserName)
+          .futureValue
           .trigger[SubscriptionReadyForPaymentTrigger]
 
       setTriggersWithin[Assertion](

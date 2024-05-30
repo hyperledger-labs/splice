@@ -224,6 +224,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
           def expireBuyTrafficRequestsTrigger = aliceValidatorBackend
             .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+            .futureValue
             .trigger[ExpireBuyTrafficRequestsTrigger]
 
           bracket(
@@ -355,6 +356,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
     def completeBuyTrafficRequestTrigger = buyerValidator
       .userWalletAutomation(buyer.config.ledgerApiUser)
+      .futureValue
       .trigger[CompleteBuyTrafficRequestTrigger]
 
     // Pause CompleteBuyTrafficRequestTrigger so the request doesn't immediately move from Created to Completed

@@ -43,10 +43,11 @@ object DarResources {
 
   val wallet_0_1_0 = DarResource("splice-wallet-0.1.0.dar")
   val wallet_0_1_1 = DarResource("splice-wallet-0.1.1.dar")
+  val wallet_0_1_2 = DarResource("splice-wallet-0.1.2.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
-    Seq(wallet_0_1_0, wallet_0_1_1),
+    Seq(wallet_0_1_0, wallet_0_1_1, wallet_0_1_2),
   )
 
   val walletPayments_0_1_0 = DarResource("splice-wallet-payments-0.1.0.dar")

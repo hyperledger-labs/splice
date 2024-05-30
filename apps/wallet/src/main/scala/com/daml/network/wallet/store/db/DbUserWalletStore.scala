@@ -56,13 +56,13 @@ class DbUserWalletStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       storeDescriptor = StoreDescriptor(
-        version = 1,
+        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
+        // to version 2 descriptors.
+        version = 2,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
         key = Map(
-          // TODO (#6385): this shouldn't be required anymore, but keep in mind data continuity
-          "endUserName" -> key.endUserName,
           "endUserParty" -> key.endUserParty.toProtoPrimitive,
           "validatorParty" -> key.validatorParty.toProtoPrimitive,
           "dsoParty" -> key.dsoParty.toProtoPrimitive,

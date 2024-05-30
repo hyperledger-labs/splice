@@ -1175,6 +1175,7 @@ class WalletTxLogIntegrationTest
       def aliceAcceptedTransferOfferTrigger =
         aliceValidatorBackend
           .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+          .futureValue
           .trigger[AcceptedTransferOfferTrigger]
 
       // We disable the trigger and use a large number of transfers to ensure at least some will get batched

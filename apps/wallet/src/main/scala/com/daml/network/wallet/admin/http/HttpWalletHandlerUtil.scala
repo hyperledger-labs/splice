@@ -38,14 +38,22 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       } yield mkResponse(contracts.map(_.contract.toHttp).toVector)
     }
 
-  protected def getUserStore(user: String): Future[UserWalletStore] =
-    Future.successful(getUserWallet(user).store)
+  protected def getUserStore(
+      user: String
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[UserWalletStore] =
+    getUserWallet(user).map(_.store)
 
-  protected def getUserWallet(user: String): UserWalletService =
+  protected def getUserWallet(
+      user: String
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[UserWalletService] =
     walletManager
       .lookupUserWallet(user)
-      .getOrElse(
-        throw Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}").asRuntimeException()
+      .map(
+        _.getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(show"User ${user.singleQuoted}")
+            .asRuntimeException()
+        )
       )
 
   /** Executes a wallet action by calling a choice on the WalletInstall contract for the given user.
@@ -66,17 +74,17 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       dislosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Response] = {
-    val userWallet = getUserWallet(user)
-    val userStore = userWallet.store
-    val userParty = userStore.key.endUserParty
     for {
+      userWallet <- getUserWallet(user)
+      userStore = userWallet.store
+      userParty = userStore.key.endUserParty
       // TODO (#4906) pick install based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
       unadornedUpdate <- getUpdate(install.contractId, userStore)
       update = install.exercise(_ => unadornedUpdate)
       result <- dedup match {
         case None =>
-          getUserWallet(user).connection
+          userWallet.connection
             .submit(Seq(validatorParty), Seq(userParty), update, priority = priority)
             .withDisclosedContracts(dislosedContracts)
             .noDedup

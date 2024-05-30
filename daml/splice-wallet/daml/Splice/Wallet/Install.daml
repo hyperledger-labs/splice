@@ -227,7 +227,12 @@ data AmuletOperationOutcome
 data WalletAppInstall_ExecuteBatchResult = WalletAppInstall_ExecuteBatchResult
   with
     endUserName : Text
+      -- The endUserName whose WalletAppInstall was used. This can be confusing as the treasury runs per party
+      -- and just picks some install for an end-user with that party.
     outcomes: [AmuletOperationOutcome]
+    optEndUserParty : Optional Party
+      -- The primary party on whose wallet the batch was executed. This is useful since the logic parsing
+      -- the tx log entry currently cannot resolve the payload of the WalletAppInstall to get the party from there.
   deriving (Eq, Show)
 
 data WalletAppInstall_AppPaymentRequest_RejectResult = WalletAppInstall_AppPaymentRequest_RejectResult
@@ -321,6 +326,7 @@ template WalletAppInstall
         accepted <- executeAmuletOperationRec executionContext inputs [] operations
         return WalletAppInstall_ExecuteBatchResult with
           endUserName
+          optEndUserParty = Some endUserParty
           outcomes = reverse accepted
 
     nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : WalletAppInstall_AppPaymentRequest_RejectResult

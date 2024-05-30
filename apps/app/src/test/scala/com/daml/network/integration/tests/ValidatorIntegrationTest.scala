@@ -273,10 +273,10 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     }
   }
 
-  "create and list CNS entries" in { implicit env =>
+  "create and list CNS entries with multiple users for the same party" in { implicit env =>
     initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
-    aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    val aliceParty = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     aliceWalletClient.tap(10)
 
     val name = "alice.unverified.cns"
@@ -291,9 +291,29 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
     aliceWalletClient.acceptSubscriptionRequest(createResponse.subscriptionRequestCid)
 
-    eventually() {
+    val aliceEntries = eventually() {
       val entriesResponse = aliceAnsExternalClient.listAnsEntries()
       entriesResponse.entries should have size 1
+      entriesResponse
+    }
+
+    clue("Onboard charlie backed by alice's party") {
+      aliceValidatorBackend.onboardUser(charlieWalletClient.config.ledgerApiUser, Some(aliceParty))
+    }
+    clue("Check CNS entries") {
+      charlieAnsExternalClient.listAnsEntries() shouldBe aliceEntries
+    }
+    clue("Compare wallet tx logs") {
+      val aliceTxs = aliceWalletClient.listTransactions(None, 10)
+      val charlieTxs = charlieWalletClient.listTransactions(
+        None,
+        aliceTxs.size,
+      ) // protect from flakes due to background activity
+      aliceTxs shouldBe charlieTxs
+    }
+    clue("Offboard alice and check that charlie can still tap") {
+      aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
+      charlieWalletClient.tap(10)
     }
   }
 
@@ -352,7 +372,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       entries => {
         forAtLeast(numTestUsers, entries)(
           _.message should include(
-            s"Completed processing with outcome: onboarded wallet end-user '${prefix}"
+            s"Completed processing with outcome: started wallet automation for end-user party ${prefix}"
           )
         )
       },
@@ -407,8 +427,8 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
           entries => {
             forAtLeast(numTestUsers, entries)(
               _.message should (include(
-                s"offboarded user ${prefix}"
-              ) and endWith("from wallet"))
+                s"offboarded wallet for user party ${prefix}"
+              ))
             )
           },
         )

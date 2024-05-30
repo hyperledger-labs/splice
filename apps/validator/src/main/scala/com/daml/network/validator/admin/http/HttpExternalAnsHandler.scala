@@ -36,11 +36,12 @@ class HttpExternalAnsHandler(
   )(tuser: TracedUser): Future[r0.CreateAnsEntryResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createAnsEntry") { implicit traceContext => _ =>
-      val connection = getUserWallet(user).connection
       retryProvider.retryForClientCalls(
         "createAnsEntry",
         "create ANS entry",
         for {
+          endUserWallet <- getUserWallet(user)
+          connection = endUserWallet.connection
           partyId <- connection.getPrimaryParty(user)
           ansRules <- scanConnection.getAnsRules()
           ansRulesCt = ansRules.toAssignedContract.getOrElse(

@@ -577,8 +577,8 @@ class HttpWalletHandler(
   ): Future[r0.UserStatusResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.userStatus") { implicit traceContext => _ =>
-      val optWallet = walletManager.lookupUserWallet(user)
       for {
+        optWallet <- walletManager.lookupUserWallet(user)
         hasFeaturedAppRight <- optWallet match {
           case None => Future(false)
           case Some(wallet) =>
@@ -648,8 +648,10 @@ class HttpWalletHandler(
       Codec.encode(CNNodeUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
-  private[this] def getUserTreasury(user: String): Future[TreasuryService] =
-    Future.successful(getUserWallet(user).treasury)
+  private[this] def getUserTreasury(user: String)(implicit
+      tc: TraceContext
+  ): Future[TreasuryService] =
+    getUserWallet(user).map(_.treasury)
 
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.

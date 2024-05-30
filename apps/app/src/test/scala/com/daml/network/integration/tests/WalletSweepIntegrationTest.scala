@@ -59,7 +59,7 @@ class WalletSweepIntegrationTest
           if (name == "sv1Validator") {
             c.copy(
               walletSweep = Map(
-                c.validatorWalletUser.value -> WalletSweepConfig(
+                sv1PartyId.toProtoPrimitive -> WalletSweepConfig(
                   NonNegativeNumeric.tryCreate(maxBalanceUsd),
                   NonNegativeNumeric.tryCreate(minBalanceUsd),
                   alicePartyId.toProtoPrimitive,
@@ -69,7 +69,7 @@ class WalletSweepIntegrationTest
           } else if (name == "aliceValidator") {
             c.copy(
               autoAcceptTransfers = Map(
-                c.validatorWalletUser.value ->
+                alicePartyId.toProtoPrimitive ->
                   AutoAcceptTransfersConfig(fromParties = Seq(sv1PartyId.toProtoPrimitive))
               )
             )
@@ -238,6 +238,7 @@ class WalletSweepIntegrationTest
     Seq(
       aliceValidatorBackend
         .userWalletAutomation(aliceUserName)
+        .futureValue
         .trigger[AutoAcceptTransferOffersTrigger]
     )
   }

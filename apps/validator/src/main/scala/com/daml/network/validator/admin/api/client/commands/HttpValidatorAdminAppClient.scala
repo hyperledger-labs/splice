@@ -32,13 +32,17 @@ object HttpValidatorAdminAppClient {
       )
   }
 
-  case class OnboardUser(name: String) extends BaseCommand[http.OnboardUserResponse, PartyId] {
+  case class OnboardUser(name: String, existingPartyId: Option[PartyId])
+      extends BaseCommand[http.OnboardUserResponse, PartyId] {
 
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardUserResponse] =
-      client.onboardUser(definitions.OnboardUserRequest(name), headers)
+      client.onboardUser(
+        definitions.OnboardUserRequest(name, existingPartyId.map(_.toProtoPrimitive)),
+        headers,
+      )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

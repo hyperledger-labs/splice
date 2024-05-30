@@ -61,17 +61,17 @@ class UserWalletManager(
     with HasHealth
     with LimitHelpers {
 
-  // map from end user name to end-user treasury service
-  private[this] val endUserWalletsMap
-      : scala.collection.concurrent.Map[String, (RetryProvider, UserWalletService)] =
+  // map from end user party to end-user wallet service
+  private[this] val endUserPartyWalletsMap
+      : scala.collection.concurrent.Map[PartyId, (RetryProvider, UserWalletService)] =
     TrieMap.empty
 
-  private[this] def removeEndUserWallet(
-      endUserName: String
+  private[this] def removeEndUserPartyWallet(
+      endUserParty: PartyId
   ): Option[(RetryProvider, UserWalletService)] =
     blocking {
       this.synchronized {
-        endUserWalletsMap.remove(endUserName)
+        endUserPartyWalletsMap.remove(endUserParty)
       }
     }
 
@@ -79,25 +79,23 @@ class UserWalletManager(
   // the new service if there is no existing service for the user yet.
   // Accessing a concurrent map while modifying it is safe, so we only need to synchronize adding
   // and removing users.
-  private[this] def addEndUserWallet(
-      endUserName: String,
+  private[this] def addEndUserPartyWallet(
       endUserParty: PartyId,
-      participantId: ParticipantId,
-      createWallet: (String, PartyId, ParticipantId) => (RetryProvider, UserWalletService),
+      createWallet: PartyId => (RetryProvider, UserWalletService),
   ): Option[(RetryProvider, UserWalletService)] = blocking {
     this.synchronized {
-      if (endUserWalletsMap.contains(endUserName)) {
+      if (endUserPartyWalletsMap.contains(endUserParty)) {
         logger.debug(
-          show"Wallet for user ${endUserName.singleQuoted} already exists, not creating a new one."
+          show"Wallet for user party ${endUserParty} already exists, not creating a new one."
         )(TraceContext.empty)
         None
       } else {
         logger.debug(
-          show"Creating wallet service and retry provider for user ${endUserName.singleQuoted}."
+          show"Creating wallet service and retry provider for user ${endUserParty}."
         )(TraceContext.empty)
-        val endUserWallet = createWallet(endUserName, endUserParty, participantId)
-        endUserWalletsMap.put(endUserName, endUserWallet): Unit
-        Some(endUserWallet)
+        val endUserPartyWallet = createWallet(endUserParty)
+        endUserPartyWalletsMap.put(endUserParty, endUserPartyWallet): Unit
+        Some(endUserPartyWallet)
       }
     }
   }
@@ -106,7 +104,7 @@ class UserWalletManager(
     override def name = s"set per-user retry providers as closed"
     override def done = false
     override def run() = {
-      endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
+      endUserPartyWalletsMap.values.foreach { case (userRetryProvider, _) =>
         userRetryProvider.setAsClosing()
       }
     }
@@ -117,7 +115,7 @@ class UserWalletManager(
     // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
     override def run() = {
-      endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
+      endUserPartyWalletsMap.values.foreach { case (userRetryProvider, _) =>
         userRetryProvider.close()
       }
     }
@@ -127,12 +125,30 @@ class UserWalletManager(
     *
     * Succeeds if the user has been onboarded and its wallet has been initialized.
     */
-  final def lookupUserWallet(endUserName: String): Option[UserWalletService] =
-    endUserWalletsMap.get(endUserName).map(_._2)
+  // TODO(#12550): move away from tracking onboarded users via on-ledger contracts, and create only one WalletAppInstall per user-party
+  final def lookupUserWallet(
+      endUserName: String
+  )(implicit tc: TraceContext): Future[Option[UserWalletService]] = {
+    store.lookupInstallByName(endUserName).flatMap {
+      case None =>
+        Future.successful(None)
+      case Some(install) =>
+        Future.successful(
+          lookupEndUserPartyWallet(PartyId.tryFromProtoPrimitive(install.payload.endUserParty))
+        )
+    }
+  }
 
-  final def endUserWallets: Iterable[(RetryProvider, UserWalletService)] = endUserWalletsMap.values
+  final def lookupEndUserPartyWallet(
+      endUserParty: PartyId
+  ): Option[UserWalletService] =
+    endUserPartyWalletsMap.get(endUserParty).map(_._2)
 
-  final def listUsers: Seq[String] = endUserWallets.map(_._2.store.key.endUserName).toSeq
+  final def endUserPartyWallets: Iterable[(RetryProvider, UserWalletService)] =
+    endUserPartyWalletsMap.values
+
+  final def listEndUserParties: Seq[PartyId] =
+    endUserPartyWallets.map(_._2.store.key.endUserParty).toSeq
 
   /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
     *
@@ -146,16 +162,15 @@ class UserWalletManager(
     if (retryProvider.isClosing) {
       UnlessShutdown.AbortedDueToShutdown
     } else {
-      val endUserName = install.payload.endUserName
       val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
 
       val userRetryProviderAndWalletService =
-        addEndUserWallet(endUserName, endUserParty, participantId, createEndUserWallet)
+        addEndUserPartyWallet(endUserParty, createEndUserPartyWallet)
 
       // There might have been a concurrent call to .close() that missed the above addition of this user
       if (retryProvider.isClosing) {
         logger.debug(
-          show"Detected race between adding wallet for user ${endUserName.singleQuoted} and shutdown: closing wallet."
+          show"Detected race between adding wallet for party ${endUserParty} and shutdown: closing wallet."
         )(TraceContext.empty)
         userRetryProviderAndWalletService.foreach { case (userRetryProvider, walletService) =>
           userRetryProvider.close()
@@ -168,18 +183,15 @@ class UserWalletManager(
     }
   }
 
-  private def createEndUserWallet(
-      endUserName: String,
-      endUserParty: PartyId,
-      participantId: ParticipantId,
+  private def createEndUserPartyWallet(
+      endUserParty: PartyId
   ): (RetryProvider, UserWalletService) = {
     val key = UserWalletStore.Key(
       dsoParty = store.walletKey.dsoParty,
       store.walletKey.validatorParty,
-      endUserName,
       endUserParty,
     )
-    val userLoggerFactory = loggerFactory.append("user", key.endUserName)
+    val userLoggerFactory = loggerFactory.append("endUserParty", key.endUserParty.toString)
     // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
     // without the entire node going down.
     val userRetryProvider =
@@ -206,23 +218,23 @@ class UserWalletManager(
       participantId,
       ingestFromParticipantBegin,
       Option.when(endUserParty == store.walletKey.validatorParty)(validatorTopupConfig),
-      walletSweep.get(endUserName),
-      autoAcceptTransfers.get(endUserName),
+      // TODO(#12126): Use PartyId instead of String, so that config mistakes show on startup
+      // TODO(#12554): make it easier to configure the sweep functionality and guard better against operator errors (typos, etc.)
+      walletSweep.get(endUserParty.toProtoPrimitive),
+      autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
     )
     (userRetryProvider, walletService)
   }
 
-  def offboardUser(username: String): PartyId = {
-    removeEndUserWallet(username) match {
+  def offboardUserParty(userParty: PartyId) = {
+    removeEndUserPartyWallet(userParty) match {
       case None =>
         throw Status.NOT_FOUND
-          .withDescription(s"No wallet service found for user ${username}")
+          .withDescription(show"No wallet service found for user party ${userParty}")
           .asRuntimeException()
       case Some((userRetryProvider, walletService)) =>
-        val endUserParty = walletService.store.key.endUserParty
         userRetryProvider.close()
         walletService.close()
-        endUserParty
     }
   }
 
@@ -248,28 +260,17 @@ class UserWalletManager(
           ]
         ]]
       ] = hostedUsers.toSeq
-        .map(u =>
-          store.lookupInstallByParty(u).flatMap {
+        .map(endUserParty =>
+          // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
+          this.lookupEndUserPartyWallet(endUserParty) match {
             case None =>
-              // This can happen if the ingestion of the corresponding WalletAppInstall contract
-              // has not yet completed. Ignoring the reward is perfectly fine, we
-              // will pick it up next time.
               logger.info(
-                s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract, ignoring."
+                show"Might miss validator rewards as the UserWalletStore for end-user party ${endUserParty} is not (yet) setup."
               )
               Future.successful(Seq.empty)
-            case Some(install) =>
-              // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
-              this.lookupUserWallet(install.payload.endUserName) match {
-                case None =>
-                  logger.info(
-                    s"Might miss validator rewards as the UserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
-                  )
-                  Future.successful(Seq.empty)
-                case Some(walletOfHostedUser) =>
-                  walletOfHostedUser.store
-                    .listSortedValidatorRewards(activeIssuingRounds, limit)
-              }
+            case Some(walletOfHostedUser) =>
+              walletOfHostedUser.store
+                .listSortedValidatorRewards(activeIssuingRounds, limit)
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
@@ -279,10 +280,10 @@ class UserWalletManager(
       validatorRewardCoupons.flatten,
     )
 
-  override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)
+  override def isHealthy: Boolean = endUserPartyWalletsMap.values.forall(_._2.isHealthy)
 
   override def close(): Unit = Lifecycle.close(
     // per-user retry providers should have been closed by the shutdown signal, so only closing the services here
-    endUserWalletsMap.values.map(_._2).toSeq*
+    endUserPartyWalletsMap.values.map(_._2).toSeq*
   )(logger)
 }
