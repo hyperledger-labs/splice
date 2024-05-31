@@ -196,6 +196,7 @@ class UpdateHistoryTest
               Seq(party1),
               domain1,
               "workflowId",
+              recordTime = defaultEffectiveAt.plusMillis(i.toLong),
             )
           )
         )
