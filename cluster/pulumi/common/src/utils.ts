@@ -217,3 +217,7 @@ export function sanitizedForHelm(value: string): string {
 export function sanitizedForPostgres(value: string): string {
   return value.replaceAll('-', '_');
 }
+
+export function conditionalString(condition: boolean, value: string): string {
+  return condition ? value : '';
+}

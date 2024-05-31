@@ -1,8 +1,10 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_NAME, config } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'cn-pulumi-common';
 
 import { slackToken } from './alertings';
+
+const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
 export function installGcpLoggingAlerts(): void {
   const slackAlertNotificationChannel =
@@ -51,7 +53,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -UnresolvedAddressException
 -(resource.labels.container_name="sequencer-pg" AND ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
--(resource.labels.namespace_name="multi-validator" AND jsonPayload.message="SEQUENCER_SUBSCRIPTION_LOST")`,
+${conditionalString(enableChaosMesh, '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")')}`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',
@@ -72,6 +74,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
     },
   });
 
+  const alertCount = enableChaosMesh ? 50 : 1;
   new gcp.monitoring.AlertPolicy('logsAlert', {
     alertStrategy: {
       autoClose: '3600s',
@@ -82,20 +85,23 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
         conditionThreshold: {
           aggregations: [
             {
-              alignmentPeriod: '600s',
+              //query period
+              // if the chaos mesh is enabled we expand the query period to 1 hour to avoid false positives when the mesh is running
+              alignmentPeriod: enableChaosMesh ? '3600s' : '600s',
               crossSeriesReducer: 'REDUCE_SUM',
               groupByFields: ['metric.label.cluster'],
               perSeriesAligner: 'ALIGN_SUM',
             },
           ],
           comparison: 'COMPARISON_GT',
+          //retest period
           duration: '300s',
-          filter: pulumi.interpolate`resource.type="k8s_container" AND resource.labels.namespace_name != "sv-4" AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
+          filter: pulumi.interpolate`resource.type="k8s_container" ${conditionalString(enableChaosMesh, 'AND resource.labels.namespace_name != "sv-4" ')} AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
           trigger: {
-            count: 1,
+            count: alertCount,
           },
         },
-        displayName: `Log warnings and errors > 0 ${CLUSTER_BASENAME}`,
+        displayName: `Log warnings and errors > ${alertCount} ${CLUSTER_BASENAME}`,
       },
     ],
     displayName: 'Log warnings and errors',
