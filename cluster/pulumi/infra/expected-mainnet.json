@@ -1836,10 +1836,23 @@
       },
       "values": {
         "alertmanager": {
-          "alertmanagerSpec": {
-            "externalUrl": "https://alertmanager.global.canton.network.digitalasset.com"
-          },
           "config": {
+            "alertmanagerSpec": {
+              "externalUrl": "https://alertmanager.global.canton.network.digitalasset.com",
+              "volumeClaimTemplate": {
+                "spec": {
+                  "accessModes": [
+                    "ReadWriteOnce"
+                  ],
+                  "resources": {
+                    "requests": {
+                      "storage": "5Gi"
+                    }
+                  },
+                  "storageClassName": "standard-rwo"
+                }
+              }
+            },
             "receivers": [
               {
                 "name": "null"
