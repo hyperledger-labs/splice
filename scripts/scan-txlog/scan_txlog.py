@@ -11,6 +11,7 @@ import requests
 import textwrap
 from typing import Optional
 import sys
+import argparse
 
 cli_handler = colorlog.StreamHandler()
 cli_handler.setFormatter(
@@ -1944,14 +1945,32 @@ class PerPartyBalance:
 
 
 def main():
-    url = sys.argv[1] if len(sys.argv) == 2 else "http://localhost:5012"
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Reads the update history from a given Splice Scan server."
+    )
+    parser.add_argument('scan_url', help="Address of the Splice Scan server", default="http://localhost:5012")
+    parser.add_argument('--loglevel', help="Sets the log level", default="INFO")
+    args = parser.parse_args()
+
+    # Set up logging
     logger = colorlog.getLogger("scan_txlog")
     logger.addHandler(cli_handler)
     logger.addHandler(file_handler)
-    logger.setLevel("INFO")
+    logger.setLevel(args.loglevel)
+
+    # Set up exception handling (write unhandled exceptions to log)
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+
+        logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    sys.excepthook = handle_exception
+
     state = State(logger, {}, None)
     per_round_states = {}
-    scan_client = ScanClient(url, 100)
+    scan_client = ScanClient(args.scan_url, 100)
     last_record_time = None
     while True:
         batch = scan_client.updates(last_record_time)

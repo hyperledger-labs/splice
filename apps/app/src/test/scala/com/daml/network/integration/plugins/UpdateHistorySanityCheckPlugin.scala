@@ -44,6 +44,8 @@ class UpdateHistorySanityCheckPlugin(protected val loggerFactory: NamedLoggerFac
                   "python",
                   "scripts/scan-txlog/scan_txlog.py",
                   scan.httpClientConfig.url.toString(),
+                  "--loglevel",
+                  "DEBUG",
                 )
               )
               .!(errorProcessor)
