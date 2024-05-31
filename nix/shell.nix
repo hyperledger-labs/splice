@@ -57,6 +57,7 @@ in pkgs.mkShell {
                                      }))
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
+    python3Packages.colorlog
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
