@@ -20,7 +20,7 @@ groups:
                 uid: prometheus
               editorMode: code
               exemplar: true
-              expr: stacks_failing
+              expr: cn_deployment_pulumi_stack_status{state="failed"}
               format: time_series
               instant: true
               interval: ""
@@ -58,16 +58,47 @@ groups:
               refId: D
               type: threshold
         dashboardUid: QP_wDqDnz
-        panelId: 6
+        panelId: 11
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          __dashboardUid__: QP_wDqDnz
+          __panelId__: "11"
+          description: The pulumi operator failed to update the {{ $labels.stack }} stack. Check the logs for the deployment.
+          runbook_url: ""
+          summary: '{{ $labels.stack }} stack failed to update'
+        labels:
+          "": ""
+        isPaused: false
+      - uid: bdndg5g3x4kxsf
+        title: Deployments running
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: cn_deployment_pulumi_stack_condition{type="Reconciling"}
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+        dashboardUid: QP_wDqDnz
+        panelId: 27
         noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
           __dashboardUid__: QP_wDqDnz
-          __panelId__: "6"
-          description: The pulumi operator failed to update the {{ $labels.name }} stack. Check the logs for the deployment.
-          runbook_url: ""
-          summary: '{{ $labels.name }} stack failed to update'
-        labels:
-          "": ""
+          __panelId__: "27"
+          description: A deployment is currently running for the {{ $labels.stack }} stack.
+          severity: info
+          summary: Stack {{ $labels.stack }} is being updated
+        labels: {}
         isPaused: false

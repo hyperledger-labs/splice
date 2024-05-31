@@ -208,16 +208,16 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                   ]
                 : []),
             ],
-            alertmanagerSpec: {
-              externalUrl: alertManagerExternalUrl,
-              volumeClaimTemplate: {
-                spec: {
-                  storageClassName: 'standard-rwo',
-                  accessModes: ['ReadWriteOnce'],
-                  resources: {
-                    requests: {
-                      storage: '5Gi',
-                    },
+          },
+          alertmanagerSpec: {
+            externalUrl: alertManagerExternalUrl,
+            volumeClaimTemplate: {
+              spec: {
+                storageClassName: 'standard-rwo',
+                accessModes: ['ReadWriteOnce'],
+                resources: {
+                  requests: {
+                    storage: '5Gi',
                   },
                 },
               },
