@@ -26,7 +26,7 @@ const receiver = new k8s.apiextensions.CustomResource(
     },
     spec: {
       type: 'slack',
-      channel: config.requireEnv('SLACK_DEPLOYMENT_ALERT_NOTIFICATION_CHANNEL'),
+      channel: config.requireEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME'),
       address: 'https://slack.com/api/chat.postMessage',
       secretRef: { name: slackToken.metadata.name },
     },

@@ -520,7 +520,7 @@
       },
       "spec": {
         "address": "https://slack.com/api/chat.postMessage",
-        "channel": "slack_channel",
+        "channel": "team-canton-network-dev-testnet-deployment",
         "secretRef": {
           "name": "slack"
         },

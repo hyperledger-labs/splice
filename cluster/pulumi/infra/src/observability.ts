@@ -19,6 +19,7 @@ import {
   COMETBFT_RETAIN_BLOCKS,
 } from 'cn-pulumi-common';
 
+import { enableAlerts, slackAlertNotificationChannel, slackToken } from './alertings';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
@@ -107,11 +108,8 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const enableAlerts = config.envFlag('GCP_CLUSTER_PROD_LIKE');
 const disablePrometheusAlerts = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
 const shouldIgnoreNoDataOrDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
-const slackAlertNotificationChannel =
-  config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
@@ -126,9 +124,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   );
   const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '58.5.1';
-  const prometheusStackCrdVersion = '0.73.2';
+  const stackVersion = '59.0.0';
+  const prometheusStackCrdVersion = '0.74.0';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
+
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
@@ -194,7 +193,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                           send_resolved: true,
                           http_config: {
                             authorization: {
-                              credentials: config.requireEnv('SLACK_ACCESS_TOKEN'),
+                              credentials: slackToken(),
                             },
                           },
                           title: '{{ template "slack_title" . }}',
@@ -640,7 +639,7 @@ function createGrafanaContactPoints(namespace: Input<string>) {
       data: {
         'slackContactPoint.yaml': Buffer.from(
           readGrafanaAlertingFile('slack_contact_point.yaml')
-            .replaceAll('$SLACK_ACCESS_TOKEN', config.requireEnv('SLACK_ACCESS_TOKEN'))
+            .replaceAll('$SLACK_ACCESS_TOKEN', slackToken())
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
         ).toString('base64'),
       },

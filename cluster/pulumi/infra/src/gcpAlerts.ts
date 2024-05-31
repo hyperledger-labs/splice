@@ -1,0 +1,104 @@
+import * as gcp from '@pulumi/gcp';
+import * as pulumi from '@pulumi/pulumi';
+import { CLUSTER_BASENAME, CLUSTER_NAME, config } from 'cn-pulumi-common';
+
+import { slackToken } from './alertings';
+
+export function installGcpLoggingAlerts(): void {
+  const slackAlertNotificationChannel =
+    config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
+    'team-canton-network-internal-alerts';
+  const notificationChannel = new gcp.monitoring.NotificationChannel(
+    slackAlertNotificationChannel,
+    {
+      displayName: `${CLUSTER_BASENAME} Slack Alert Notification Channel`,
+      type: 'slack',
+      labels: {
+        channel_name: `#${slackAlertNotificationChannel}`,
+      },
+      sensitiveLabels: {
+        authToken: slackToken(),
+      },
+    }
+  );
+  const logWarningsMetric = new gcp.logging.Metric('log_warnings', {
+    name: `log_warnings_${CLUSTER_BASENAME}`,
+    description: 'Logs with a severity level of warning or above',
+    filter: `severity>=WARNING
+resource.type="k8s_container"
+resource.labels.cluster_name="${CLUSTER_NAME}"
+resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
+-(resource.labels.container_name="participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
+-- https://github.com/DACH-NY/canton-network-node/issues/10475
+-(resource.labels.container_name="cometbft" AND jsonPayload.err="error adding vote")
+-(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopping peer for error")
+-(resource.labels.container_name="cometbft" AND jsonPayload._msg="Failed to write PacketMsg")
+-- execution context overload
+-jsonPayload.message=~"Task runner canton-env-ec is .* overloaded.*"
+-- on startup
+-textPayload=~"Picked up JAVA_TOOL_OPTIONS:.*"
+-resource.labels.container_name="cns-web-ui"
+-resource.labels.container_name="wallet-web-ui"
+-resource.labels.container_name="scan-web-ui"
+-resource.labels.container_name="sv-web-ui"
+-resource.labels.container_name="splitwell-web-ui"
+-(resource.labels.container_name="cometbft" AND textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'")
+-- sequencer down
+-(resource.labels.namespace_name=~"validator.*|splitwell" AND resource.labels.container_name="participant" AND jsonPayload.message=~".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE, .* for 'sequencer-health-check-service'")
+-resource.labels.container_name=~".*pg-.*-e"
+-UnknownHostException
+-"Late processing (or clock skew) of batch"
+-UnresolvedAddressException
+-(resource.labels.container_name="sequencer-pg" AND ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
+-(resource.labels.container_name="cometbft" AND jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
+-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message="SEQUENCER_SUBSCRIPTION_LOST")`,
+    labelExtractors: {
+      cluster: 'EXTRACT(resource.labels.cluster_name)',
+      namespace: 'EXTRACT(resource.labels.namespace_name)',
+    },
+    metricDescriptor: {
+      labels: [
+        {
+          description: 'Pod namespace',
+          key: 'namespace',
+        },
+        {
+          description: 'Cluster name',
+          key: 'cluster',
+        },
+      ],
+      metricKind: 'DELTA',
+      valueType: 'INT64',
+    },
+  });
+
+  new gcp.monitoring.AlertPolicy('logsAlert', {
+    alertStrategy: {
+      autoClose: '3600s',
+    },
+    combiner: 'OR',
+    conditions: [
+      {
+        conditionThreshold: {
+          aggregations: [
+            {
+              alignmentPeriod: '600s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              groupByFields: ['metric.label.cluster'],
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          duration: '300s',
+          filter: pulumi.interpolate`resource.type="k8s_container" AND resource.labels.namespace_name != "sv-4" AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
+          trigger: {
+            count: 1,
+          },
+        },
+        displayName: `Log warnings and errors > 0 ${CLUSTER_BASENAME}`,
+      },
+    ],
+    displayName: 'Log warnings and errors',
+    notificationChannels: [notificationChannel.name],
+  });
+}

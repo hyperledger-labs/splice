@@ -1689,6 +1689,76 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "description": "Logs with a severity level of warning or above",
+      "filter": "severity>=WARNING\nresource.type=\"k8s_container\"\nresource.labels.cluster_name=\"cn-testnet\"\nresource.labels.namespace_name=~\"sv.*|validator.*|splitwell\"\n-(resource.labels.container_name=\"participant\" AND jsonPayload.message=~\"Instrument .* has recorded multiple values for the same attributes.\")\n-- https://github.com/DACH-NY/canton-network-node/issues/10475\n-(resource.labels.container_name=\"cometbft\" AND jsonPayload.err=\"error adding vote\")\n-(resource.labels.container_name=\"cometbft\" AND jsonPayload._msg=\"Stopping peer for error\")\n-(resource.labels.container_name=\"cometbft\" AND jsonPayload._msg=\"Failed to write PacketMsg\")\n-- execution context overload\n-jsonPayload.message=~\"Task runner canton-env-ec is .* overloaded.*\"\n-- on startup\n-textPayload=~\"Picked up JAVA_TOOL_OPTIONS:.*\"\n-resource.labels.container_name=\"cns-web-ui\"\n-resource.labels.container_name=\"wallet-web-ui\"\n-resource.labels.container_name=\"scan-web-ui\"\n-resource.labels.container_name=\"sv-web-ui\"\n-resource.labels.container_name=\"splitwell-web-ui\"\n-(resource.labels.container_name=\"cometbft\" AND textPayload=\"cp: not replacing '/cometbft/data/priv_validator_state.json'\")\n-- sequencer down\n-(resource.labels.namespace_name=~\"validator.*|splitwell\" AND resource.labels.container_name=\"participant\" AND jsonPayload.message=~\".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE, .* for 'sequencer-health-check-service'\")\n-resource.labels.container_name=~\".*pg-.*-e\"\n-UnknownHostException\n-\"Late processing (or clock skew) of batch\"\n-UnresolvedAddressException\n-(resource.labels.container_name=\"sequencer-pg\" AND (\"checkpoints are occurring too frequently\" OR \"Consider increasing the configuration parameter \\\"max_wal_size\\\".\"))\n-(resource.labels.container_name=\"cometbft\" AND jsonPayload._msg=\"Error stopping connection\" AND jsonPayload.err=\"already stopped\")\n-(resource.labels.namespace_name=\"multi-validator\" AND jsonPayload.message=\"SEQUENCER_SUBSCRIPTION_LOST\")",
+      "labelExtractors": {
+        "cluster": "EXTRACT(resource.labels.cluster_name)",
+        "namespace": "EXTRACT(resource.labels.namespace_name)"
+      },
+      "metricDescriptor": {
+        "labels": [
+          {
+            "description": "Pod namespace",
+            "key": "namespace"
+          },
+          {
+            "description": "Cluster name",
+            "key": "cluster"
+          }
+        ],
+        "metricKind": "DELTA",
+        "valueType": "INT64"
+      },
+      "name": "log_warnings_test"
+    },
+    "name": "log_warnings",
+    "provider": "",
+    "type": "gcp:logging/metric:Metric"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s"
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionThreshold": {
+            "aggregations": [
+              {
+                "alignmentPeriod": "600s",
+                "crossSeriesReducer": "REDUCE_SUM",
+                "groupByFields": [
+                  "metric.label.cluster"
+                ],
+                "perSeriesAligner": "ALIGN_SUM"
+              }
+            ],
+            "comparison": "COMPARISON_GT",
+            "duration": "300s",
+            "filter": "resource.type=\"k8s_container\" AND resource.labels.namespace_name != \"sv-4\" AND metric.type = \"logging.googleapis.com/user/log_warnings_test\"",
+            "trigger": {
+              "count": 1
+            }
+          },
+          "displayName": "Log warnings and errors > 0 test"
+        }
+      ],
+      "displayName": "Log warnings and errors",
+      "notificationChannels": [
+        null
+      ]
+    },
+    "name": "logsAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "logConfig": {
         "enable": true,
         "filter": "ERRORS_ONLY"
@@ -2121,7 +2191,7 @@
           }
         }
       },
-      "version": "58.5.1"
+      "version": "59.0.0"
     },
     "name": "observability-metrics",
     "provider": "",
@@ -3205,6 +3275,23 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "displayName": "test Slack Alert Notification Channel",
+      "labels": {
+        "channel_name": "#team-canton-network-dev-testnet-deployment"
+      },
+      "sensitiveLabels": {
+        "authToken": "s3cr3t"
+      },
+      "type": "slack"
+    },
+    "name": "team-canton-network-dev-testnet-deployment",
+    "provider": "",
+    "type": "gcp:monitoring/notificationChannel:NotificationChannel"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "managedZone": "prod-networks",
       "name": "public.test-stack.global.canton.network.digitalasset.com.",
       "project": "da-gcp-canton-domain",
@@ -3315,9 +3402,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "bash prometheus-crd-update.sh 0.73.2"
+      "create": "bash prometheus-crd-update.sh 0.74.0"
     },
-    "name": "update-prometheus-crd-0.73.2",
+    "name": "update-prometheus-crd-0.74.0",
     "provider": "",
     "type": "command:local:Command"
   },

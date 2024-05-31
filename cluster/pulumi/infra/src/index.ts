@@ -1,8 +1,10 @@
 // ensure the config is loaded and the ENV is overriden
 import { config } from 'cn-pulumi-common';
 
+import { enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { clusterBasename } from './config';
+import { installGcpLoggingAlerts } from './gcpAlerts';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
@@ -19,6 +21,9 @@ const istio = configureIstio(network.ingressNs, ingressIp, network.publicIngress
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = [network, istio];
 configureObservability(observabilityDependsOn);
+if (enableAlerts) {
+  installGcpLoggingAlerts();
+}
 
 configureStorage();
 
