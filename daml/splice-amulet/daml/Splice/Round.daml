@@ -1,0 +1,123 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Round where
+
+import DA.Optional (fromOptional)
+
+import Splice.AmuletConfig
+import Splice.Types
+import Splice.Issuance
+
+import Splice.Util
+
+import DA.Time
+
+-- | A mining round for which new rewards can be registered.
+-- Note that multiple mining rounds can be open at the same time to give some
+-- time for propagating a new open round, while still registering rewards
+-- against the previous open round.
+template OpenMiningRound
+  with
+    dso : Party
+    round : Round
+    amuletPrice : Decimal
+    opensAt : Time -- ^ Time after which transfers can use this mining round
+    targetClosesAt : Time -- ^ Time when this round is expected to be closed as part of standard DSO. The round SHOULD NOT be archived before this time.
+    issuingFor : RelTime -- ^ Timepoint on the issuance curve that was used to determing the issuance configuration for this round.
+    transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for Amulet transfers
+    issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+  where
+    signatory dso
+    ensure isDefinedRound round
+
+    nonconsuming choice OpenMiningRound_Fetch : OpenMiningRound
+      with
+        p : Party
+      controller p
+      do pure this
+
+-- | A mining round for which the total sum of registered rewards
+-- is being computed. Rewards can no longer be registered aginst such a round.
+template SummarizingMiningRound
+  with
+    dso : Party
+    round : Round
+    amuletPrice : Decimal
+    issuanceConfig : IssuanceConfig
+    tickDuration : RelTime
+  where
+    signatory dso
+    ensure isDefinedRound round
+
+-- | A mining round for whose rewards amulets are being issued.
+template IssuingMiningRound
+  with
+    dso : Party
+    round : Round
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    opensAt : Time-- ^ Time after which rewards from this mining round can be collected
+    targetClosesAt : Time -- ^ Time when this round is expected to close during standard DSO. The round SHOULD NOT be archived before this time.
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
+  where
+    signatory dso
+    ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon : IssuingMiningRound -> Decimal
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
+
+-- | A record that a specific mining round has been closed, which can
+-- be used to archive expired rewards.
+template ClosedMiningRound
+  with
+    dso : Party
+    round : Round
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
+  where
+    signatory dso
+    ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon : ClosedMiningRound -> Decimal
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
+
+
+-- instances
+------------
+
+instance HasCheckedFetch OpenMiningRound ForDso where
+  contractGroupId OpenMiningRound with dso; .. = ForDso with dso
+
+instance HasCheckedFetch OpenMiningRound ForRound where
+  contractGroupId OpenMiningRound with dso; round; .. = ForRound with dso; round
+
+instance HasCheckedFetch SummarizingMiningRound ForDso where
+  contractGroupId SummarizingMiningRound with dso; .. = ForDso with dso
+
+instance HasCheckedFetch SummarizingMiningRound ForRound where
+  contractGroupId SummarizingMiningRound with dso; round; .. = ForRound with dso; round
+
+instance HasCheckedFetch IssuingMiningRound ForDso where
+  contractGroupId IssuingMiningRound with dso; .. = ForDso with dso
+
+instance HasCheckedFetch IssuingMiningRound ForRound where
+  contractGroupId IssuingMiningRound with dso; round; .. = ForRound with dso; round
+
+instance HasCheckedFetch ClosedMiningRound ForDso where
+  contractGroupId ClosedMiningRound with dso; .. = ForDso with dso
+
+instance HasCheckedFetch ClosedMiningRound ForRound where
+  contractGroupId ClosedMiningRound with dso; round; .. = ForRound with dso; round

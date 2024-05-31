@@ -1,0 +1,20 @@
+sdk-version: 3.0.0-snapshot.20240318.12913.0.v1c415c97
+name: splice-dso-governance
+source: daml
+version: 0.1.2
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+- ../splice-amulet/.daml/dist/splice-amulet-current.dar
+- ../splice-amulet-name-service/.daml/dist/splice-amulet-name-service-current.dar
+- ../splice-util/.daml/dist/splice-util-current.dar
+- ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
+build-options:
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --target=2.1
+codegen:
+  java:
+    package-prefix: com.daml.network.codegen.java
+    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

@@ -1,0 +1,86 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Schedule where
+
+-- TODO(tech-debt): move this into utility library
+
+import DA.Functor ()
+import DA.List (dedupSort, head)
+
+-- | A schedule of values that change over time.
+data Schedule t a = Schedule with
+    initialValue : a -- ^ Initial value to use until the future values come into effect.
+    futureValues : [(t, a)] -- ^ sorted in ascending order
+  deriving (Eq, Show)
+
+instance Functor (Schedule t) where
+  fmap f (Schedule{..}) = Schedule with
+    initialValue = f initialValue
+    futureValues = [ (t, f x) | (t, x) <- futureValues]
+
+-- | Get the value as of a specific time
+getValueAsOf : Ord t => t -> Schedule t a -> a
+getValueAsOf time schedule =
+  case schedule.futureValues of
+    [] -> schedule.initialValue
+    ((effectiveAsOf, value) :: futureValues)
+      | time < effectiveAsOf ->
+          -- all future values are effective later than our time of interest
+          schedule.initialValue
+      | otherwise ->
+          getValueAsOf time Schedule with initialValue = value; futureValues
+
+-- | Check the validity of a schedule given a function to check the validity of its values
+validSchedule : Ord t => Schedule t a -> (a -> Bool) -> Bool
+validSchedule schedule validateValue =
+    dedupSort ts == ts
+  && all validateValue (allValues schedule)
+  where
+    ts = map fst schedule.futureValues
+
+allValues : Schedule t a -> [a]
+allValues schedule = schedule.initialValue :: map snd schedule.futureValues
+
+nextChangeScheduledAt : Schedule t a -> Optional t
+nextChangeScheduledAt schedule
+  | null schedule.futureValues = None
+  | otherwise = Some (fst(head schedule.futureValues))
+
+prune : Ord t => t -> Schedule t a -> Schedule t a
+prune now schedule = Schedule with
+      initialValue = getValueAsOf now schedule
+      futureValues = dropWhile (\(time, _) -> time < now) schedule.futureValues
+
+splitAtTime : Ord t => [(t, a)] -> t -> ([(t, a)], Optional (t, a), [(t, a)])
+splitAtTime futureValues time =
+  case partition (\(t, _) -> t < time) futureValues of
+    (prefix, (t, x) :: suffix) | t == time -> (prefix, Some (t, x), suffix)
+    (prefix, suffix) -> (prefix, None, suffix)
+
+insert : Ord t => (t, a) -> Schedule t a -> Schedule t a
+insert item schedule =
+  let (prefix, elem, suffix) = splitAtTime schedule.futureValues item._1
+  in case elem of
+    Some(_) -> error "A future value is already defined at this time."
+    None -> Schedule with
+      initialValue = schedule.initialValue
+      futureValues = prefix ++ [item] ++ suffix
+
+remove : Ord t => t -> Schedule t a -> Schedule t a
+remove time schedule =
+  let (prefix, elem, suffix) = splitAtTime schedule.futureValues time
+  in case elem of
+    Some(_) -> Schedule with
+      initialValue = schedule.initialValue
+      futureValues = prefix ++ suffix
+    None -> error "Future value to remove was not found."
+
+update : Ord t => (t, a) -> Schedule t a -> Schedule t a
+update item schedule =
+  let (prefix, elem, suffix) = splitAtTime schedule.futureValues item._1
+  in case elem of
+    Some(_) -> Schedule with
+      initialValue = schedule.initialValue
+      futureValues = prefix ++ [item] ++ suffix
+    None -> error "No future value was found at this time."

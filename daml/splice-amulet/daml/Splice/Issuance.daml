@@ -1,0 +1,171 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Amulet rewards issuance configuration and computation.
+module Splice.Issuance where
+
+import DA.Optional
+import DA.Time
+
+import Splice.Schedule
+
+import Splice.Util (require)
+
+
+-- issuance curve
+-----------------
+
+data IssuanceConfig = IssuanceConfig with
+    amuletToIssuePerYear : Decimal
+    validatorRewardPercentage : Decimal
+    appRewardPercentage : Decimal
+    validatorRewardCap : Decimal
+    featuredAppRewardCap : Decimal
+    unfeaturedAppRewardCap : Decimal
+    optValidatorFaucetCap : Optional Decimal
+      -- ^ Maximal amount in $ for the per-validator issuance of validator faucet coupons;
+      -- Introduced as part of CIP-3. Defaults to 2.85 USD.
+  deriving (Eq, Show)
+
+-- | Getter with the right default value for the validator faucet cap.
+-- Use this consistently instead of accessing the field directly.
+getValidatorFaucetCap : IssuanceConfig -> Decimal
+getValidatorFaucetCap = fromOptional 2.85 . (.optValidatorFaucetCap)
+
+validIssuanceCurve : Schedule RelTime IssuanceConfig -> Bool
+validIssuanceCurve configSchedule = validSchedule configSchedule validIssuanceConfig
+
+validIssuanceConfig : IssuanceConfig -> Bool
+validIssuanceConfig this@IssuanceConfig{..} =
+       amuletToIssuePerYear > 0.0
+    && validatorRewardPercentage >= 0.0
+    && appRewardPercentage >= 0.0
+    && validatorRewardCap >= 0.0
+    && featuredAppRewardCap >= 0.0
+    && unfeaturedAppRewardCap >= 0.0
+    && getValidatorFaucetCap this >= 0.0
+
+
+-- computation of issuance per round
+------------------------------------
+
+-- | A summary of total reward coupons issued against a specific open mining round.
+data OpenMiningRoundSummary = OpenMiningRoundSummary with
+    totalValidatorRewardCoupons : Decimal
+    totalFeaturedAppRewardCoupons : Decimal
+    totalUnfeaturedAppRewardCoupons : Decimal
+    totalSvRewardWeight : Int
+    optTotalValidatorFaucetCoupons : Optional Int
+      -- ^ Introduced as part of CIP-3.
+  deriving (Eq, Show)
+
+getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Int
+getTotalValidatorFaucetCoupons = fromOptional 0 . (.optTotalValidatorFaucetCoupons)
+
+-- | Parameters to use in a round that issues amulet as rewards for collected coupons.
+data IssuingRoundParameters = IssuingRoundParameters with
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    unclaimedAppRewards : Decimal
+    unclaimedValidatorRewards : Decimal
+    unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
+    issuancePerValidatorFaucetCoupon : Decimal
+  deriving (Eq, Show)
+
+validateOpenMiningRoundSummary : CanAssert m => OpenMiningRoundSummary -> m ()
+validateOpenMiningRoundSummary summary = do
+    require "totalValidatorRewardCoupons >= 0.0" (summary.totalValidatorRewardCoupons >= 0.0)
+    require "totalFeaturedAppRewardCoupons >= 0.0" (summary.totalFeaturedAppRewardCoupons >= 0.0)
+    require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
+    require "totalValidatorFaucetCoupons >= 0" (getTotalValidatorFaucetCoupons summary >= 0)
+
+computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
+computeIssuingRoundParameters tickDuration amuletPrice config summary =
+    IssuingRoundParameters with
+      issuancePerValidatorRewardCoupon = validatorRewardIssuance.issuancePerCoupon
+      issuancePerUnfeaturedAppRewardCoupon = unfeaturedAppIssuance.issuancePerCoupon
+      issuancePerFeaturedAppRewardCoupon =
+        unfeaturedAppIssuance.issuancePerCoupon + featuredAppIssuance.issuancePerCoupon
+      issuancePerSvRewardCoupon
+      unclaimedValidatorRewards = validatorFaucetIssuance.unclaimedRewards
+      unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
+      unclaimedSvRewards
+      issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
+  where
+    amuletsToIssueToSvs =
+      amuletsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
+
+    issuancePerSvRewardCoupon =
+      if summary.totalSvRewardWeight == 0
+        then amuletsToIssueToSvs -- signal what could be earned with one coupon in this round
+        else amuletsToIssueToSvs / intToDecimal summary.totalSvRewardWeight
+
+    -- As noted in `computeIssuanceTranche` below, Decimal uses HalfEven rounding on division and multiplication,
+    -- which means that for a fully subscribed SV issuance, there is a rounding error of up to 0.5e-10 * 2.4e6 = 0.00012.
+    -- This is 1.2 USD at the high price of 10k USD per amulet, which we accept as it does not meaningfully affect the tokenomics.
+    unclaimedSvRewards =
+      max 0.0 $ amuletsToIssueToSvs - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
+
+    roundsPerYear =
+      intToDecimal (convertRelTimeToMicroseconds (days 365)) /
+      intToDecimal (convertRelTimeToMicroseconds tickDuration)
+    amuletsToIssueInRound = config.amuletToIssuePerYear / roundsPerYear
+
+    validatorRewardIssuance = computeIssuanceTranche
+      (amuletsToIssueInRound * config.validatorRewardPercentage)
+      config.validatorRewardCap
+      summary.totalValidatorRewardCoupons
+
+    -- validator faucets receive the remainder of the validator tranche
+    validatorFaucetIssuance = computeIssuanceTranche
+      validatorRewardIssuance.unclaimedRewards
+      (getValidatorFaucetCap config / amuletPrice)
+      (intToDecimal $ getTotalValidatorFaucetCoupons summary)
+
+    unfeaturedAppIssuance = computeIssuanceTranche
+      (amuletsToIssueInRound * config.appRewardPercentage)
+      config.unfeaturedAppRewardCap
+      (summary.totalFeaturedAppRewardCoupons + summary.totalUnfeaturedAppRewardCoupons)
+
+    -- featured apps receive the normal unfeatured app rewards plus
+    -- the remainder of the rewards not claimed by the unfeatured app rewards issuance
+    -- while respecting their total cap
+    featuredAppIssuance = computeIssuanceTranche
+      unfeaturedAppIssuance.unclaimedRewards
+      (config.featuredAppRewardCap - config.unfeaturedAppRewardCap)  -- adjusted cap
+      summary.totalFeaturedAppRewardCoupons
+
+data IssuanceTranche = IssuanceTranche with
+  rewardsToIssue : Decimal -- ^ Total amulets to issue as rewards in this tranche
+  issuancePerCoupon : Decimal -- ^ Issuence per reward coupon for this tranche
+  unclaimedRewards : Decimal -- ^ Amulets to issue in this tranche that were not claimed
+
+-- | `computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons`
+--
+-- computes parameters that issue as many rewards per coupon as possible up to
+-- a maximum of `capPerCoupon` amulets.
+computeIssuanceTranche : Decimal -> Decimal -> Decimal -> IssuanceTranche
+computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons
+  | totalCoupons <= 0.0 = IssuanceTranche with
+      rewardsToIssue
+      issuancePerCoupon = capPerCoupon  -- signal what could be earned with one coupon in this round
+      unclaimedRewards = rewardsToIssue
+  | otherwise =
+      let
+        scaledTotalCoupons = capPerCoupon * totalCoupons
+        cappedRewardsToIssue = min rewardsToIssue scaledTotalCoupons
+        issuancePerCoupon =
+          -- note: no risk of overflow, as rewardsToIssue * capPerCoupon is always way below the largest Decimal
+          (cappedRewardsToIssue * capPerCoupon) / scaledTotalCoupons
+
+        -- Decimal uses HalfEven rounding on division and multiplication, which means that when rounding up there is a
+        -- rounding error of up to 0.5e-10 * rewardsToIssue. We accept this as it does not meaningfully affect the
+        -- tokenomics; and is in favor of the rewardees.
+        --
+        -- There are obviously no unclaimed rewards when over-issuing.
+        unclaimedRewards = max 0.0 $ rewardsToIssue - issuancePerCoupon * totalCoupons
+      in
+        IssuanceTranche with ..
+

@@ -1,0 +1,38 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- Base types for Amulet and all related modules.
+module Splice.Types where
+
+
+newtype Round = Round with number : Int
+  deriving (Eq, Show, Ord)
+
+-- | Check if a round has a positive round number
+isDefinedRound : Round -> Bool
+isDefinedRound round = round.number >= 0
+
+
+-- | The group of contracts managed by the DSO party.
+--
+-- Used for checked fetches.
+data ForDso = ForDso with
+    dso : Party
+  deriving (Eq, Show)
+
+
+-- | The group of contracts managed by the DSO party for a specific mining round.
+--
+-- Used for checked fetches.
+data ForRound = ForRound with
+    dso : Party
+    round : Round
+  deriving (Eq, Show)
+
+-- | The group of contracts managed by the DSO party and owned by a specific party.
+--
+-- Used for checked fetches.
+data ForOwner = ForOwner with
+    dso : Party
+    owner : Party
+  deriving (Eq, Show)

@@ -1,0 +1,20 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.RelRound where
+
+import Splice.Types (Round(..))
+
+-- Round utilities
+------------------
+
+-- | The equivalent of RelTime for rounds, i.e., a delta between
+-- two rounds
+newtype RelRound = RelRound with diff : Int
+  deriving (Eq, Ord, Show)
+
+addRelRound : Round -> RelRound -> Round
+addRelRound round i = Round with number = round.number + i.diff
+
+subRound : Round -> Round -> RelRound
+subRound (Round a) (Round b) = RelRound (a - b)

@@ -1,0 +1,321 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Ans where
+
+import DA.Action (void)
+import DA.Time
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Wallet.Payment
+import Splice.Wallet.Subscriptions
+import Splice.Util
+
+data AnsRules_RequestEntryResult = AnsRules_RequestEntryResult
+  with
+    entryCid : ContractId AnsEntryContext
+    requestCid : ContractId SubscriptionRequest
+
+data AnsRules_CollectInitialEntryPaymentResult = AnsRules_CollectInitialEntryPaymentResult
+  with
+    entryCid : ContractId AnsEntry
+    subscriptionStateCid : ContractId SubscriptionIdleState
+
+data AnsEntryContext_CollectInitialEntryPaymentResult = AnsEntryContext_CollectInitialEntryPaymentResult
+  with
+    entryCid : ContractId AnsEntry
+    subscriptionStateCid : ContractId SubscriptionIdleState
+
+data AnsRules_CollectEntryRenewalPaymentResult = AnsRules_CollectEntryRenewalPaymentResult
+  with
+    entryCid : ContractId AnsEntry
+    subscriptionStateCid : ContractId SubscriptionIdleState
+
+data AnsRules_RejectEntryInitialPaymentResult = AnsRules_RejectEntryInitialPaymentResult
+  with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data AnsEntryContext_CollectEntryRenewalPaymentResult = AnsEntryContext_CollectEntryRenewalPaymentResult
+  with
+    entryCid : ContractId AnsEntry
+    subscriptionStateCid : ContractId SubscriptionIdleState
+
+data AnsEntryContext_RejectEntryInitialPaymentResult = AnsEntryContext_RejectEntryInitialPaymentResult
+  with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data AnsEntryContext_TerminateResult = AnsEntryContext_TerminateResult
+  with
+
+data AnsEntry_ExpireResult = AnsEntry_ExpireResult
+  with
+
+data AnsEntry_RenewResult = AnsEntry_RenewResult
+  with
+    entryCid : ContractId AnsEntry
+
+-- | The rules governing how users can pay to use the Amulet Name service.
+template AnsRules
+  with
+    dso : Party
+    -- It is accepted to have a single config for now for simplification.
+    -- We can extend it to be effectively dated schedule config like what we have in AmuletRules when needed.
+    config : AnsRulesConfig
+  where
+    signatory dso
+    ensure validAnsConfig config
+
+    -- Request a ans entry, to be paid and renewed via subscription payments.
+    -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
+    nonconsuming choice AnsRules_RequestEntry : AnsRules_RequestEntryResult
+      with
+        name : Text
+        url : Text
+        description : Text
+        user : Party
+      controller user
+      do
+        let subscriptionData = SubscriptionData with
+              sender = user
+              receiver = dso
+              provider = dso
+              dso
+              description = config.descriptionPrefix <> show name
+            payData = SubscriptionPayData with
+              paymentAmount = PaymentAmount config.entryFee USDUnit
+              paymentInterval = config.entryLifetime
+              paymentDuration = config.renewalDuration
+        request <- create SubscriptionRequest with
+          subscriptionData
+          payData
+        context <- create AnsEntryContext with
+          reference = request
+          ..
+        return AnsRules_RequestEntryResult with
+          entryCid = context
+          requestCid = request
+
+    -- Collect a user's initial payment for a ans entry allocation.
+    nonconsuming choice AnsRules_CollectInitialEntryPayment : AnsRules_CollectInitialEntryPaymentResult
+      with
+        user : Party
+        entryContext : ContractId AnsEntryContext
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+      controller dso, user
+      do
+        payment <- fetchAndValidateInitialPayment paymentCid (ExpectedPayment with dso, sender = user)
+        context <- fetchAndValidateEntryContext entryContext (ExpectedEntryContext with dso, user, reference = payment.reference)
+        -- accept payment which creates the subscription
+        collectResult <- exercise paymentCid SubscriptionInitialPayment_Collect with
+          transferContext
+        -- burn the amulet transferred to the DSO party (using fetchAndArchive for extra safety)
+        void $ fetchAndArchive (ForOwner with dso; owner = dso) collectResult.amulet
+        let subscriptionStateCid = collectResult.subscriptionState
+        subscriptionState <- fetchUncheckedReferenceData subscriptionStateCid
+        -- deliver the promised good: create the ans entry
+        entryCid <- case context of
+          AnsEntryContext{..} -> create AnsEntry with
+            expiresAt = subscriptionState.nextPaymentDueAt
+            ..
+        -- return the created contracts
+        return AnsRules_CollectInitialEntryPaymentResult with
+          ..
+
+    -- Collect a recurring entry renewal payment, renewing the entry.
+    nonconsuming choice AnsRules_CollectEntryRenewalPayment : AnsRules_CollectEntryRenewalPaymentResult
+      with
+        user : Party
+        entryContext : ContractId AnsEntryContext
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId AnsEntry -- ^ The currently active entry.
+        transferContext : AppTransferContext
+      controller dso, user
+      do
+        payment <- fetchAndValidatePayment paymentCid (ExpectedPayment with dso, sender = user)
+        subscription <- fetchUncheckedReferenceData payment.subscription
+        context <- fetchAndValidateEntryContext entryContext (ExpectedEntryContext with dso, user, reference = subscription.reference)
+        -- fetch entry, will be archived by the renewal further below
+        entry <- fetchUncheckedButArchiveLater entryCid
+        -- sanity checks
+        require "Current entry matches subscription context"
+          ((AnsEntryContext dso entry.user entry.name entry.url entry.description subscription.reference) == context)
+        require "Subscription entry renewal times are in sync"
+          (payment.thisPaymentDueAt == entry.expiresAt)
+        -- accept payment
+        result <- exercise paymentCid SubscriptionPayment_Collect with
+          transferContext
+        let (subscriptionStateCid, amuletCid) = (result.subscriptionState, result.amulet)
+        -- burn the amulet transferred to the DSO party (using fetchAndArchive for extra safety)
+        void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
+        -- renew entry
+        renewSummary <- exercise entryCid AnsEntry_Renew with
+          extension = payment.payData.paymentInterval
+        -- return the created contracts
+        return AnsRules_CollectEntryRenewalPaymentResult with
+          entryCid = renewSummary.entryCid
+          ..
+
+    nonconsuming choice AnsRules_RejectEntryInitialPayment: AnsRules_RejectEntryInitialPaymentResult
+      with
+        paymentCid: ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+      controller dso
+      do
+        result <- exercise paymentCid SubscriptionInitialPayment_Reject with transferContext
+        return AnsRules_RejectEntryInitialPaymentResult with
+          amuletSum = result.amuletSum
+
+data ExpectedPayment = ExpectedPayment
+  with
+    dso : Party
+    sender : Party
+  deriving (Show, Eq)
+
+fetchAndValidateInitialPayment : ContractId SubscriptionInitialPayment -> ExpectedPayment -> Update SubscriptionInitialPayment
+fetchAndValidateInitialPayment cid ExpectedPayment{..} = do
+  payment <- fetchUncheckedButArchiveLater cid
+  -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
+  require "matching DSO party" (dso == payment.subscriptionData.provider)
+  require "Sender matches" (sender == payment.subscriptionData.sender)
+  pure payment
+
+fetchAndValidatePayment : ContractId SubscriptionPayment -> ExpectedPayment -> Update SubscriptionPayment
+fetchAndValidatePayment cid ExpectedPayment{..} = do
+  payment <- fetchUncheckedButArchiveLater cid
+  -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
+  require "matching DSO party" (dso == payment.subscriptionData.provider)
+  require "Sender matches" (sender == payment.subscriptionData.sender)
+  pure payment
+
+data ExpectedEntryContext = ExpectedEntryContext
+  with
+    dso : Party
+    user : Party
+    reference : ContractId SubscriptionRequest
+  deriving (Show, Eq)
+
+fetchAndValidateEntryContext : ContractId AnsEntryContext -> ExpectedEntryContext -> Update AnsEntryContext
+fetchAndValidateEntryContext cid ExpectedEntryContext{..} = do
+  context <- fetchUncheckedReferenceData cid
+  require "matching DSO party" (dso == context.dso)
+  require "User matches" (user == context.user)
+  require "Subscription reference matches" (reference == context.reference)
+  pure context
+
+data AnsRulesConfig = AnsRulesConfig with
+    renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
+    entryLifetime : RelTime -- Duration until an entry expires
+    entryFee : Decimal -- Fee for each entry
+    descriptionPrefix : Text -- Prefix to use for the description of the entry subscription
+  deriving (Eq, Show)
+
+template AnsEntryContext
+  with
+    dso : Party
+    user : Party
+    name : Text
+    url : Text
+    description : Text
+    reference : ContractId SubscriptionRequest -- ^ Reference to the corresponding subscription, note that the contract may already be archived. This is just a tracking id.
+  where
+    signatory dso, user
+
+
+    choice AnsEntryContext_Terminate : AnsEntryContext_TerminateResult
+      with
+        actor : Party
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller actor
+      do require "Actor is signatory" (actor `elem` signatory this)
+         terminated <- fetchUncheckedAndArchive terminatedSubscriptionCid
+         require "Reference matches" (terminated.reference == reference)
+         return AnsEntryContext_TerminateResult
+
+    nonconsuming choice AnsEntryContext_CollectInitialEntryPayment : AnsEntryContext_CollectInitialEntryPaymentResult
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+        ansRulesCid : ContractId AnsRules
+      controller dso
+      do
+        summary <- exercise ansRulesCid AnsRules_CollectInitialEntryPayment with
+              user
+              entryContext = self
+              paymentCid
+              transferContext
+        return AnsEntryContext_CollectInitialEntryPaymentResult with
+          entryCid = summary.entryCid
+          subscriptionStateCid = summary.subscriptionStateCid
+
+    nonconsuming choice AnsEntryContext_CollectEntryRenewalPayment : AnsEntryContext_CollectEntryRenewalPaymentResult
+      with
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId AnsEntry -- ^ The currently active entry.
+        transferContext : AppTransferContext
+        ansRulesCid : ContractId AnsRules
+      controller dso
+      do
+        summary <- exercise ansRulesCid AnsRules_CollectEntryRenewalPayment with
+              user
+              entryContext = self
+              paymentCid
+              entryCid
+              transferContext
+        return AnsEntryContext_CollectEntryRenewalPaymentResult with
+          entryCid = summary.entryCid
+          subscriptionStateCid = summary.subscriptionStateCid
+
+    nonconsuming choice AnsEntryContext_RejectEntryInitialPayment : AnsEntryContext_RejectEntryInitialPaymentResult
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+        ansRulesCid : ContractId AnsRules
+      controller dso
+      do
+        result <- exercise ansRulesCid AnsRules_RejectEntryInitialPayment with
+          paymentCid
+          transferContext
+        return AnsEntryContext_RejectEntryInitialPaymentResult with
+          amuletSum = result.amuletSum
+
+
+-- | A ans entry that needs to be renewed continuously.
+-- Renewal recreates this contract with an updated `expiresAt` field.
+template AnsEntry
+  with
+    user : Party
+    dso : Party
+    name : Text
+    url : Text -- either empty or contains a valid http/https url
+    description : Text -- can be empty
+    expiresAt : Time
+  where
+    signatory user, dso
+
+    choice AnsEntry_Expire : AnsEntry_ExpireResult
+      with
+        actor : Party
+      controller actor
+      do time <- getTime
+         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+         require "Contract expired" (expiresAt < time)
+         return AnsEntry_ExpireResult
+
+    choice AnsEntry_Renew : AnsEntry_RenewResult
+      with
+        extension : RelTime
+      controller user, dso
+      do require "Extension positive" (extension > aunit)
+         entryCid <- create this with
+           expiresAt = this.expiresAt `addRelTime` extension
+         return AnsEntry_RenewResult with
+            ..
+
+validAnsConfig : AnsRulesConfig -> Bool
+validAnsConfig AnsRulesConfig{..} =
+    renewalDuration > days 0
+    && entryLifetime > days 0
+    && entryFee > 0.0

@@ -1,0 +1,1410 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.DsoRules where
+
+import DA.Action (void, when, unless)
+import DA.Either (partitionEithers)
+import DA.Exception
+import DA.Foldable (forA_)
+import DA.List as List
+import DA.Optional (isNone, fromSome, fromOptional, isSome)
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import qualified DA.Text as T
+import DA.Time
+
+import Splice.Amulet
+import Splice.AmuletRules
+
+import Splice.Round
+import Splice.Types
+import Splice.ValidatorLicense
+import Splice.Wallet.Subscriptions
+import Splice.DecentralizedSynchronizer (MemberTraffic)
+
+import qualified Splice.CometBft as CometBft
+import Splice.Ans
+import Splice.SvOnboarding
+import Splice.DSO.AmuletPrice
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.SvState
+import Splice.Util
+
+
+-- Types
+---------
+
+-- | Actions that require confirmation from SV nodes before they can be executed.
+--
+-- There are two processes for executing such actions:
+-- 1. Any SV can request a vote to execute such an action upon which the other SV's
+--    can respond with their votes for whether they accept the execution or not.
+--    This process requires 2 * f + 1 votes* for the action to be considered definitive
+--    and it can be used for all actions that require confirmation.
+-- 2. Some of the actions that require confirmations should be executed automatically
+--    once the ledger and the wall-clocks of the SV nodes are in a particular state.
+--    These actions are confirmed by each SV node automatically once the action's precondition is met.
+--    Once 2 * f + 1 confirmations* are visible to the DSO delegate it executes them.
+--
+-- * Simplified for clarity; see `requiredNumVotes` for exact formula.
+--
+-- Process 2 is an optimization of Process 1 for the case where no disagreement to the
+-- action is expected. It avoids the extra round-trip and the complications of having
+-- the DSO delegate to reliably initiate the vote when it is time to execute an automated action
+-- that requires confirmation.
+--
+-- We expect honest SV nodes to only create confirmations for actions
+-- whose preconditions are met. We also rely on the execution of these actions to be
+-- idempotent, as more than the required number of confirmations can be created and the DSO delegate could
+-- thus in principle execute the corresponding action multiple times.
+--
+-- Note also that having these two processes also aids in distinguishing between manually initiated
+-- ad-hoc votes and the regular confirmations that need to happen during standard DSO.
+data ActionRequiringConfirmation
+  = ARC_DsoRules with
+      dsoAction : DsoRules_ActionRequiringConfirmation
+  | ARC_AmuletRules with
+      amuletRulesAction : AmuletRules_ActionRequiringConfirmation
+  | ARC_AnsEntryContext with
+      ansEntryContextCid : ContractId AnsEntryContext
+      ansEntryContextAction : AnsEntryContext_ActionRequiringConfirmation
+  | ExtActionRequiringConformation with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+        -- This on takes care of providing extensibility for the specific variants below.
+  deriving (Eq, Show)
+
+data AmuletRules_ActionRequiringConfirmation
+  = CRARC_MiningRound_StartIssuing AmuletRules_MiningRound_StartIssuing
+    -- ^ Automated action to start an issuing round once the summary of the reward coupons have been computed.
+  | CRARC_MiningRound_Archive AmuletRules_MiningRound_Archive
+    -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
+  | CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule
+    -- ^ Voted action to add a config schedule to the `AmuletRules`.
+  | CRARC_RemoveFutureAmuletConfigSchedule AmuletRules_RemoveFutureAmuletConfigSchedule
+    -- ^ Voted action to remove a config schedule from the `AmuletRules`.
+  | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
+    -- ^ Voted action to update a config schedule in the `AmuletRules`.
+  deriving (Eq, Show)
+
+data DsoRules_ActionRequiringConfirmation
+  = SRARC_AddSv DsoRules_AddSv
+    -- ^ Voted action to directly add an SV
+  | SRARC_OffboardSv DsoRules_OffboardSv
+    -- ^ Voted action to remove an SV
+  | SRARC_ConfirmSvOnboarding DsoRules_ConfirmSvOnboarding
+    -- ^ Automated action to confirm that a party can become an SV.
+  | SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight
+    -- ^ Voted action to grant a featured app right. Not idempotent.
+  | SRARC_RevokeFeaturedAppRight DsoRules_RevokeFeaturedAppRight
+    -- ^ Revoke a specific featured app right.
+  | SRARC_SetConfig DsoRules_SetConfig
+    -- ^ Voted action to change the `DsoRulesConfig`. Not idempotent.
+  deriving (Eq, Show)
+
+data AnsEntryContext_ActionRequiringConfirmation
+  = ANSRARC_CollectInitialEntryPayment AnsEntryContext_CollectInitialEntryPayment
+    -- ^ Automated action to collect initial payment of an ans entry.
+  | ANSRARC_RejectEntryInitialPayment AnsEntryContext_RejectEntryInitialPayment
+    -- ^ Automated action to reject initial payment of an ans entry.
+  deriving (Eq, Show)
+
+-- | Information about SVs relevant to DSO governance.
+data SvInfo = SvInfo with
+    name : Text -- ^ Human-readable name; must be unique.
+    joinedAsOfRound : Round -- ^ Round in which the SV joined
+    svRewardWeight : Int -- ^ Weight of the SV in the SV reward distribution.
+    participantId : Text -- ^ Participant ID of the SV, stored here as PartyToParticipant mappings are tracked via state on the DsoRules + SvOnboardingConfirmed contracts.
+  deriving (Eq, Show)
+
+-- | Information about offboarded svs
+data OffboardedSvInfo = OffboardedSvInfo with
+    name : Text -- ^ Human-readable name; must be unique.
+    participantId : Text -- ^ Participant ID of the offboarded SV.
+  deriving (Eq, Show)
+
+data DsoSummary = DsoSummary with
+    dsoDelegate : Party
+    numSvs : Int
+    requiredNumVotes : Int
+    -- | The number of votes required for considering a confirmation, a request for a vote, or
+    -- a DSO delegate election definitive.
+  deriving (Eq, Show)
+
+-- | Choice return types
+-------------------------
+-- In order to support upgrades of the Daml models, all choices should return records, which can
+-- then be extended in future versions.
+
+data Confirmation_ExpireResult = Confirmation_ExpireResult
+
+data DsoRules_AddSvResult = DsoRules_AddSvResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_OffboardSvResult = DsoRules_OffboardSvResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_SubmitStatusReportResult = DsoRules_SubmitStatusReportResult with
+    newReport : ContractId SvStatusReport
+
+data DsoRules_AddConfirmedSvResult = DsoRules_AddConfirmedSvResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_SetSynchronizerNodeConfigResult = DsoRules_SetSynchronizerNodeConfigResult with
+    svNodeState : ContractId SvNodeState
+
+data DsoRules_RequestElectionResult = DsoRules_RequestElectionResult with
+    electionRequestCid : ContractId ElectionRequest
+
+data DsoRules_ElectDsoDelegateResult = DsoRules_ElectDsoDelegateResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_ArchiveOutdatedElectionRequestResult = DsoRules_ArchiveOutdatedElectionRequestResult
+
+data DsoRules_ConfirmActionResult = DsoRules_ConfirmActionResult with
+    confirmation : ContractId Confirmation
+
+data DsoRules_ExecuteConfirmedActionResult = DsoRules_ExecuteConfirmedActionResult
+
+data DsoRules_ExpireStaleConfirmationResult = DsoRules_ExpireStaleConfirmationResult
+
+data DsoRules_RequestVoteResult = DsoRules_RequestVoteResult with
+    voteRequest : ContractId VoteRequest
+
+data DsoRules_CastVoteResult = DsoRules_CastVoteResult with
+    voteRequest : ContractId VoteRequest
+
+data DsoRules_UpdateAmuletPriceVoteResult = DsoRules_UpdateAmuletPriceVoteResult with
+    amuletPriceVote : ContractId AmuletPriceVote
+
+data DsoRules_GarbageCollectAmuletPriceVotesResult = DsoRules_GarbageCollectAmuletPriceVotesResult
+
+data DsoRules_SetConfigResult = DsoRules_SetConfigResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult with
+    featuredAppRight : ContractId FeaturedAppRight
+
+data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResult
+
+data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
+    validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_StartSvOnboardingResult = DsoRules_StartSvOnboardingResult with
+    onboardingRequest : ContractId SvOnboardingRequest
+
+data DsoRules_ExpireSvOnboardingRequestResult = DsoRules_ExpireSvOnboardingRequestResult
+
+data DsoRules_ArchiveSvOnboardingRequestResult = DsoRules_ArchiveSvOnboardingRequestResult
+
+data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult with
+    onboardingConfirmed : ContractId SvOnboardingConfirmed
+
+data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
+    expireSum : AmuletExpireSummary
+
+data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
+    expireSum : AmuletExpireSummary
+
+data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
+    summarizingRound: ContractId SummarizingMiningRound
+    openRound : ContractId OpenMiningRound
+
+data DsoRules_CollectEntryRenewalPaymentResult = DsoRules_CollectEntryRenewalPaymentResult with
+    ansEntry : ContractId AnsEntry
+    subscriptionState : ContractId SubscriptionIdleState
+
+data DsoRules_ExpireAnsEntryResult = DsoRules_ExpireAnsEntryResult
+
+data DsoRules_ExpireSubscriptionResult = DsoRules_ExpireSubscriptionResult
+
+data DsoRules_TerminateSubscriptionResult = DsoRules_TerminateSubscriptionResult
+
+data DsoRules_ReceiveSvRewardCouponResult = DsoRules_ReceiveSvRewardCouponResult with
+    svRewardState : ContractId SvRewardState
+    svRewardCoupons : [ContractId SvRewardCoupon]
+
+data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult with
+    unclaimedReward: Optional (ContractId UnclaimedReward)
+
+data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
+    unclaimedReward: ContractId UnclaimedReward
+
+data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
+    closedRound : ContractId ClosedMiningRound
+
+data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficContractsResult with
+    memberTraffic : ContractId MemberTraffic
+
+data DsoRules_MergeSvRewardStateResult = DsoRules_MergeSvRewardStateResult with
+    svRewardState : ContractId SvRewardState
+
+
+-- Workflow templates
+---------------------
+
+-- TODO(#7649) revise and/or remove
+data ElectionRequestReason
+  = ERR_DsoDelegateUnavailable
+  -- TODO(#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
+  | ERR_OtherReason Text
+  | ExtElectionRequestReason with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Ord, Show)
+
+-- | A request to elect a new DSO delegate.
+-- TODO(#7649) revise and/or remove
+template ElectionRequest with
+    dso : Party
+    requester : Party
+    epoch : Int  -- current epoch whose DSO delegate should be replaced
+    reason : ElectionRequestReason -- reason for electing a new DSO delegate
+    ranking : [Party] -- preference ranking for new DSO delegates
+  where
+    -- NOTE: we expect the requester to observe this contract by hosting the
+    -- DSO party (as all SVs do). The requester can in
+    -- particular not be a signatory, as otherwise fetching and archiving of
+    -- the request would require the requesters confirmation instead of only
+    -- the confirmation of the DSO party.
+    signatory dso
+
+
+-- | A confirmation for the DSO delegate to take action as part of standard DSO.
+-- Used for executing automated actions in a shortened process.
+-- See the comments on `ActionRequiringConfirmation` for details.
+template Confirmation with
+    dso : Party
+    confirmer : Party
+    action : ActionRequiringConfirmation
+    expiresAt : Time
+  where
+    -- As for 'ElectionRequest' we only make the DSO party a signatory.
+    signatory dso
+
+    choice Confirmation_Expire : Confirmation_ExpireResult
+      controller dso
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
+         return Confirmation_ExpireResult
+
+-- | A request for the other svs to vote on the execution of an action requiring confirmation.
+-- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
+--
+-- See the comments on `ActionRequiringConfirmation` for details.
+--
+-- Version2, which tracks all votes in a single contract.
+template VoteRequest
+  with
+    dso : Party
+    requester : Text
+    -- ^ The SV that requested to execute the action.
+    action : ActionRequiringConfirmation
+    -- ^ The action whose confirmation is required.
+    reason : Reason
+    -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
+    voteBefore : Time
+    -- ^ The time before which votes are accepted, and SHOULD be submitted.
+    votes : Map.Map Text Vote
+    -- ^ The votes cast by current or previous SVs. These may be previous SVs in case
+    -- there was an SV change after the vote was requested.
+    trackingCid : Optional (ContractId VoteRequest)
+    -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
+    -- This is always set to the first ContractId of the original vote request (None on creation).
+  where
+    signatory dso
+
+data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
+    request : VoteRequest -- ^ The original vote request.
+    completedAt : Time -- ^ When the vote request was completed.
+    offboardedVoters : [Text] -- ^ SVs that voted but were offboarded before the vote completed.
+    abstainingSvs : [Text] -- ^ SVs that did not vote.
+    outcome : VoteRequestOutcome  -- ^ The final result of the vote.
+  deriving (Eq, Show)
+
+data VoteRequestOutcome
+  = VRO_AcceptedButActionFailed with
+      description : Text -- ^ Description of the failure.
+  | VRO_Accepted with -- The action was accepted by a super-majority.
+      effectiveAt : Time -- ^ Time when the action will be effective.
+  | VRO_Rejected  -- The action was rejected by a super-majority.
+  | VRO_Expired   -- The action was neither accepted nor rejected by a super-majority during the voting period.
+  | ExtVoteRequestOutcome with
+      dummyUnitField : ()
+        --  ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Show)
+--
+-- | A vote cast by an SV.
+data Vote = Vote with
+    sv : Party -- ^ The SV party used to submit the vote.
+    accept : Bool
+    -- ^ Whether the responder accepted the request to execute the action or not.
+    reason : Reason
+    -- ^ The reason for voting this way.
+  deriving(Eq, Show)
+
+data Reason = Reason with
+    url : Text -- ^ Url pointing to additional background on the reason, e.g., using a https://w3c-ccg.github.io/hashlink/
+    body : Text -- ^ Freeform text intended for human consumption.
+  deriving (Eq, Show)
+
+
+data DsoRulesConfig = DsoRulesConfig with
+    numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
+    numMemberTrafficContractsThreshold : Int -- ^ The minimum number of member traffic contracts required for merging
+    actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
+    svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
+    svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing an SV confirmation
+    voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
+    dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DSO delegate to complete an action it should take care of
+    synchronizerNodeConfigLimits : SynchronizerNodeConfigLimits  -- ^ Limits to enforce on the svs' `SynchronizerNodeConfig`
+    maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
+    decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
+    nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
+  deriving (Eq, Show)
+
+data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
+    time : Time
+    -- ^ The time at which the migration is scheduled to start.
+    migrationId : Int
+    -- ^ The incremental integer ID of the migration.
+  deriving (Eq, Show)
+
+data TrafficState = TrafficState with
+    consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
+  deriving (Eq, Show)
+
+template DsoRules with
+    dso : Party
+    epoch : Int        -- ^ The number of DSO delegates that have already been elected.
+    svs : Map.Map Party SvInfo
+    offboardedSvs : Map.Map Party OffboardedSvInfo
+    dsoDelegate : Party
+    config : DsoRulesConfig
+    initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
+    isDevNet : Bool
+  where
+    ensure
+      dsoDelegate `Map.member` svs &&
+        unique (map (.name) (Map.values svs)) &&
+        config.numUnclaimedRewardsThreshold > 0
+
+    -- NOTE: the svs are not direct signatories as that would not give us the right fault-tolerance wrt
+    -- validating choices on this contract. Instead, the svs are indirect signatories by being
+    -- hosting the DSO party with confirmation rights.
+    signatory dso
+
+
+    -- Sv management
+    ------------------------
+
+    choice DsoRules_AddSv : DsoRules_AddSvResult
+      with
+        newSvParty : Party
+        newSvName : Text
+        newSvRewardWeight : Int
+        newSvParticipantId : Text
+        joinedAsOfRound : Round
+      controller dso
+      do newDsoRules <- dsoRules_addSv this arg
+         return DsoRules_AddSvResult with ..
+
+    choice DsoRules_OffboardSv : DsoRules_OffboardSvResult
+      with
+        sv : Party
+      controller dso
+      do
+        require "There is more than one sv" (Map.size svs > 1)
+        case Map.lookup sv svs of
+          None -> fail "Not a sv"
+          Some info -> do
+            -- NOTE: this immediate deletion will lead to the SV apps of the remaining svs
+            -- revoking that sv's rights in the CometBFT network and the topology state.
+            let newSvs = Map.delete sv svs
+            -- We optimize for prompt removal of a sv if the vote said so. We can thus not wait for a DSO delegate-election
+            -- and instead just choose the sv with the lexicographically smallest name.
+            let (newDsoDelegate, newEpoch)
+                  | sv == dsoDelegate = (head (Map.keys newSvs), epoch + 1)
+                  | otherwise        = (dsoDelegate, epoch)
+            let offboardedSvInfo = OffboardedSvInfo with
+                    name = info.name
+                    participantId = info.participantId
+            -- create the new rules contract
+            newDsoRules <- create DsoRules with
+              dso
+              epoch = newEpoch
+              dsoDelegate = newDsoDelegate
+              svs = newSvs
+              offboardedSvs = Map.insert sv offboardedSvInfo offboardedSvs
+              config
+              initialTrafficState
+              isDevNet
+
+            return DsoRules_OffboardSvResult with ..
+
+    -- Update an SV's Status report
+    nonconsuming choice DsoRules_SubmitStatusReport : DsoRules_SubmitStatusReportResult
+      with
+        sv : Party
+        previousReportCid : ContractId SvStatusReport
+        status : SvStatus
+      controller sv
+      do
+        newReport <- case Map.lookup sv svs of
+          None -> fail "SV is not an SV"
+          Some info -> do
+            previousReport <- fetchAndArchive (ForSvNode with dso; sv; svName = info.name) previousReportCid
+            create SvStatusReport with
+              dso
+              sv
+              svName = info.name
+              number = previousReport.number + 1
+              status = Some status
+        return DsoRules_SubmitStatusReportResult with ..
+
+    -- Called by SV candidates to add themselves to the DsoRules once they are confirmed and ready.
+    -- We use the passed rounds for reliably determining the earliest open round, which will be
+    -- the first round in which the new SV will receive rewards.
+    nonconsuming choice DsoRules_AddConfirmedSv : DsoRules_AddConfirmedSvResult
+      with
+        sv : Party
+        svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
+        earliestRoundCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+        amuletRulesCid: ContractId AmuletRules
+      controller sv
+      do
+
+        svOnboardingConfirmed <- fetchAndArchive (ForOwner with dso; owner = sv) svOnboardingConfirmedCid
+
+        let forDso = ForDso with dso
+        earliestRound <- fetchReferenceData forDso earliestRoundCid
+        middleRound <- fetchReferenceData forDso middleRoundCid
+        latestRound <- fetchReferenceData forDso latestRoundCid
+        require "middleRound is one after earliestRound" (middleRound.round.number == earliestRound.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+
+        addSvResult <- exercise self DsoRules_AddSv with
+          newSvParty = sv
+          newSvName = svOnboardingConfirmed.svName
+          newSvRewardWeight = svOnboardingConfirmed.svRewardWeight
+          newSvParticipantId = svOnboardingConfirmed.svParticipantId
+          joinedAsOfRound = earliestRound.round
+
+        return DsoRules_AddConfirmedSvResult with
+          newDsoRules = addSvResult.newDsoRules
+
+
+    -- Decentralized synchronizer config management
+    -----------------------------------
+
+    -- Every SV can change their own synchronizer node's config within the configured limits.
+    nonconsuming choice DsoRules_SetSynchronizerNodeConfig : DsoRules_SetSynchronizerNodeConfigResult
+      with
+        sv : Party
+        synchronizerId : Text
+        newNodeConfig : SynchronizerNodeConfig
+        nodeStateCid : ContractId SvNodeState
+      controller sv
+      do
+        -- check that the synchronizer is known
+        require "Synchronizer with this id is configured" (synchronizerId `Map.member` config.decentralizedSynchronizer.synchronizers)
+        -- check validity of config and constraint on voting power
+        require "Valid configuration" (validSynchronizerNodeConfig config.synchronizerNodeConfigLimits newNodeConfig)
+        unless isDevNet $
+          require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
+        -- update the SV operator node's state
+        info <- getSvInfo sv this
+        let svName = info.name
+        nodeState <- fetchAndArchive (ForSvNode with dso; sv; svName) nodeStateCid
+        let state = nodeState.state
+        svNodeState <- create nodeState with
+          state = state with
+            synchronizerNodes = Map.insert synchronizerId newNodeConfig state.synchronizerNodes
+        return DsoRules_SetSynchronizerNodeConfigResult with ..
+
+
+    -- Automation DSO delegate election
+    ------------------------------
+    -- TODO(#7649) revise and/or remove
+    nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
+      with
+        requester : Party
+        reason: ElectionRequestReason
+        ranking : [Party]
+      controller requester
+      do
+        -- TODO(#7649): consider interaction with concurrent SV changes
+        require "Requester is an SV" (requester `Map.member` svs)
+        require "All svs are ranked exactly once" (sort ranking == sort (Map.keys svs))
+        electionRequestCid <- create ElectionRequest with
+          ..
+        return DsoRules_RequestElectionResult with ..
+
+    -- TODO(#7649) revise and/or remove
+    choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
+      with
+        actor : Party
+        requestCids : [ContractId ElectionRequest]
+      controller actor
+      do
+        let summary = summarizeDso this
+        -- fetch, check, and archive all requests
+        reqs <- forA requestCids $ \requestCid -> do
+          req <- fetchAndArchive (ForDso with dso) requestCid
+          require "Request is for this epoch" (req.epoch == epoch)
+          require "Requester is an SV" (req.requester `Map.member` svs)
+          pure req
+        let numVotes = length reqs
+            numVoters = numVotes
+            -- TODO(#7649): consider whether that is the right number of votes to require
+            -- as there might be more votes being taken into consideration
+            numVotesForMajority = (summary.requiredNumVotes + 1) / 2
+        require "Requests are from different svs" (unique $ map (.requester) reqs)
+        require "There are enough requests" (numVotes >= summary.requiredNumVotes)
+        let rankings = [ (req.requester, req.ranking) | req <- reqs ]
+            newDsoDelegate = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
+        let newDsoRules = DsoRules with epoch = epoch + 1, dsoDelegate = newDsoDelegate, ..
+        newDsoRules <- create newDsoRules
+        return DsoRules_ElectDsoDelegateResult with ..
+
+    nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
+      with
+        requestCid : ContractId ElectionRequest
+      controller dsoDelegate
+      do
+        request <- fetchAndArchive (ForDso with dso) requestCid
+        require "Election request is outdated" (request.epoch < epoch)
+        return DsoRules_ArchiveOutdatedElectionRequestResult
+
+
+    -- Executing actions with confirmation
+    --------------------------------------
+
+    nonconsuming choice DsoRules_ConfirmAction : DsoRules_ConfirmActionResult
+      with
+        confirmer : Party
+        action : ActionRequiringConfirmation
+      controller confirmer
+      do
+        require "Confirmer is an SV" (confirmer `Map.member` svs)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.actionConfirmationTimeout
+        confirmation <- create Confirmation with
+          dso
+          confirmer
+          action
+          expiresAt
+        return DsoRules_ConfirmActionResult with ..
+
+    nonconsuming choice DsoRules_ExecuteConfirmedAction : DsoRules_ExecuteConfirmedActionResult
+      with
+        action : ActionRequiringConfirmation
+        amuletRulesCid : Optional( ContractId AmuletRules )
+        confirmationCids : [ContractId Confirmation]
+      controller dsoDelegate
+      do
+        let s = summarizeDso this
+        let forDso = ForDso with dso
+        require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
+        confirmers <- forA confirmationCids $ \confirmationCid -> do
+          confirmation <- fetchAndArchive forDso confirmationCid
+          require "Confirmer is an SV" (confirmation.confirmer `Map.member` svs)
+          require "Confirmed action matches" (confirmation.action == action)
+          pure confirmation.confirmer
+        require "No duplicate confirmers" (unique confirmers)
+        executeActionRequiringConfirmation self amuletRulesCid action
+        return DsoRules_ExecuteConfirmedActionResult
+
+
+    -- Voting as part of on-ledger governance (version 2)
+    -----------------------------------------------------
+
+    -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
+    nonconsuming choice DsoRules_RequestVote : DsoRules_RequestVoteResult
+      with
+        requester : Party
+        action : ActionRequiringConfirmation
+        reason : Reason
+        voteRequestTimeout : Optional RelTime
+      controller requester
+      do
+        requesterName <- case requester `Map.lookup` svs of
+          None -> fail "Requester is not an SV"
+          Some info -> pure (info.name)
+        requireWellformedReason config reason
+        now <- getTime
+        let voteBefore = case voteRequestTimeout of
+              Some value ->
+                now `addRelTime` value
+              None ->
+                now `addRelTime` config.voteRequestTimeout
+        require "There is some time to vote" (now < voteBefore)
+        let requesterVote = Vote with
+              sv = requester
+              accept = True
+              reason = Reason with url = ""; body = "I accept, as I requested the vote."
+        voteRequest <- create VoteRequest with
+          dso
+          requester = requesterName
+          action
+          reason
+          voteBefore
+          votes = Map.fromList [(requesterName, requesterVote)]
+          trackingCid = None
+        return DsoRules_RequestVoteResult with ..
+
+
+    -- Note that this choice can be used to both cast the initial vote, and update a vote.
+    -- TODO(#9319): rate limit SVs wrt updating their votes
+    nonconsuming choice DsoRules_CastVote : DsoRules_CastVoteResult
+      with
+        requestCid : ContractId VoteRequest
+        vote : Vote
+      controller vote.sv
+      do
+        -- validate vote parameters
+        requireWellformedVote config vote
+        voterName <- case Map.lookup vote.sv svs of
+          None -> fail "Voter is not an SV"
+          Some info -> pure info.name
+        -- validate and archive request
+        now <- getTime
+        request <- fetchAndArchive (ForDso with dso) requestCid
+        require "request is open" (now < request.voteBefore)
+        -- store vote
+        voteRequest <- create request with
+          votes = Map.insert voterName vote request.votes
+          trackingCid = Some (fromOptional requestCid request.trackingCid)
+        return DsoRules_CastVoteResult with ..
+
+    -- We expect the TxHistory log of the SV app to store the choice argument together
+    -- with its result for historical reference.
+    nonconsuming choice DsoRules_CloseVoteRequest : DsoRules_CloseVoteRequestResult
+      with
+        requestCid : ContractId VoteRequest
+        amuletRulesCid : Optional (ContractId AmuletRules)
+      controller dsoDelegate
+      do
+        request <- fetchAndArchive (ForDso with dso) requestCid
+        -- count the votes
+        now <- getTime
+        let activeSvs = map (.name) $ Map.values svs
+        let activeSvSet = Set.fromList activeSvs
+        let (validVotes, offboardedVoters) = partitionEithers
+              [ if voterName `Set.member` activeSvSet then Left vote else Right voterName
+              | (voterName, vote) <- Map.toList request.votes
+              ]
+        let abstainingSvs = [ name | name <- activeSvs, not (name `Map.member` request.votes) ]
+        let (yays, nays) = partition (.accept) validVotes
+        let s = summarizeDso this
+        outcome <-
+          if length yays >= s.requiredNumVotes
+            then do
+              try do
+                executeActionRequiringConfirmation self amuletRulesCid request.action
+                pure $ VRO_Accepted with
+                  effectiveAt = fromOptional now $
+                    actionRequiringConfirmationEffectiveAt request.action
+              catch
+                (ex : AnyException) ->
+                  pure $ VRO_AcceptedButActionFailed with
+                    description = message ex
+            else
+              if length nays >= s.requiredNumVotes
+              then pure VRO_Rejected
+              else pure VRO_Expired
+        -- check if the request is ready to be closed
+        when (now < request.voteBefore) $ do
+          let svBeingOffboarded = case request.action of
+                ARC_DsoRules (SRARC_OffboardSv (DsoRules_OffboardSv with sv)) ->
+                  fmap (.name) (Map.lookup sv svs)
+                _ -> None
+          require "All svs (except one being offboarded) must have voted to allow early closing" $
+            all (\m -> Some m == svBeingOffboarded || m `Map.member` request.votes) activeSvs
+          require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
+        -- report the result
+        pure DsoRules_CloseVoteRequestResult with
+            request
+            completedAt = now
+            offboardedVoters
+            abstainingSvs
+            outcome
+
+
+    -- Voting on the amulet price
+    ---------------------------
+
+    nonconsuming choice DsoRules_UpdateAmuletPriceVote : DsoRules_UpdateAmuletPriceVoteResult
+      with
+        sv : Party
+        voteCid : ContractId AmuletPriceVote
+        amuletPrice : Decimal
+      controller sv
+      do
+        void $ fetchAndArchive (ForOwner with dso; owner = sv) voteCid
+        now <- getTime
+        -- create new vote
+        amuletPriceVote <- create AmuletPriceVote with
+          dso
+          sv
+          amuletPrice = Some amuletPrice
+          lastUpdatedAt = now
+        return DsoRules_UpdateAmuletPriceVoteResult with ..
+
+    -- | Garbage-collect AmuletPriceVotes from removed svs and duplicate ones that might
+    -- happen due to a too quick removal and re-addition of a sv.
+    -- We expect this to be run as an OnAssignedContractTrigger for the DsoRules contract.
+    --
+    -- Note: we do not archive the AmuletPriceVote of an SV on its removal,
+    -- as that would allow that SV to block the removal via updating its AmuletPriceVote at the right time.
+    --
+    -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
+    nonconsuming choice DsoRules_GarbageCollectAmuletPriceVotes : DsoRules_GarbageCollectAmuletPriceVotesResult
+      with
+        nonSvVoteCids : [ContractId AmuletPriceVote]
+        duplicateVoteCids : [[ContractId AmuletPriceVote]]
+      controller dsoDelegate
+      do
+        let forDso = ForDso with dso
+        -- validate and archive non-sv votes
+        forA_ nonSvVoteCids $ \voteCid -> do
+          vote <- fetchAndArchive forDso voteCid
+          require "SV is no sv" (not $ vote.sv `Map.member` svs)
+        -- validate and archive duplicates
+        forA_ duplicateVoteCids $ \voteCids -> do
+          require "Unique references to duplicates" (unique voteCids)
+          votes <- forA voteCids $ \voteCid -> do
+            -- archival happens below for all but the most recent vote
+            vote <- fetchButArchiveLater forDso voteCid
+            pure (voteCid, vote)
+          -- keep the most recently updated vote to avoid UI glitches
+          case sortOn (\(_, vote) -> Down (vote.lastUpdatedAt)) votes of
+            [] -> fail "empty list of duplicate votes"
+            [_] -> fail "singleton list of duplicate votes"
+            ((_, vote)::duplicates) -> do
+              require "matching DSO party" (vote.dso == dso)
+              require "SV is a sv" (vote.sv `Map.member` svs)
+              forA_ duplicates $ \(duplicateCid, duplicate) -> do
+                -- safe, as we fetched it before and check the constraints below
+                potentiallyUnsafeArchive duplicateCid
+                require "matching DSO party" (duplicate.dso == dso)
+                require "SV of duplicate matches" (duplicate.sv == vote.sv)
+        return DsoRules_GarbageCollectAmuletPriceVotesResult
+
+
+    -- DSO rules config management
+    ------------------------------
+
+    choice DsoRules_SetConfig : DsoRules_SetConfigResult
+      with
+        newConfig : DsoRulesConfig
+      controller dso
+      do
+        -- TODO(M3-57): sanity check the newConfig to avoid locking up operations, e.g., by setting `maxTextLength = -1`
+        newDsoRules <- create this with config = newConfig
+        return DsoRules_SetConfigResult with ..
+
+
+    -- App rights management
+    ------------------------
+
+    nonconsuming choice DsoRules_GrantFeaturedAppRight : DsoRules_GrantFeaturedAppRightResult
+      with
+        provider : Party
+      controller dso
+      do
+        featuredAppRight <- create FeaturedAppRight with
+          dso
+          provider
+        return DsoRules_GrantFeaturedAppRightResult with ..
+
+    nonconsuming choice DsoRules_RevokeFeaturedAppRight : DsoRules_RevokeFeaturedAppRightResult
+      with
+        rightCid : ContractId FeaturedAppRight
+      controller dso
+      do
+        void $ fetchAndArchive (ForDso with dso) rightCid
+        return DsoRules_RevokeFeaturedAppRightResult
+
+
+    -- Validator onboarding
+    -----------------------
+
+    nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
+      with
+        sponsor : Party
+        validator : Party
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        -- create license that records in particular which SV sponsored the onboarding of the validator
+        validatorLicense <- create ValidatorLicense with
+          dso
+          sponsor
+          validator
+          faucetState = None
+        return DsoRules_OnboardValidatorResult with ..
+
+
+    -- SV onboarding
+    ----------------
+
+    nonconsuming choice DsoRules_StartSvOnboarding : DsoRules_StartSvOnboardingResult
+      with
+        candidateName : Text
+        candidateParty : Party
+        candidateParticipantId: Text
+        token : Text
+        sponsor : Party
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
+        onboardingRequest <- create SvOnboardingRequest with ..
+        return DsoRules_StartSvOnboardingResult with ..
+
+    nonconsuming choice DsoRules_ExpireSvOnboardingRequest : DsoRules_ExpireSvOnboardingRequestResult
+      with
+        cid: ContractId SvOnboardingRequest
+      controller dsoDelegate
+      do
+        exercise cid SvOnboardingRequest_Expire
+        return DsoRules_ExpireSvOnboardingRequestResult
+
+    nonconsuming choice DsoRules_ArchiveSvOnboardingRequest : DsoRules_ArchiveSvOnboardingRequestResult
+      with
+        svOnboardingRequestCid: ContractId SvOnboardingRequest
+      controller dsoDelegate
+      do
+        -- TODO(#3756) Enable archiving also before the sv is added, after a matching `SvOnboardingConfirmed` contract is created.
+        svOnboardingRequest <- fetchAndArchive (ForDso with dso) svOnboardingRequestCid
+        let maybeSv = Map.lookup svOnboardingRequest.candidateParty svs
+        require "SV party is an SV" (isSome maybeSv)
+        require "SV name matches" ((fromSome maybeSv).name == svOnboardingRequest.candidateName)
+        return DsoRules_ArchiveSvOnboardingRequestResult
+
+    nonconsuming choice DsoRules_ConfirmSvOnboarding : DsoRules_ConfirmSvOnboardingResult
+      with
+        newSvParty : Party
+        newSvName : Text
+        newParticipantId : Text
+        newSvRewardWeight : Int
+        reason : Text
+      controller dso
+      do
+        ensureNeverOperatedNode newSvParty this
+        if (not isDevNet)
+          then
+            require "SV name is expected to be new unless in devnet" (newSvName `notElem` (map (.name) (Map.values svs)))
+          else pure ()
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
+        onboardingConfirmed <- create SvOnboardingConfirmed with
+          svParty = newSvParty
+          svName = newSvName
+          svRewardWeight = newSvRewardWeight
+          svParticipantId = newParticipantId
+          reason
+          dso
+          expiresAt
+        return DsoRules_ConfirmSvOnboardingResult with ..
+
+    choice DsoRules_ExpireSvOnboardingConfirmed : DsoRules_ExpireSvOnboardingConfirmedResult
+      with
+        cid: ContractId SvOnboardingConfirmed
+      controller dsoDelegate
+      do
+        svOnboardingConfirmed <- fetchButArchiveLater (ForDso with dso) cid
+        exercise cid SvOnboardingConfirmed_Expire
+        -- register the sv as offboarded so it's PartyToParticipant mapping for the DSO party gets removed
+        let sv = svOnboardingConfirmed.svParty
+        let offboardingInfo = OffboardedSvInfo with
+              name = svOnboardingConfirmed.svName
+              participantId = svOnboardingConfirmed.svParticipantId
+        newDsoRules <- create this with
+          offboardedSvs = Map.insert sv offboardingInfo offboardedSvs
+        return DsoRules_ExpireSvOnboardingConfirmedResult with ..
+
+
+    -- Amulet management driven directly by the DSO delegate
+    -------------------------------------------------------
+
+    nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
+      with
+        cid : ContractId Amulet
+        choiceArg : Amulet_Expire
+      controller dsoDelegate
+      do
+        result <- exercise cid choiceArg
+        return DsoRules_Amulet_ExpireResult with
+          expireSum = result.expireSum
+
+    nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : DsoRules_LockedAmulet_ExpireAmuletResult
+      with
+        cid : ContractId LockedAmulet
+        choiceArg : LockedAmulet_ExpireAmulet
+      controller dsoDelegate
+      do
+        result <- exercise cid choiceArg
+        return DsoRules_LockedAmulet_ExpireAmuletResult with
+          expireSum = result.expireSum
+
+
+    -- Round management driven directly by the DSO delegate
+    ------------------------------------------------------
+
+    nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+        amuletPriceVoteCids : [ContractId AmuletPriceVote]
+      controller dsoDelegate
+      do
+        amuletPrice <- fetchMedianAmuletPrice dso (Map.keys svs) amuletPriceVoteCids
+        result <- exercise amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with ..
+        return DsoRules_AdvanceOpenMiningRoundsResult with
+          summarizingRound = result.summarizingRoundCid
+          openRound = result.openRoundCid
+
+
+    -- ANS entry and payment management driven directly by the DSO delegate
+    -----------------------------------------------
+
+    nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
+      with
+        ansEntryContextCid : ContractId AnsEntryContext
+        choiceArg : AnsEntryContext_CollectEntryRenewalPayment
+      controller dsoDelegate
+      do
+        summary <- exercise ansEntryContextCid choiceArg
+        return DsoRules_CollectEntryRenewalPaymentResult with
+          ansEntry = summary.entryCid
+          subscriptionState = summary.subscriptionStateCid
+
+    nonconsuming choice DsoRules_ExpireAnsEntry : DsoRules_ExpireAnsEntryResult
+      with
+        ansEntryCid : ContractId AnsEntry
+        choiceArg : AnsEntry_Expire
+      controller dsoDelegate
+      do
+        exercise ansEntryCid choiceArg
+        pure DsoRules_ExpireAnsEntryResult
+
+    nonconsuming choice DsoRules_ExpireSubscription : DsoRules_ExpireSubscriptionResult
+      with
+        ansEntryContextCid : ContractId AnsEntryContext
+        subscriptionIdleStateCid: ContractId SubscriptionIdleState
+        choiceArg : SubscriptionIdleState_ExpireSubscription
+      controller dsoDelegate
+      do
+        result <- exercise subscriptionIdleStateCid choiceArg
+        exercise ansEntryContextCid (AnsEntryContext_Terminate dso result.terminatedSubscription)
+        pure DsoRules_ExpireSubscriptionResult
+
+    nonconsuming choice DsoRules_TerminateSubscription : DsoRules_TerminateSubscriptionResult
+      with
+        ansEntryContextCid : ContractId AnsEntryContext
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller dsoDelegate
+      do
+        exercise ansEntryContextCid (AnsEntryContext_Terminate dso terminatedSubscriptionCid)
+        pure DsoRules_TerminateSubscriptionResult
+
+
+    -- Reward management driven directly by the DSO delegate
+    -------------------------------------------------------
+
+    nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
+      with
+        sv : Party
+        openRoundCid : ContractId OpenMiningRound
+        rewardStateCid : ContractId SvRewardState
+        beneficiaries : [(Party, Int)]
+      controller sv
+      do
+        case Map.lookup sv svs of
+          None -> fail "SV is not an SV"
+          Some info -> do
+            -- check round
+            now <- getTime
+            openRound <- fetchReferenceData (ForDso with dso) openRoundCid
+            require "OpenRound is open" (openRound.opensAt <= now)
+
+            -- check and update state
+            rewardState <- fetchAndArchive (ForSv with dso; svName = info.name) rewardStateCid
+            let state = rewardState.state
+            require
+              ("Round " <> show openRound.round <> " is greater than the last round a reward has been received for " <> show state.lastRoundCollected)
+              (state.lastRoundCollected < openRound.round)
+
+            newRewardStateCid <- create rewardState with
+              state = RewardState with
+                lastRoundCollected = openRound.round
+                numRoundsCollected = state.numRoundsCollected + 1
+                numRoundsMissed =
+                  state.numRoundsMissed + (openRound.round.number - state.lastRoundCollected.number - 1)
+                numCouponsIssued = state.numCouponsIssued + length beneficiaries
+
+            -- check weights and issue rewards
+            let totalBenficiaryWeight = sum $ map snd beneficiaries
+            require "Total beneficiary weight matches SV operator weight" (totalBenficiaryWeight == info.svRewardWeight)
+            require "At most one coupon per beneficiary" (unique $ map fst beneficiaries)
+
+            couponCids <- forA beneficiaries $ \(beneficiary, weight) ->
+              create SvRewardCoupon with
+                dso
+                sv
+                beneficiary
+                weight
+                round = openRound.round
+
+            return DsoRules_ReceiveSvRewardCouponResult with
+                svRewardState = newRewardStateCid
+                svRewardCoupons = couponCids
+
+
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    -----------------------------------------------------------------
+    nonconsuming choice DsoRules_ClaimExpiredRewards : DsoRules_ClaimExpiredRewardsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_ClaimExpiredRewards
+      controller dsoDelegate
+      do
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_ClaimExpiredRewardsResult with
+          unclaimedReward = result.unclaimedRewardCid
+
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice DsoRules_MergeUnclaimedRewards : DsoRules_MergeUnclaimedRewardsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller dsoDelegate
+      do
+        require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
+        result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
+        return DsoRules_MergeUnclaimedRewardsResult with
+          unclaimedReward = result.unclaimedRewardCid
+
+    nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        issuingRoundCid : ContractId IssuingMiningRound
+      controller dsoDelegate
+      do
+        result <- exercise amuletRulesCid AmuletRules_MiningRound_Close with ..
+        return DsoRules_MiningRound_CloseResult with
+          closedRound = result.closedRoundCid
+
+
+    -- Contract Expiry
+    ------------------
+
+    -- TODO(M3-57): generalize this to `ExpiringContract` and use it for all expiring contracts in `Splice.DsoRules`
+    nonconsuming choice DsoRules_ExpireStaleConfirmation : DsoRules_ExpireStaleConfirmationResult
+      with
+        staleConfirmationCid : ContractId Confirmation
+      controller dsoDelegate
+      do
+        now <- getTime
+        staleConfirmation <- fetchAndArchive (ForDso with dso) staleConfirmationCid
+        require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        return DsoRules_ExpireStaleConfirmationResult
+
+    -- Batch merge of member traffic contracts
+    -------------------------------------------
+    nonconsuming choice DsoRules_MergeMemberTrafficContracts : DsoRules_MergeMemberTrafficContractsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        trafficCids : [ContractId MemberTraffic]
+      controller dsoDelegate
+      do
+        require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
+        result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
+        return DsoRules_MergeMemberTrafficContractsResult with
+          memberTraffic = result.mergedTrafficCid
+
+
+    -- | Note this choice only exists to clean up duplicate contracts caused by the bug in #12495.
+    -- There should never be duplicates going forward.
+    nonconsuming choice DsoRules_MergeSvRewardState : DsoRules_MergeSvRewardStateResult
+      with
+        svName : Text
+        rewardStateCids : [ContractId SvRewardState]
+      controller dsoDelegate
+      do require "Number of SvRewardState contracts to merge is >= 2" (length rewardStateCids >= 2)
+         rewardStates <- forA rewardStateCids $ fetchAndArchive (ForSv this.dso svName)
+         -- We don't attempt to merge the fields in the reward state since there is no good
+         -- way to do so and none of the fields other than lastRoundCollected are crucial and for that
+         -- taking the max is the correct merge.
+         cid <- create $ maximumOn (\state -> state.state.lastRoundCollected) rewardStates
+         pure $ DsoRules_MergeSvRewardStateResult cid
+
+summarizeDso : DsoRules -> DsoSummary
+summarizeDso dsoRules = DsoSummary with
+    dsoDelegate = dsoRules.dsoDelegate
+    numSvs
+    requiredNumVotes =
+      -- NOTE:
+      --   For a vote with n svs and f = floor((n - 1) /3) byzantine svs, we want to have the following properties:
+      --     *availability*: f operators abstaining, won’t stop the vote
+      --        ⇒ numRequiredVotes <= n - f
+      --     *tolerate DSO delegate selecting the votes*: the threshold must be independent of the number of votes cast
+      --     *integrity*: f operators cannot boost their voting power for future votes by collaborating
+      --        ⇒ implies f < threshold-for-accepting-an-action
+      --     *result acceptance*: outcome is accepted by SV operators
+      --        ⇒ we can pick between requiring numYays >= n / 2 + 1 (simple majority) and requiring numYays >= numRequiredVotes (super-majority)
+      --   We favor the following threshold that agrees with our preference of having both integrity and availability.
+      ceiling ((intToDecimal (numSvs + f + 1)) / 2.0)
+  where
+    numSvs = Map.size dsoRules.svs
+    f = floor ((intToDecimal (numSvs - 1)) / 3.0)
+
+-- | Execute an action which requires certain number of confirmations from SVs.
+-- Each confirmed action can at most be executed once.
+executeActionRequiringConfirmation: ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
+  ARC_AmuletRules with .. ->
+    case amuletRulesCid of
+      None -> error "amuletRulesCid was not defined."
+      Some amuletRulesCid -> do
+        case amuletRulesAction of
+          CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+  ARC_DsoRules with .. ->
+    case dsoAction of
+      SRARC_AddSv choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_OffboardSv choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ConfirmSvOnboarding choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
+  ARC_AnsEntryContext with .. ->
+    case ansEntryContextAction of
+      ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
+      ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
+  ExtActionRequiringConformation _dummyUnitField -> pure ()
+
+-- Functions implementing instant-runoff voting
+-----------------------------------------------
+
+data VotingState a = VotingState with
+    rankings : Map.Map a [[a]]
+    -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
+    loosers : Set.Set a
+    -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
+    -- that would result from filtering the remaining rankings eagerly.
+  deriving (Eq, Show)
+
+instantRunOffVoting : Ord a => Int -> Int -> [(a, [a])] -> a
+instantRunOffVoting requiredNumVotes remainingVotingRounds rankings0 =
+    determineWinner requiredNumVotes remainingVotingRounds st
+  where
+    -- Only consider candidates that confirmed their readiness by voting themselves,
+    -- as a prudent engineering measure. These candidates have very recently shown to
+    -- be able to submit transactions.
+    voters = Set.fromList $ map fst rankings0
+    rankings = map (filter (`Set.member` voters) . snd) rankings0
+    st = tallyVotes rankings (VotingState Map.empty Set.empty)
+
+-- | Determine the winner of a preference voting election using Instant-RunOff voting
+-- https://en.wikipedia.org/wiki/Instant-runoff_voting
+determineWinner : Ord a => Int -> Int -> VotingState a -> a
+determineWinner requiredNumVotes remainingVotingRounds st
+  | remainingVotingRounds <= 0 = winner
+  | requiredNumVotes <= numWinnerVotes = winner
+  | otherwise =
+      let (looser, _) = head candidates
+          updatedVotes = distributeVotes looser st
+      in  determineWinner requiredNumVotes (remainingVotingRounds - 1) updatedVotes
+  where
+    candidates = sortOn snd
+      [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList st.rankings ]
+    (winner, numWinnerVotes) = last candidates
+
+
+distributeVotes : forall a. Ord a => a -> VotingState a -> VotingState a
+distributeVotes looser st =
+  case Map.lookup looser st.rankings of
+    None -> error "deletion of non-existent candidate"
+    Some remainingRankings ->
+      tallyVotes remainingRankings VotingState with
+        rankings = st.rankings
+        loosers = Set.insert looser st.loosers
+
+tallyVotes : Ord a => [[a]] -> VotingState a -> VotingState a
+tallyVotes rankings votes = foldl tallyVote votes rankings
+
+tallyVote : forall a. Ord a => VotingState a -> [a] -> VotingState a
+tallyVote st [] = st
+tallyVote st (p :: ps)
+  -- loosers cannot become candidates again
+  | p `Set.member` st.loosers = tallyVote st ps
+  | otherwise = VotingState with
+      rankings = Map.alter tally p st.rankings
+      loosers = st.loosers
+  where
+    tally : Optional [[a]] -> Optional [[a]]
+    tally None = Some [ps]
+    tally (Some rankings) = Some (ps :: rankings)
+
+
+-- Wellformedness checks
+------------------------
+
+requireWellformedReason : DsoRulesConfig -> Reason -> Update ()
+requireWellformedReason config reason = do
+  require "Reason URL is not too long" (T.length reason.url <= config.maxTextLength)
+  require "Reason body is not too long" (T.length reason.body <= config.maxTextLength)
+
+requireWellformedVote : DsoRulesConfig -> Vote -> Update ()
+requireWellformedVote config vote = do
+  requireWellformedReason config vote.reason
+
+ensureNotExpired : Time -> Update ()
+ensureNotExpired expiresAt = do
+  now <- getTime
+  require "Contract has not yet expired" (now < expiresAt)
+
+
+-- Vote Request support functions
+---------------------------------
+
+-- | Get the future-dated effectiveAt of an action requiring confirmation.
+actionRequiringConfirmationEffectiveAt : ActionRequiringConfirmation -> Optional Time
+actionRequiringConfirmationEffectiveAt action =
+  case action of
+    ARC_AmuletRules with .. ->
+      case amuletRulesAction of
+        CRARC_AddFutureAmuletConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
+        CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleTime
+        CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
+        CRARC_MiningRound_Archive _ -> None
+        CRARC_MiningRound_StartIssuing _ -> None
+    ARC_DsoRules with .. -> None
+    ARC_AnsEntryContext with .. -> None
+    ExtActionRequiringConformation _dummyUnitField ->
+      error "Encountered unexpected ExtActionRequiringConformation at runtime"
+
+
+-- On- and offboarding
+----------------------
+
+getSvInfo : Party -> DsoRules -> Update SvInfo
+getSvInfo operator this =
+  optional (fail "Not a sv") pure $ Map.lookup operator this.svs
+
+lookupSvInfoByName : Text -> DsoRules -> Optional (Party, SvInfo)
+lookupSvInfoByName svName DsoRules{..} =
+  find (\info -> info._2.name == svName) $ Map.toList svs
+
+-- | Returns True if an SV with that name is either currently onboarded
+-- or an SV with that name has been onboarded before and is now in offboardedSvs.
+svHasBeenOnboardedBefore : Text -> DsoRules -> Bool
+svHasBeenOnboardedBefore svName this =
+  isSome (lookupSvInfoByName svName this) || any (\info -> info.name == svName) (Map.values this.offboardedSvs)
+
+ensureNeverOperatedNode : Party -> DsoRules -> Update ()
+ensureNeverOperatedNode newSvParty this = do
+  require "SV party has not yet operated a node" $
+    not (newSvParty `Map.member` this.svs || newSvParty `Map.member` this.offboardedSvs)
+
+-- factored out from the choice to avoid mistakes from having the fields of DsoRules{..} in scope
+dsoRules_addSv : DsoRules -> DsoRules_AddSv -> Update (ContractId DsoRules)
+dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
+  ensureNeverOperatedNode newSvParty this0
+  -- in DevNet we allow changing the operator of an existing sv, which we implement as a removal and re-addition
+  this@DsoRules{..} <-
+    if this0.isDevNet
+      then
+        let DsoRules{..} = this0 in -- bring all DsoRules fields into scope
+        case lookupSvInfoByName newSvName this0 of
+          None -> pure this0
+          Some (sv, info) -> do
+            let offboardingInfo = OffboardedSvInfo with
+                  name = info.name
+                  participantId = info.participantId
+            pure $ this0 with
+              svs = Map.delete sv svs
+              offboardedSvs = Map.insert sv offboardingInfo offboardedSvs
+      else do
+        require "SV is not currently onboarded" (isNone $ lookupSvInfoByName newSvName this0)
+        pure this0
+
+  -- create per-sv contracts if they have never been onboarded
+  unless (svHasBeenOnboardedBefore newSvName this) $
+    createPerSvContracts this arg
+  -- create per SV party contracts
+  let initialAmuletPriceVote = None
+  createPerSvPartyContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote
+  -- register the new operator in the DsoRules
+  let svInfo = SvInfo with
+        name = newSvName
+        joinedAsOfRound
+        svRewardWeight = newSvRewardWeight
+        participantId = newSvParticipantId
+  create this with
+    svs = Map.insert newSvParty svInfo svs
+
+createPerSvContracts : DsoRules -> DsoRules_AddSv -> Update ()
+createPerSvContracts DsoRules{..} DsoRules_AddSv{..} = do
+  void $ create SvRewardState with
+    dso
+    svName = newSvName
+    state = RewardState with
+      lastRoundCollected = Round (joinedAsOfRound.number - 1)
+      numRoundsMissed = 0
+      numRoundsCollected = 0
+      numCouponsIssued = 0
+
+createPerSvPartyContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> Update ()
+createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice = do
+  now <- getTime
+  -- Note: we currently track the amulet-price vote on a per operator basis.
+  -- This implies it will be reset when an operator is offboarded and re-onboarded.
+  void $ create AmuletPriceVote with
+    dso
+    sv = newSvParty
+    amuletPrice
+    lastUpdatedAt = now
+  void $ create SvStatusReport with
+    dso
+    sv = newSvParty
+    svName = newSvName
+    number = 0
+    status = None
+  void $ create SvNodeState with
+    dso
+    sv = newSvParty
+    svName = newSvName
+    state = NodeState with
+      synchronizerNodes
+
+
+-- instances
+------------
+
+instance HasCheckedFetch ElectionRequest ForDso where
+  contractGroupId ElectionRequest {..} = ForDso with dso
+
+instance HasCheckedFetch VoteRequest ForDso where
+  contractGroupId VoteRequest {..} = ForDso with dso
+
+instance HasCheckedFetch FeaturedAppRight ForDso where
+  contractGroupId FeaturedAppRight {..} = ForDso with dso
+
+instance HasCheckedFetch Confirmation ForDso where
+  contractGroupId Confirmation {..} = ForDso with dso

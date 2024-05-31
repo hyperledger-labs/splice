@@ -1,0 +1,123 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utility functions for different kinds of fees.
+module Splice.Fees where
+
+import Splice.Types
+import Splice.RelRound
+import DA.Time
+
+-- Time utilities
+-----------------
+
+relTimeToMicros : RelTime -> Decimal
+relTimeToMicros dt = intToDecimal (convertRelTimeToMicroseconds dt)
+
+microsPerDay : Decimal
+microsPerDay = relTimeToMicros (days 1)
+
+relTimeToDays : RelTime -> Decimal
+relTimeToDays dt = relTimeToMicros dt / microsPerDay
+
+daysToRelTime : Decimal -> RelTime
+daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
+
+
+-- Rates per mining round
+-------------------------
+
+newtype RatePerRound = RatePerRound with rate : Decimal
+  deriving (Eq, Ord, Show)
+
+chargeRatePerRound : RatePerRound -> RelRound -> Decimal
+chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
+
+-- | Scale a round rate such that
+--
+-- ALL s r dt. s * chargeRatePerRound r dt = chargeRatePerRound (s `scaleRatePerRound` r) dt
+--
+scaleRatePerRound : Decimal -> RatePerRound -> RatePerRound
+scaleRatePerRound s r = RatePerRound with rate = s * r.rate
+
+
+-- Fixed and variable rates
+---------------------------
+
+-- | A fixed fee independent of the action being taken.
+-- TODO(M3-90): check whether this name matches usage in financial terms, it probably isn't. Should it be 'flat-fee', 'constantfee', ... ???
+newtype FixedFee = FixedFee with fee : Decimal
+  deriving (Eq, Ord, Show)
+
+scaleFixedFee : Decimal -> FixedFee -> FixedFee
+scaleFixedFee s f = FixedFee with fee = s * f.fee
+
+-- | A rate defined as a piecewise linear function, e.g.,
+-- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+-- corresponds to 1% of the first 100, 0.1% of the next 1000 and 0.01% of the next 1000000
+-- and 0.001% for everything above that.
+data SteppedRate = SteppedRate
+  with
+    initialRate : Decimal
+    steps : [(Decimal, Decimal)]
+  deriving (Eq, Ord, Show)
+
+validSteppedRate : SteppedRate -> Bool
+validSteppedRate SteppedRate{initialRate, steps} =
+  validRate initialRate &&
+  all (\(step, rate) -> 0.0 < step && validRate rate) steps && not (null steps)
+  where
+    validRate : Decimal -> Bool
+    validRate r = 0.0 <= r && r <= 1.0
+
+chargeSteppedRate : SteppedRate -> Decimal -> Decimal
+chargeSteppedRate SteppedRate{initialRate, steps} amount =
+  goChargeSteppedRate (amount, initialRate, 0.0) steps
+
+goChargeSteppedRate : (Decimal, Decimal, Decimal) -> [(Decimal, Decimal)] -> Decimal
+goChargeSteppedRate (remainder, _currentRate, rate) _
+  | remainder <= 0.0 = rate
+goChargeSteppedRate (remainder, currentRate, rate) [] = rate + remainder * currentRate
+goChargeSteppedRate (remainder, currentRate, rate) ((step, steppedRate) :: steps) =
+  let remainder' = remainder - step
+      rate' = min remainder step * currentRate + rate
+  in goChargeSteppedRate (remainder', steppedRate, rate') steps
+
+-- | Scale a fixed-plus-variable rate such that
+--
+-- ALL s r q. s * chargeSteppedRate r (q/s) = chargeSteppedRate (s `scaleSteppedRate` r) q
+--
+scaleSteppedRate : Decimal -> SteppedRate -> SteppedRate
+scaleSteppedRate s r =
+  SteppedRate with
+    initialRate = r.initialRate
+    steps = map (\(step, rate) -> (step * s, rate)) $ r.steps
+
+-- Expiring amounts
+----------------------
+
+data ExpiringAmount = ExpiringAmount with
+    initialAmount : Decimal
+    createdAt : Round
+    ratePerRound : RatePerRound
+  deriving (Eq, Ord, Show)
+
+validExpiringAmount : ExpiringAmount -> Bool
+validExpiringAmount e = e.initialAmount > 0.0
+
+actualAmount : Round -> ExpiringAmount -> Decimal
+actualAmount t e
+  | e.ratePerRound.rate <= 0.0 = error $ "Round rate must be positive: " <> show e.ratePerRound.rate
+  | t <= e.createdAt = e.initialAmount
+  | otherwise =
+      let roundsPassed = t `subRound` e.createdAt
+      in
+        max 0.0 (e.initialAmount - chargeRatePerRound e.ratePerRound roundsPassed)
+
+-- | Smart constructor for an expiring amount.
+expiringAmount : RatePerRound -> Decimal -> Round -> ExpiringAmount
+expiringAmount ratePerRound initialAmount createdAt =
+  ExpiringAmount with initialAmount; createdAt; ratePerRound
+
+getValueAsOfRound0 : ExpiringAmount -> Decimal
+getValueAsOfRound0 e = e.initialAmount + e.ratePerRound.rate * intToDecimal e.createdAt.number
