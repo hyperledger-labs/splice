@@ -27,9 +27,12 @@ Upcoming
 
 * Bugfixes
 
-  The wallet automation for collecting rewards is started only once per Daml party instead of
-  once per onboarded wallet user. This enables setups where multiple wallet users have access to
-  the same coin holdings for the same Daml party.
+  * The wallet automation for collecting rewards is started only once per Daml party instead of
+    once per onboarded wallet user. This enables setups where multiple wallet users have access to
+    the same coin holdings for the same Daml party.
+
+  * Fixed a bug where a user wallet wrongly attempted to use the featured app right of the validator
+    admin party if that existed, which resulted in failed transactions.
 
 * The `approved-sv-id-values-*.yaml` files have been removed from the release bundle. The approved SV identities for
   each network instance can now exclusively be obtained from the `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs>`_ .

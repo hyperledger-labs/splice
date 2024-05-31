@@ -509,7 +509,6 @@ class TreasuryService(
         maxNumInputs,
         issuingRoundsMap,
       )
-      validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
       val createFeeUsd = configUsd.createFee.fee
       if (
@@ -555,11 +554,8 @@ class TreasuryService(
             .map(r => (r.payload.user, r.contractId))
             .toMap[String, ValidatorRight.ContractId]
             .asJava,
-          // The first (locking amulet) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
-          // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
-          validatorFeaturedAppRight
-            .map(r => r.contractId)
-            .toJava,
+          // The wallet app is not a featured app ==> not featured app right in the transfer contexts used for its workflow steps.
+          None.toJava,
         )
         Some(
           (

@@ -520,7 +520,7 @@ class ScanIntegrationTest
     }
 
     val (appRewardAmount, validatorRewardAmount) =
-      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, true)
+      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
 
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {

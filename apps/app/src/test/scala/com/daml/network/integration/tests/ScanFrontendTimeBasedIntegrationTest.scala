@@ -47,6 +47,8 @@ class ScanFrontendTimeBasedIntegrationTest
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 
+      // Note this has no effect on the wallet app, as it is not a featured app and thus does not use the featured app
+      // right in the transfer contexts of its submissions. We leave it here to test that it has no effect.
       grantFeaturedAppRight(aliceValidatorWalletClient)
 
       clue("Tap to get some amulets") {
@@ -83,7 +85,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
-            Seq(s"${aliceValidatorWalletParty} 91.5 CC"),
+            Seq(s"${aliceValidatorWalletParty} 0.249 CC"),
           )
         }
 

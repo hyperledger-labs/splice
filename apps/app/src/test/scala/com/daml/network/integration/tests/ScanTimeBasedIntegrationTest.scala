@@ -277,8 +277,8 @@ class ScanTimeBasedIntegrationTest
             sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
             Seq(
               // TODO(#10941): consider de-hard-coding the expected values here
-              (aliceValidatorWalletClient, BigDecimal(20644.8400000000)),
               (bobValidatorWalletClient, BigDecimal(8.4060000000)),
+              (aliceValidatorWalletClient, BigDecimal(7.6860000000)),
             ),
           )
         }

@@ -38,6 +38,8 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 
+      // Note this has no effect on the wallet app, as it is not a featured app and thus does not use the featured app
+      // right in the transfer contexts of its submissions. We leave it here to test that it has no effect.
       grantFeaturedAppRight(bobValidatorWalletClient)
 
       bobWalletClient.tap(50)
@@ -75,7 +77,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       )
 
       val (appRewardAmount, validatorRewardAmount) =
-        getRewardCouponsValue(appRewards, validatorRewards, true)
+        getRewardCouponsValue(appRewards, validatorRewards, featured = false)
 
       checkTxHistory(
         bobValidatorWalletClient,
