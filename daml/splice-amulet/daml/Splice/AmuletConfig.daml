@@ -1,0 +1,62 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AmuletConfig where
+
+import Splice.Fees
+import Splice.DecentralizedSynchronizer
+import Splice.Issuance
+import Splice.Schedule
+import DA.Time
+
+data Amulet = Amulet deriving (Show, Eq)
+data USD = USD deriving (Show, Eq)
+
+-- | Configuration determining the fees and limits for Amulet transfers granted by
+-- the AmuletRules.
+--
+-- See Splice.Scripts.Parameters for concrete values.
+data TransferConfig unit = TransferConfig with
+    createFee : FixedFee -- ^ Fee to create a new amulet.
+    holdingFee : RatePerRound -- ^ Fee for keeping a amulet around
+    transferFee : SteppedRate -- ^ Fee for transferring some amount of amulet to a new owner.
+    lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked amulet.
+    extraFeaturedAppRewardAmount : Decimal -- ^ Extra $-amount of reward for featured apps.
+    maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
+    maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
+    maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked amulet.
+  deriving (Eq, Show)
+
+-- | Configuration includes TransferConfig, issuance curve and tickDuration
+--
+-- See Splice.Scripts.Parameters for concrete values.
+data AmuletConfig unit = AmuletConfig with
+    transferConfig : TransferConfig unit -- ^ Configuration determining the fees and limits for Amulet transfers
+    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    decentralizedSynchronizer : AmuletDecentralizedSynchronizerConfig -- ^ Configuration for the decentralized synchronizer and its fees.
+    -- TODO(M4-85): the values in here are likely quite large (several URls and long synchronizerIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    packageConfig : PackageConfig
+      -- ^ Configuration determining the version of each package
+      -- that should be used for command submissions.
+  deriving (Eq, Show)
+
+-- Check constraints on config params on which the implementation of the choices rely.
+validAmuletConfig : AmuletConfig unit -> Bool
+validAmuletConfig AmuletConfig{..} =
+    tickDuration > days 0
+  && validIssuanceCurve issuanceCurve
+  && validAmuletDecentralizedSynchronizerConfig decentralizedSynchronizer
+
+-- | The package config defines for each daml package (identified by name)
+-- the package version that should be used for command submissions
+-- at that point.
+data PackageConfig = PackageConfig
+  with
+    amulet : Text
+    amuletNameService : Text
+    dsoGovernance : Text
+    validatorLifecycle : Text
+    wallet : Text
+    walletPayments : Text
+  deriving (Show, Eq)

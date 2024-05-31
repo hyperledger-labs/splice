@@ -1,0 +1,105 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.CometBft where
+
+import qualified DA.Map as Map
+import qualified DA.Text as T
+
+{-
+
+General approach for CometBFT integration:
+
+- every SV controls their
+    - CometBFT nodes (at most 2, with total voting power <= 1 for mainnet)
+    - governance keys <= 2
+    - sequencing keys <= 2
+
+- every SV can freely update their CometBft CometBftConfig provided it is
+    - valid
+    - for mainnet, total voting power <= 1
+
+- SV nodes monitor whether
+  - SVs have sequencing, governance keys and CometBFT nodes registered
+  - these keys and nodes are actually used
+
+- once we find that DsoRules becomes too heavy wrt SvInfo, we factor that out into a separate contract, one per sv
+
+- in DevNet, CometBFT validator nodes that are more likely to be available are given 100x voting power
+  to minimize the impact of CometBFT validator nodes that get connected for testing, and disconnect afterwards w/o unregistering as a validator
+
+-}
+
+
+-- config data
+--------------
+
+-- | Config for a single CometBFT node.
+data CometBftNodeConfig = CometBftNodeConfig with
+    validatorPubKey : Text
+    votingPower : Int
+  deriving (Eq, Show)
+
+-- | Config for a key used by the SvApp to create CometBFT network governance transactions.
+data GovernanceKeyConfig = GovernanceKeyConfig with
+    pubKey : Text
+  deriving (Eq, Show)
+
+-- | Config for a key used by the CometBFT Sequencer Driver to sequence messages via the CometBFT network.
+data SequencingKeyConfig = SequencingKeyConfig with
+    pubKey : Text
+  deriving (Eq, Show)
+
+-- | Config for all CometBFT nodes and keys under the control of a single SV node operator.
+data CometBftConfig = CometBftConfig with
+    nodes : Map.Map Text CometBftNodeConfig
+    -- ^ A map from CometBft node-ids to their configuration.
+    governanceKeys : [GovernanceKeyConfig]
+    sequencingKeys : [SequencingKeyConfig]
+  deriving (Eq, Show)
+
+-- | Limits on the configurations that SV node operators can choose for their CometBFT nodes and keys.
+data CometBftConfigLimits = CometBftConfigLimits with
+    maxNumCometBftNodes : Int
+    maxNumGovernanceKeys : Int
+    maxNumSequencingKeys : Int
+    maxNodeIdLength : Int
+    maxPubKeyLength : Int
+  deriving (Eq, Show)
+
+
+-- default values
+-----------------
+
+emptyCometBftConfig : CometBftConfig
+emptyCometBftConfig = CometBftConfig Map.empty [] []
+
+defaultCometBftConfigLimits : CometBftConfigLimits
+defaultCometBftConfigLimits = CometBftConfigLimits with
+    maxNumCometBftNodes = 2
+    maxNumGovernanceKeys = 2
+    maxNumSequencingKeys = 2
+    maxNodeIdLength = 50
+    maxPubKeyLength = 256
+
+
+-- validity checks
+------------------
+
+validCometBftConfig : CometBftConfigLimits -> CometBftConfig -> Bool
+validCometBftConfig limits config =
+    all (validCometBftNodeConfig limits) (Map.toList config.nodes) &&
+    (Map.size config.nodes <= limits.maxNumCometBftNodes) &&
+    length config.governanceKeys <= limits.maxNumGovernanceKeys &&
+    length config.sequencingKeys <= limits.maxNumSequencingKeys &&
+    all (\k -> T.length k.pubKey <= limits.maxPubKeyLength) config.governanceKeys &&
+    all (\k -> T.length k.pubKey <= limits.maxPubKeyLength) config.sequencingKeys
+
+validCometBftNodeConfig : CometBftConfigLimits -> (Text, CometBftNodeConfig) -> Bool
+validCometBftNodeConfig limits (nodeId, config) =
+  T.length nodeId <= limits.maxNodeIdLength &&
+  config.votingPower >= 0 &&
+  T.length config.validatorPubKey <= limits.maxPubKeyLength
+
+totalVotingPower : CometBftConfig -> Int
+totalVotingPower config = sum $ map votingPower $ Map.values $ config.nodes

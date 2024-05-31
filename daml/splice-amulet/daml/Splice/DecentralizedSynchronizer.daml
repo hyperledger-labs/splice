@@ -1,0 +1,98 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and contracts for managing synchronizer fees
+module Splice.DecentralizedSynchronizer where
+
+import qualified DA.Set as Set
+import DA.Time
+
+import Splice.Types
+import Splice.Util
+
+
+-- Decentralized synchronizer configuration
+-------------------------------
+
+-- | The configuration of the logical concept of a decentralized synchronizer, which consists over its lifetime
+-- of a series of actual synchronizers, which are introduced for handling the (rare) occasions of switching
+-- to a new synchronizer protocol version.
+data AmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
+    requiredSynchronizers : Set.Set Text -- ^ The synchronizer-ids of all synchronizers that Amulet and ANS users should be connected to.
+    activeSynchronizer : Text -- ^ The synchronizer-id of the synchronizer on which the SVs accepts transactions involving the
+                        -- AmuletRules and related contracts, which must be one of the `requiredSynchronizers`.
+    fees : SynchronizerFeesConfig -- ^ The fees charged for using the decentralized synchronizer. We use the same fees across all active decentralized synchronizers.
+  deriving (Eq, Show)
+
+-- | The limits defining the free base rate delivered by the synchronizer.
+-- It defines the base rate as allowing at most burstAmount of sequencing traffic within a window of burstWindow seconds.
+data BaseRateTrafficLimits = BaseRateTrafficLimits with
+    burstAmount: Int -- ^ The total burstAmount in bytes of sequencing traffic delivered over the burstWindow
+    burstWindow: RelTime -- ^ Time window within which the burstAmount must not be exceeded
+  deriving (Eq, Show)
+
+-- | Synchronizer fees related configuration to be tracked on the DsoRules contract
+data SynchronizerFeesConfig = SynchronizerFeesConfig with
+    baseRateTrafficLimits: BaseRateTrafficLimits -- ^ Configuration limits for base rate traffic
+    extraTrafficPrice: Decimal -- ^ The price of extra traffic denominated in $/MB
+    readVsWriteScalingFactor: Int -- ^ How much the sending of a message to its recipient costs in terms of bytes written to the synchronizer.
+    -- This factor is specified in parts per 10,000 (or per 10 mille)
+    -- We charge for sending messages depending on the number of recipients,
+    -- as delivering the message incurs a cost as well, albeit usually a much
+    -- smaller one than the cost of a write.
+    minTopupAmount: Int -- ^ The minimum amount of extra traffic (in bytes) that must be bought when buying extra traffic.
+    -- This ensures that the SVs can amortize the cost of executing that transaction.
+  deriving (Eq, Show)
+
+
+validAmuletDecentralizedSynchronizerConfig : AmuletDecentralizedSynchronizerConfig -> Bool
+validAmuletDecentralizedSynchronizerConfig config =
+  config.activeSynchronizer `Set.member` config.requiredSynchronizers
+
+
+-- Per sequencer member synchronizer traffic tracking
+------------------------------------------------
+
+-- | The state of the extra synchronizer traffic purchases of a sequencer sv.
+template MemberTraffic with
+    dso : Party
+    memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
+    synchronizerId : Text -- ^ The id of the synchronizer for which this contract tracks purchased extra traffic
+    migrationId : Int -- ^ The migration id of the synchronizer for which this contract tracks purchased extra traffic
+    totalPurchased : Int -- ^ The number of bytes of extra traffic purchased
+    numPurchases : Int -- ^ Number of times extra traffic has been purchased
+    amuletSpent : Decimal -- ^ Total Amulet spent on extra traffic
+    usdSpent : Decimal -- ^ Total USD spent on extra traffic
+  where
+    signatory dso
+
+    ensure totalPurchased >= 0
+      && numPurchases >= 0
+      && amuletSpent >= 0.0
+      && usdSpent >= 0.0
+      && migrationId >= 0
+
+
+initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
+initialMemberTraffic dso memberId synchronizerId migrationId = MemberTraffic with
+    dso
+    memberId
+    migrationId
+    synchronizerId
+    totalPurchased = 0
+    numPurchases = 0
+    amuletSpent = 0.0
+    usdSpent = 0.0
+
+data ForMemberTraffic = ForMemberTraffic with
+    dso : Party
+    memberId : Text
+    synchronizerId : Text
+    migrationId: Int
+  deriving (Eq, Show)
+
+instance HasCheckedFetch MemberTraffic ForDso where
+    contractGroupId MemberTraffic{..} = ForDso with ..
+
+instance HasCheckedFetch MemberTraffic ForMemberTraffic where
+    contractGroupId MemberTraffic{..} = ForMemberTraffic with ..

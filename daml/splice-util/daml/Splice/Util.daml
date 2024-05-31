@@ -1,0 +1,129 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utility functions shared across all splice apps.
+module Splice.Util
+( require,
+
+  requireMatchingContract,
+
+  HasCheckedFetch(..),
+  fetchAndArchive,
+  fetchReferenceData,
+  fetchPublicReferenceData,
+  fetchButArchiveLater,
+
+  fetchUncheckedAndArchive,
+  fetchUncheckedReferenceData,
+  fetchUncheckedButArchiveLater,
+
+  potentiallyUnsafeArchive
+) where
+
+import DA.Action (unless)
+
+-- | Require that a contract-id refers to a specific contract.
+requireMatchingContract : (Eq t, Show t, HasFetch t) => ContractId t -> t -> Update ()
+requireMatchingContract cid expectedCo = do
+  co <- fetch cid
+  unless (co == expectedCo) $ fail $
+    "Contract mismatch: expected " <> show expectedCo <>
+    ", got " <> show co <> " referenced by " <> show cid
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+-- | Contracts typically come in groups. For example, all contracts managed by a specific DSO party.
+--
+-- We aim to always fetch with a specific contract group identifier to ensure that we do not mixup
+-- contracts from different groups.
+class (HasFetch t, Show t, Eq cgid, Show cgid) => HasCheckedFetch t cgid where
+  contractGroupId : t -> cgid
+
+-- | Fetch a contract that is part of a specific contract group.
+--
+-- The group is typically chosen by the caller to match its own group, or a more specific group.
+fetchChecked : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchChecked expectedcgid cid = do
+  co <- fetch cid
+  checkContractGroupId expectedcgid cid co
+
+-- | Fetch and archive a contract in one go.
+--
+-- Use this when implementing choices that mutate another contract by
+-- fetching, archiving, and then creating the updated contract.
+fetchAndArchive : (HasCheckedFetch t cgid, HasArchive t) => cgid -> ContractId t -> Update t
+fetchAndArchive cgid cid = do
+  co <- fetchChecked cgid cid
+  archive cid
+  return co
+
+-- | Fetch a contract that serves as reference data.
+--
+-- Use this whenever you need to fetch a contract that you do not intend to mutate.
+fetchReferenceData : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchReferenceData = fetchChecked
+
+-- | Fetch a contract that is not reference data, and should be archived later in some cases.
+--
+-- Prefer `fetchAndArchive` over this function, as it avoids forgetting to archive the contract.
+fetchButArchiveLater : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchButArchiveLater = fetchChecked
+
+
+-- | Fetch a contract that offers a choice anybody to be read as reference data.
+fetchPublicReferenceData : (HasCheckedFetch t cgid, HasExercise t ch t) => cgid -> ContractId t -> ch -> Update t
+fetchPublicReferenceData expectedCgid cid arg = do
+  co <- exercise cid arg
+  checkContractGroupId expectedCgid cid co
+
+
+-- Unchecked variants of the above functions
+-- Avoid these whenever possible! Actually, we should not need these at all.
+
+-- TODO(#9465): remove their use in ANS
+-- TODO(#9464): remove their use in Splitwell and drop them completely
+
+-- | Fetch and archive a contract in one go.
+--
+-- Use this when implementing choices that mutate another contract by
+-- fetching, archiving, and then creating the updated contract.
+fetchUncheckedAndArchive : (HasFetch b, HasArchive b) => ContractId b -> Update b
+fetchUncheckedAndArchive cid = do
+  co <- fetch cid
+  archive cid
+  return co
+
+-- | Fetch a contract that serves as reference data.
+--
+-- Use this whenever you need to fetch a contract that you do not intend to mutate.
+fetchUncheckedReferenceData : HasFetch t => ContractId t -> Update t
+fetchUncheckedReferenceData = fetch
+
+-- | Fetch a contract that is not reference data, and should be archived later in some cases.
+--
+-- Prefer `fetchAndArchive` over this function, as it avoids forgetting to archive the contract.
+fetchUncheckedButArchiveLater : HasFetch t => ContractId t -> Update t
+fetchUncheckedButArchiveLater = fetch
+
+-- | A more appropriately named version of `archive`.
+--
+-- Please justify all its uses, and where possible prefer `fetchAndArchive`
+-- so that the contract group identifier is surely performed.
+potentiallyUnsafeArchive : HasArchive t => ContractId t -> Update ()
+potentiallyUnsafeArchive = archive
+
+
+-- Internal functions
+---------------------
+
+checkContractGroupId : HasCheckedFetch t cgid => cgid -> ContractId t -> t -> Update t
+checkContractGroupId expectedcgid cid co = do
+  let cgid = contractGroupId co
+  unless (expectedcgid == cgid) $ fail $
+    "Contract group identifier mismatch: expected " <> show expectedcgid <>
+    ", got " <> show cgid <> " for " <> show (cid, co)
+  return co

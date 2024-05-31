@@ -1,0 +1,72 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.SvOnboarding where
+
+import Splice.Types
+
+import Splice.Util
+
+data SvOnboardingRequest_ExpireResult = SvOnboardingRequest_ExpireResult
+
+data SvOnboardingConfirmed_ExpireResult = SvOnboardingConfirmed_ExpireResult
+
+-- | Template used by the SVs to collect confirmations for the onboarding of an SV candidate.
+-- The existence of this contract triggers SV automation that creates confirmation contracts for
+-- the candidate if the token is a valid `SvOnboardingToken` and matches an `ApprovedSvIdentity`.
+template SvOnboardingRequest with
+    candidateName : Text            -- ^ Human-readable name of the SV candidate. Must match the one in `ApprovedSvIdentity`!
+    candidateParty : Party          -- ^ PartyId of the candidate SV party.
+    candidateParticipantId : Text   -- ^ ParticipantId of the candidate SV.
+    token : Text                    -- ^ An encoded and signed `SvOnboardingToken` that confirms the candidate's identity.
+    sponsor : Party                 -- ^ The established SV node that created this contract.
+    dso: Party
+    expiresAt : Time                -- ^ When this contract can be archived even if the onboarding did not succeed.
+  where
+    signatory dso
+    observer candidateParty
+
+    -- Archive if we are past the `expiresAt`.
+    choice SvOnboardingRequest_Expire : SvOnboardingRequest_ExpireResult
+      controller dso
+      do
+        now <- getTime
+        require "Onboarding has expired" (now >= expiresAt)
+        pure SvOnboardingRequest_ExpireResult
+
+-- | A confirmation for approval of a candidate SV.
+--
+-- Once this contract is created, the workflows to onboard that SVs node starts.
+template SvOnboardingConfirmed with
+    svParty : Party
+    svName : Text
+    svRewardWeight : Int
+    svParticipantId: Text
+    reason : Text
+    dso : Party
+    expiresAt : Time            -- ^ When this contract can be archived.
+  where
+    signatory dso
+    observer svParty
+
+    -- Archive if we are past the `expiresAt`.
+    choice SvOnboardingConfirmed_Expire : SvOnboardingConfirmed_ExpireResult
+      controller dso
+      do
+        now <- getTime
+        require "SV candidate confirmation has expired" (now >= expiresAt)
+        pure SvOnboardingConfirmed_ExpireResult
+
+
+-- instances
+------------
+
+instance HasCheckedFetch SvOnboardingConfirmed ForOwner where
+  contractGroupId SvOnboardingConfirmed {..} = ForOwner with dso; owner = svParty
+
+instance HasCheckedFetch SvOnboardingConfirmed ForDso where
+  contractGroupId SvOnboardingConfirmed {..} = ForDso with dso
+
+
+instance HasCheckedFetch SvOnboardingRequest ForDso where
+  contractGroupId SvOnboardingRequest {..} = ForDso with dso

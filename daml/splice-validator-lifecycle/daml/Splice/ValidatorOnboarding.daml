@@ -1,0 +1,55 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorOnboarding where
+
+import Splice.Util
+
+data ValidatorOnboarding_MatchResult = ValidatorOnboarding_MatchResult with
+    usedSecret : ContractId UsedSecret
+
+data ValidatorOnboarding_ExpireResult = ValidatorOnboarding_ExpireResult
+
+-- | Template used by a sponsoring SV node to keep track of the onboarding of a validator candidate.
+-- We use a secret for authenticating the candidate once he has set up his participant.
+-- The secret should be unique, contain at least 256-bits of entropy,
+-- and be communicated to the candidate via a secure off-ledger channel.
+-- Once the candidate has set up his participants, he contacts the SV node via an API call
+-- and presents his secret, which triggers the SV node to add him as a validator
+-- (as a separate on-ledger action for reducing coupling with the DSO governance contracts).
+template ValidatorOnboarding with
+    sv : Party                  -- ^ The SV node sponsoring this onboarding.
+    candidateSecret : Text      -- ^ The unique secret given to the candidate.
+    expiresAt : Time            -- ^ Can be used by the SV for time-bounding the offer.
+  where
+    signatory sv
+
+    -- Archive the offer if the right secret was provided, noting which validator (party) used it.
+    choice ValidatorOnboarding_Match: ValidatorOnboarding_MatchResult
+      with
+        providedSecret : Text
+        validator : Party
+      controller sv
+      do
+        require "provided secret matches the stored secret" (providedSecret == candidateSecret)
+        usedSecret <- create UsedSecret with
+          secret = candidateSecret
+          ..
+        return ValidatorOnboarding_MatchResult with ..
+
+    -- Archive if we are past the `expiresAt`.
+    choice ValidatorOnboarding_Expire : ValidatorOnboarding_ExpireResult
+      controller sv
+      do
+        now <- getTime
+        require "ValidatorOnboarding has expired" (now >= expiresAt)
+        pure ValidatorOnboarding_ExpireResult
+
+
+-- | Template used by a sponsoring SV node for enforcing that an onboarding secret is used only once.
+template UsedSecret with
+    sv : Party                  -- ^ The SV node that sponsored the onboarding.
+    secret : Text               -- ^ An onboarding secret.
+    validator : Party           -- ^ The validator that onboarded using the secret.
+  where
+    signatory sv

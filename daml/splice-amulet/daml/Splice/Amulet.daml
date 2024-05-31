@@ -1,0 +1,321 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | The contracts representing the long-term state of Splice.
+module Splice.Amulet where
+
+import Prelude hiding (forA)
+import DA.Action (void)
+
+import Splice.Expiry
+import Splice.Fees
+import Splice.Round
+import Splice.Types
+
+import Splice.Util
+
+data AmuletExpireSummary = AmuletExpireSummary with
+  owner : Party
+  round: Round -- ^ Round for which this expiry was registered.
+  changeToInitialAmountAsOfRoundZero : Decimal
+  -- The change to the total balance introduced by a amulet expiry, normalized to round zero, i.e.,
+  -- a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
+  changeToHoldingFeesRate : Decimal
+    -- ^ The change of total holding fees introduced by a amulet expiry.
+
+-- | Result of an operation that created a new amulet, e.g.,
+-- by minting a fresh amulet, or by unlocking a locked amulet.
+data AmuletCreateSummary amuletContractId = AmuletCreateSummary with
+    amulet : amuletContractId -- ^ The new amulet that was created
+    amuletPrice : Decimal -- ^ The amulet price at the round the amulet was created
+    round: Round -- ^ Round for which this amulet was created.
+
+data Amulet_ExpireResult = Amulet_ExpireResult with
+  expireSum : AmuletExpireSummary
+
+data LockedAmulet_UnlockResult = LockedAmulet_UnlockResult with
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data LockedAmulet_OwnerExpireLockResult = LockedAmulet_OwnerExpireLockResult with
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data LockedAmulet_ExpireAmuletResult = LockedAmulet_ExpireAmuletResult with
+  expireSum : AmuletExpireSummary
+
+data ValidatorRight_ArchiveAsValidatorResult = ValidatorRight_ArchiveAsValidatorResult
+
+data ValidatorRight_ArchiveAsUserResult = ValidatorRight_ArchiveAsUserResult
+
+data FeaturedAppRight_WithdrawResult = FeaturedAppRight_WithdrawResult
+
+data FeaturedAppRight_CancelResult = FeaturedAppRight_CancelResult
+
+data AppRewardCoupon_DsoExpireResult = AppRewardCoupon_DsoExpireResult with
+  featured : Bool
+  amount : Decimal
+
+data ValidatorRewardCoupon_DsoExpireResult = ValidatorRewardCoupon_DsoExpireResult with
+  amount : Decimal
+
+data ValidatorRewardCoupon_ArchiveAsValidatorResult = ValidatorRewardCoupon_ArchiveAsValidatorResult with
+
+data SvRewardCoupon_DsoExpireResult = SvRewardCoupon_DsoExpireResult with
+  weight: Int
+
+data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBeneficiaryResult
+
+-- | A amulet, which can be locked and whose amount expires over time.
+--
+-- The expiry serves to charge an inactivity fee, and thereby ensures that the
+-- SVs can reclaim the corresponding storage space at some point in the future.
+template Amulet
+  with
+    dso : Party
+    owner : Party
+    amount : ExpiringAmount
+  where
+    signatory dso, owner
+    ensure validExpiringAmount amount
+
+    choice Amulet_Expire : Amulet_ExpireResult
+      with
+        roundCid : ContractId OpenMiningRound
+      controller dso
+      do  requireAmuletExpiredForAllOpenRounds roundCid this
+          let expireSum = AmuletExpireSummary with
+                owner = owner
+                round = amount.createdAt
+                changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
+                changeToHoldingFeesRate = - (amount.ratePerRound.rate)
+          return Amulet_ExpireResult with ..
+
+template LockedAmulet
+  with
+    amulet : Amulet
+    lock : TimeLock
+  where
+    signatory lock.holders, signatory amulet
+
+
+    choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
+      with
+        openRoundCid : ContractId OpenMiningRound
+      controller amulet.owner :: lock.holders
+      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
+         amuletCid <- create amulet
+         let amuletSum = AmuletCreateSummary with
+               amulet = amuletCid
+               amuletPrice = openMiningRound.amuletPrice
+               round = openMiningRound.round
+         return LockedAmulet_UnlockResult with ..
+
+    choice LockedAmulet_OwnerExpireLock : LockedAmulet_OwnerExpireLockResult
+      with
+        openRoundCid : ContractId OpenMiningRound
+      controller amulet.owner
+      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
+         t <- getTime
+         require "Lock is expired" (lock.expiresAt < t)
+         amuletCid <- create amulet
+         let amuletSum = AmuletCreateSummary with
+               amulet = amuletCid
+               amuletPrice = openMiningRound.amuletPrice
+               round = openMiningRound.round
+         return LockedAmulet_OwnerExpireLockResult with ..
+
+    choice LockedAmulet_ExpireAmulet : LockedAmulet_ExpireAmuletResult
+      with
+        roundCid : ContractId OpenMiningRound
+      controller amulet.dso
+      do t <- getTime
+         require "Lock is expired" (lock.expiresAt < t)
+         requireAmuletExpiredForAllOpenRounds roundCid amulet
+         let expireSum = AmuletExpireSummary with
+               owner = amulet.owner
+               round = amulet.amount.createdAt
+               changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 amulet.amount)
+               changeToHoldingFeesRate = - (amulet.amount.ratePerRound.rate)
+         return LockedAmulet_ExpireAmuletResult with ..
+
+
+-- Contracts to implement reward issuance
+-- ======================================
+
+-- | The right to claim amulet issuances for a user's burns as their validator.
+template ValidatorRight with
+    dso : Party
+    user : Party
+    validator : Party
+  where
+    signatory user, validator
+
+    choice ValidatorRight_ArchiveAsValidator : ValidatorRight_ArchiveAsValidatorResult
+      controller validator
+      do return ValidatorRight_ArchiveAsValidatorResult
+
+    choice ValidatorRight_ArchiveAsUser : ValidatorRight_ArchiveAsUserResult
+      controller user
+      do return ValidatorRight_ArchiveAsUserResult
+
+    -- TODO(M3-90): cancellation, withdrawal
+
+
+-- | The right for an application provider to earn featured app rewards.
+template FeaturedAppRight with
+    dso : Party
+    provider : Party
+  where
+    signatory dso
+    observer provider
+
+    choice FeaturedAppRight_Withdraw : FeaturedAppRight_WithdrawResult
+      with
+        reason : Text
+      controller dso
+      do return FeaturedAppRight_WithdrawResult
+
+    choice FeaturedAppRight_Cancel : FeaturedAppRight_CancelResult
+      controller provider
+      do return FeaturedAppRight_CancelResult
+
+
+-- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
+-- Amulet transfer coordinated by the app of a provider.
+template AppRewardCoupon
+  with
+    dso : Party
+    provider : Party -- ^ Application provider
+    featured : Bool
+    amount : Decimal
+    round : Round
+  where
+    signatory dso
+    ensure amount > 0.0
+
+    -- The provider is no signatory so their node's unavailability does not hold up the rewards issuance process.
+    -- The coupon will be archived once it expired as part of standard DSO.
+    observer provider
+
+    choice AppRewardCoupon_DsoExpire : AppRewardCoupon_DsoExpireResult
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller dso
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+         return AppRewardCoupon_DsoExpireResult with
+           ..
+
+
+-- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
+-- hosted by a validator operator.
+template ValidatorRewardCoupon
+  with
+    dso : Party
+    user : Party
+    amount : Decimal
+    round : Round
+  where
+    signatory dso
+    ensure amount > 0.0
+
+    -- The user is no signatory so their node's unavailability does not hold up the rewards issuance process.
+    -- The coupon will be archived once it expired as part of standard DSO.
+    observer user
+
+    choice ValidatorRewardCoupon_DsoExpire : ValidatorRewardCoupon_DsoExpireResult
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller dso
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+        void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+        return ValidatorRewardCoupon_DsoExpireResult with ..
+
+
+    choice ValidatorRewardCoupon_ArchiveAsValidator : ValidatorRewardCoupon_ArchiveAsValidatorResult
+      -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
+      with
+        validator : Party
+        rightCid : ContractId ValidatorRight
+      controller dso, validator
+      do
+        requireMatchingContract rightCid (ValidatorRight with dso; validator, user)
+        return ValidatorRewardCoupon_ArchiveAsValidatorResult
+
+
+-- | A coupon for a beneficiary to receive part of the SV issuance for a specific SV node and round.
+template SvRewardCoupon with
+    dso : Party
+    sv : Party -- ^ The party identifying the SV node for which the reward is issued.
+    beneficiary : Party -- ^ The beneficiary allowed to receive the reward.
+    round : Round
+    weight : Int -- ^ Coupons receive a share of the SV issuance proportional to their weight.
+  where
+    ensure weight > 0
+
+    signatory dso
+
+    -- The beneficiary is an observer of the coupon, as they need to be able to claim it; but they are not
+    -- a signatory, to avoid their node's unavailability to block the coupon issuance.
+    observer beneficiary
+
+    -- The SV is an observes so they can see both the transaction creating and the one archiving the coupon.
+    -- They are not a signatory to ensure their node's unavailability cannot block the coupon redemption.
+    observer sv
+
+    choice SvRewardCoupon_DsoExpire : SvRewardCoupon_DsoExpireResult
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller dso
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+        void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+        return SvRewardCoupon_DsoExpireResult with ..
+
+    -- Choice called by the beneficiary as part of a AmuletRules_Transfer to claim the reward.
+    choice SvRewardCoupon_ArchiveAsBeneficiary : SvRewardCoupon_ArchiveAsBeneficiaryResult
+      controller beneficiary
+      do return SvRewardCoupon_ArchiveAsBeneficiaryResult
+
+
+-- | Rewards that have not been claimed and are thus at the disposal of the foundation.
+template UnclaimedReward with
+    dso : Party
+    amount : Decimal
+  where
+    ensure amount > 0.0
+
+    signatory dso
+
+requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
+requireAmuletExpiredForAllOpenRounds roundCid amulet = do
+  round <- fetchReferenceData (ForDso with dso = amulet.dso) roundCid
+  -- Note: we exploit that there are exactly three open rounds active at any
+  -- point in time; and we ensure that a amulet can be expired as soon as it can
+  -- definitely not be used as an input to transfer anymore.
+  require "Amulet is expired" (isAmuletExpired round amulet.amount)
+
+
+-- instances
+------------
+
+instance HasCheckedFetch Amulet ForOwner where
+  contractGroupId Amulet{..} = ForOwner with ..
+
+instance HasCheckedFetch LockedAmulet ForOwner where
+  contractGroupId lockedAmulet = contractGroupId (lockedAmulet.amulet)
+
+instance HasCheckedFetch AppRewardCoupon ForOwner where
+  contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = provider
+
+instance HasCheckedFetch SvRewardCoupon ForOwner where
+  contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
+
+-- This instance is slightly dangerous, as it could lead to a missed check of the validator.
+-- We accept this, as at least the DSO party check is done, and the remainder is careful coding.
+instance HasCheckedFetch ValidatorRewardCoupon ForDso where
+  contractGroupId ValidatorRewardCoupon {..} = ForDso with dso
+
+instance HasCheckedFetch UnclaimedReward ForDso where
+  contractGroupId UnclaimedReward {..} = ForDso with dso

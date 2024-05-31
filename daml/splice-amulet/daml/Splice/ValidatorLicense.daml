@@ -1,0 +1,105 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorLicense where
+
+import DA.Action (void)
+
+import Splice.Round
+import Splice.Types
+import Splice.Util
+
+data FaucetState = FaucetState with
+    firstReceivedFor : Round -- ^ The first round for which a coupon was received.
+    lastReceivedFor : Round -- ^ The last round for which a coupon was received.
+    numCouponsMissed : Int -- ^ The number of rounds for which no coupon was received.
+  deriving (Eq, Show)
+
+data ValidatorLicense_ReceiveFaucetCouponResult = ValidatorLicense_ReceiveFaucetCouponResult with
+    licenseCid : ContractId ValidatorLicense
+    couponCid : ContractId ValidatorFaucetCoupon
+
+data ValidatorLicense_WithdrawResult = ValidatorLicense_WithdrawResult
+
+data ValidatorLicense_CancelResult = ValidatorLicense_CancelResult
+
+data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResult
+
+-- | The existence of a validator license is what makes a validator an (onboarded) validator.
+template ValidatorLicense with
+    validator : Party           -- ^ The validator (party) that this license is about.
+    sponsor : Party             -- ^ The SV node that sponsored the onboarding.
+    dso : Party                 -- ^ The party representing the operations of the decentralized synchronizer.
+    faucetState : Optional FaucetState
+  where
+    signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
+    observer validator -- not a signatory to simplify the creation of the license as part of onboarding
+
+
+    -- We expect the wallet of the validator to call this choice automatically.
+    choice ValidatorLicense_ReceiveFaucetCoupon : ValidatorLicense_ReceiveFaucetCouponResult
+      with
+        openRoundCid : ContractId OpenMiningRound
+      controller validator
+      do
+        now <- getTime
+        openRound <- fetchReferenceData (ForDso with dso) openRoundCid
+        require "OpenRound is open" (openRound.opensAt <= now)
+
+        newFaucetState <- case faucetState of
+          None -> return $ Some FaucetState with
+            firstReceivedFor = openRound.round
+            lastReceivedFor = openRound.round
+            numCouponsMissed = 0
+
+          Some state -> do
+            require "Not yet received" (state.lastReceivedFor < openRound.round)
+            return $ Some FaucetState with
+              firstReceivedFor = state.firstReceivedFor
+              lastReceivedFor = openRound.round
+              numCouponsMissed = state.numCouponsMissed + (openRound.round.number - state.lastReceivedFor.number - 1)
+
+        licenseCid <- create this with faucetState = newFaucetState
+
+        couponCid <- create ValidatorFaucetCoupon with
+          dso
+          validator
+          round = openRound.round
+
+        return ValidatorLicense_ReceiveFaucetCouponResult with ..
+
+    choice ValidatorLicense_Withdraw : ValidatorLicense_WithdrawResult
+      with
+        reason : Text
+      controller dso
+      do return ValidatorLicense_WithdrawResult
+
+    choice ValidatorLicense_Cancel : ValidatorLicense_CancelResult
+      with
+        reason : Text
+      controller validator
+      do return ValidatorLicense_CancelResult
+
+
+template ValidatorFaucetCoupon with
+    dso : Party
+    validator : Party
+    round : Round
+  where
+    signatory dso, validator
+
+    choice ValidatorFaucetCoupon_DsoExpire : ValidatorFaucetCoupon_DsoExpireResult
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller dso
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds advance on their own time.
+         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+         return ValidatorFaucetCoupon_DsoExpireResult
+
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
+  contractGroupId ValidatorFaucetCoupon{..} = ForOwner with dso; owner = validator

@@ -1,0 +1,81 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.DsoBootstrap where
+
+import qualified DA.Map as Map
+import DA.Time
+
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Schedule
+import Splice.Types
+
+import Splice.Ans
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.DsoRules
+
+data DsoBootstrap_BootstrapResult = DsoBootstrap_BootstrapResult
+
+-- | A template for bootstrapping DsoRules and AmuletRules.
+template DsoBootstrap with
+    dso : Party
+    sv1Party : Party -- ^ the SV that bootstraps the network
+    sv1Name : Text -- ^ human-readable name of SV1
+    sv1RewardWeight : Int -- ^ the weight of SV1 in the reward distribution
+    sv1ParticipantId : Text -- ^ the id of the participant of the SV that bootstraps the synchronizer
+    sv1SynchronizerNodes : SynchronizerNodeConfigMap -- ^ Synchronizer nodes on which this workflow runs
+    round0Duration : RelTime
+    amuletConfig : AmuletConfig USD
+    amuletPrice : Decimal
+    ansRulesConfig: AnsRulesConfig
+    config : DsoRulesConfig
+    initialTrafficState: Map.Map Text TrafficState
+    isDevNet : Bool
+  where
+    signatory dso
+    observer sv1Party
+
+    choice DsoBootstrap_Bootstrap : DsoBootstrap_BootstrapResult
+      controller dso
+      do
+        -- create amulet-rules and the initial price vote of SV1
+        amuletRulesCid <- create AmuletRules with
+          dso
+          configSchedule = Schedule with
+            initialValue = amuletConfig
+            futureValues = []
+          isDevNet
+        _ <- create AnsRules with
+          dso
+          config = ansRulesConfig
+        -- bootstrap rounds
+        exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
+          round0Duration
+          amuletPrice
+        -- create the DSO rules with the SV1 as the sole sv
+        let sv1SvInfo = SvInfo with
+              name = sv1Name
+              joinedAsOfRound = Round 0
+              svRewardWeight = sv1RewardWeight
+              participantId = sv1ParticipantId
+        let dsoRules = DsoRules with
+              dso
+              epoch = 0
+              svs = Map.fromList [(sv1Party, sv1SvInfo)]
+              offboardedSvs = Map.empty
+              dsoDelegate = sv1Party
+              config
+              initialTrafficState
+              isDevNet
+        create dsoRules
+        -- create initial per-sv and per-operator contracts for sv1
+        let addSvChoiceArgs = DsoRules_AddSv with
+              newSvParty = sv1Party
+              newSvName = sv1Name
+              newSvParticipantId = sv1ParticipantId
+              joinedAsOfRound = Round 0
+              newSvRewardWeight = sv1RewardWeight
+        createPerSvContracts dsoRules addSvChoiceArgs
+        createPerSvPartyContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice)
+        return DsoBootstrap_BootstrapResult
