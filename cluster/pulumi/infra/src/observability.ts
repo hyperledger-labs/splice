@@ -7,19 +7,23 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersi
 import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
-  CLUSTER_NAME,
   CLUSTER_HOSTNAME,
+  CLUSTER_NAME,
+  COMETBFT_RETAIN_BLOCKS,
+  ENABLE_COMETBFT_PRUNING,
+  EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
-  config,
-  EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
-  ENABLE_COMETBFT_PRUNING,
-  COMETBFT_RETAIN_BLOCKS,
 } from 'cn-pulumi-common';
 
-import { enableAlerts, slackAlertNotificationChannel, slackToken } from './alertings';
+import {
+  clusterIsBeingReset,
+  enableAlerts,
+  slackAlertNotificationChannel,
+  slackToken,
+} from './alertings';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
@@ -108,8 +112,8 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const disablePrometheusAlerts = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
-const shouldIgnoreNoDataOrDataSourceError = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
+const disablePrometheusAlerts = clusterIsBeingReset;
+const shouldIgnoreNoDataOrDataSourceError = clusterIsBeingReset;
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(

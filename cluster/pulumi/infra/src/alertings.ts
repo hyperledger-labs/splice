@@ -7,3 +7,5 @@ export const slackAlertNotificationChannel =
 export function slackToken(): string {
   return config.requireEnv('SLACK_ACCESS_TOKEN');
 }
+
+export const clusterIsBeingReset = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
