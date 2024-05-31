@@ -59,7 +59,10 @@ Object.keys(env).forEach(key => {
 });
 
 /*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
-export function createStackCR(name: string): pulumi.CustomResource {
+export function createStackCR(
+  name: string,
+  supportsResetOnSameCommit: boolean
+): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
     name,
     {
@@ -67,41 +70,49 @@ export function createStackCR(name: string): pulumi.CustomResource {
       kind: 'Stack',
       metadata: { name: name, namespace: namespace.logicalName },
       spec: {
-        stack: `organization/${name}/${name}.${CLUSTER_BASENAME}`,
-        backend: config.requireEnv('PULUMI_BACKEND_URL'),
-        envRefs: {
-          ...envRefs,
-          REPO_ROOT: {
-            type: 'Literal',
-            literal: {
-              value: `/tmp/pulumi-working/operator/${name}/workspace`,
+        ...{
+          stack: `organization/${name}/${name}.${CLUSTER_BASENAME}`,
+          backend: config.requireEnv('PULUMI_BACKEND_URL'),
+          envRefs: {
+            ...envRefs,
+            REPO_ROOT: {
+              type: 'Literal',
+              literal: {
+                value: `/tmp/pulumi-working/operator/${name}/workspace`,
+              },
+            },
+            GCP_CLUSTER_BASENAME: {
+              type: 'Literal',
+              literal: {
+                value: CLUSTER_BASENAME,
+              },
             },
           },
-          GCP_CLUSTER_BASENAME: {
-            type: 'Literal',
-            literal: {
-              value: CLUSTER_BASENAME,
+          fluxSource: {
+            sourceRef: {
+              apiVersion: gitRepo.apiVersion,
+              kind: gitRepo.kind,
+              name: gitRepo.metadata.name,
             },
+            dir: `cluster/pulumi/${name}`,
           },
+          // Do not resync the stack when the commit hash matches the last one
+          continueResyncOnCommitMatch: false,
+          // Do not destroy the stack when the CR is deleted
+          destroyOnFinalize: false,
+          // Refresh before every sync
+          refresh: false,
+          // Enforce that the stack already exists
+          useLocalStackOnly: true,
+          // retry if the stack is locked by another operation
+          retryOnUpdateConflict: true,
         },
-        fluxSource: {
-          sourceRef: {
-            apiVersion: gitRepo.apiVersion,
-            kind: gitRepo.kind,
-            name: gitRepo.metadata.name,
-          },
-          dir: `cluster/pulumi/${name}`,
-        },
-        // Do not resync the stack when the commit hash matches the last one
-        continueResyncOnCommitMatch: false,
-        // Do not destroy the stack when the CR is deleted
-        destroyOnFinalize: false,
-        // Refresh before every sync
-        refresh: false,
-        // Enforce that the stack already exists
-        useLocalStackOnly: true,
-        // retry if the stack is locked by another operation
-        retryOnUpdateConflict: true,
+        ...(supportsResetOnSameCommit
+          ? {
+              continueResyncOnCommitMatch: true,
+              resyncFrequencySeconds: 300,
+            }
+          : {}),
       },
     },
     {
