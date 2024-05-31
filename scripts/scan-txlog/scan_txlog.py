@@ -190,6 +190,49 @@ class DamlDecimal:
         return self.decimal > other.decimal
 
 
+@dataclass
+class SteppedRate:
+    initial_rate: DamlDecimal
+    steps: list
+
+    def scale(self, factor):
+        return SteppedRate(
+            self.initial_rate,
+            [(x * factor, y) for (x, y) in self.steps],
+        )
+
+    def charge(self, amount):
+        remainder = amount
+        total = DamlDecimal(0)
+        steps_index = 0
+        current_rate = self.initial_rate
+        while remainder > DamlDecimal(0):
+            if steps_index >= len(self.steps):
+                total += remainder * current_rate
+                remainder = 0
+            else:
+                (step, stepped_rate) = self.steps[steps_index]
+                steps_index += 1
+                total += min(remainder, step) * current_rate
+                current_rate = stepped_rate
+                remainder -= step
+        return total
+
+
+@dataclass
+class TransferConfig:
+    create_fee: DamlDecimal
+    transfer_fee: SteppedRate
+    lock_holder_fee: DamlDecimal
+
+    def scale(self, factor):
+        return TransferConfig(
+            self.create_fee * factor,
+            self.transfer_fee.scale(factor),
+            self.lock_holder_fee * factor,
+        )
+
+
 # Wrapper around LF values to easily work with the protobuf encoding
 @dataclass
 class LfValue:
@@ -197,6 +240,23 @@ class LfValue:
 
     def get_open_mining_round_round(self):
         return self.__get_record_field(1).__get_round_number()
+
+    def get_open_mining_round_amulet_price(self):
+        return self.__get_record_field(2).__get_numeric()
+
+    def get_open_mining_transfer_config(self):
+        config = self.__get_record_field(6)
+        create_fee = config.__get_record_field(0).get_fixed_fee()
+        transfer_fee = config.__get_record_field(2).__get_stepped_rate()
+        lock_holder_fee = config.__get_record_field(3).get_fixed_fee()
+        return TransferConfig(
+            create_fee,
+            transfer_fee,
+            lock_holder_fee,
+        )
+
+    def get_fixed_fee(self):
+        return self.__get_record_field(0).__get_numeric()
 
     def get_issuing_mining_round_round(self):
         return self.__get_record_field(1).__get_round_number()
@@ -404,6 +464,9 @@ class LfValue:
     def get_transfer_output_receiver(self):
         return self.__get_record_field(0).__get_party()
 
+    def get_transfer_output_amount(self):
+        return self.__get_record_field(2).__get_numeric()
+
     def get_transfer_output_receiver_fee_ratio(self):
         return self.__get_record_field(1).__get_numeric()
 
@@ -478,6 +541,19 @@ class LfValue:
 
     def __get_timestamp(self):
         return datetime.utcfromtimestamp(int(self.value["timestamp"]) / 1000000)
+
+    def __get_stepped_rate(self):
+        initial_rate = self.__get_record_field(0).__get_numeric()
+        steps = [
+            x.__get_stepped_rate_step() for x in self.__get_record_field(1).__get_list()
+        ]
+        return SteppedRate(initial_rate, steps)
+
+    def __get_stepped_rate_step(self):
+        return (
+            self.__get_record_field(0).__get_numeric(),
+            self.__get_record_field(1).__get_numeric(),
+        )
 
 
 @dataclass
@@ -984,6 +1060,14 @@ class State:
             == subscription_request_cid
         )
 
+    def get_open_mining_round_by_round_number(self, round_number):
+        open_rounds = self.list_contracts(TemplateQualifiedNames.open_mining_round)
+        return next(
+            open_round
+            for open_round in open_rounds.values()
+            if open_round.payload.get_open_mining_round_round() == round_number
+        )
+
     def handle_transaction(self, transaction):
         previous_state = self.clone(self.logger)
         record_time = datetime.fromisoformat(transaction.record_time)
@@ -1138,19 +1222,24 @@ class State:
     def handle_transfer_outputs(
         self,
         transaction,
-        output_receiver_fee_ratios,
+        sender,
+        open_round,
+        declared_outputs,
         output_amulet_cids,
         output_fees,
         sender_change_amulet_cid,
         sender_change_fee,
     ):
         assert len(output_amulet_cids) == len(output_fees)
-        assert len(output_receiver_fee_ratios) == len(output_fees)
+        assert len(declared_outputs) == len(output_fees)
         output_amounts = []
         fee_amounts = []
         output_descriptions = []
-        for receiver_fee_ratio, output, output_fee in zip(
-            output_receiver_fee_ratios, output_amulet_cids, output_fees
+        amulet_price = open_round.payload.get_open_mining_round_amulet_price()
+        transfer_config_usd = open_round.payload.get_open_mining_transfer_config()
+        transfer_config_cc = transfer_config_usd.scale(DamlDecimal(1) / amulet_price)
+        for (declared_output_amount, receiver_fee_ratio), output, output_fee in zip(
+            declared_outputs, output_amulet_cids, output_fees
         ):
             cid = output["value"].get_contract_id()
             output_event = transaction.by_contract_id[cid]
@@ -1179,6 +1268,8 @@ class State:
                     output_descriptions += [
                         f"amulet with amount {initial_amount} owned by {owner}"
                     ]
+                    # set to an empty list to simplify computations below
+                    lock_holders = []
                 case _:
                     self.get_transaction_logger(transaction).error(
                         f"unexpected output tag: {tag}"
@@ -1186,11 +1277,27 @@ class State:
             fee_amounts += [output_fee]
             receiver_fee = receiver_fee_ratio * output_fee
             sender_fee = output_fee - receiver_fee
+            transfer_fee = (
+                DamlDecimal(0)
+                if sender == owner
+                else transfer_config_cc.transfer_fee.charge(declared_output_amount)
+            )
+            locking_fee = len(lock_holders) * transfer_config_cc.lock_holder_fee
+            create_fee = transfer_config_cc.create_fee
+            if output_fee != create_fee + transfer_fee + locking_fee:
+                self.get_transaction_logger(transaction).error(
+                    f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}"
+                )
             output_descriptions += ["  fees:"]
-            if sender_fee > DamlDecimal("0"):
-                output_descriptions += [f"    sender: {sender_fee}"]
-            if receiver_fee > DamlDecimal("0"):
-                output_descriptions += [f"    receiver: {receiver_fee}"]
+            output_descriptions += [f"    total: {output_fee}"]
+            output_descriptions += [f"      base_transfer_fee: {create_fee}"]
+            if transfer_fee > DamlDecimal(0):
+                output_descriptions += [f"      transfer_fee: {transfer_fee}"]
+            if locking_fee > DamlDecimal(0):
+                output_descriptions += [f"      locking_fee: {locking_fee}"]
+            output_descriptions += [f"    split between:"]
+            output_descriptions += [f"      sender: {sender_fee}"]
+            output_descriptions += [f"      receiver: {receiver_fee}"]
         if sender_change_amulet_cid:
             sender_change = transaction.by_contract_id[sender_change_amulet_cid]
             amount = (
@@ -1226,11 +1333,13 @@ class State:
         provider = arg.get_transfer_provider()
         inputs = arg.get_transfer_inputs()
         outputs = arg.get_transfer_outputs()
-        output_receiver_fee_ratios = [
-            x.get_transfer_output_receiver_fee_ratio() for x in outputs
+        declared_outputs = [
+            (x.get_transfer_output_amount(), x.get_transfer_output_receiver_fee_ratio())
+            for x in outputs
         ]
         res = event.exercise_result
         round_number = res.get_transfer_result_round()
+        round_contract = self.get_open_mining_round_by_round_number(round_number)
         (inputs_description, effective_inputs) = self.handle_transfer_inputs(
             transaction, sender, round_number, inputs
         ).summary()
@@ -1244,7 +1353,9 @@ class State:
         (outputs_description, output_amounts, fee_amounts) = (
             self.handle_transfer_outputs(
                 transaction,
-                output_receiver_fee_ratios,
+                sender,
+                round_contract,
+                declared_outputs,
                 output_amulets_cids,
                 output_fees,
                 sender_change_amulet_cid,
@@ -1833,7 +1944,7 @@ class PerPartyBalance:
 
 
 def main():
-    url = sys.argv[1] if len(sys.argv) == 2 else "localhost:5012"
+    url = sys.argv[1] if len(sys.argv) == 2 else "http://localhost:5012"
     logger = colorlog.getLogger("scan_txlog")
     logger.addHandler(cli_handler)
     logger.addHandler(file_handler)
