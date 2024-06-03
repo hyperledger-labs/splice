@@ -695,109 +695,89 @@ class TransferInputs:
             for r in issuing_mining_rounds.values()
         }
 
+    def summarize_reward_type(self, header, rewards_by_round, get_issuance, get_amount):
+        output = []
+        effective_inputs = []
+        if rewards_by_round:
+            output += [header]
+            for round_number, rewards in rewards_by_round.items():
+                issuing = get_issuance(
+                    self.issuing_mining_rounds_by_round[round_number]
+                )
+                total_cc = DamlDecimal(0)
+                total_amount = DamlDecimal(0)
+                for reward in rewards:
+                    amount = get_amount(reward.payload)
+                    total_amount += amount
+                    total_cc += amount * issuing
+                effective_inputs += [total_cc]
+                # Note: total_cc is not necessarily exactly total_amount * issuing due to
+                # (a + b) * z not being equal to a * z + b * z in DamlDecimal.
+                # Displaying individual rewards is way too noisy though so we accept this.
+                output += [
+                    f"  recorded in round {round_number}: -{total_cc} = -{total_amount} @ {issuing}"
+                ]
+        return (output, effective_inputs)
+
     def summary(self):
         output = []
         effective_inputs = []
-        unfeatured_app_reward_amounts = {
-            round_number: total
-            for round_number, app_rewards in self.app_rewards.items()
-            if (
-                total := sum(
-                    [
-                        reward.payload.get_app_reward_amount()
-                        for reward in app_rewards
-                        if not reward.payload.get_app_reward_featured()
-                    ]
-                )
+        unfeatured_app_rewards = {}
+        featured_app_rewards = {}
+        for round_number, rewards in self.app_rewards.items():
+            for reward in rewards:
+                if reward.payload.get_app_reward_featured():
+                    featured_app_rewards.setdefault(round_number, []).append(reward)
+                else:
+                    unfeatured_app_rewards.setdefault(round_number, []).append(reward)
+
+        (unfeatured_outputs, unfeatured_inputs) = self.summarize_reward_type(
+            "unfeatured_app_activity_records",
+            unfeatured_app_rewards,
+            lambda r: r.get_issuing_mining_round_issuance_per_unfeatured_app_reward(),
+            lambda r: r.get_app_reward_amount(),
+        )
+        output += unfeatured_outputs
+        effective_inputs += unfeatured_inputs
+
+        (featured_outputs, featured_inputs) = self.summarize_reward_type(
+            "featured_app_activity_records",
+            featured_app_rewards,
+            lambda r: r.get_issuing_mining_round_issuance_per_featured_app_reward(),
+            lambda r: r.get_app_reward_amount(),
+        )
+        output += featured_outputs
+        effective_inputs += featured_inputs
+
+        (validator_outputs, validator_inputs) = self.summarize_reward_type(
+            "validator_activity_records",
+            self.validator_rewards,
+            lambda r: r.get_issuing_mining_round_issuance_per_validator_reward(),
+            lambda r: r.get_validator_reward_amount(),
+        )
+        output += validator_outputs
+        effective_inputs += validator_inputs
+
+        (validator_faucet_outputs, validator_faucet_inputs) = (
+            self.summarize_reward_type(
+                "validator_faucet_activity_records",
+                self.validator_faucets,
+                lambda r: r.get_issuing_mining_round_issuance_per_validator_faucet(),
+                lambda r: DamlDecimal(1),  # faucets always have value 1
             )
-        }
-        if unfeatured_app_reward_amounts:
-            output += ["unfeatured_app_activity_records"]
-            for round_number, reward_sum in unfeatured_app_reward_amounts.items():
-                issuing = self.issuing_mining_rounds_by_round[
-                    round_number
-                ].get_issuing_mining_round_issuance_per_unfeatured_app_reward()
-                cc = issuing * reward_sum
-                effective_inputs += [cc]
-                output += [
-                    f"  recorded in round {round_number}: -{cc} = -{reward_sum} @ {issuing}"
-                ]
-        featured_app_reward_amounts = {
-            round_number: total
-            for round_number, app_rewards in self.app_rewards.items()
-            if (
-                total := sum(
-                    [
-                        reward.payload.get_app_reward_amount()
-                        for reward in app_rewards
-                        if reward.payload.get_app_reward_featured()
-                    ]
-                )
-            )
-        }
-        if featured_app_reward_amounts:
-            output += ["featured_app_activity_records"]
-            for round_number, reward_sum in featured_app_reward_amounts.items():
-                issuing = self.issuing_mining_rounds_by_round[
-                    round_number
-                ].get_issuing_mining_round_issuance_per_featured_app_reward()
-                cc = issuing * reward_sum
-                effective_inputs += [cc]
-                output += [
-                    f"  recorded in round {round_number}: -{cc} = -{reward_sum} @ {issuing}"
-                ]
-        validator_reward_amounts = {
-            round_number: sum(
-                [
-                    reward.payload.get_validator_reward_amount()
-                    for reward in validator_rewards
-                ]
-            )
-            for round_number, validator_rewards in self.validator_rewards.items()
-        }
-        if validator_reward_amounts:
-            output += ["validator_activity_records"]
-            for round_number, reward_sum in validator_reward_amounts.items():
-                issuing = self.issuing_mining_rounds_by_round[
-                    round_number
-                ].get_issuing_mining_round_issuance_per_validator_reward()
-                cc = issuing * reward_sum
-                effective_inputs += [cc]
-                output += [
-                    f"  recorded in round {round_number}: -{cc} = -{reward_sum} @ {issuing}"
-                ]
-        validator_faucet_amounts = {
-            round_number: len(validator_faucets)
-            for round_number, validator_faucets in self.validator_faucets.items()
-        }
-        if validator_faucet_amounts:
-            output += ["validator_liveness_activity_records"]
-            for round_number, reward_sum in validator_faucet_amounts.items():
-                issuing = self.issuing_mining_rounds_by_round[
-                    round_number
-                ].get_issuing_mining_round_issuance_per_validator_faucet()
-                cc = issuing * DamlDecimal(reward_sum)
-                effective_inputs += [cc]
-                output += [
-                    f"  recorded in round {round_number}: -{cc} = -{reward_sum} @ {issuing}"
-                ]
-        sv_reward_amounts = {
-            round_number: sum(
-                [reward.payload.get_sv_reward_coupon_weight() for reward in sv_rewards]
-            )
-            for round_number, sv_rewards in self.sv_rewards.items()
-        }
-        if sv_reward_amounts:
-            output += ["sv_activity_records:"]
-            for round_number, reward_sum in sv_reward_amounts.items():
-                issuing = self.issuing_mining_rounds_by_round[
-                    round_number
-                ].get_issuing_mining_round_issuance_per_sv_reward()
-                cc = issuing * DamlDecimal(reward_sum)
-                effective_inputs += [cc]
-                output += [
-                    f"  recorded in round {round_number}: -{cc} = -{reward_sum} @ {issuing}"
-                ]
+        )
+        output += validator_faucet_outputs
+        effective_inputs += validator_faucet_inputs
+
+        (sv_outputs, sv_inputs) = self.summarize_reward_type(
+            "sv_activity_records",
+            self.sv_rewards,
+            lambda r: r.get_issuing_mining_round_issuance_per_sv_reward(),
+            lambda r: r.get_sv_reward_coupon_weight(),
+        )
+        output += sv_outputs
+        effective_inputs += sv_inputs
+
         if self.amulets:
             output += ["amulets:"]
             for amulet in self.amulets:
@@ -1133,6 +1113,9 @@ class State:
         coupons = (
             event.exercise_result.get_receive_sv_reward_coupons_result_sv_reward_coupons()
         )
+        # This can happen if the SV has weight 0
+        if len(coupons) == 0:
+            return HandleTransactionResult.empty()
         for coupon_cid in coupons:
             coupon = transaction.by_contract_id[coupon_cid]
             beneficiary = coupon.payload.get_sv_reward_coupon_beneficiary()
@@ -1892,6 +1875,10 @@ class State:
             case "FeaturedAppRight_Cancel":
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeMemberTrafficContracts":
+                return HandleTransactionResult.empty()
+            case "DsoRules_GarbageCollectAmuletPriceVotes":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireStaleConfirmation":
                 return HandleTransactionResult.empty()
             case choice:
                 self.get_transaction_logger(transaction).error(
