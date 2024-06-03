@@ -128,6 +128,8 @@ object CNNodeTests extends LazyLogging {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
+    registerPlugin(new UpdateHistorySanityCheckPlugin(loggerFactory))
+
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
     override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
