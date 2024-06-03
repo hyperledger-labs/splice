@@ -106,7 +106,7 @@ export function installParticipant(
     },
     version,
     {
-      dependsOn,
+      dependsOn: dependsOn.concat([postgres]),
     }
   );
 

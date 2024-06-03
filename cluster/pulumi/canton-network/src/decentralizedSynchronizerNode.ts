@@ -117,7 +117,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
         enablePostgresMetrics: true,
       },
       version,
-      { dependsOn: [cometbftRelease.release], parent: this }
+      { dependsOn: [cometbftRelease.release, sequencerPostgres, mediatorPostgres], parent: this }
     );
   }
 
