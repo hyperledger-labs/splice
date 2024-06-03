@@ -202,9 +202,9 @@ workflow:
           context:
             - artifactory
             - slack-context
-          # Skip healthchecks for 45 minutes after starting an sv/validator node restore from backup.
+          # Skip healthchecks for 60 minutes after starting an sv/validator node restore from backup.
           # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
-          max_pipeline_age_secs: 2700
+          max_pipeline_age_secs: 3600
           workflow_names: "restore_sv_cidaily restore_validator_cidaily"
           only_if_running: false
       - preflight_check:
