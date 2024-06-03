@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 61,
+  "id": 91,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -127,7 +127,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\"} / 1000",
+          "expr": "daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\",sender=~\"$sender\"} / 1000",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -232,7 +232,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(max without (sender) (daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"}) - ignoring (sender) group_right daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\"}) / 1000000",
+          "expr": "(max without (sender) (daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"}) - ignoring (sender) group_right daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\",sender=~\"$sender\"}) / 1000000",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -337,7 +337,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "increase(daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\"}[10m]) / (1000000 * 60 * 10)",
+          "expr": "increase(daml_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",sender!~\"SEQ::.*\",sender=~\"$sender\"}[10m]) / (1000000 * 60 * 10)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -941,7 +941,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1044,7 +1045,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1142,7 +1144,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1240,7 +1243,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1316,7 +1320,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "sv-1"
           ],
@@ -1376,6 +1380,34 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "definition": "label_values(daml_block_acknowledgments_micros,sender)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "sender",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(daml_block_acknowledgments_micros,sender)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
@@ -1387,6 +1419,6 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }
