@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import aiohttp
+import asyncio
 import colorlog
 from dataclasses import dataclass
 from decimal import *
@@ -7,7 +9,6 @@ from datetime import datetime
 import json
 import logging
 import pprint
-import requests
 import textwrap
 from typing import Optional
 import sys
@@ -123,20 +124,33 @@ class HandleTransactionResult:
 
 @dataclass
 class ScanClient:
+    session: aiohttp.ClientSession
     url: str
     page_size: int
 
-    def updates(self, after_record_time=None):
+    async def updates(self, after_record_time=None):
         payload = {"after_record_time": after_record_time, "page_size": self.page_size}
-        response = requests.post(f"{self.url}/api/scan/v0/updates", json=payload)
+        response = await self.session.post(
+            f"{self.url}/api/scan/v0/updates", json=payload
+        )
         response.raise_for_status()
-        return response.json()["transactions"]
+        json = await response.json()
+        return json["transactions"]
 
-    def balance(self, party, round_number):
+    async def balance(self, party, round_number):
         params = {"party_id": party, "asOfEndOfRound": round_number}
-        response = requests.get(f"{self.url}/api/scan/v0/wallet-balance", params)
+        response = await self.session.get(
+            f"{self.url}/api/scan/v0/wallet-balance", params=params
+        )
         response.raise_for_status()
-        return DamlDecimal(response.json()["wallet_balance"])
+        json = await response.json()
+        return (party, DamlDecimal(json["wallet_balance"]))
+
+    async def party_balances(self, round_number, parties):
+        balances = await asyncio.gather(
+            *[self.balance(party, round_number) for party in parties]
+        )
+        return dict(balances)
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -1709,7 +1723,7 @@ class State:
                     case "ValidatorRewardCoupon_DsoExpire":
                         validator_reward_coupon = self.active_contracts[cid]
                         rewards += [validator_reward_coupon]
-                        del self.validator_reward_coupons[cid]
+                        del self.active_contracts[cid]
                     case "ValidatorFaucetCoupon_DsoExpire":
                         validator_faucet_coupon = self.active_contracts[cid]
                         rewards += [validator_faucet_coupon]
@@ -1931,13 +1945,17 @@ class PerPartyBalance:
         return total
 
 
-def main():
+async def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description="Reads the update history from a given Splice Scan server."
     )
-    parser.add_argument('scan_url', help="Address of the Splice Scan server", default="http://localhost:5012")
-    parser.add_argument('--loglevel', help="Sets the log level", default="INFO")
+    parser.add_argument(
+        "scan_url",
+        help="Address of the Splice Scan server",
+        default="http://localhost:5012",
+    )
+    parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     args = parser.parse_args()
 
     # Set up logging
@@ -1952,63 +1970,70 @@ def main():
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
 
-        logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+        logger.error(
+            "Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback)
+        )
+
     sys.excepthook = handle_exception
 
     state = State(logger, {}, None)
     per_round_states = {}
-    scan_client = ScanClient(args.scan_url, 100)
     last_record_time = None
-    while True:
-        batch = scan_client.updates(last_record_time)
-        logger.debug(
-            f"Processing batch of size {len(batch)} starting at {last_record_time}"
-        )
-        for transaction_json in batch:
-            transaction = TransactionTree.parse(transaction_json)
+    async with aiohttp.ClientSession() as session:
+        scan_client = ScanClient(session, args.scan_url, 100)
+        while True:
+            batch = await scan_client.updates(last_record_time)
             logger.debug(
-                f"Processing transaction {transaction.update_id} at {transaction.record_time}"
+                f"Processing batch of size {len(batch)} starting at {last_record_time}"
             )
-            previous_state = state.clone(logger)
-            result = state.handle_transaction(transaction)
-            for round_number in result.new_open_rounds:
-                round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
-                round_logger.addHandler(cli_handler)
-                round_logger.addHandler(file_handler)
-                # warning to avoid repeated log messages for the same transaction
-                round_logger.setLevel("WARNING")
-                per_round_states[round_number] = previous_state.clone(round_logger)
-            if result.for_open_round != None:
-                for round_number, per_round_state in per_round_states.items():
-                    if round_number >= result.for_open_round:
-                        per_round_state.handle_transaction(transaction)
-            if result.new_closed_round:
-                closed_round = result.new_closed_round
-                round_state = per_round_states[closed_round]
-                del per_round_states[closed_round]
-                balances = round_state.balance_end_of_round()
-                lines = [f"effective balances for closed round: {closed_round}"]
-                matches = True
-                for party, balance in balances.items():
-                    computed_balance = balance.effective_for_round(closed_round)
-                    scan_balance = scan_client.balance(party, closed_round)
-                    matches_for_party = scan_balance == computed_balance
-                    matches &= matches_for_party
-                    lines += [
-                        f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-                    ]
-                log = "\n".join(lines)
-                if matches:
-                    logger.info(log)
-                else:
-                    logger.error(log)
+            for transaction_json in batch:
+                transaction = TransactionTree.parse(transaction_json)
+                logger.debug(
+                    f"Processing transaction {transaction.update_id} at {transaction.record_time}"
+                )
+                previous_state = state.clone(logger)
+                result = state.handle_transaction(transaction)
+                for round_number in result.new_open_rounds:
+                    round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
+                    round_logger.addHandler(cli_handler)
+                    round_logger.addHandler(file_handler)
+                    # warning to avoid repeated log messages for the same transaction
+                    round_logger.setLevel("WARNING")
+                    per_round_states[round_number] = previous_state.clone(round_logger)
+                if result.for_open_round != None:
+                    for round_number, per_round_state in per_round_states.items():
+                        if round_number >= result.for_open_round:
+                            per_round_state.handle_transaction(transaction)
+                if result.new_closed_round:
+                    closed_round = result.new_closed_round
+                    round_state = per_round_states[closed_round]
+                    del per_round_states[closed_round]
+                    balances = round_state.balance_end_of_round()
+                    lines = [f"effective balances for closed round: {closed_round}"]
+                    matches = True
+                    scan_party_balances = await scan_client.party_balances(
+                        closed_round, balances.keys()
+                    )
+                    for party, balance in sorted(balances.items()):
+                        computed_balance = balance.effective_for_round(closed_round)
+                        scan_balance = scan_party_balances[party]
+                        matches_for_party = scan_balance == computed_balance
+                        matches &= matches_for_party
+                        lines += [
+                            f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+                        ]
+                    log = "\n".join(lines)
+                    if matches:
+                        logger.info(log)
+                    else:
+                        logger.error(log)
 
-        if len(batch) >= 1:
-            last_record_time = batch[-1]["record_time"]
-        if len(batch) < scan_client.page_size:
-            logger.debug(f"Reached end of stream at {last_record_time}")
-            break
+            if len(batch) >= 1:
+                last_record_time = batch[-1]["record_time"]
+            if len(batch) < scan_client.page_size:
+                logger.debug(f"Reached end of stream at {last_record_time}")
+                break
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
