@@ -136,11 +136,14 @@ object CNNodeTests extends LazyLogging {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
+    protected val runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
 
-    registerPlugin(
-      new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
-    )
+    if (runUpdateHistorySanityCheck) {
+      registerPlugin(
+        new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
+      )
+    }
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 

@@ -31,9 +31,6 @@ class UpdateHistorySanityCheckPlugin(
     with Matchers
     with Inspectors {
 
-  // to be updated: it fails right now but we want to use it to test
-  private val checkScriptResult = false
-
   override def beforeEnvironmentDestroyed(
       config: CNNodeConfig,
       environment: CNNodeTestConsoleEnvironment,
@@ -44,37 +41,35 @@ class UpdateHistorySanityCheckPlugin(
       scan =>
         paginateHistory(scan, None)
 
-        if (checkScriptResult) {
-          val readLines = mutable.Buffer[String]()
-          val errorProcessor = ProcessLogger(line => readLines.append(line))
-          try {
-            scala.sys.process
-              .Process(
-                Seq(
-                  "python",
-                  "scripts/scan-txlog/scan_txlog.py",
-                  scan.httpClientConfig.url.toString(),
-                  "--loglevel",
-                  "DEBUG",
-                  "--scan-balance-assertions",
-                ) ++ ignoredRootCreates.flatMap { templateId =>
-                  Seq("--ignore-root-create", QualifiedName(templateId).toString)
-                }
-              )
-              .!(errorProcessor)
-          } catch {
-            case NonFatal(ex) =>
-              logger.error("Failed to run scan_txlog.py. Dumping output.", ex)(TraceContext.empty)
-              readLines.foreach(logger.error(_)(TraceContext.empty))
-              throw new RuntimeException("scan_txlog.py failed.", ex)
-          }
+        val readLines = mutable.Buffer[String]()
+        val errorProcessor = ProcessLogger(line => readLines.append(line))
+        try {
+          scala.sys.process
+            .Process(
+              Seq(
+                "python",
+                "scripts/scan-txlog/scan_txlog.py",
+                scan.httpClientConfig.url.toString(),
+                "--loglevel",
+                "DEBUG",
+                "--scan-balance-assertions",
+              ) ++ ignoredRootCreates.flatMap { templateId =>
+                Seq("--ignore-root-create", QualifiedName(templateId).toString)
+              }
+            )
+            .!(errorProcessor)
+        } catch {
+          case NonFatal(ex) =>
+            logger.error("Failed to run scan_txlog.py. Dumping output.", ex)(TraceContext.empty)
+            readLines.foreach(logger.error(_)(TraceContext.empty))
+            throw new RuntimeException("scan_txlog.py failed.", ex)
+        }
 
-          readLines.filter { log =>
-            log.contains("ERROR:") || log.contains("WARNING:")
-          } should be(empty)
-          forExactly(1, readLines) { line =>
-            line should include("Reached end of stream")
-          }
+        readLines.filter { log =>
+          log.contains("ERROR:") || log.contains("WARNING:")
+        } should be(empty)
+        forExactly(1, readLines) { line =>
+          line should include("Reached end of stream")
         }
     }
   }

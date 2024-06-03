@@ -74,6 +74,9 @@ class WalletTxLogIntegrationTest
       })
   }
 
+  // TODO (#12694): reenable
+  override protected val runUpdateHistorySanityCheck: Boolean = false
+
   "A wallet" should {
 
     "handle tap" in { implicit env =>

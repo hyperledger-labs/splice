@@ -51,6 +51,9 @@ class Ans4SvsIntegrationTest
           )(config)
       )
 
+  // TODO (#12697): reenable
+  override protected val runUpdateHistorySanityCheck: Boolean = false
+
   def leaderExpiredAnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
     sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]
 

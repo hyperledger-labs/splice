@@ -1952,6 +1952,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_RequestElection":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ElectDsoDelegate":
+                return HandleTransactionResult.empty()
             case "AmuletRules_AddFutureAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
             case choice:

@@ -78,6 +78,9 @@ class WalletManualRoundsIntegrationTest
         )(config)
       )
 
+  // TODO (#12694): reenable
+  override protected val runUpdateHistorySanityCheck: Boolean = false
+
   "A wallet" should {
     "list all amulets, including locked amulets, with additional position details" in {
       implicit env =>

@@ -55,6 +55,9 @@ class WalletTimeBasedIntegrationTest
         )(config)
       )
 
+  // TODO (#12697): reenable
+  override protected val runUpdateHistorySanityCheck: Boolean = false
+
   "A wallet" should {
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
