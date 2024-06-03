@@ -1956,6 +1956,11 @@ async def main():
         default="http://localhost:5012",
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
+    parser.add_argument(
+        "--scan-balance-assertions",
+        help="Enable comparison against end of round balances reported by scan. TODO(#12672): Scan balance aggregates are currently broken",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     # Set up logging
@@ -2000,11 +2005,11 @@ async def main():
                     # warning to avoid repeated log messages for the same transaction
                     round_logger.setLevel("WARNING")
                     per_round_states[round_number] = previous_state.clone(round_logger)
-                if result.for_open_round != None:
+                if result.for_open_round != None and args.scan_balance_assertions:
                     for round_number, per_round_state in per_round_states.items():
                         if round_number >= result.for_open_round:
                             per_round_state.handle_transaction(transaction)
-                if result.new_closed_round:
+                if result.new_closed_round and args.scan_balance_assertions:
                     closed_round = result.new_closed_round
                     round_state = per_round_states[closed_round]
                     del per_round_states[closed_round]
