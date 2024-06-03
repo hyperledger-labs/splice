@@ -816,30 +816,38 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[DomainId] = for {
-    decentralizedSynchronizerId <- participantAdminConnection.getDomainId(
-      config.domains.global.alias
-    )
-    participantId <- participantAdminConnection.getParticipantId()
-    // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
-    // we are in the middle of an DSO party migration so don't reconnect to the domain.
-    proposals <- participantAdminConnection.listPartyToParticipant(
-      TopologyStoreId.DomainStore(decentralizedSynchronizerId).filterName,
-      filterParty = dsoPartyId.filterString,
-      filterParticipant = participantId.filterString,
-      proposals = TopologyTransactionType.ProposalSignedBy(participantId.uid.namespace.fingerprint),
-    )
-    _ <-
-      if (proposals.nonEmpty) {
-        logger.info(
-          "Participant is in process of hosting the DSO party, not reconnecting to domain to avoid inconsistent ACS"
+  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[DomainId] =
+    retryProvider.retry(
+      RetryFor.ClientCalls,
+      "connect_domain",
+      "Connect to global domain if not migrating party",
+      for {
+        decentralizedSynchronizerId <- participantAdminConnection.getDomainId(
+          config.domains.global.alias
         )
-        Future.unit
-      } else {
-        logger.info("Reconnecting to global domain")
-        participantAdminConnection.connectDomain(config.domains.global.alias)
-      }
-  } yield decentralizedSynchronizerId
+        participantId <- participantAdminConnection.getParticipantId()
+        // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
+        // we are in the middle of an DSO party migration so don't reconnect to the domain.
+        proposals <- participantAdminConnection.listPartyToParticipant(
+          TopologyStoreId.DomainStore(decentralizedSynchronizerId).filterName,
+          filterParty = dsoPartyId.filterString,
+          filterParticipant = participantId.filterString,
+          proposals =
+            TopologyTransactionType.ProposalSignedBy(participantId.uid.namespace.fingerprint),
+        )
+        _ <-
+          if (proposals.nonEmpty) {
+            logger.info(
+              "Participant is in process of hosting the DSO party, not reconnecting to domain to avoid inconsistent ACS"
+            )
+            Future.unit
+          } else {
+            logger.info("Reconnecting to global domain")
+            participantAdminConnection.connectDomain(config.domains.global.alias)
+          }
+      } yield decentralizedSynchronizerId,
+      logger,
+    )
 }
 
 object JoiningNodeInitializer {}
