@@ -28,13 +28,14 @@ class AcsExporter(
   private val domainStateTopology = new DomainParametersStateTopologyConnection(
     participantAdminConnection
   )
-  def exportAcsAtTimestamp(domain: DomainId, timestamp: Instant, parties: PartyId*)(implicit
-      tc: TraceContext
+  def exportAcsAtTimestamp(domain: DomainId, timestamp: Instant, force: Boolean, parties: PartyId*)(
+      implicit tc: TraceContext
   ): Future[ByteString] = {
     participantAdminConnection.downloadAcsSnapshot(
       parties = parties.toSet,
       filterDomainId = Some(domain),
       timestamp = Some(timestamp),
+      force = force,
     )
   }
 

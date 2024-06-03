@@ -234,7 +234,7 @@ class DisasterRecoveryIntegrationTest
       "lost-domain",
       (identities, timestampBeforeDisaster) => {
         val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-        val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster))
+        val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster, force = true))
         svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
           dump.acsTimestamp should be(timestampBeforeDisaster)
           writeMigrationDumpFile(sv, ids, dump)
@@ -248,7 +248,11 @@ class DisasterRecoveryIntegrationTest
       (identities, timestampBeforeDisaster) => {
         val dump =
           sv2Backend
-            .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.dsoPartyId))
+            .getDomainDataSnapshot(
+              timestampBeforeDisaster,
+              Some(identities.head.dsoPartyId),
+              force = true,
+            )
         dump.acsTimestamp should be(timestampBeforeDisaster)
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
@@ -387,7 +391,10 @@ class DisasterRecoveryIntegrationTest
 
         withClueAndLog("Getting and writing disaster recovery dumps for validator") {
           val validatorDump =
-            aliceValidatorBackend.getValidatorDomainDataSnapshot(timestampBeforeDisaster.toString)
+            aliceValidatorBackend.getValidatorDomainDataSnapshot(
+              timestampBeforeDisaster.toString,
+              force = true,
+            )
 
           writeValidatorMigrationDumpFile(aliceValidatorBackend, validatorDump)
         }
@@ -557,7 +564,7 @@ class DisasterRecoveryIntegrationTest
     clue(s"Waiting for all SVs participants to be caught up to ${timestamp}") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
         eventuallySucceeds() {
-          svBackend.getDomainDataSnapshot(timestamp)
+          svBackend.getDomainDataSnapshot(timestamp, force = true)
         }
       )
     }

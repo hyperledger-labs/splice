@@ -95,7 +95,8 @@ object HttpValidatorAdminAppClient {
   }
 
   case class GetValidatorDomainDataSnapshot(
-      timestamp: Instant
+      timestamp: Instant,
+      force: Boolean,
   ) extends BaseCommand[
         http.GetValidatorDomainDataSnapshotResponse,
         DomainMigrationDump,
@@ -110,6 +111,7 @@ object HttpValidatorAdminAppClient {
     ], http.GetValidatorDomainDataSnapshotResponse] =
       client.getValidatorDomainDataSnapshot(
         timestamp.toString,
+        force = Some(force),
         headers = headers,
       )
 

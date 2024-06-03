@@ -509,7 +509,7 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class GetDomainDataSnapshot(timestamp: Instant, partyId: Option[PartyId])
+  case class GetDomainDataSnapshot(timestamp: Instant, partyId: Option[PartyId], force: Boolean)
       extends BaseCommand[
         http.GetDomainDataSnapshotResponse,
         DomainDataSnapshot,
@@ -524,6 +524,7 @@ object HttpSvAdminAppClient {
       client.getDomainDataSnapshot(
         timestamp.toString,
         partyId.map(_.toProtoPrimitive),
+        force = Some(force),
         headers = headers,
       )
 

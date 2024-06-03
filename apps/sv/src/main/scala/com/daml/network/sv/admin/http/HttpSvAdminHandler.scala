@@ -491,6 +491,7 @@ class HttpSvAdminHandler(
   override def getDomainDataSnapshot(respond: SvAdminResource.GetDomainDataSnapshotResponse.type)(
       timestamp: String,
       partyId: Option[String],
+      force: Option[Boolean],
   )(
       tuser: TracedUser
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
@@ -500,6 +501,7 @@ class HttpSvAdminHandler(
         .getDomainDataSnapshot(
           Instant.parse(timestamp),
           partyId.map(Codec.tryDecode(Codec.Party)(_)),
+          force.getOrElse(false),
         )
         .map { response =>
           SvAdminResource.GetDomainDataSnapshotResponse.OK(

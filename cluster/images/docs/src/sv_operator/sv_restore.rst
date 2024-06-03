@@ -97,8 +97,8 @@ Currently, the recommended method for doing so is by inspecting the log files of
 specifically searching for log lines from the ACS commitment process. ACS commitment in Canton
 is the periodic process in which pairs of participants confirm to each other that they agree on the
 the relevant subset of the Active Contract Set (ACS) on ledger at that point in time.
-By searching the log files of your particpant for "CommitmentPeriod" you can see the periods for which
-your particpant has committed to the ACS, and with whom. You should look for "Commitment correct for sender" messages, such as:
+By searching the log files of your participant for "CommitmentPeriod" you can see the periods for which
+your participant has committed to the ACS, and with whom. You should look for "Commitment correct for sender" messages, such as:
 ``Commitment correct for sender PAR::Digital-Asset-Eng-4::12205f1149bc... and period CommitmentPeriod(fromExclusive = 2024-04-21T23:24:00Z, toInclusive = 2024-04-21T23:25:00Z)``,
 indicating that your participant agreed with that of another node, `Digital-Asset-Eng-4` in this example,
 at the `toInclusive` time, `2024-04-21T23:25:00Z` in this example.
@@ -107,6 +107,10 @@ The SVs should find a period for which most of them have mutually committed to. 
 committed after the chosen timestamp will be lost. On the other hand, any SV not committed to the chosen
 timestamp will have to either completely re-onboarded, or copy over a data dump from another SV that is
 caught up to the chosen timestamp. This a tradeoff to be discussed among the SVs at the time of recovery.
+
+It is beneficial to err on the side of going a bit further back in time than the last agreed upon ACS commitment.
+Going back 15 minutes further is probably a good rule of thumb, as most validators have at least two transactions every round, which means that
+validator participants will have recorded transactions after the selected timestamp, enabling them to get a clean dump with the selected timestamp.
 
 Creating a Data Dump from the SV App
 ++++++++++++++++++++++++++++++++++++

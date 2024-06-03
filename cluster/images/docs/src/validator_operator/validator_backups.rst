@@ -90,11 +90,12 @@ The following steps will produce a data dump through the validator app, consisti
 Active Contract Set (ACS) as of the required timestamp. That data dump will then be stored on the validator app's PVC,
 and the validator app and participant will be configured to consume it and restore the data from it.
 
+Please make sure before you fetch a data dump from the validator app that your participant was healthy around the timestamp that the SVs have provided.
 The data dump can be fetched from the validator app by running the following command:
 
 .. code-block:: bash
 
-    curl -sSLf "https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/domain/data-snapshot?timestamp=<timestamp>" -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json" > dump_response.json
+    curl -sSLf "https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/domain/data-snapshot?timestamp=<timestamp>&force=true" -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json" > dump_response.json
     echo $(cat dump_response.json | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)') '{"migrationId": <migration_id>}' | jq -s add > dump.json
 
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app, as obtained from your OAuth provider, and `<timestamp>` is the timestamp provided by the SVs,

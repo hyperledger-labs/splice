@@ -104,7 +104,7 @@ class HttpValidatorAdminHandler(
 
   override def getValidatorDomainDataSnapshot(
       respond: v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.type
-  )(timestamp: String)(
+  )(timestamp: String, force: Option[Boolean])(
       tuser: TracedUser
   ): Future[v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
@@ -117,6 +117,7 @@ class HttpValidatorAdminHandler(
             domainId,
             // TODO(#9731): get migration id from scan instead of configuring here
             config.domainMigrationId,
+            force.getOrElse(false),
           )
           .map { response =>
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(

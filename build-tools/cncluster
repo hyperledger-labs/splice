@@ -2427,6 +2427,14 @@ function subcmd_disaster_recovery_test() {
   local tmpdir
   tmpdir=$(mktemp -d)
 
+  local svIngressNames
+  # keys are node names with sv-
+  svIngressNames[1]=2
+  svIngressNames[2]=2-eng
+  svIngressNames[3]=3-eng
+  svIngressNames[4]=4-eng
+  local svIngressName
+
   _cluster_reset
 
   _info "Deploying original domain"
@@ -2435,27 +2443,29 @@ function subcmd_disaster_recovery_test() {
   _cluster_apply "$version"
 
   _info "Getting identity dumps"
-  for sv in 1 2 3 4; do
-    token=$(subcmd_get_token sv-${sv})
-    id=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv")
+    id=$(curl -sSL --fail-with-body "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
     echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
   _info "Scaling down cometbft"
-  for sv in 1 2 3 4; do
-    kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-cometbft
+  for sv in "${!svIngressNames[@]}"; do
+    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
   done
 
   # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
 
   _info "Finding agreed upon timestamp"
-  for sv in 1 2 3 4; do
-    token=$(subcmd_get_token sv-${sv})
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv")
     done=0
     acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
     while [ $done == 0 ]; do
         _info "Attempting to get ACS from time $acs_time"
-        data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+        data=$(curl -sSL --fail-with-body "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
         snapshot=$(echo "$data" | jq .data_snapshot)
         if [ "$snapshot" == "null" ]; then
             error=$(echo "$data" | jq -r .error)
@@ -2478,9 +2488,10 @@ function subcmd_disaster_recovery_test() {
   _info "Decided on timestamp for dumps: $dump_timestamp"
 
   _info "Getting data dumps"
-  for sv in 1 2 3 4; do
-    token=$(subcmd_get_token sv-${sv})
-    data=$(curl -s "https://sv.sv-${sv}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv")
+    data=$(curl -sSL --fail-with-body "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&force=true" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
         error=$(echo "$data" | jq -r .error)
@@ -2496,19 +2507,19 @@ function subcmd_disaster_recovery_test() {
   done
 
   _info "Scaling down sequencers and mediators"
-  for sv in 1 2 3 4; do
-    kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-sequencer global-domain-0-mediator
+  for sv in "${!svIngressNames[@]}"; do
+    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-sequencer global-domain-0-mediator
   done
 
-  for sv in 1 2 3 4; do
-    pod=$(kubectl get pod -n sv-${sv} -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
+  for sv in "${!svIngressNames[@]}"; do
+    pod=$(kubectl get pod -n sv-"$sv" -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
 
     # Copy dump file to the pvc on the sv-app
     kubectl cp "$tmpdir/dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
   done
 
   token=$(subcmd_get_token validator1)
-  dump=$(curl -s "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+  dump=$(curl -sSL --fail-with-body "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&force=true" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
   echo "$(echo "$dump" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')" '{"migrationId": 1}' | jq -s add > "$tmpdir/dump-validator1.json"
   pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
