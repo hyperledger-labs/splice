@@ -46,6 +46,7 @@ class UpdateHistorySanityCheckPlugin(protected val loggerFactory: NamedLoggerFac
                   scan.httpClientConfig.url.toString(),
                   "--loglevel",
                   "DEBUG",
+                  "--scan-balance-assertions",
                 )
               )
               .!(errorProcessor)

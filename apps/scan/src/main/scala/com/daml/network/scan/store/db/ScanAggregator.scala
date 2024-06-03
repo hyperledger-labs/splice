@@ -809,19 +809,20 @@ final class ScanAggregator(
         group by  round,
                   party
       ),
-      previous_totals as (
+      previous_totals as (select * from (
         select    party,
-                  max(coalesce(cumulative_app_rewards, 0)) as prev_cumulative_app_rewards,
-                  max(coalesce(cumulative_validator_rewards, 0)) as prev_cumulative_validator_rewards,
-                  max(coalesce(cumulative_traffic_purchased, 0)) as prev_cumulative_traffic_purchased,
-                  max(coalesce(cumulative_traffic_purchased_cc_spent, 0)) as prev_cumulative_traffic_purchased_cc_spent,
-                  max(coalesce(cumulative_traffic_num_purchases, 0)) as prev_cumulative_traffic_num_purchases,
-                  max(coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0)) as prev_cumulative_change_to_initial_amount_as_of_round_zero,
-                  max(coalesce(cumulative_change_to_holding_fees_rate, 0)) as prev_cumulative_change_to_holding_fees_rate
+                  coalesce(cumulative_app_rewards, 0) as prev_cumulative_app_rewards,
+                  coalesce(cumulative_validator_rewards, 0) as prev_cumulative_validator_rewards,
+                  coalesce(cumulative_traffic_purchased, 0) as prev_cumulative_traffic_purchased,
+                  coalesce(cumulative_traffic_purchased_cc_spent, 0) as prev_cumulative_traffic_purchased_cc_spent,
+                  coalesce(cumulative_traffic_num_purchases, 0) as prev_cumulative_traffic_num_purchases,
+                  coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0) as prev_cumulative_change_to_initial_amount_as_of_round_zero,
+                  coalesce(cumulative_change_to_holding_fees_rate, 0) as prev_cumulative_change_to_holding_fees_rate,
+                  row_number() over (partition by party order by closed_round desc) as row_num
         from      round_party_totals
         where     store_id = $storeId
-        group by  party
-      ),
+      ) as previous_totals_with_row
+        where row_num = 1),
       cumulative_totals as (
         select    nt.round,
                   nt.party,

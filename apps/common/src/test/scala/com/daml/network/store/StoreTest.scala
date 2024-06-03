@@ -131,7 +131,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected val holdingFee = 1.0
+  protected val holdingFee = BigDecimal(1.0)
 
   protected def openMiningRound(dso: PartyId, round: Long, amuletPrice: Double) = {
     val template = new roundCodegen.OpenMiningRound(
@@ -173,9 +173,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def amulet(
       owner: PartyId,
-      amount: Double,
+      amount: BigDecimal,
       createdAtRound: Long,
-      ratePerRound: Double,
+      ratePerRound: BigDecimal,
   ) = {
     val templateId = amuletCodegen.Amulet.TEMPLATE_ID
     val template = new amuletCodegen.Amulet(
@@ -196,9 +196,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def lockedAmulet(
       owner: PartyId,
-      amount: Double,
+      amount: BigDecimal,
       createdAtRound: Long,
-      ratePerRound: Double,
+      ratePerRound: BigDecimal,
   ) = {
     val templateId = amuletCodegen.LockedAmulet.TEMPLATE_ID
     val amuletTemplate = amulet(owner, amount, createdAtRound, ratePerRound).payload

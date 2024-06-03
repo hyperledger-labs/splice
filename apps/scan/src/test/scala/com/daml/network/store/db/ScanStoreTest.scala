@@ -1,5 +1,6 @@
 package com.daml.network.store.db
 
+import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet.{
@@ -96,7 +97,7 @@ abstract class ScanStoreTest
               balanceChanges = Map(
                 user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
                   BigDecimal(amuletAmount).bigDecimal,
-                  BigDecimal(holdingFee).bigDecimal,
+                  holdingFee.bigDecimal,
                 )
               ),
               amuletPrice = 0.0005,
@@ -163,7 +164,7 @@ abstract class ScanStoreTest
 
       "return correct total amulet balance for the round where the locked amulet expired and for the rounds before and after" in {
         val amuletRound1 = 100.0
-        val changeToInitialAmountAsOfRoundZero = -50.0
+        val changeToInitialAmountAsOfRoundZero = BigDecimal(-50.0)
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
           closedMiningRound(dsoParty, round = round.toLong)
@@ -184,8 +185,8 @@ abstract class ScanStoreTest
               new splice.amulet.AmuletExpireSummary(
                 user1.toProtoPrimitive,
                 new splice.types.Round(2),
-                new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
-                new java.math.BigDecimal(holdingFee),
+                changeToInitialAmountAsOfRoundZero.bigDecimal,
+                holdingFee.bigDecimal,
               )
             ).toValue,
             nextOffset(),
@@ -238,63 +239,118 @@ abstract class ScanStoreTest
         val keptAmuletAmount = 60.0
         val sentAmuletAmount = 40.0
         val amuletAmount = keptAmuletAmount + sentAmuletAmount
-        val lastClosedRound = 3
-        val closedRounds = (0 to lastClosedRound).map { round =>
-          closedMiningRound(dsoParty, round = round.toLong)
-        }
-
+        val lastClosedRound = 5
+        val balanceChanges = Seq(
+          // round 0: no change
+          // round 1: user1 gets balance increase, no change for user2
+          1L -> Map(
+            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(10.0).bigDecimal,
+              holdingFee.bigDecimal,
+            )
+          ),
+          // round 2: both users get a balance increase
+          2L -> Map(
+            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(60.0).bigDecimal,
+              holdingFee.bigDecimal,
+            ),
+            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(40.0).bigDecimal,
+              (2 * holdingFee).bigDecimal,
+            ),
+          ),
+          // round 3: user1 reduces balance, no change for user2
+          3L -> Map(
+            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(-40.0).bigDecimal,
+              (-holdingFee).bigDecimal,
+            )
+          ),
+          // round 4: user2 reduces balance, no change for user1
+          4L -> Map(
+            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(-30.0).bigDecimal,
+              (-holdingFee).bigDecimal,
+            )
+          ),
+          // round 5: both users increase their balance
+          5L -> Map(
+            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(10.0).bigDecimal,
+              holdingFee.bigDecimal,
+            ),
+            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+              BigDecimal(10.0).bigDecimal,
+              holdingFee.bigDecimal,
+            ),
+          ),
+        )
+        // We only care about the balance changes in the result, just add a random dummy argument.
+        val dummyTransferArg = mkAmuletRulesTransfer(user1, 0.0)
         for {
           store <- mkStore()
-          amuletRulesContract = amuletRules()
-          _ <- dummyDomain.exercise(
-            amuletRulesContract,
-            interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
-            Transfer.choice.name,
-            mkAmuletRulesTransfer(user1, amuletAmount),
-            mkTransferResult(
-              round = 2,
-              inputAppRewardAmount = 0,
-              inputAmuletAmount = amuletAmount,
-              inputValidatorRewardAmount = 0,
-              inputSvRewardAmount = 0,
-              balanceChanges = Map(
-                user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-                  BigDecimal(keptAmuletAmount).bigDecimal,
-                  BigDecimal(holdingFee).bigDecimal,
-                ),
-                user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-                  BigDecimal(sentAmuletAmount).bigDecimal,
-                  BigDecimal(holdingFee).bigDecimal,
-                ),
-              ),
-              amuletPrice = 0.0005,
-            ),
-            nextOffset(),
-          )(
-            store.multiDomainAcsStore
-          )
-          _ <- MonadUtil.sequentialTraverse(closedRounds) { closed =>
-            dummyDomain.create(closed)(
-              store.multiDomainAcsStore
-            )
+          // Close the first 2 rounds, no events for them.
+          _ <- Seq(0L, 1L).traverse { round =>
+            for {
+              _ <- dummyDomain.create(
+                closedMiningRound(dsoParty, round)
+              )(store.multiDomainAcsStore)
+              _ <- store.aggregate()
+            } yield ()
           }
-          _ <- store.aggregate()
+          amuletRulesContract = amuletRules()
+          _ <- balanceChanges.traverse { case (round, balanceChanges) =>
+            for {
+              _ <- dummyDomain.exercise(
+                amuletRulesContract,
+                interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+                Transfer.choice.name,
+                dummyTransferArg,
+                mkTransferResult(
+                  round = round,
+                  inputAppRewardAmount = 0,
+                  inputAmuletAmount = amuletAmount,
+                  inputValidatorRewardAmount = 0,
+                  inputSvRewardAmount = 0,
+                  balanceChanges = balanceChanges,
+                  amuletPrice = 0.0005,
+                ),
+                nextOffset(),
+              )(
+                store.multiDomainAcsStore
+              )
+              _ <- dummyDomain.create(
+                closedMiningRound(dsoParty, round)
+              )(store.multiDomainAcsStore)
+              _ <- store.aggregate()
+            } yield ()
+          }
         } yield {
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
           forEvery(
             Table(
-              ("user", "amulet amount"),
-              (user1, keptAmuletAmount),
-              (user2, sentAmuletAmount),
+              ("user", "round", "initial amulet amount", "holding fee rate"),
+              (user1, 0L, BigDecimal(0.0), BigDecimal(0.0)),
+              (user2, 0L, BigDecimal(0.0), BigDecimal(0.0)),
+              (user1, 1L, BigDecimal(10.0), holdingFee),
+              (user2, 1L, BigDecimal(0.0), BigDecimal(0.0)),
+              (user1, 2L, BigDecimal(10.0 + 60.0), 2 * holdingFee),
+              (user2, 2L, BigDecimal(40.0), 2 * holdingFee),
+              (user1, 3L, BigDecimal(10.0 + 60.0 - 40.0), holdingFee),
+              (user2, 3L, BigDecimal(40.0), 2 * holdingFee),
+              (user1, 4L, BigDecimal(10.0 + 60.0 - 40.0), holdingFee),
+              (user2, 4L, BigDecimal(40.0 - 30.0), holdingFee),
+              (user1, 5L, BigDecimal(10.0 + 60.0 - 40.0 + 10), 2 * holdingFee),
+              (user2, 5L, BigDecimal(40.0 - 30.0 + 10), 2 * holdingFee),
             )
-          ) { (user, amuletAmount) =>
-            store.getWalletBalance(user, 1).futureValue shouldBe (0.0) withClue "at round 1"
+          ) { (user, round, initialAmuletAmount, holdingFeeRate) =>
             store
-              .getWalletBalance(user, 2)
-              .futureValue shouldBe (amuletAmount - 3 * holdingFee) withClue "at round 2"
-            store
-              .getWalletBalance(user, 3)
-              .futureValue shouldBe (amuletAmount - 4 * holdingFee) withClue "at round 3"
+              .getWalletBalance(user, round)
+              .futureValue shouldBe initialAmuletAmount - BigDecimal(round + 1) * holdingFeeRate
+          }
+
+          forAll(Seq(user1, user2)) { user =>
             val failure = store.getWalletBalance(user, lastClosedRound + 1L).failed.futureValue
             failure.getMessage should be(roundNotAggregated().getMessage)
           }
@@ -1261,9 +1317,9 @@ trait AmuletTransferUtil { self: StoreTest =>
   /** A AmuletRules_Mint exercise event with one child Amulet create event */
   def mintTransaction(
       receiver: PartyId,
-      amount: Double,
+      amount: BigDecimal,
       round: Long,
-      ratePerRound: Double,
+      ratePerRound: BigDecimal,
       amuletPrice: Double = 1.0,
   )(
       offset: String
@@ -1313,15 +1369,15 @@ trait AmuletTransferUtil { self: StoreTest =>
   def mkAmuletExpireResult(
       owner: PartyId,
       round: Long,
-      changeToInitialAmountAsOfRoundZero: Double,
-      changeToHoldingFeesRate: Double,
+      changeToInitialAmountAsOfRoundZero: BigDecimal,
+      changeToHoldingFeesRate: BigDecimal,
   ) =
     new Amulet_ExpireResult(
       new splice.amulet.AmuletExpireSummary(
         owner.toProtoPrimitive,
         new splice.types.Round(round),
-        new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
-        new java.math.BigDecimal(changeToHoldingFeesRate),
+        changeToInitialAmountAsOfRoundZero.bigDecimal,
+        changeToHoldingFeesRate.bigDecimal,
       )
     ).toValue
 

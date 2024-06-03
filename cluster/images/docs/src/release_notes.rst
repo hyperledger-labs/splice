@@ -37,6 +37,12 @@ Upcoming
 * The `approved-sv-id-values-*.yaml` files have been removed from the release bundle. The approved SV identities for
   each network instance can now exclusively be obtained from the `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs>`_ .
 
+* CC Scan
+
+  Fix a bug in the balance API and UI where balances did not get tracked
+  properly if the balance change for a given party was negative in one
+  round, e.g., because it transferred away a large amount.
+
 0.1.10
 ------
 

@@ -1958,7 +1958,7 @@ async def main():
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
         "--scan-balance-assertions",
-        help="Enable comparison against end of round balances reported by scan. TODO(#12672): Scan balance aggregates are currently broken",
+        help="Enable comparison against end of round balances reported by scan.",
         action="store_true",
     )
     args = parser.parse_args()
