@@ -309,6 +309,15 @@ class LfValue:
     def get_locked_amulet_time_lock(self):
         return self.__get_record_field(1)
 
+    def get_dso_rules_amulet_expire_cid(self):
+        return self.__get_record_field(0).get_contract_id()
+
+    def get_dso_rules_locked_amulet_expire_cid(self):
+        return self.__get_record_field(0).get_contract_id()
+
+    def get_dso_rules_expire_ans_entry_cid(self):
+        return self.__get_record_field(0).get_contract_id()
+
     def get_time_lock_holders(self):
         return [x.__get_party() for x in self.__get_record_field(0).__get_list()]
 
@@ -1510,6 +1519,33 @@ class State:
             f"ExpireUnlock: Amulet {amulet} was unlocked because lock expired"
         )
 
+    def handle_dso_rules_amulet_expire(self, transaction, event):
+        contract_id = event.exercise_argument.get_dso_rules_amulet_expire_cid()
+        amulet = self.active_contracts[contract_id]
+        del self.active_contracts[contract_id]
+        self.get_transaction_logger(transaction).info(
+            f"Dso_AmuletExpire: Amulet {amulet} expired"
+        )
+        return HandleTransactionResult.empty()
+
+    def handle_dso_rules_locked_amulet_expire(self, transaction, event):
+        contract_id = event.exercise_argument.get_dso_rules_locked_amulet_expire_cid()
+        lockedAmulet = self.active_contracts[contract_id]
+        del self.active_contracts[contract_id]
+        self.get_transaction_logger(transaction).info(
+            f"Dso_LockedAmuletExpire: Locked Amulet {lockedAmulet} expired"
+        )
+        return HandleTransactionResult.empty()
+
+    def handle_dso_rules_expire_ans_entry(self, transaction, event):
+        contract_id = event.exercise_argument.get_dso_rules_expire_ans_entry_cid()
+        entry = self.active_contracts[contract_id]
+        del self.active_contracts[contract_id]
+        self.get_transaction_logger(transaction).info(
+            f"Dso_ExpireAnsEntry: AnsEntry {entry} expired"
+        )
+        return HandleTransactionResult.empty()
+
     def handle_dso_bootstrap(self, transaction, event):
         rounds = set()
         for event_id in event.child_event_ids:
@@ -1821,14 +1857,10 @@ class State:
                 return self.handle_locked_amulet_unlock(transaction, event)
             case "LockedAmulet_OwnerExpireLock":
                 return self.handle_locked_owner_expire_lock(transaction, event)
-            case "Amulet_Expire":
-                raise Exception("TODO(#12513): Amulet_Expire")
             case "DsoRules_Amulet_Expire":
-                raise Exception("TODO(#12513): DsoRules_Amulet_Expire")
-            case "LockedAmulet_ExpireAmulet":
-                raise Exception("TODO(#12513): LockedAmulet_ExpireAmulet")
+                return self.handle_dso_rules_amulet_expire(transaction, event)
             case "DsoRules_LockedAmulet_ExpireAmulet":
-                raise Exception("TODO(#12513): DsoRules_LockedAmulet_ExpireAmulet")
+                return self.handle_dso_rules_locked_amulet_expire(transaction, event)
             case "AnsRules_RequestEntry":
                 return self.handle_request_entry(transaction, event)
             case "SubscriptionRequest_AcceptAndMakePayment":
@@ -1846,6 +1878,8 @@ class State:
             case "DsoRules_ExpireSubscription":
                 # No change to the tracked ACS.
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExpireAnsEntry":
+                return self.handle_dso_rules_expire_ans_entry(transaction, event)
             case "DsoRules_TerminateSubscription":
                 # No change to the tracked ACS.
                 return HandleTransactionResult.empty()
