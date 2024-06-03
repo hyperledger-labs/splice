@@ -273,9 +273,16 @@ Depending on whether it is a network-wide issue or an SV local issue, investigat
 
 For an SV local issue, the main thing to investigae is whether just the SV app is broken or whether the underlying Canton components might also be broken.
 
-The easiest way of checking this is to check the periodic acknowledgements from their participant and mediator sequencer log. This is a message each node
+The easiest way of checking this is to check the periodic acknowledgements from their participant and mediator. This is a message each node
 sends out to acknowledge that it has seen messages up to a certain timestamp. This allows both to see whether the node is active at all (i.e. has it stopped sending out acknowledgements) and whether it as lagging behind.
 
+The acknowlegdements can be seen in the [global domain catchup dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/ca9df344-c699-4efe-83c2-5fb2639d96d9/global-domain-catchup?orgId=1&refresh=30s&var-DS=prometheus&var-namespace=sv-1&var-migration=All&var-member=All&var-sender=PAR::Cumberland-2::1220af629c13...).
+Particularly useful are the lag and the catchup speed which let you estimate how long it will take for a node to catchup.
+
+![Cumberland lagging](pics/acknowledgement_dashboard.png)
+
+
+If you need more detailed information, you can also look at the sequencer logs.
 For example, in the logs below you can see SBI acknowledging timestamp `2024-04-29T05:06:06.692783Z` at `2024-04-29 05:35:41.170` so it is roughly lagging 30min behind but the participant is active. A delay of a few seconds is expected, anything larger than a minute will mean that this participant is unable to confirm
 transactions because it sees the confirmation only after the configured `participantResponseTimeout`.
 
