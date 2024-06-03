@@ -73,6 +73,23 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
       } yield result should contain theSameElementsAs value
     }
 
+    "set and get optional string arrays" in {
+      val value = Array("a", "b", "c")
+      for {
+        resultSome <- storage.querySingle(
+          sql"select 1, ${value.map(lengthLimited)}".as[(Int, Option[Array[String]])].headOption,
+          "optional array",
+        )
+        resultNone <- storage.querySingle(
+          sql"select 1, null".as[(Int, Option[Array[String]])].headOption,
+          "optional array",
+        )
+      } yield {
+        resultSome._2.value should contain theSameElementsAs value
+        resultNone._2 shouldBe None
+      }
+    }
+
     "set and get string sequences" in {
       val value = Seq("a", "b", "c")
       for {
