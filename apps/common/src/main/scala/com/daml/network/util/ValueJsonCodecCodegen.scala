@@ -29,7 +29,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 object ValueJsonCodecCodegen {
   def serializableContractPayload(
       event: CreatedEvent
-  ): Option[String] = {
+  ): Either[String, String] = {
     import scala.language.existentials
     for {
       companion <- ContractCompanions.lookup(event.getTemplateId)
@@ -40,13 +40,13 @@ object ValueJsonCodecCodegen {
   def deserializableContractPayload(
       templateId: Identifier,
       payload: String,
-  ): Option[JavaApi.DamlRecord] = for {
+  ): Either[String, JavaApi.DamlRecord] = for {
     companion <- ContractCompanions.lookup(templateId)
   } yield companion.fromJson(payload).toValue
 
   def serializeChoiceArgument(
       event: ExercisedEvent
-  ): Option[String] = for {
+  ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
     arg = choiceCompanion.argTypeDecoder.decode(event.getChoiceArgument)
@@ -57,7 +57,7 @@ object ValueJsonCodecCodegen {
       templateId: Identifier,
       choice: String,
       argument: String,
-  ): Option[JavaApi.DamlRecord] = for {
+  ): Either[String, JavaApi.DamlRecord] = for {
     companion <- ContractCompanions.lookup(templateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
     arg = choiceCompanion.argJsonDecoder.decode(new JsonLfReader(argument))
@@ -65,7 +65,7 @@ object ValueJsonCodecCodegen {
 
   def serializeChoiceResult(
       event: ExercisedEvent
-  ): Option[String] = for {
+  ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
     ret = choiceCompanion.returnTypeDecoder.decode(event.getExerciseResult)
@@ -76,7 +76,7 @@ object ValueJsonCodecCodegen {
       templateId: Identifier,
       choice: String,
       result: String,
-  ): Option[JavaApi.Value] = for {
+  ): Either[String, JavaApi.Value] = for {
     companion <- ContractCompanions.lookup(templateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
     res = choiceCompanion.resultJsonDecoder.decode(new JsonLfReader(result))

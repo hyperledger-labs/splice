@@ -254,332 +254,460 @@ class TransferConfig:
 class LfValue:
     value: dict
 
+    # template OpenMiningRound -> round
     def get_open_mining_round_round(self):
-        return self.__get_record_field(1).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template OpenMiningRound -> amuletPrice
     def get_open_mining_round_amulet_price(self):
-        return self.__get_record_field(2).__get_numeric()
+        return self.__get_record_field("amuletPrice").__get_numeric()
 
+    # template OpenMiningRound -> config
     def get_open_mining_transfer_config(self):
-        config = self.__get_record_field(6)
-        create_fee = config.__get_record_field(0).get_fixed_fee()
-        transfer_fee = config.__get_record_field(2).__get_stepped_rate()
-        lock_holder_fee = config.__get_record_field(3).get_fixed_fee()
+        config = self.__get_record_field("transferConfigUsd")
+        create_fee = config.__get_record_field("createFee").get_fixed_fee()
+        transfer_fee = config.__get_record_field("transferFee").__get_stepped_rate()
+        lock_holder_fee = config.__get_record_field("lockHolderFee").get_fixed_fee()
         return TransferConfig(
             create_fee,
             transfer_fee,
             lock_holder_fee,
         )
 
+    # data FixedFee -> fee
     def get_fixed_fee(self):
-        return self.__get_record_field(0).__get_numeric()
+        return self.__get_record_field("fee").__get_numeric()
 
+    # template IssuingMiningRound -> round
     def get_issuing_mining_round_round(self):
-        return self.__get_record_field(1).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template SummarizingMiningRound -> round
     def get_summarizing_mining_round_round(self):
-        return self.__get_record_field(1).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template IssuingMiningRound -> issuancePerSvRewardCoupon
     def get_issuing_mining_round_issuance_per_sv_reward(self):
-        return self.__get_record_field(5).__get_numeric()
+        return self.__get_record_field("issuancePerSvRewardCoupon").__get_numeric()
 
+    # template IssuingMiningRound -> issuancePerValidatorRewardCoupon
     def get_issuing_mining_round_issuance_per_validator_reward(self):
-        return self.__get_record_field(2).__get_numeric()
+        return self.__get_record_field("issuancePerValidatorRewardCoupon").__get_numeric()
 
+    # template IssuingMiningRound -> issuancePerFeaturedAppRewardCoupon
     def get_issuing_mining_round_issuance_per_featured_app_reward(self):
-        return self.__get_record_field(3).__get_numeric()
+        return self.__get_record_field("issuancePerFeaturedAppRewardCoupon").__get_numeric()
 
+    # template IssuingMiningRound -> issuancePerUnfeaturedAppRewardCoupon
     def get_issuing_mining_round_issuance_per_unfeatured_app_reward(self):
-        return self.__get_record_field(4).__get_numeric()
+        return self.__get_record_field("issuancePerUnfeaturedAppRewardCoupon").__get_numeric()
 
+    # template IssuingMiningRound -> optIssuancePerValidatorFaucetCoupon
     def get_issuing_mining_round_issuance_per_validator_faucet(self):
-        return self.__get_record_field(8).__get_optional().__get_numeric()
+        return self.__get_record_field("optIssuancePerValidatorFaucetCoupon").__get_numeric()
 
+    # choice DsoRules_MiningRound_Close -> issuingRoundCid
     def get_mining_round_close_issuing_round_cid(self):
-        return self.__get_record_field(1).get_contract_id()
+        return self.__get_record_field("issuingRoundCid").get_contract_id()
 
+    # template Amulet -> owner
     def get_amulet_owner(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("owner").__get_party()
 
+    # template Amulet -> amount
     def get_amulet_amount(self):
-        return self.__get_record_field(2)
+        return self.__get_record_field("amount")
 
+    # template LockedAmulet -> amulet
     def get_locked_amulet_amulet(self):
-        return self.__get_record_field(0)
+        return self.__get_record_field("amulet")
 
+    # template LockedAmulet -> amulet
     def get_locked_amulet_time_lock(self):
-        return self.__get_record_field(1)
+        return self.__get_record_field("lock")
 
+    # choice DsoRules_Amulet_Expire -> cid
     def get_dso_rules_amulet_expire_cid(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("cid").get_contract_id()
 
+    # choice DsoRules_LockedAmulet_ExpireAmulet -> cid
     def get_dso_rules_locked_amulet_expire_cid(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("cid").get_contract_id()
 
+    # choice DsoRules_ExpireAnsEntry -> cid
     def get_dso_rules_expire_ans_entry_cid(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("ansEntryCid").get_contract_id()
 
+    # data TimeLock -> holders
     def get_time_lock_holders(self):
-        return [x.__get_party() for x in self.__get_record_field(0).__get_list()]
+        return [x.__get_party() for x in self.__get_record_field("holders").__get_list()]
 
+    # data TimeLock -> expiresAt
     def get_time_lock_expires_at(self):
-        return self.__get_record_field(1).__get_timestamp()
+        return self.__get_record_field("expiresAt").__get_timestamp()
 
+    # data ExpiringAmount -> initialAmount
     def get_expiring_amount_initial_amount(self):
-        return self.__get_record_field(0).__get_numeric()
+        return self.__get_record_field("initialAmount").__get_numeric()
 
+    # data ExpiringAmount -> initialAmount
     def get_expiring_amount_created_at(self):
-        return self.__get_record_field(1).__get_round_number()
+        return self.__get_record_field("createdAt").__get_round_number()
 
+    # data ExpiringAmount -> ratePerRound; data RatePerRound -> rate
     def get_expiring_amount_rate_per_round(self):
-        return self.__get_record_field(2).__get_record_field(0).__get_numeric()
+        return self.__get_record_field("ratePerRound").__get_record_field("rate").__get_numeric()
 
+    # data DsoRules_ReceiveSvRewardCouponResult -> svRewardCoupons
     def get_receive_sv_reward_coupons_result_sv_reward_coupons(self):
-        return [x.get_contract_id() for x in self.__get_record_field(1).__get_list()]
+        return [x.get_contract_id() for x in self.__get_record_field("svRewardCoupons").__get_list()]
 
+    # template SvRewardCoupon -> beneficiary
     def get_sv_reward_coupon_beneficiary(self):
-        return self.__get_record_field(2).__get_party()
+        return self.__get_record_field("beneficiary").__get_party()
 
+    # template SvRewardCoupon -> sv
     def get_sv_reward_coupon_sv(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("sv").__get_party()
 
+    # template SvRewardCoupon -> round
     def get_sv_reward_coupon_round(self):
-        return self.__get_record_field(3).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template SvRewardCoupon -> weight
     def get_sv_reward_coupon_weight(self):
-        return self.__get_record_field(4).__get_int64()
+        return self.__get_record_field("weight").__get_int64()
 
+    # choice DsoRules_ExecuteConfirmedAction -> action
     def get_execute_confirmed_action_action(self):
-        return self.__get_record_field(0).__get_variant()
+        return self.__get_record_field("action").__get_variant()
 
+    # choice DsoRules_AdvanceOpenMiningRounds -> latestRoundCid
     def get_advance_open_mining_rounds_latest_round_cid(self):
-        return self.__get_record_field(3).get_contract_id()
+        return self.__get_record_field("latestRoundCid").get_contract_id()
 
+    # ARC_AmuletRules -> amuletRulesAction
     def get_arc_amulet_rules_amulet_rules_action(self):
-        return self.__get_record_field(0).__get_variant()
+        return self.__get_record_field("amuletRulesAction").__get_variant()
 
+    # ARC_AnsEntryContext -> ansEntryContextCid
     def get_arc_ans_entry_context_ans_entry_context_cid(self):
-        return self.__get_record_field(1).__get_variant()
+        return self.__get_record_field("ansEntryContextCid").get_contract_id()
 
+    # ARC_AnsEntryContext -> ansEntryContextAction
+    def get_arc_ans_entry_context_ans_entry_context_action(self):
+        return self.__get_record_field("ansEntryContextAction").__get_variant()
+
+    # CRARC_MiningRound_StartIssuing -> AmuletRules_MiningRound_StartIssuingResult
     def get_start_issuing_mining_round_cid(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("miningRoundCid").get_contract_id()
 
+    # data AmuletRules_MiningRound_StartIssuingResult -> issuingRoundCid
     def get_start_issuing_result_issuing_round_cid(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("issuingRoundCid").get_contract_id()
 
+    # choice AmuletRules_Transfer -> transfer
     def get_amulet_rules_transfer_transfer(self):
-        return self.__get_record_field(0)
+        return self.__get_record_field("transfer")
 
+    # data Transfer -> sender
     def get_transfer_sender(self):
-        return self.__get_record_field(0).__get_party()
+        return self.__get_record_field("sender").__get_party()
 
+    # data Transfer -> provider
     def get_transfer_provider(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("provider").__get_party()
 
+    # data Transfer -> inputs
     def get_transfer_inputs(self):
-        return [x.__get_variant() for x in self.__get_record_field(2).__get_list()]
+        return [x.__get_variant() for x in self.__get_record_field("inputs").__get_list()]
 
+    # data Transfer -> outputs
     def get_transfer_outputs(self):
-        return self.__get_record_field(3).__get_list()
+        return self.__get_record_field("outputs").__get_list()
 
+    # data TransferResult -> round
     def get_transfer_result_round(self):
-        return self.__get_record_field(0).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # data TransferResult -> summary
     def get_transfer_result_summary(self):
-        return self.__get_record_field(1)
+        return self.__get_record_field("summary")
 
+    # data TransferResult -> summary; data TransferSummary -> senderChangeFee
     def get_transfer_result_sender_change_fee(self):
         return (
             self.get_transfer_result_summary().get_transfer_summary_sender_change_fee()
         )
 
+    # data TransferSummary -> senderChangeFee
     def get_transfer_summary_sender_change_fee(self):
-        return self.__get_record_field(7).__get_numeric()
+        return self.__get_record_field("senderChangeFee").__get_numeric()
 
+    # data TransferResult -> summary; data TransferSummary -> senderChangeAmount
     def get_transfer_result_sender_change_amount(self):
         return (
             self.get_transfer_result_summary().get_transfer_summary_sender_change_amount()
         )
 
+    # data TransferSummary -> senderChangeAmount
     def get_transfer_summary_sender_change_amount(self):
-        return self.__get_record_field(8).__get_numeric()
+        return self.__get_record_field("senderChangeAmount").__get_numeric()
 
+    # data TransferResult -> summary; data TransferSummary -> outputFees
     def get_transfer_result_output_fees(self):
         return [
             d.__get_numeric()
             for d in self.get_transfer_result_summary()
-            .__get_record_field(6)
+            .__get_record_field("outputFees")
             .__get_list()
         ]
 
+    # data TransferResult -> senderChangeAmulet
     def get_transfer_result_sender_change_amulet(self):
-        optional = self.__get_record_field(3).__get_optional()
+        optional = self.__get_record_field("senderChangeAmulet").__get_optional()
         if optional:
             return optional.get_contract_id()
         else:
             return None
 
+    # data TransferResult -> createdAmulets
     def get_transfer_result_created_amulets(self):
-        return [x.__get_variant() for x in self.__get_record_field(2).__get_list()]
+        return [x.__get_variant() for x in self.__get_record_field("createdAmulets").__get_list()]
 
+    # data ValidatorLicense_ReceiveFaucetCouponResult -> faucetCoupon
     def get_receive_validator_faucet_coupon_result_coupon_cid(self):
-        return self.__get_record_field(1).get_contract_id()
+        return self.__get_record_field("couponCid").get_contract_id()
 
+    # template ValidatorFaucetCoupon -> validator
     def get_validator_faucet_validator(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("validator").__get_party()
 
+    # template ValidatorFaucetCoupon -> round
     def get_validator_faucet_round(self):
-        return self.__get_record_field(2).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template ValidatorRewardCoupon -> user
     def get_validator_reward_user(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("user").__get_party()
 
+    # template ValidatorRewardCoupon -> round
     def get_validator_reward_round(self):
-        return self.__get_record_field(3).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # template ValidatorRewardCoupon -> amount
     def get_validator_reward_amount(self):
-        return self.__get_record_field(2).__get_numeric()
+        return self.__get_record_field("amount").__get_numeric()
 
+    # data AmuletRules_DevNet_TapResult -> amuletSum
     def get_tap_result_amulet_sum(self):
-        return self.__get_record_field(0)
+        return self.__get_record_field("amuletSum")
 
+    # data LockedAmulet_UnlockResult -> amuletSum
     def get_locked_amulet_unlock_result_amulet_sum(self):
-        return self.__get_record_field(0)
+        return self.__get_record_field("amuletSum")
 
+    # data AmuletCreateSummary -> amulet
     def get_amulet_summary_amulet(self):
-        return self.__get_record_field(0).get_contract_id()
+        return self.__get_record_field("amulet").get_contract_id()
 
+    # data AmuletCreateSummary -> round
     def get_amulet_summary_round(self):
-        return self.__get_record_field(2).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # choice AmuletRules_BuyMemberTraffic -> inputs
     def get_buy_member_traffic_inputs(self):
-        return [x.__get_variant() for x in self.__get_record_field(0).__get_list()]
+        return [x.__get_variant() for x in self.__get_record_field("inputs").__get_list()]
 
+    # choice AmuletRules_BuyMemberTraffic -> provider
     def get_buy_member_traffic_provider(self):
-        return self.__get_record_field(2).__get_party()
+        return self.__get_record_field("provider").__get_party()
 
+    # choice AmuletRules_BuyMemberTraffic -> memberId
     def get_buy_member_traffic_member_id(self):
-        return self.__get_record_field(3).__get_text()
+        return self.__get_record_field("memberId").__get_text()
 
+    # choice AmuletRules_BuyMemberTraffic -> synchronizerId
     def get_buy_member_traffic_synchronizer_id(self):
-        return self.__get_record_field(4).__get_text()
+        return self.__get_record_field("synchronizerId").__get_text()
 
+    # choice AmuletRules_BuyMemberTraffic -> migrationId
     def get_buy_member_traffic_migration_id(self):
-        return self.__get_record_field(5).__get_int64()
+        return self.__get_record_field("migrationId").__get_int64()
 
+    # choice AmuletRules_BuyMemberTraffic -> trafficAmount
     def get_buy_member_traffic_traffic_amount(self):
-        return self.__get_record_field(6).__get_int64()
+        return self.__get_record_field("trafficAmount").__get_int64()
 
+    # data AmuletRules_BuyMemberTrafficResult -> round
     def get_buy_member_traffic_result_round(self):
-        return self.__get_record_field(0).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # data AmuletRules_BuyMemberTrafficResult -> senderChangeAmulet
     def get_buy_member_traffic_result_sender_change_amulet(self):
-        optional = self.__get_record_field(4).__get_optional()
+        optional = self.__get_record_field("senderChangeAmulet").__get_optional()
         if optional:
             return optional.get_contract_id()
         else:
             return None
 
+    # data AmuletRules_BuyMemberTrafficResult -> amuletPaid
     def get_buy_member_traffic_result_amulet_paid(self):
-        return self.__get_record_field(2).__get_numeric()
+        return self.__get_record_field("amuletPaid").__get_numeric()
 
+    # data AmuletRules_BuyMemberTrafficResult -> amuletPaid
     def get_buy_member_traffic_result_transfer_summary(self):
-        return self.__get_record_field(1)
+        return self.__get_record_field("summary")
 
+    # data TransferOutput -> receiver
     def get_transfer_output_receiver(self):
-        return self.__get_record_field(0).__get_party()
+        return self.__get_record_field("receiver").__get_party()
 
+    # data TransferOutput -> amount
     def get_transfer_output_amount(self):
-        return self.__get_record_field(2).__get_numeric()
+        return self.__get_record_field("amount").__get_numeric()
 
+    # data TransferOutput -> receiverFeeRatio
     def get_transfer_output_receiver_fee_ratio(self):
-        return self.__get_record_field(1).__get_numeric()
+        return self.__get_record_field("receiverFeeRatio").__get_numeric()
 
+    # template AppRewardCoupon -> provider
     def get_app_reward_provider(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("provider").__get_party()
 
+    # template AppRewardCoupon -> featured
     def get_app_reward_featured(self):
-        return self.__get_record_field(2).__get_bool()
+        return self.__get_record_field("featured").__get_bool()
 
+    # template AppRewardCoupon -> amount
     def get_app_reward_amount(self):
-        return self.__get_record_field(3).__get_numeric()
+        return self.__get_record_field("amount").__get_numeric()
 
+    # template AppRewardCoupon -> round
     def get_app_reward_round(self):
-        return self.__get_record_field(4).__get_round_number()
+        return self.__get_record_field("round").__get_round_number()
 
+    # ExtTransferInput -> optInputValidatorFaucetCoupon
     def get_ext_transfer_input_validator_faucet_coupon(self):
-        cid = self.__get_record_field(1).__get_optional()
+        cid = self.__get_record_field("optInputValidatorFaucetCoupon")
         if cid:
             return cid.get_contract_id()
         else:
             return None
 
+    # template AnsEntryContext -> name
     def get_ans_entry_context_name(self):
-        return self.__get_record_field(2).__get_text()
+        return self.__get_record_field("name").__get_text()
 
+    # template AnsEntryContext -> user
     def get_ans_entry_context_user(self):
-        return self.__get_record_field(1).__get_party()
+        return self.__get_record_field("user").__get_party()
 
+    # template AnsEntryContext -> reference
     def get_ans_entry_context_subscription_request(self):
-        return self.__get_record_field(5).get_contract_id()
+        return self.__get_record_field("reference").get_contract_id()
 
+    # template SubscriptionIdleState -> reference
     def get_subscription_idle_state_reference(self):
-        return self.__get_record_field(4).get_contract_id()
+        return self.__get_record_field("reference").get_contract_id()
+
+    # data SteppedRate
+    def __get_stepped_rate(self):
+        initial_rate = self.__get_record_field("initialRate").__get_numeric()
+        steps = [
+            x.__get_stepped_rate_step() for x in self.__get_record_field("steps").__get_list()
+        ]
+        return SteppedRate(initial_rate, steps)
+
+    # (Decimal, Decimal)
+    def __get_stepped_rate_step(self):
+        return (
+            self.__get_record_field("_1").__get_numeric(),
+            self.__get_record_field("_2").__get_numeric(),
+        )
 
     def __get_optional(self):
-        o = self.value["optional"]
-        if "value" in o:
-            return LfValue(o["value"])
+        if self.value:
+            return self
         else:
             return None
 
     def __get_numeric(self):
-        return DamlDecimal(self.value["numeric"])
+        try:
+            return DamlDecimal(self.value)
+        except Exception as e:
+            raise LfValueParseException(self, "numeric", e)
 
     def __get_text(self):
-        return self.value["text"]
+        if isinstance(self.value, str):
+            return self.value
+        else:
+            raise LfValueParseException(self, "text", f"Expected string, got {type(self.value)}")
 
     def __get_variant(self):
-        variant = self.value["variant"]
-        return {"tag": variant["constructor"], "value": LfValue(variant["value"])}
+        try:
+            tag = self.value["tag"]
+            value = self.value["value"]
+            return {"tag": tag, "value": LfValue(value)}
+        except Exception as e:
+            raise LfValueParseException(self, "variant", e)
 
     def __get_party(self):
-        return self.value["party"]
+        if isinstance(self.value, str):
+            return self.value
+        else:
+            raise LfValueParseException(self, "party", f"Expected string, got {type(self.value)}")
 
     def __get_int64(self):
-        return int(self.value["int64"])
+        try:
+            return int(self.value)
+        except Exception as e:
+            raise LfValueParseException(self, "int64", e)
 
     def get_contract_id(self):
-        return self.value["contractId"]
+        if isinstance(self.value, str):
+            return self.value
+        else:
+            raise LfValueParseException(self, "contract id", f"Expected string, got {type(self.value)}")
 
     def __get_list(self):
-        return [LfValue(x) for x in self.value["list"].get("elements", [])]
+        if isinstance(self.value, list):
+            return [LfValue(x) for x in self.value]
+        else:
+            raise LfValueParseException(self, "list", f"Expected list, got {type(self.value)}")
 
-    def __get_record_field(self, field_index):
-        return LfValue(self.value["record"]["fields"][field_index]["value"])
+    def __get_record_field(self, field_name):
+        try:
+            if field_name in self.value:
+                return LfValue(self.value[field_name])
+            else:
+                raise LfValueParseException(self, "record", f"Missing record field {field_name}")
+        except Exception as e:
+            raise LfValueParseException(self, "record", e)
 
     def __get_round_number(self):
-        return self.__get_record_field(0).__get_int64()
+        return self.__get_record_field("number").__get_int64()
 
     def __get_bool(self):
-        return self.value["bool"]
+        if isinstance(self.value, bool):
+            return self.value
+        else:
+            raise LfValueParseException(self, "boolean", f"Expected boolean, got {type(self.value)}")
 
     def __get_timestamp(self):
-        return datetime.utcfromtimestamp(int(self.value["timestamp"]) / 1000000)
+        try:
+            return datetime.fromisoformat(self.value)
+        except Exception as e:
+            raise LfValueParseException(self, "timestamp", e)
 
-    def __get_stepped_rate(self):
-        initial_rate = self.__get_record_field(0).__get_numeric()
-        steps = [
-            x.__get_stepped_rate_step() for x in self.__get_record_field(1).__get_list()
-        ]
-        return SteppedRate(initial_rate, steps)
-
-    def __get_stepped_rate_step(self):
-        return (
-            self.__get_record_field(0).__get_numeric(),
-            self.__get_record_field(1).__get_numeric(),
-        )
-
+class LfValueParseException(Exception):
+    def __init__(self, value, type, details):
+        message = f"Could not parse value {value.value} as {type}: {details}"
+        self.value = value.value
+        self.type = type
+        self.details = details
+        self.message = message
+        super().__init__(message)
 
 @dataclass
 class ExercisedEvent:
@@ -1734,7 +1862,7 @@ class State:
             case "ARC_AnsEntryContext":
                 ans_entry_context_action = action[
                     "value"
-                ].get_arc_ans_entry_context_ans_entry_context_cid()
+                ].get_arc_ans_entry_context_ans_entry_context_action()
                 match ans_entry_context_action["tag"]:
                     case "ANSRARC_CollectInitialEntryPayment":
                         # The last event is the actual choice, the previous ones are confirmations.

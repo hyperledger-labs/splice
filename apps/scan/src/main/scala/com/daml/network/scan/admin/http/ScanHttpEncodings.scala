@@ -8,7 +8,9 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.UpdateHistoryItem
-import com.google.protobuf.util.JsonFormat
+import com.daml.network.util.{Contract, ValueJsonCodecCodegen}
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 import java.time.ZoneOffset
 import scala.jdk.CollectionConverters.*
@@ -18,7 +20,7 @@ object ScanHttpEncodings {
   def ledgerTreeUpdateToHttp(
       tx: LedgerClient.GetTreeUpdatesResponse,
       migrationId: Long,
-  ): UpdateHistoryItem = {
+  )(implicit elc: ErrorLoggingContext): UpdateHistoryItem = {
     val tree = tx.update match {
       case TransactionTreeUpdate(tree) => tree
       case ReassignmentUpdate(_) =>
@@ -44,7 +46,7 @@ object ScanHttpEncodings {
     )
   }
 
-  private def treeEventToHttp(treeEvent: TreeEvent) = {
+  private def treeEventToHttp(treeEvent: TreeEvent)(implicit elc: ErrorLoggingContext) = {
     treeEvent match {
       case event: CreatedEvent =>
         definitions.TreeEvent.fromCreatedEvent(
@@ -55,10 +57,7 @@ object ScanHttpEncodings {
               event.getContractId,
               templateIdString(event.getTemplateId),
               event.getPackageName,
-              // TODO (#12548): replace with the correct encoding
-              io.circe.parser
-                .parse(JsonFormat.printer().print(event.getArguments.toProto))
-                .getOrElse(failedToWriteToJson()),
+              encodeContractPayload(event),
               event.getCreatedAt.atOffset(ZoneOffset.UTC),
             )
         )
@@ -72,19 +71,9 @@ object ScanHttpEncodings {
               templateIdString(event.getTemplateId),
               event.getPackageName,
               event.getChoice,
-              // TODO (#12548): replace with the correct encoding
-              io.circe.parser
-                .parse(
-                  JsonFormat.printer().print(event.getChoiceArgument.toProto)
-                )
-                .getOrElse(failedToWriteToJson()),
+              encodeChoiceArgument(event),
               event.getChildEventIds.asScala.toVector,
-              // TODO (#12548): replace with the correct encoding
-              io.circe.parser
-                .parse(
-                  JsonFormat.printer().print(event.getExerciseResult.toProto)
-                )
-                .getOrElse(failedToWriteToJson()),
+              encodeExerciseResult(event),
               event.isConsuming,
             )
         )
@@ -96,7 +85,72 @@ object ScanHttpEncodings {
   private def templateIdString(templateId: Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
 
-  private def failedToWriteToJson() =
-    throw new IllegalStateException("Failed to write to JSON.")
+  private def failedToWriteToJson(err: String): Nothing =
+    throw new IllegalStateException(s"Failed to write to JSON: $err")
 
+  /** Parses a string that is known to contain a valid JSON value to io.circe.Json */
+  private def tryParseJson(validJsonString: String): io.circe.Json =
+    io.circe.parser
+      .parse(validJsonString)
+      .fold(err => failedToWriteToJson(err.message), identity)
+
+  private def encodeContractPayload(
+      event: CreatedEvent
+  )(implicit elc: ErrorLoggingContext): io.circe.Json = {
+    ValueJsonCodecCodegen
+      .serializableContractPayload(event)
+      .fold(
+        err => {
+          elc.error(s"Failed to encode contract payload: $err")
+          encodeValueFallback(err, event.getArguments)
+        },
+        tryParseJson,
+      )
+  }
+
+  private def encodeChoiceArgument(
+      event: ExercisedEvent
+  )(implicit elc: ErrorLoggingContext): io.circe.Json = {
+    ValueJsonCodecCodegen
+      .serializeChoiceArgument(event)
+      .fold(
+        err => {
+          elc.error(s"Failed to encode choice argument: $err")
+          encodeValueFallback(err, event.getChoiceArgument)
+        },
+        tryParseJson,
+      )
+  }
+
+  private def encodeExerciseResult(
+      event: ExercisedEvent
+  )(implicit elc: ErrorLoggingContext): io.circe.Json = {
+    ValueJsonCodecCodegen
+      .serializeChoiceResult(event)
+      .fold(
+        err => {
+          elc.error(s"Failed to encode exercise result: $err")
+          encodeValueFallback(err, event.getExerciseResult)
+        },
+        tryParseJson,
+      )
+  }
+
+  private def encodeValueFallback(
+      error: String,
+      value: com.daml.ledger.javaapi.data.Value,
+  )(implicit elc: ErrorLoggingContext): io.circe.Json = {
+    import io.circe.syntax.*
+    val fallbackValue = tryParseJson(
+      ApiCodecCompressed
+        .apiValueToJsValue(Contract.javaValueToLfValue(value))
+        .compactPrint
+    )
+    io.circe
+      .JsonObject(
+        "error" -> io.circe.Json.fromString(error),
+        "value" -> fallbackValue,
+      )
+      .asJson
+  }
 }

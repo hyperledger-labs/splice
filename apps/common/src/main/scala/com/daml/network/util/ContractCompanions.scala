@@ -45,7 +45,7 @@ object ContractCompanions {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def lookup(
       templateId: Identifier
-  ): Option[C] = {
+  ): Either[String, C] = {
     val qualifiedName = QualifiedName(templateId.getPackageId, templateId.getEntityName)
 
     def templateMatches(id: Identifier) =
@@ -61,18 +61,20 @@ object ContractCompanions {
       )
 
     // The cast should not be necessary
-    companion.map(_.asInstanceOf[C])
+    companion.map(_.asInstanceOf[C]).toRight(s"Could not find companion for $qualifiedName")
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def lookupChoice(
       companion: C,
       choice: String,
-  ): Option[GenericChoice] = {
+  ): Either[String, GenericChoice] = {
     import scala.language.existentials
     val result = companion.choices.asScala.get(choice)
 
     // Throw away all type safety
-    result.map(_.asInstanceOf[GenericChoice])
+    result
+      .map(_.asInstanceOf[GenericChoice])
+      .toRight(s"Could not find companion for choice $choice of ${companion.TEMPLATE_ID}")
   }
 }
