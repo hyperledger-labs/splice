@@ -17,6 +17,7 @@ import com.daml.network.sv.config.InitialAnsConfig
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.sv.automation.leaderbased.{
@@ -67,6 +68,11 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
   def leaderExpiredAnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
     sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]
+
+  // created by the expiry test
+  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
+    codegen.AnsEntry.TEMPLATE_ID
+  )
 
   "ans" should {
     "allocate unique ans entries, even when multiple parties race for them" in { implicit env =>

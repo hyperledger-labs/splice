@@ -77,6 +77,7 @@ class HandleTransactionResult:
     new_open_rounds: set
     new_closed_round: str
 
+    @staticmethod
     def empty():
         return HandleTransactionResult(None, None, set(), None)
 
@@ -659,7 +660,7 @@ class TransactionTree:
                     if event.is_consuming:
                         archived_events[event.contract_id] = event
                 else:
-                    logger.error(
+                    raise Exception(
                         f"Encountered Unknown event when producing acs diff: {event}"
                     )
         non_transient_created_events = {
@@ -911,16 +912,18 @@ class PerPartyState:
 
 # The state at a given record time
 class State:
-    def __init__(self, logger, active_contracts, record_time):
+    def __init__(self, logger, active_contracts, record_time, ignored_root_creates):
         self.logger = logger
         self.active_contracts = active_contracts
         self.record_time = record_time
+        self.ignored_root_creates = ignored_root_creates
 
     def clone(self, new_logger):
         return State(
             new_logger,
             self.active_contracts.copy(),
             self.record_time,
+            self.ignored_root_creates
         )
 
     def summary(self):
@@ -1123,6 +1126,9 @@ class State:
             self.get_transaction_logger(transaction).error(f"Unknown event: {event}")
 
     def handle_root_created_event(self, transaction, event):
+        if event.template_id.qualified_name in self.ignored_root_creates:
+            return HandleTransactionResult.empty()
+
         match event.template_id.qualified_name:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
@@ -1277,7 +1283,7 @@ class State:
                     ]
                     # set to an empty list to simplify computations below
                     lock_holders = []
-                case _:
+                case tag:
                     self.get_transaction_logger(transaction).error(
                         f"unexpected output tag: {tag}"
                     )
@@ -1446,7 +1452,7 @@ class State:
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
         if sender_change_cid:
             sender_change = transaction.by_contract_id[sender_change_cid]
-            self.active_contracts[cid] = sender_change
+            self.active_contracts[sender_change_cid] = sender_change
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
             if (
@@ -1741,7 +1747,7 @@ class State:
                     case "ANSRARC_RejectEntryInitialPayment":
                         raise Exception("baz")
                     case tag:
-                        logger.error(f"Unexpected ARC_AnsEntryContext tag: {tag}")
+                        self.logger.error(f"Unexpected ARC_AnsEntryContext tag: {tag}")
             case _:
                 self.get_transaction_logger(transaction).error(
                     f"Unexpected action: {action}"
@@ -1863,6 +1869,8 @@ class State:
                 return self.handle_dso_rules_locked_amulet_expire(transaction, event)
             case "AnsRules_RequestEntry":
                 return self.handle_request_entry(transaction, event)
+            case "DsoRules_ExpireAnsEntry":
+                return HandleTransactionResult.empty()
             case "SubscriptionRequest_AcceptAndMakePayment":
                 return self.handle_subscription_request_accept_and_make_payment(
                     transaction, event
@@ -1883,6 +1891,8 @@ class State:
             case "DsoRules_TerminateSubscription":
                 # No change to the tracked ACS.
                 return HandleTransactionResult.empty()
+            case "SubscriptionIdleState_CancelSubscription":
+                return HandleTransactionResult.empty()
             case "DsoRules_ClaimExpiredRewards":
                 return self.handle_claim_expired_rewards(transaction, event)
             case "DsoRules_MergeUnclaimedRewards":
@@ -1901,6 +1911,10 @@ class State:
             case "DsoRules_OnboardValidator":
                 return HandleTransactionResult.empty()
             case "DsoRules_StartSvOnboarding":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireSvOnboardingRequest":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireSvOnboardingConfirmed":
                 return HandleTransactionResult.empty()
             case "DsoRules_ConfirmAction":
                 return HandleTransactionResult.empty()
@@ -1926,7 +1940,19 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_GarbageCollectAmuletPriceVotes":
                 return HandleTransactionResult.empty()
+            case "DsoRules_CastVote":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ArchiveOutdatedElectionRequest":
+                return HandleTransactionResult.empty()
             case "DsoRules_ExpireStaleConfirmation":
+                return HandleTransactionResult.empty()
+            case "DsoRules_RequestVote":
+                return HandleTransactionResult.empty()
+            case "DsoRules_CloseVoteRequest":
+                return HandleTransactionResult.empty()
+            case "DsoRules_RequestElection":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_AddFutureAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
             case choice:
                 self.get_transaction_logger(transaction).error(
@@ -1989,6 +2015,11 @@ async def main():
         help="Address of the Splice Scan server",
         default="http://localhost:5012",
     )
+    parser.add_argument(
+        "--ignore-root-create",
+        nargs='*',
+        default=[],
+    )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
         "--scan-balance-assertions",
@@ -2015,7 +2046,7 @@ async def main():
 
     sys.excepthook = handle_exception
 
-    state = State(logger, {}, None)
+    state = State(logger, {}, None, args.ignore_root_create)
     per_round_states = {}
     last_record_time = None
     async with aiohttp.ClientSession() as session:

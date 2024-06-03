@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import cats.syntax.parallel.*
 import com.auth0.exception.Auth0Exception
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.auth.AuthUtil
@@ -106,7 +107,14 @@ object CNNodeTests extends LazyLogging {
 
     protected lazy val resetRequiredTopologyState: Boolean = true
 
-    registerPlugin(new UpdateHistorySanityCheckPlugin(loggerFactory))
+    protected val runUpdateHistorySanityCheck: Boolean = true
+    protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+
+    if (runUpdateHistorySanityCheck) {
+      registerPlugin(
+        new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
+      )
+    }
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
     if (resetRequiredTopologyState) {
       registerPlugin(new ResetDecentralizedNamespace())
@@ -128,7 +136,11 @@ object CNNodeTests extends LazyLogging {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
-    registerPlugin(new UpdateHistorySanityCheckPlugin(loggerFactory))
+    protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+
+    registerPlugin(
+      new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
+    )
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 

@@ -1,10 +1,12 @@
 package com.daml.network.integration.plugins
 
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,8 +18,16 @@ import scala.collection.mutable
 import scala.sys.process.ProcessLogger
 import scala.util.control.NonFatal
 
-class UpdateHistorySanityCheckPlugin(protected val loggerFactory: NamedLoggerFactory)
-    extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+/** Runs `scripts/scan-txlog/scan_txlog.py`, to make sure that we have no transactions that would break it.
+  *
+  * @param ignoredRootCreates some tests create contracts directly via ledger_api_extensions.commands.
+  *                            This is a list of TemplateIds that are created in such a way,
+  *                            which won't cause an error in the script.
+  */
+class UpdateHistorySanityCheckPlugin(
+    ignoredRootCreates: Seq[Identifier],
+    protected val loggerFactory: NamedLoggerFactory,
+) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
     with Matchers
     with Inspectors {
 
@@ -47,7 +57,9 @@ class UpdateHistorySanityCheckPlugin(protected val loggerFactory: NamedLoggerFac
                   "--loglevel",
                   "DEBUG",
                   "--scan-balance-assertions",
-                )
+                ) ++ ignoredRootCreates.flatMap { templateId =>
+                  Seq("--ignore-root-create", QualifiedName(templateId).toString)
+                }
               )
               .!(errorProcessor)
           } catch {
@@ -61,7 +73,7 @@ class UpdateHistorySanityCheckPlugin(protected val loggerFactory: NamedLoggerFac
             log.contains("ERROR:") || log.contains("WARNING:")
           } should be(empty)
           forExactly(1, readLines) { line =>
-            line should contain("Reached end of stream")
+            line should include("Reached end of stream")
           }
         }
     }

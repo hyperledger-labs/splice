@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.sv.automation.leaderbased.MergeSvRewardStateContractsTrigger
@@ -14,6 +15,10 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       // Single SV to allow direct ledger API submissions as the DSO
       // to create SvRewardState contracts.
       .simpleTopology1Sv(this.getClass.getSimpleName)
+
+  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
+    SvRewardState.TEMPLATE_ID
+  )
 
   "Multiple SvRewardStates for the same SV get merged" in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty

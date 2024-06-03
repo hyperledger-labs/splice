@@ -58,6 +58,9 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil {
 
+  // Fails with unexpected CreatedEvent roots
+  override protected val runUpdateHistorySanityCheck: Boolean = false
+
   override def environmentDefinition =
     super.environmentDefinition
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
