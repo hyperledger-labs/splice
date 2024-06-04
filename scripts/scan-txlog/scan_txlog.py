@@ -292,19 +292,27 @@ class LfValue:
 
     # template IssuingMiningRound -> issuancePerValidatorRewardCoupon
     def get_issuing_mining_round_issuance_per_validator_reward(self):
-        return self.__get_record_field("issuancePerValidatorRewardCoupon").__get_numeric()
+        return self.__get_record_field(
+            "issuancePerValidatorRewardCoupon"
+        ).__get_numeric()
 
     # template IssuingMiningRound -> issuancePerFeaturedAppRewardCoupon
     def get_issuing_mining_round_issuance_per_featured_app_reward(self):
-        return self.__get_record_field("issuancePerFeaturedAppRewardCoupon").__get_numeric()
+        return self.__get_record_field(
+            "issuancePerFeaturedAppRewardCoupon"
+        ).__get_numeric()
 
     # template IssuingMiningRound -> issuancePerUnfeaturedAppRewardCoupon
     def get_issuing_mining_round_issuance_per_unfeatured_app_reward(self):
-        return self.__get_record_field("issuancePerUnfeaturedAppRewardCoupon").__get_numeric()
+        return self.__get_record_field(
+            "issuancePerUnfeaturedAppRewardCoupon"
+        ).__get_numeric()
 
     # template IssuingMiningRound -> optIssuancePerValidatorFaucetCoupon
     def get_issuing_mining_round_issuance_per_validator_faucet(self):
-        return self.__get_record_field("optIssuancePerValidatorFaucetCoupon").__get_numeric()
+        return self.__get_record_field(
+            "optIssuancePerValidatorFaucetCoupon"
+        ).__get_numeric()
 
     # choice DsoRules_MiningRound_Close -> issuingRoundCid
     def get_mining_round_close_issuing_round_cid(self):
@@ -340,7 +348,9 @@ class LfValue:
 
     # data TimeLock -> holders
     def get_time_lock_holders(self):
-        return [x.__get_party() for x in self.__get_record_field("holders").__get_list()]
+        return [
+            x.__get_party() for x in self.__get_record_field("holders").__get_list()
+        ]
 
     # data TimeLock -> expiresAt
     def get_time_lock_expires_at(self):
@@ -356,11 +366,18 @@ class LfValue:
 
     # data ExpiringAmount -> ratePerRound; data RatePerRound -> rate
     def get_expiring_amount_rate_per_round(self):
-        return self.__get_record_field("ratePerRound").__get_record_field("rate").__get_numeric()
+        return (
+            self.__get_record_field("ratePerRound")
+            .__get_record_field("rate")
+            .__get_numeric()
+        )
 
     # data DsoRules_ReceiveSvRewardCouponResult -> svRewardCoupons
     def get_receive_sv_reward_coupons_result_sv_reward_coupons(self):
-        return [x.get_contract_id() for x in self.__get_record_field("svRewardCoupons").__get_list()]
+        return [
+            x.get_contract_id()
+            for x in self.__get_record_field("svRewardCoupons").__get_list()
+        ]
 
     # template SvRewardCoupon -> beneficiary
     def get_sv_reward_coupon_beneficiary(self):
@@ -420,7 +437,9 @@ class LfValue:
 
     # data Transfer -> inputs
     def get_transfer_inputs(self):
-        return [x.__get_variant() for x in self.__get_record_field("inputs").__get_list()]
+        return [
+            x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
+        ]
 
     # data Transfer -> outputs
     def get_transfer_outputs(self):
@@ -473,7 +492,10 @@ class LfValue:
 
     # data TransferResult -> createdAmulets
     def get_transfer_result_created_amulets(self):
-        return [x.__get_variant() for x in self.__get_record_field("createdAmulets").__get_list()]
+        return [
+            x.__get_variant()
+            for x in self.__get_record_field("createdAmulets").__get_list()
+        ]
 
     # data ValidatorLicense_ReceiveFaucetCouponResult -> faucetCoupon
     def get_receive_validator_faucet_coupon_result_coupon_cid(self):
@@ -517,7 +539,9 @@ class LfValue:
 
     # choice AmuletRules_BuyMemberTraffic -> inputs
     def get_buy_member_traffic_inputs(self):
-        return [x.__get_variant() for x in self.__get_record_field("inputs").__get_list()]
+        return [
+            x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
+        ]
 
     # choice AmuletRules_BuyMemberTraffic -> provider
     def get_buy_member_traffic_provider(self):
@@ -615,7 +639,8 @@ class LfValue:
     def __get_stepped_rate(self):
         initial_rate = self.__get_record_field("initialRate").__get_numeric()
         steps = [
-            x.__get_stepped_rate_step() for x in self.__get_record_field("steps").__get_list()
+            x.__get_stepped_rate_step()
+            for x in self.__get_record_field("steps").__get_list()
         ]
         return SteppedRate(initial_rate, steps)
 
@@ -642,7 +667,9 @@ class LfValue:
         if isinstance(self.value, str):
             return self.value
         else:
-            raise LfValueParseException(self, "text", f"Expected string, got {type(self.value)}")
+            raise LfValueParseException(
+                self, "text", f"Expected string, got {type(self.value)}"
+            )
 
     def __get_variant(self):
         try:
@@ -656,7 +683,9 @@ class LfValue:
         if isinstance(self.value, str):
             return self.value
         else:
-            raise LfValueParseException(self, "party", f"Expected string, got {type(self.value)}")
+            raise LfValueParseException(
+                self, "party", f"Expected string, got {type(self.value)}"
+            )
 
     def __get_int64(self):
         try:
@@ -668,20 +697,26 @@ class LfValue:
         if isinstance(self.value, str):
             return self.value
         else:
-            raise LfValueParseException(self, "contract id", f"Expected string, got {type(self.value)}")
+            raise LfValueParseException(
+                self, "contract id", f"Expected string, got {type(self.value)}"
+            )
 
     def __get_list(self):
         if isinstance(self.value, list):
             return [LfValue(x) for x in self.value]
         else:
-            raise LfValueParseException(self, "list", f"Expected list, got {type(self.value)}")
+            raise LfValueParseException(
+                self, "list", f"Expected list, got {type(self.value)}"
+            )
 
     def __get_record_field(self, field_name):
         try:
             if field_name in self.value:
                 return LfValue(self.value[field_name])
             else:
-                raise LfValueParseException(self, "record", f"Missing record field {field_name}")
+                raise LfValueParseException(
+                    self, "record", f"Missing record field {field_name}"
+                )
         except Exception as e:
             raise LfValueParseException(self, "record", e)
 
@@ -692,13 +727,16 @@ class LfValue:
         if isinstance(self.value, bool):
             return self.value
         else:
-            raise LfValueParseException(self, "boolean", f"Expected boolean, got {type(self.value)}")
+            raise LfValueParseException(
+                self, "boolean", f"Expected boolean, got {type(self.value)}"
+            )
 
     def __get_timestamp(self):
         try:
             return datetime.fromisoformat(self.value)
         except Exception as e:
             raise LfValueParseException(self, "timestamp", e)
+
 
 class LfValueParseException(Exception):
     def __init__(self, value, type, details):
@@ -708,6 +746,7 @@ class LfValueParseException(Exception):
         self.details = details
         self.message = message
         super().__init__(message)
+
 
 @dataclass
 class ExercisedEvent:
@@ -1051,7 +1090,7 @@ class State:
             new_logger,
             self.active_contracts.copy(),
             self.record_time,
-            self.ignored_root_creates
+            self.ignored_root_creates,
         )
 
     def summary(self):
@@ -2082,6 +2121,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_ElectDsoDelegate":
                 return HandleTransactionResult.empty()
+            case "DsoRules_MergeSvRewardState":
+                return HandleTransactionResult.empty()
             case "AmuletRules_AddFutureAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
             case choice:
@@ -2147,7 +2188,7 @@ async def main():
     )
     parser.add_argument(
         "--ignore-root-create",
-        nargs='*',
+        nargs="*",
         default=[],
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")

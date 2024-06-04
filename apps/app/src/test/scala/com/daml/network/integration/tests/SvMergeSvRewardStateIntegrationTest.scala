@@ -20,9 +20,6 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
     SvRewardState.TEMPLATE_ID
   )
 
-  // TODO (#12693): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
-
   "Multiple SvRewardStates for the same SV get merged" in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty
 
