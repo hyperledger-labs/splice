@@ -247,10 +247,15 @@ class UpdateHistoryIntegrationTest
     // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
     val transactionsOnly = updateHistory
       .getUpdates(
-        Some((recordedUpdates.head.update match {
-          case TransactionTreeUpdate(tree) => CantonTimestamp.assertFromInstant(tree.getRecordTime)
-          case ReassignmentUpdate(transfer) => transfer.recordTime
-        }).minusMillis(1L)), // include the first element, as otherwise it's excluded
+        Some(
+          (
+            0L,
+            // Note that we deliberately do not start from ledger begin here since the ledgerBeginSv1 variable above
+            // only points at the end after initialization.
+            recordedUpdates.head.update.recordTime
+              .minusMillis(1L), // include the first element, as otherwise it's excluded
+          )
+        ),
         PageLimit.tryCreate(recordedUpdates.size),
       )
       .futureValue

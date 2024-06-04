@@ -600,9 +600,15 @@ class HttpScanHandler(
       store.updateHistory.fold[Future[v0.ScanResource.GetUpdateHistoryResponse]](
         Future.failed(new IllegalStateException("UpdateHistory not available."))
       ) { updateHistory =>
+        val afterO = request.after.map { after =>
+          (
+            after.afterMigrationId,
+            CantonTimestamp(Timestamp.assertFromString(after.afterRecordTime)),
+          )
+        }
         updateHistory
           .getUpdates(
-            request.afterRecordTime.map(t => CantonTimestamp(Timestamp.assertFromString(t))),
+            afterO,
             PageLimit.tryCreate(request.pageSize),
           )
           .map { txs =>

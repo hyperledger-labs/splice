@@ -25,6 +25,7 @@ import scala.util.control.NonFatal
   *                            which won't cause an error in the script.
   */
 class UpdateHistorySanityCheckPlugin(
+    scanName: String,
     ignoredRootCreates: Seq[Identifier],
     protected val loggerFactory: NamedLoggerFactory,
 ) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
@@ -37,7 +38,7 @@ class UpdateHistorySanityCheckPlugin(
   ): Unit = {
     // Only SV1 will work.
     // Also, it might not be initialized if the test uses `manualStart` and it wasn't ever started.
-    environment.scans.local.find(scan => scan.name == "sv1Scan" && scan.is_initialized).foreach {
+    environment.scans.local.find(scan => scan.name == scanName && scan.is_initialized).foreach {
       scan =>
         paginateHistory(scan, None)
 
@@ -79,13 +80,13 @@ class UpdateHistorySanityCheckPlugin(
   @tailrec
   private def paginateHistory(
       scan: ScanAppBackendReference,
-      afterRecordTime: Option[String],
+      after: Option[(Long, String)],
   ): Unit = {
-    val result = scan.getUpdateHistory(10, afterRecordTime)
+    val result = scan.getUpdateHistory(10, after)
     result.lastOption match {
       case None => () // done
       case Some(members.UpdateHistoryTransaction(last)) =>
-        paginateHistory(scan, Some(last.recordTime))
+        paginateHistory(scan, Some((last.migrationId, last.recordTime)))
     }
   }
 }

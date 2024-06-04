@@ -810,7 +810,7 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetUpdateHistory(count: Int, afterRecordTime: Option[String])
+  case class GetUpdateHistory(count: Int, after: Option[(Long, String)])
       extends InternalBaseCommand[http.GetUpdateHistoryResponse, Seq[
         definitions.UpdateHistoryItem
       ]] {
@@ -822,7 +822,12 @@ object HttpScanAppClient {
       HttpResponse,
     ], http.GetUpdateHistoryResponse] = {
       client.getUpdateHistory(
-        definitions.UpdateHistoryRequest(afterRecordTime, count),
+        definitions.UpdateHistoryRequest(
+          after.map { case (migrationId, recordTime) =>
+            definitions.UpdateHistoryRequestAfter(migrationId, recordTime)
+          },
+          count,
+        ),
         headers,
       )
     }

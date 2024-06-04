@@ -352,7 +352,8 @@ class UpdateHistoryTest
       }
 
       "pagination works" in {
-        val store = mkStore(party1, migration1, participant1)
+        val storeMigrationId1 = mkStore(party1, migration1, participant1)
+        val storeMigrationId2 = mkStore(party1, migration2, participant1)
 
         val updates = (1 to 10).toList.map(i =>
           TransactionTreeUpdate(
@@ -369,33 +370,44 @@ class UpdateHistoryTest
         )
 
         def allHistoryPaginated(
-            afterRecordTime: Option[Instant],
+            store: UpdateHistory,
+            after: Option[(Long, Instant)],
             acc: Seq[TransactionTreeUpdate],
         ): Seq[TransactionTreeUpdate] = {
           val result =
             store
               .getUpdates(
-                afterRecordTime.map(CantonTimestamp.assertFromInstant),
+                after.map { case (migrationId, recordTime) =>
+                  (migrationId, CantonTimestamp.assertFromInstant(recordTime))
+                },
                 PageLimit.tryCreate(1),
               )
               .futureValue
           result.lastOption match {
             case None => acc // done
-            case Some((last, _)) =>
+            case Some((last, migrationId)) =>
               last.update match {
                 case tree: TransactionTreeUpdate =>
-                  allHistoryPaginated(Some(tree.tree.getRecordTime), acc :+ tree)
+                  allHistoryPaginated(
+                    store,
+                    Some((migrationId, tree.tree.getRecordTime)),
+                    acc :+ tree,
+                  )
                 case ReassignmentUpdate(transfer) =>
-                  allHistoryPaginated(Some(transfer.recordTime.toInstant), acc)
+                  allHistoryPaginated(
+                    store,
+                    Some((migrationId, transfer.recordTime.toInstant)),
+                    acc,
+                  )
               }
           }
         }
 
         for {
-          _ <- initStore(store)
+          _ <- initStore(storeMigrationId1)
           _ <- withoutRepeatedIngestionWarning(
             MonadUtil.sequentialTraverse(updates) { update =>
-              store.ingestionSink
+              storeMigrationId1.ingestionSink
                 .ingestUpdate(
                   domain1,
                   update,
@@ -403,9 +415,31 @@ class UpdateHistoryTest
             },
             maxCount = updates.size,
           )
-          all <- store.getUpdates(None, PageLimit.tryCreate(1000))
+          _ <- initStore(storeMigrationId2)
+          // insert the same transactions but in migration id 2,
+          _ <- withoutRepeatedIngestionWarning(
+            MonadUtil.sequentialTraverse(updates) { update =>
+              storeMigrationId2.ingestionSink
+                .ingestUpdate(
+                  domain1,
+                  update,
+                )
+            },
+            maxCount = updates.size,
+          )
+          all <- storeMigrationId1.getUpdates(None, PageLimit.tryCreate(1000))
+          all2 <- storeMigrationId2.getUpdates(None, PageLimit.tryCreate(1000))
         } yield {
-          allHistoryPaginated(None, Seq.empty) should be(all.map(_._1.update))
+          // It doesn't matter through which store we query since the migration id only matters for ingestion
+          all shouldBe all2
+          allHistoryPaginated(storeMigrationId1, None, Seq.empty) should be(all.map(_._1.update))
+          val expected = ((1 to 10).map(i =>
+            (1L, CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong)))
+          ) ++
+            (1 to 10).map(i =>
+              (2L, CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong)))
+            ))
+          all.map { case (u, migrationId) => (migrationId, u.update.recordTime) } shouldBe expected
         }
       }
 

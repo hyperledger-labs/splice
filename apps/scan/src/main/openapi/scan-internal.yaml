@@ -994,17 +994,34 @@ components:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
           $ref: "#/components/schemas/AmuletAmount"
+    UpdateHistoryRequestAfter:
+      type: object
+      required:
+        - after_migration_id
+        - after_record_time
+      properties:
+        after_migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id from which to start returning transactions. This is inclusive.
+        after_record_time:
+          type: string
+          description: |
+            The record time to start returning transactions from. This only affects
+            transactions with the same migration id as after_migration_id. Higher migration ids
+            are always considered to be later.
     UpdateHistoryRequest:
       type: object
       required:
         - page_size
       properties:
-        after_record_time:
-          type: string
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
           description: |
-            A ISO-8601 formatted date-time string, with microsecond precision.
-            The transactions returned will have a record_time greater than this value.
-            Omit this parameter to start reading from the beginning of the ledger.
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
         page_size:
           description: |
             The maximum number of transactions returned for this request.

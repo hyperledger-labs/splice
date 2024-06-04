@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import cats.data.NonEmptyList
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
@@ -38,6 +39,8 @@ import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -579,14 +582,24 @@ final class UpdateHistory(
 
   // TODO (#12552): include reassignments
   def getUpdates(
-      afterRecordTime: Option[CantonTimestamp],
+      afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
-    for {
-      rows <- storage
-        .query(
-          sql"""
-      select
+    val afterFilters = afterO match {
+      case None =>
+        NonEmptyList.of(sql"migration_id >= 0 and record_time >= ${CantonTimestamp.MinValue}")
+      case Some((afterMigrationId, afterRecordTime)) =>
+        // using an OR in a query might cause the query planner to do a Seq scan,
+        // whereas this makes it so that the two queries use updt_hist_tran_hi_mi_rt_di,
+        // and merged via Merge Append.
+        NonEmptyList.of(
+          sql"migration_id = ${afterMigrationId} and record_time > ${afterRecordTime} ",
+          sql"migration_id > ${afterMigrationId} and record_time >= ${CantonTimestamp.MinValue}",
+        )
+    }
+    def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
+      sql"""
+      (select
         row_id,
         update_id,
         record_time,
@@ -599,11 +612,16 @@ final class UpdateHistory(
         command_id
       from update_history_transactions
       where
-        history_id = $historyId and
-        record_time > ${afterRecordTime.getOrElse(CantonTimestamp.MinValue)}
-      order by record_time, domain_id
-      limit ${limit.limit}
-    """.as[SelectFromTransactions],
+        history_id = $historyId and """ ++ afterFilter ++
+        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+    }
+    val unionAll = afterFilters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
+    val finalQuery = (sql"select * from (" ++ unionAll ++ sql") all_queries " ++
+      sql"""order by migration_id, record_time, domain_id limit ${limit.limit}""")
+    for {
+      rows <- storage
+        .query(
+          finalQuery.toActionBuilder.as[SelectFromTransactions],
           "getUpdates",
         )
       creates <- queryCreateEvents(rows.map(_.rowId))

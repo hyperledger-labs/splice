@@ -108,11 +108,16 @@ object CNNodeTests extends LazyLogging {
     protected lazy val resetRequiredTopologyState: Boolean = true
 
     protected def runUpdateHistorySanityCheck: Boolean = true
+    protected def updateHistoryScanName: String = "sv1Scan"
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
-        new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
+        new UpdateHistorySanityCheckPlugin(
+          updateHistoryScanName,
+          updateHistoryIgnoredRootCreates,
+          loggerFactory,
+        )
       )
     }
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
@@ -137,11 +142,16 @@ object CNNodeTests extends LazyLogging {
       with LedgerApiExtensions {
 
     protected def runUpdateHistorySanityCheck: Boolean = true
+    protected def updateHistoryScanName: String = "sv1Scan"
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
-        new UpdateHistorySanityCheckPlugin(updateHistoryIgnoredRootCreates, loggerFactory)
+        new UpdateHistorySanityCheckPlugin(
+          updateHistoryScanName,
+          updateHistoryIgnoredRootCreates,
+          loggerFactory,
+        )
       )
     }
 

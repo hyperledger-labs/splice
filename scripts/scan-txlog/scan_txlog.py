@@ -25,6 +25,9 @@ file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
+# Matches the prefix defined in ParticipantAdminConnection
+import_acs_workflow_id_prefix = "canton-network-acs-import"
+
 
 @dataclass
 class TemplateId:
@@ -124,13 +127,30 @@ class HandleTransactionResult:
 
 
 @dataclass
+class PaginationKey:
+    last_migration_id: int
+    last_record_time: str
+
+    def __str__(self):
+        return str((self.last_migration_id, self.last_record_time))
+
+    def json(self):
+        return {
+            "after_record_time": self.last_record_time,
+            "after_migration_id": self.last_migration_id,
+        }
+
+
+@dataclass
 class ScanClient:
     session: aiohttp.ClientSession
     url: str
     page_size: int
 
-    async def updates(self, after_record_time=None):
-        payload = {"after_record_time": after_record_time, "page_size": self.page_size}
+    async def updates(self, after):
+        payload = {"page_size": self.page_size}
+        if after:
+            payload["after"] = after.json()
         response = await self.session.post(
             f"{self.url}/api/scan/v0/updates", json=payload
         )
@@ -794,14 +814,26 @@ class Event:
 class TransactionTree:
     root_event_ids: list
     events_by_id: dict
+    migration_id: int
     record_time: str
     update_id: str
+    workflow_id: str
 
-    def __init__(self, root_event_ids, events_by_id, record_time, update_id):
+    def __init__(
+        self,
+        root_event_ids,
+        events_by_id,
+        migration_id,
+        record_time,
+        update_id,
+        workflow_id,
+    ):
         self.root_event_ids = root_event_ids
         self.events_by_id = events_by_id
         self.record_time = record_time
+        self.migration_id = migration_id
         self.update_id = update_id
+        self.workflow_id = workflow_id
         self.by_contract_id = {
             event.contract_id: event
             for event in self.events_by_id.values()
@@ -815,9 +847,14 @@ class TransactionTree:
                 event_id: Event.parse(event)
                 for event_id, event in json["events_by_id"].items()
             },
+            json["migration_id"],
             json["record_time"],
             json["update_id"],
+            json["workflow_id"],
         )
+
+    def is_acs_import(self):
+        return self.workflow_id.startswith(import_acs_workflow_id_prefix)
 
     def acs_diff(self):
         created_events = {}
@@ -2270,60 +2307,72 @@ async def main():
 
     state = State(logger, {}, None, args.ignore_root_create)
     per_round_states = {}
-    last_record_time = None
+    pagination_key = None
     async with aiohttp.ClientSession() as session:
         scan_client = ScanClient(session, args.scan_url, 100)
         while True:
-            batch = await scan_client.updates(last_record_time)
+            batch = await scan_client.updates(pagination_key)
             logger.debug(
-                f"Processing batch of size {len(batch)} starting at {last_record_time}"
+                f"Processing batch of size {len(batch)} starting at {pagination_key}"
             )
             for transaction_json in batch:
                 transaction = TransactionTree.parse(transaction_json)
-                logger.debug(
-                    f"Processing transaction {transaction.update_id} at {transaction.record_time}"
-                )
-                previous_state = state.clone(logger)
-                result = state.handle_transaction(transaction)
-                for round_number in result.new_open_rounds:
-                    round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
-                    round_logger.addHandler(cli_handler)
-                    round_logger.addHandler(file_handler)
-                    # warning to avoid repeated log messages for the same transaction
-                    round_logger.setLevel("WARNING")
-                    per_round_states[round_number] = previous_state.clone(round_logger)
-                if result.for_open_round != None and args.scan_balance_assertions:
-                    for round_number, per_round_state in per_round_states.items():
-                        if round_number >= result.for_open_round:
-                            per_round_state.handle_transaction(transaction)
-                if result.new_closed_round and args.scan_balance_assertions:
-                    closed_round = result.new_closed_round
-                    round_state = per_round_states[closed_round]
-                    del per_round_states[closed_round]
-                    balances = round_state.balance_end_of_round()
-                    lines = [f"effective balances for closed round: {closed_round}"]
-                    matches = True
-                    scan_party_balances = await scan_client.party_balances(
-                        closed_round, balances.keys()
+                if transaction.is_acs_import():
+                    # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
+                    # Note that this also ignores the ACS import of non-founding SVs atm. This would be correct once we do backfilling of history
+                    # but until then this script can only run against the founding SV.
+                    logger.debug(
+                        f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
                     )
-                    for party, balance in sorted(balances.items()):
-                        computed_balance = balance.effective_for_round(closed_round)
-                        scan_balance = scan_party_balances[party]
-                        matches_for_party = scan_balance == computed_balance
-                        matches &= matches_for_party
-                        lines += [
-                            f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-                        ]
-                    log = "\n".join(lines)
-                    if matches:
-                        logger.info(log)
-                    else:
-                        logger.error(log)
-
+                else:
+                    logger.debug(
+                        f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
+                    )
+                    previous_state = state.clone(logger)
+                    result = state.handle_transaction(transaction)
+                    for round_number in result.new_open_rounds:
+                        round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
+                        round_logger.addHandler(cli_handler)
+                        round_logger.addHandler(file_handler)
+                        # warning to avoid repeated log messages for the same transaction
+                        round_logger.setLevel("WARNING")
+                        per_round_states[round_number] = previous_state.clone(
+                            round_logger
+                        )
+                    if result.for_open_round != None and args.scan_balance_assertions:
+                        for round_number, per_round_state in per_round_states.items():
+                            if round_number >= result.for_open_round:
+                                per_round_state.handle_transaction(transaction)
+                    if result.new_closed_round and args.scan_balance_assertions:
+                        closed_round = result.new_closed_round
+                        round_state = per_round_states[closed_round]
+                        del per_round_states[closed_round]
+                        balances = round_state.balance_end_of_round()
+                        lines = [f"effective balances for closed round: {closed_round}"]
+                        matches = True
+                        scan_party_balances = await scan_client.party_balances(
+                            closed_round, balances.keys()
+                        )
+                        for party, balance in sorted(balances.items()):
+                            computed_balance = balance.effective_for_round(closed_round)
+                            scan_balance = scan_party_balances[party]
+                            matches_for_party = scan_balance == computed_balance
+                            matches &= matches_for_party
+                            lines += [
+                                f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+                            ]
+                        log = "\n".join(lines)
+                        if matches:
+                            logger.info(log)
+                        else:
+                            logger.error(log)
             if len(batch) >= 1:
-                last_record_time = batch[-1]["record_time"]
+                last = batch[-1]
+                pagination_key = PaginationKey(
+                    last["migration_id"], last["record_time"]
+                )
             if len(batch) < scan_client.page_size:
-                logger.debug(f"Reached end of stream at {last_record_time}")
+                logger.debug(f"Reached end of stream at {pagination_key}")
                 break
 
 
