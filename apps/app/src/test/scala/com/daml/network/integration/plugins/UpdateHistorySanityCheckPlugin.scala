@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
 class UpdateHistorySanityCheckPlugin(
     scanName: String,
     ignoredRootCreates: Seq[Identifier],
+    ignoredRootExercises: Seq[(Identifier, String)],
     protected val loggerFactory: NamedLoggerFactory,
 ) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
     with Matchers
@@ -56,6 +57,8 @@ class UpdateHistorySanityCheckPlugin(
                 "--scan-balance-assertions",
               ) ++ ignoredRootCreates.flatMap { templateId =>
                 Seq("--ignore-root-create", QualifiedName(templateId).toString)
+              } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
+                Seq("--ignore-root-exercise", s"${QualifiedName(templateId).toString}:$choice")
               }
             )
             .!(errorProcessor)

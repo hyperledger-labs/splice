@@ -110,12 +110,14 @@ object CNNodeTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected def updateHistoryScanName: String = "sv1Scan"
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+    protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           updateHistoryScanName,
           updateHistoryIgnoredRootCreates,
+          updateHistoryIgnoredRootExercises,
           loggerFactory,
         )
       )
@@ -144,12 +146,14 @@ object CNNodeTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected def updateHistoryScanName: String = "sv1Scan"
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+    protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           updateHistoryScanName,
           updateHistoryIgnoredRootCreates,
+          updateHistoryIgnoredRootExercises,
           loggerFactory,
         )
       )

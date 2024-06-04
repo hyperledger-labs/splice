@@ -38,6 +38,9 @@ class TemplateId:
         self.template_id = template_id
         self.qualified_name = template_id.split(":", 1)[1]
 
+    def __str__(self):
+        return self.template_id
+
 
 class TemplateQualifiedNames:
     amulet = "Splice.Amulet:Amulet"
@@ -543,6 +546,10 @@ class LfValue:
 
     # data AmuletRules_DevNet_TapResult -> amuletSum
     def get_tap_result_amulet_sum(self):
+        return self.__get_record_field("amuletSum")
+
+    # data AmuletRules_MintResult -> amuletSum
+    def get_mint_result_amulet_sum(self):
         return self.__get_record_field("amuletSum")
 
     # data LockedAmulet_UnlockResult -> amuletSum
@@ -1134,11 +1141,19 @@ class PerPartyState:
 
 # The state at a given record time
 class State:
-    def __init__(self, logger, active_contracts, record_time, ignored_root_creates):
+    def __init__(
+        self,
+        logger,
+        active_contracts,
+        record_time,
+        ignored_root_creates,
+        ignored_root_exercises,
+    ):
         self.logger = logger
         self.active_contracts = active_contracts
         self.record_time = record_time
         self.ignored_root_creates = ignored_root_creates
+        self.ignored_root_exercises = ignored_root_exercises
 
     def clone(self, new_logger):
         return State(
@@ -1146,6 +1161,7 @@ class State:
             self.active_contracts.copy(),
             self.record_time,
             self.ignored_root_creates,
+            self.ignored_root_exercises,
         )
 
     def summary(self):
@@ -1354,7 +1370,11 @@ class State:
 
     def handle_root_created_event(self, transaction, event):
         if event.template_id.qualified_name in self.ignored_root_creates:
-            return HandleTransactionResult.empty()
+            if event.template_id.qualified_name in TemplateQualifiedNames.all_tracked:
+                self.active_contracts[event.contract_id] = event
+                return HandleTransactionResult.empty()
+            else:
+                return HandleTransactionResult.empty()
 
         match event.template_id.qualified_name:
             case TemplateQualifiedNames.dso_bootstrap:
@@ -1658,6 +1678,21 @@ class State:
         self.active_contracts[cid] = amulet
         self.get_transaction_logger(transaction).info(
             f"Tap: {owner} tapped {amount} in round {round_number}"
+        )
+        return HandleTransactionResult.for_open_round(round_number)
+
+    def handle_mint(self, transaction, event):
+        summary = event.exercise_result.get_mint_result_amulet_sum()
+        cid = summary.get_amulet_summary_amulet()
+        amulet = transaction.by_contract_id[cid]
+        owner = amulet.payload.get_amulet_owner()
+        amount = amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+        round_number = (
+            amulet.payload.get_amulet_amount().get_expiring_amount_created_at()
+        )
+        self.active_contracts[cid] = amulet
+        self.get_transaction_logger(transaction).info(
+            f"Mint: {owner} minted {amount} in round {round_number}"
         )
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -2137,6 +2172,8 @@ class State:
                 return self.handle_transfer(transaction, event)
             case "AmuletRules_DevNet_Tap":
                 return self.handle_tap(transaction, event)
+            case "AmuletRules_Mint":
+                return self.handle_mint(transaction, event)
             case "AmuletRules_BuyMemberTraffic":
                 return self.handle_buy_member_traffic(transaction, event)
             case "LockedAmulet_Unlock":
@@ -2240,9 +2277,18 @@ class State:
             case "AmuletRules_AddFutureAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
             case choice:
-                self.get_transaction_logger(transaction).error(
-                    f"Unexpected choice: {choice}"
-                )
+                choice_str = f"{event.template_id.qualified_name}:{choice}"
+                if choice_str in self.ignored_root_exercises:
+                    if (
+                        event.is_consuming
+                        and event.template_id.qualified_name
+                        in TemplateQualifiedNames.all_tracked
+                    ):
+                        del self.active_contracts[event.contract_id]
+                else:
+                    self.get_transaction_logger(transaction).error(
+                        f"Unexpected choice: {event.template_id}:{choice}"
+                    )
                 return HandleTransactionResult.empty()
 
     def balance_end_of_round(self):
@@ -2306,6 +2352,12 @@ async def main():
         nargs="*",
         default=[],
     )
+    parser.add_argument(
+        "--ignore-root-exercise",
+        nargs="*",
+        default=[],
+        help="Ignored root exercises in the form TemplateQualifiedName:Choice",
+    )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
         "--scan-balance-assertions",
@@ -2332,7 +2384,7 @@ async def main():
 
     sys.excepthook = handle_exception
 
-    state = State(logger, {}, None, args.ignore_root_create)
+    state = State(logger, {}, None, args.ignore_root_create, args.ignore_root_exercise)
     per_round_states = {}
     pagination_key = None
     async with aiohttp.ClientSession() as session:

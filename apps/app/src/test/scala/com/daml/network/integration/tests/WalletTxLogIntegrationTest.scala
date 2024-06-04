@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.lf.data.Numeric
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
 import com.daml.network.config.CNNodeConfigTransforms
@@ -41,6 +42,14 @@ class WalletTxLogIntegrationTest
 
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 
+  override lazy val updateHistoryIgnoredRootCreates = Seq(
+    amuletCodegen.Amulet.TEMPLATE_ID
+  )
+
+  override lazy val updateHistoryIgnoredRootExercises = Seq(
+    (amuletCodegen.Amulet.TEMPLATE_ID, "Archive")
+  )
+
   private def usdAsTappedAmulet(usd: Double) =
     BigDecimal(BigDecimal(usd).bigDecimal.divide(amuletPrice.bigDecimal, 10, RoundingMode.CEILING))
 
@@ -73,9 +82,6 @@ class WalletTxLogIntegrationTest
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
   }
-
-  // TODO (#12694): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
 

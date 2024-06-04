@@ -48,9 +48,6 @@ class ScanIntegrationTest
       )
       .withTrafficTopupsDisabled
 
-  // TODO (#12694): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "list transaction pages in ascending and descending order" in { implicit env =>
     onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val nrTaps = 10

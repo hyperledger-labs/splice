@@ -78,7 +78,7 @@ class WalletManualRoundsIntegrationTest
         )(config)
       )
 
-  // TODO (#12694): reenable
+  // TODO (#12693): reenable
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
