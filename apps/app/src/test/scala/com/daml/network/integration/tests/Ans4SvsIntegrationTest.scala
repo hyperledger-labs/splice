@@ -1,22 +1,15 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subscriptionsCodegen
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.leaderbased.{
-  ExpiredAnsEntryTrigger,
-  TerminatedSubscriptionTrigger,
-}
-import com.daml.network.sv.config.InitialAnsConfig
+import com.daml.network.sv.automation.leaderbased.TerminatedSubscriptionTrigger
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.Assertion
 
@@ -33,29 +26,9 @@ class Ans4SvsIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        updateAutomationConfig(ConfigurableApp.Sv)(
-          _.withPausedTrigger[ExpiredAnsEntryTrigger]
-        )(config)
-      )
-      .addConfigTransform((_, config) =>
-        // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
-        CNNodeConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(
-            _.copy(
-              initialAnsConfig = InitialAnsConfig(
-                renewalDuration = NonNegativeFiniteDuration.ofSeconds(10),
-                entryLifetime = NonNegativeFiniteDuration.ofSeconds(10),
-              )
-            )
-          )(config)
-      )
 
   // TODO (#12697): reenable
   override protected val runUpdateHistorySanityCheck: Boolean = false
-
-  def leaderExpiredAnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
-    sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]
 
   // TODO(#11927): incorporate this test into AnsIntegrationTest
   "ans" should {
