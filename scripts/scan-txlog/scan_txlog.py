@@ -1301,10 +1301,15 @@ class State:
         previous_state = self.clone(self.logger)
         record_time = datetime.fromisoformat(transaction.record_time)
         result = HandleTransactionResult.empty()
-        for event_id in transaction.root_event_ids:
-            event = transaction.events_by_id[event_id]
-            event_result = self.handle_root_event(transaction, event)
-            result = result.merge(event_result)
+        try:
+            for event_id in transaction.root_event_ids:
+                event = transaction.events_by_id[event_id]
+                event_result = self.handle_root_event(transaction, event)
+                result = result.merge(event_result)
+        except Exception as e:
+            self.get_transaction_logger(transaction).error(
+                f"Encountered exception while processing transaction, attempting to continue relying on acs_diff to fix up the state for this transaction: {e}"
+            )
 
         # This is a sanity check to make sure the code does not forget tracking an ACS change.
         acs_diff = transaction.acs_diff()
