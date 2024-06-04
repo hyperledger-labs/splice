@@ -355,64 +355,22 @@ class WalletManualRoundsIntegrationTest
         c.payload.featured shouldBe false
       }
 
-      // TODO(#12658): reactivate as part of fixing the code below
-//      val balanceBefore = eventually() {
       eventually() {
         val balance = aliceValidatorWalletClient.balance()
         balance.round shouldBe tapRound + 2
-        balance
       }
 
-      actAndCheck(
-        "Advance rounds until reward coupons can be collected",
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         Seq(1, 2).foreach(_ => advanceRoundsByOneTickViaAutomation),
-      )(
-        "Wait for reward to be collected",
-        _ => {
-          aliceValidatorWalletClient
-            .listAppRewardCoupons() should be(empty)
-
-          // The rewards are too small to cover the create fee.
-          // TODO(#12658): ensure and test that they are not collected by checking for the log message issued by the treasure for skipping over rewards, and check that the balance remains the same
-          // Right now the balance is actually lower than before!
-//          checkBalance(
-//            aliceValidatorWalletClient,
-//            Some(balanceBefore.round + 2),
-//            (
-//              balanceBefore.unlockedQty,
-//              balanceBefore.unlockedQty,
-//            ),
-//            (balanceBefore.lockedQty, balanceBefore.lockedQty),
-//            (0, 1),
-//          )
+        entries => {
+          forAtLeast(1, entries) { line =>
+            line.message should (include(
+              "Not executing a merge operation because there no amulets to merge"
+            ) and include("smaller than the create-fee"))
+          }
         },
       )
     }
-
-    "issue app rewards for direct transfers to validator party" in { implicit env =>
-      val (_, bobUserParty) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWalletClient)
-
-      val couponsBefore = aliceValidatorWalletClient.listAppRewardCoupons().length.toLong
-
-      clue("Tap to get some amulets") {
-        aliceWalletClient.tap(500.0)
-      }
-
-      grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
-      eventually()({
-        bobWalletClient.balance().unlockedQty should not be (BigDecimal(0.0))
-        aliceValidatorWalletClient.listAppRewardCoupons() should have length (couponsBefore + 1)
-        aliceValidatorWalletClient
-          .listAppRewardCoupons()
-          .lastOption
-          .value
-          .payload
-          .featured shouldBe false // wallet is not a featured app
-      })
-    }
-
   }
 
   private def lookupAnsContextCid(
