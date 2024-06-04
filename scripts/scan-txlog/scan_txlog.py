@@ -1015,7 +1015,7 @@ class PerPartyState:
         initial_amount = amount.get_expiring_amount_initial_amount()
         rate_per_round = amount.get_expiring_amount_rate_per_round()
         round_diff = max(0, round_number - created_at)
-        effective_amount = initial_amount - DamlDecimal(round_diff) * rate_per_round
+        effective_amount = max(initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0"))
         return f"round {round_number}: {effective_amount} = {initial_amount} - {round_diff} * {rate_per_round}"
 
     def __str__(self):
@@ -2173,7 +2173,8 @@ class PerPartyBalance:
         for locked_amulet in self.locked_amulets:
             amulet = locked_amulet.payload.get_locked_amulet_amulet()
             total += self.__effective_for_round(round_number, amulet)
-        return total
+        # we deliberately cap the sum as opposed to each individual amulet to match scan
+        return max(total, DamlDecimal("0"))
 
 
 async def main():

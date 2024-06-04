@@ -35,9 +35,6 @@ class WalletTxLogTimeBasedIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
   }
 
-  // TODO (#12696): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "A wallet" should {
 
     "handle app and validator rewards" in { implicit env =>

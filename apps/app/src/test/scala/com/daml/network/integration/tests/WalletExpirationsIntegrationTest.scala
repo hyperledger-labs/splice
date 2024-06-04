@@ -60,9 +60,6 @@ class WalletExpirationsIntegrationTest
         )(config)
       )
 
-  // TODO (#12696): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "A wallet" should {
     "auto-expire payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
