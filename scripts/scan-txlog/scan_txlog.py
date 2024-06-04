@@ -635,6 +635,10 @@ class LfValue:
     def get_subscription_idle_state_reference(self):
         return self.__get_record_field("reference").get_contract_id()
 
+    # choice DsoRules_TerminateSubscription -> ansEntryContextCid
+    def get_dso_rules_terminate_subscription_ans_entry_context_cid(self):
+        return self.__get_record_field("ansEntryContextCid").get_contract_id()
+
     # data SteppedRate
     def __get_stepped_rate(self):
         initial_rate = self.__get_record_field("initialRate").__get_numeric()
@@ -2011,6 +2015,51 @@ class State:
         assert event.choice_name == "AnsEntryContext_CollectEntryRenewalPayment"
         return self.handle_entry_collect_payment(transaction, event, renewal=True)
 
+    def handle_subscription_idle_state_cancel_subscription(self, transaction, event):
+        idle_state = self.active_contracts[event.contract_id]
+        del self.active_contracts[event.contract_id]
+        reference = idle_state.payload.get_subscription_idle_state_reference()
+        ans_entry_context = self.get_ans_entry_context_by_subscription_request(
+            reference
+        )
+        user = ans_entry_context.payload.get_ans_entry_context_user()
+        name = ans_entry_context.payload.get_ans_entry_context_name()
+        self.get_transaction_logger(transaction).info(
+            f"AnsCancelSubscription: Subscription cancelled by user {user} for entry {name}"
+        )
+        # Not associated with any round so just return an empty result
+        return HandleTransactionResult.empty()
+
+    def handle_dso_rules_terminate_subscription(self, transaction, event):
+        arg = event.exercise_argument
+        ans_entry_context_cid = (
+            arg.get_dso_rules_terminate_subscription_ans_entry_context_cid()
+        )
+        ans_entry_context = self.active_contracts[ans_entry_context_cid]
+        user = ans_entry_context.payload.get_ans_entry_context_user()
+        name = ans_entry_context.payload.get_ans_entry_context_name()
+        del self.active_contracts[ans_entry_context_cid]
+        self.get_transaction_logger(transaction).info(
+            f"AnsTerminateSubscription: Subscription terminated for user {user} and entry {name}"
+        )
+        # Not associated with any round so just return an empty result
+        return HandleTransactionResult.empty()
+
+    def handle_dso_rules_expire_subscription(self, transaction, event):
+        arg = event.exercise_argument
+        ans_entry_context_cid = (
+            arg.get_dso_rules_expire_subscription_ans_entry_context_cid()
+        )
+        ans_entry_context = self.active_contracts[ans_entry_context_cid]
+        user = ans_entry_context.payload.get_ans_entry_context_user()
+        name = ans_entry_context.payload.get_ans_entry_context_name()
+        del self.active_contracts[ans_entry_context_cid]
+        self.get_transaction_logger(transaction).info(
+            f"AnsExpireSubscription: Subscription expired for user {user} and entry {name}"
+        )
+        # Not associated with any round so just return an empty result
+        return HandleTransactionResult.empty()
+
     def handle_root_exercised_event(self, transaction, event):
         self.get_transaction_logger(transaction).debug(
             f"Root exercise: {event.choice_name}"
@@ -2050,16 +2099,17 @@ class State:
                 return self.handle_dso_rules_collect_entry_renewal_payment(
                     transaction, event
                 )
+            case "DsoRules_ExpireAnsEntry":
+                return self.handle_dso_rules_expire_ans_entry(transaction, event)
             case "DsoRules_ExpireSubscription":
                 # No change to the tracked ACS.
                 return HandleTransactionResult.empty()
-            case "DsoRules_ExpireAnsEntry":
-                return self.handle_dso_rules_expire_ans_entry(transaction, event)
             case "DsoRules_TerminateSubscription":
-                # No change to the tracked ACS.
-                return HandleTransactionResult.empty()
+                return self.handle_dso_rules_terminate_subscription(transaction, event)
             case "SubscriptionIdleState_CancelSubscription":
-                return HandleTransactionResult.empty()
+                return self.handle_subscription_idle_state_cancel_subscription(
+                    transaction, event
+                )
             case "DsoRules_ClaimExpiredRewards":
                 return self.handle_claim_expired_rewards(transaction, event)
             case "DsoRules_MergeUnclaimedRewards":

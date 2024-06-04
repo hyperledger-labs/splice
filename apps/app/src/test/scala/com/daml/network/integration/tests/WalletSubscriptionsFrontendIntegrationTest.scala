@@ -24,9 +24,6 @@ class WalletSubscriptionsFrontendIntegrationTest
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
-  // TODO (#12697): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "A wallet UI" should {
 
     "show and cancel subscriptions" in { implicit env =>

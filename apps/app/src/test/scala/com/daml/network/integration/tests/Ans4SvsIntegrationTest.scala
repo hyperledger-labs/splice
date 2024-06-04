@@ -27,9 +27,6 @@ class Ans4SvsIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
 
-  // TODO (#12697): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   // TODO(#11927): incorporate this test into AnsIntegrationTest
   "ans" should {
     "terminated subscriptions are archived" in { implicit env =>

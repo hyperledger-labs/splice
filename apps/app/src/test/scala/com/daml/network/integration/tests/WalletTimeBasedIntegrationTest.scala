@@ -33,6 +33,9 @@ class WalletTimeBasedIntegrationTest
   private val testEntryUrl = "https://ans-dir-url.com"
   private val testEntryDescription = "Sample CNS Entry Description"
 
+  // TODO (#12720): reenable
+  override protected def runUpdateHistorySanityCheck: Boolean = false
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -54,9 +57,6 @@ class WalletTimeBasedIntegrationTest
           _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
         )(config)
       )
-
-  // TODO (#12697): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
 
