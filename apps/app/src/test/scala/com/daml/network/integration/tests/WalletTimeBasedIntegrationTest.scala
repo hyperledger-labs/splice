@@ -33,9 +33,6 @@ class WalletTimeBasedIntegrationTest
   private val testEntryUrl = "https://ans-dir-url.com"
   private val testEntryDescription = "Sample CNS Entry Description"
 
-  // TODO (#12720): reenable
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -190,7 +187,7 @@ class WalletTimeBasedIntegrationTest
       clue("Check wallet after advancing to next 2 round") {
         eventually()(aliceWalletClient.list().lockedAmulets.head.round shouldBe startRound + 2)
         logger.debug(
-          s"ISEGALL. lockedAmulet has round: ${aliceWalletClient.list().lockedAmulets.head.round}"
+          s"lockedAmulet has round: ${aliceWalletClient.list().lockedAmulets.head.round}"
         )
         aliceWalletClient.list().lockedAmulets should have length 1
 

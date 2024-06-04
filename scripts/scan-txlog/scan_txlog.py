@@ -659,6 +659,18 @@ class LfValue:
     def get_dso_rules_terminate_subscription_ans_entry_context_cid(self):
         return self.__get_record_field("ansEntryContextCid").get_contract_id()
 
+    # data DsoRules_Amulet_ExpireResult -> expireSum
+    def get_dso_rules_amulet_expire_result_expire_sum(self):
+        return self.__get_record_field("expireSum")
+
+    # data DsoRules_LockedAmulet_ExpireResult -> expireSum
+    def get_dso_rules_locked_amulet_expire_result_expire_sum(self):
+        return self.__get_record_field("expireSum")
+
+    # data AmuletExpireSummary -> round
+    def get_amulet_expire_summary_round(self):
+        return self.__get_record_field("round").__get_round_number()
+
     # data SteppedRate
     def __get_stepped_rate(self):
         initial_rate = self.__get_record_field("initialRate").__get_numeric()
@@ -1056,7 +1068,9 @@ class PerPartyState:
         initial_amount = amount.get_expiring_amount_initial_amount()
         rate_per_round = amount.get_expiring_amount_rate_per_round()
         round_diff = max(0, round_number - created_at)
-        effective_amount = max(initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0"))
+        effective_amount = max(
+            initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+        )
         return f"round {round_number}: {effective_amount} = {initial_amount} - {round_diff} * {rate_per_round}"
 
     def __str__(self):
@@ -1737,19 +1751,27 @@ class State:
         contract_id = event.exercise_argument.get_dso_rules_amulet_expire_cid()
         amulet = self.active_contracts[contract_id]
         del self.active_contracts[contract_id]
-        self.get_transaction_logger(transaction).info(
-            f"Dso_AmuletExpire: Amulet {amulet} expired"
+        expire_summary = (
+            event.exercise_result.get_dso_rules_amulet_expire_result_expire_sum()
         )
-        return HandleTransactionResult.empty()
+        round_number = expire_summary.get_amulet_expire_summary_round()
+        self.get_transaction_logger(transaction).info(
+            f"Dso_AmuletExpire: Amulet {amulet} expired in round {round_number}"
+        )
+        return HandleTransactionResult.for_open_round(round_number)
 
     def handle_dso_rules_locked_amulet_expire(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_locked_amulet_expire_cid()
         lockedAmulet = self.active_contracts[contract_id]
         del self.active_contracts[contract_id]
-        self.get_transaction_logger(transaction).info(
-            f"Dso_LockedAmuletExpire: Locked Amulet {lockedAmulet} expired"
+        expire_summary = (
+            event.exercise_result.get_dso_rules_locked_amulet_expire_result_expire_sum()
         )
-        return HandleTransactionResult.empty()
+        round_number = expire_summary.get_amulet_expire_summary_round()
+        self.get_transaction_logger(transaction).info(
+            f"Dso_LockedAmuletExpire: Locked Amulet {lockedAmulet} expired in round {round_number}"
+        )
+        return HandleTransactionResult.for_open_round(round_number)
 
     def handle_dso_rules_expire_ans_entry(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_expire_ans_entry_cid()
