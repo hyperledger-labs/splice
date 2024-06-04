@@ -59,7 +59,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     with WalletTestUtil {
 
   // Fails with unexpected CreatedEvent roots
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition =
     super.environmentDefinition

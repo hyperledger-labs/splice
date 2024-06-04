@@ -28,7 +28,7 @@ class Ans4SvsIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
 
   // TODO (#12697): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   // TODO(#11927): incorporate this test into AnsIntegrationTest
   "ans" should {

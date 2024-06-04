@@ -107,7 +107,7 @@ object CNNodeTests extends LazyLogging {
 
     protected lazy val resetRequiredTopologyState: Boolean = true
 
-    protected val runUpdateHistorySanityCheck: Boolean = true
+    protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {
@@ -136,7 +136,7 @@ object CNNodeTests extends LazyLogging {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
-    protected val runUpdateHistorySanityCheck: Boolean = true
+    protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
 
     if (runUpdateHistorySanityCheck) {

@@ -67,7 +67,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       )
 
   // TODO (#12693): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   def leaderExpiredAnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
     sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]

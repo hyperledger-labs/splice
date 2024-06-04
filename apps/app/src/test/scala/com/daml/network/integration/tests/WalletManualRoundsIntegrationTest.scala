@@ -79,7 +79,7 @@ class WalletManualRoundsIntegrationTest
       )
 
   // TODO (#12694): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
     "list all amulets, including locked amulets, with additional position details" in {

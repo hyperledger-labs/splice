@@ -75,7 +75,7 @@ class WalletTxLogIntegrationTest
   }
 
   // TODO (#12694): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
 

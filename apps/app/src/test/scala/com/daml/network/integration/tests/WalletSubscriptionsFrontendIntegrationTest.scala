@@ -25,7 +25,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       .withSequencerConnectionsFromScanDisabled()
 
   // TODO (#12697): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet UI" should {
 

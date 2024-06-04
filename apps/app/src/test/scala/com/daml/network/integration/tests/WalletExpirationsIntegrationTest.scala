@@ -61,7 +61,7 @@ class WalletExpirationsIntegrationTest
       )
 
   // TODO (#12696): reenable
-  override protected val runUpdateHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   "A wallet" should {
     "auto-expire payment requests" in { implicit env =>
