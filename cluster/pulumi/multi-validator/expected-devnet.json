@@ -3853,6 +3853,14 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-0-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
         }
       }
     },
@@ -3877,6 +3885,14 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-1-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
         }
       }
     },
@@ -3901,6 +3917,14 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-2-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
         }
       }
     },
@@ -3925,6 +3949,14 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-3-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
         }
       }
     },
@@ -3949,6 +3981,14 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-4-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
         }
       }
     },

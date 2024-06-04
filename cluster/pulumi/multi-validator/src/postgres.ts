@@ -23,6 +23,10 @@ export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.
     {
       persistence: { secretName },
       db: { volumeSize: '400Gi', maxConnections: 1000 },
+      resources: {
+        requests: { memory: '10Gi' },
+        limits: { memory: '20Gi' },
+      },
     },
     defaultVersion,
     [passwordSecret]
