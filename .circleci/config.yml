@@ -3238,6 +3238,9 @@ jobs:
       check_cluster_version:
         type: boolean
         default: true
+      delay_mins:
+        type: integer
+        default: 0
       migration_id:
         type: integer
         default: 0
@@ -3302,7 +3305,19 @@ jobs:
                 cmd_before_retry: |-
                   echo "VPN connection seems to have died, restarting VPN and retrying..."
                   /tmp/vpn-scripts/restart-vpn.sh
-
+            - when:
+                condition: << parameters.delay_mins >>
+                steps:
+                  - run:
+                      name: sleep for << parameters.delay_mins >>
+                      command: |
+                        echo "Waiting for << parameters.delay_mins >> minutes."
+                        sleep 60
+                        # This loop is needed because CCI kills any task that sleeps for too long with no output
+                        for (( i = 1; i < << parameters.delay_mins >>; i += 1 )); do
+                          echo "Still waiting ($i min(s) elapsed)"
+                          sleep 60
+                        done
             - run_bash_command_in_nix:
                 cmd_name: Run SV preflight tests
                 additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
@@ -4767,6 +4782,7 @@ workflows:
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
+          delay_mins: 10 # delay the preflight tests to give autoscaler some time to be happy
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
