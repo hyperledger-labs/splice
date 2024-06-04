@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 59,
+  "id": 300,
   "links": [],
   "panels": [
     {
@@ -558,9 +558,13 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -570,7 +574,7 @@
         "hide": 0,
         "includeAll": true,
         "label": "Member",
-        "multi": false,
+        "multi": true,
         "name": "member",
         "options": [],
         "query": {
@@ -591,9 +595,9 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
-  "title": "Synchronizer Traffic",
-  "uid": "fdlk3uqfkkt1cd",
-  "version": 18,
+  "timezone": "",
+  "title": "Synchronizer Fees",
+  "uid": "fdnphvrryfq4gf",
+  "version": 3,
   "weekStart": ""
 }
