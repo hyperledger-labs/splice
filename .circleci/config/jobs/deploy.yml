@@ -283,6 +283,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       skip_infra:
         type: boolean
         default: false
@@ -359,6 +362,11 @@ jobs:
                   # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
                   # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
                   cncluster prefresh
+
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
                   cncluster reset
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster

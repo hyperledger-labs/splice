@@ -1679,6 +1679,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       skip_infra:
         type: boolean
         default: false
@@ -1755,6 +1758,11 @@ jobs:
                   # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
                   # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
                   cncluster prefresh
+
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
                   cncluster reset
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
@@ -3897,6 +3905,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cidaily"
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - wait_for_previous_pipeline
@@ -3907,6 +3916,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cidaily-testnet"
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - wait_for_previous_pipeline
@@ -4484,6 +4494,7 @@ workflows:
             - slack-context
           cluster: "cimain"
           update_deployment_branch: false  # No need to create a deployment branch for cimain
+          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
@@ -4932,6 +4943,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "ciupgrade"
+          silence_deployment_alerts: true
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
@@ -5301,6 +5313,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           requires:
             - set_scratchnet
@@ -5376,6 +5389,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "user-selected-scratchnet"
+          silence_deployment_alerts: true
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
@@ -5420,6 +5434,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "user-selected-scratchnet"
+          silence_deployment_alerts: true
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
@@ -5577,6 +5592,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "user-selected-scratchnet"
+          silence_deployment_alerts: true
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
@@ -5839,6 +5855,7 @@ workflows:
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           deploy_version: "devnet-next"
+          silence_deployment_alerts: false
           use_published_artifacts: true
           requires:
             - wait_for_previous_pipeline
@@ -6130,6 +6147,7 @@ workflows:
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           deploy_version: "testnet-next"
+          silence_deployment_alerts: false
           use_published_artifacts: true
           requires:
             - wait_for_previous_pipeline

@@ -23,6 +23,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cidaily"
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - wait_for_previous_pipeline
@@ -33,6 +34,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cidaily-testnet"
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - wait_for_previous_pipeline

@@ -2710,37 +2710,89 @@ function subcmd_silence_grafana_alerts() {
 
     if [ "$#" -lt 2 ]; then
         echo "Usage: cncluster silence_grafana_alerts <duration> <matcher1> [<matcher2> ...]"
+        echo " or    cncluster silence_grafana_alerts <duration> -f <file>"
         echo ""
-        echo "Example:"
+        echo "Examples:"
         echo "  cncluster silence_grafana_alerts \"2 minutes\" \"alertname=Report Creation Time Lag\" \"report_publisher=Digital-Asset-Eng-3\""
+        echo "  cncluster silence_grafana_alerts \"2 minutes\" -f ./silences.json"
+        echo ""
+        echo "File format:"
+        echo "  The file passed to -f should be a JSON file with a root array of silences. Each silence is an object containing a"
+        echo "  valid silence payload for the grafana/alertmanager API, excluding the startsAt and endsAt fields."
+
         exit 1
     fi
 
     duration=$1
-    shift 1
-
-    matchers="[]"
-    for matcher in "$@"; do
-        name=${matcher%=*}
-        value=${matcher#*=}
-        matchers=$(echo "$matchers" | jq ". +=  [{\"name\":\"${name}\",\"value\":\"${value}\",\"isEqual\":true,\"isRegex\":false}]")
-    done
-
     now=$(date -u '+%FT%TZ')
     until=$(date -u -d "+${duration}" '+%FT%TZ')
+
     _info "Fetching token"
     token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
-    _info "Adding silence"
+
+    shift 1
+
+    local file=""
+
+    while getopts "f:" opt; do
+        case ${opt} in
+            f)
+                file=$OPTARG
+                _info "Reading from filename: $file"
+                ;;
+            *)
+                _error "No valid options provided. Valid options: -f <filename>"
+                ;;
+        esac
+    done
+
+    if [ -n "$file" ]; then
+        _info "Reading silence payload(s) from file."
+        if [ ! -f "$file" ]; then
+            _error "File $file does not exist"
+        fi
+
+        silences=$(jq -c '.[]' < "$file")
+        while read -r silence; do
+            _create_grafana_silence "$now" "$until" \
+                "$(echo "$silence" | jq -r .createdBy)" \
+                "$(echo "$silence" | jq -r .comment)" \
+                "$(echo "$silence" | jq -c .matchers)" \
+                "$token"
+        done < <(echo "$silences")
+    else
+        _info "Reading non-regex matchers from command line."
+        matchers="[]"
+        for matcher in "$@"; do
+            name=${matcher%=*}
+            value=${matcher#*=}
+            matchers=$(echo "$matchers" | jq ". +=  [{\"name\":\"${name}\",\"value\":\"${value}\",\"isEqual\":true,\"isRegex\":false}]")
+        done
+        _create_grafana_silence "$now" "$until" "cncluster" "Silence created via cncluster command" "$matchers" "$token"
+    fi
+}
+
+function _create_grafana_silence() {
+    local startsAt="$1"
+    local endsAt="$2"
+    local createdBy="$3"
+    local comment="$4"
+    local matchers="$5"
+
+    local token="$6"
+
+    _info "Adding silence with the following: $startsAt, $endsAt, $createdBy, $comment"
+
     curl -sSL --fail-with-body \
         "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
         -H 'content-type: application/json' \
         --request POST \
         -H "x-non-jwt-auth: Bearer ${token}" \
          --data "{
-            \"startsAt\":\"${now}\",\
-            \"endsAt\":\"${until}\",\
-            \"createdBy\":\"Automation\",\
-            \"comment\":\"Silence while restoring from backup\",\
+            \"startsAt\":\"${startsAt}\",\
+            \"endsAt\":\"${endsAt}\",\
+            \"createdBy\":\"${createdBy}\",\
+            \"comment\":\"${comment}\",\
             \"matchers\":$matchers
             }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
     # If the above fails with a 401 Unauthorized:

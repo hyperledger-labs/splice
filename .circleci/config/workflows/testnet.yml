@@ -18,6 +18,7 @@ workflow:
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           deploy_version: "testnet-next"
+          silence_deployment_alerts: false
           use_published_artifacts: true
           requires:
             - wait_for_previous_pipeline

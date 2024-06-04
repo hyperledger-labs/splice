@@ -24,6 +24,7 @@ workflow:
             - slack-context
           cluster: "cimain"
           update_deployment_branch: false  # No need to create a deployment branch for cimain
+          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline

@@ -29,6 +29,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "ciupgrade"
+          silence_deployment_alerts: true
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade

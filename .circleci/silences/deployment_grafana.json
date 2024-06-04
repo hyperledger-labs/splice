@@ -1,0 +1,38 @@
+[
+  {
+    "createdBy": "ci (deploy_cluster)",
+    "comment": "An initial alert silence to cover the turburlent deployment period",
+    "matchers": [
+      {
+        "name": "alertname",
+        "value": "Report Creation Time Lag",
+        "isEqual": true,
+        "isRegex": false
+      },
+      {
+        "name": "report_publisher",
+        "value": "Digital-Asset-*",
+        "isEqual": true,
+        "isRegex": true
+      }
+    ]
+  },
+  {
+    "createdBy": "ci (deploy_cluster)",
+    "comment": "An initial alert silence to cover the turburlent deployment period",
+    "matchers": [
+      {
+        "name": "alertname",
+        "value": "Report Creation Time Lag",
+        "isEqual": true,
+        "isRegex": false
+      },
+      {
+        "name": "report_publisher",
+        "value": "DA-Helm-Test-Node",
+        "isEqual": true,
+        "isRegex": false
+      }
+    ]
+  }
+]
