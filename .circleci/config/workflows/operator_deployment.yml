@@ -1,0 +1,20 @@
+workflow:
+  update_deployment:
+    when:
+      equal: [ update-deployment, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_operator:
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+  preview_pulumi_changes:
+    when:
+      equal: [ preview-changes, << pipeline.parameters.run-job >> ]
+    jobs:
+      - preview_pulumi_changes:
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          project: << pipeline.parameters.pulumi-project >>

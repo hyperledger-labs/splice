@@ -1,0 +1,45 @@
+jobs:
+  preview_pulumi_changes:
+    parameters:
+      <<: *cluster-parameter
+      project:
+        type: string
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Run preview
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+             --keep GITHUB_TOKEN
+             --keep SLACK_ACCESS_TOKEN
+             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+             --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+             --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
+             --keep ARTIFACTORY_USER
+             --keep ARTIFACTORY_PASSWORD
+             --keep K6_USERS_PASSWORD
+             --keep K6_VALIDATOR_ADMIN_USERNAME
+             --keep K6_VALIDATOR_ADMIN_PASSWORD
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
+            cncluster pulumi << parameters.project >> preview --diff

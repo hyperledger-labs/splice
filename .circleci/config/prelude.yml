@@ -58,7 +58,8 @@ parameters:
         cluster-lock-reaper,
         mark-for-testnet,
         apply-infra,
-        update-deployment
+        update-deployment,
+        preview-changes
       ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
@@ -99,6 +100,10 @@ parameters:
   # The target version for hard migrations in the `deploy_ciperiodic_migration` job
   # Empty/default means "latest on branch"
   upgrade-version:
+    type: string
+    default: ""
+  # The pulumi project to be used in the `preview_pulumi_changes` job
+  pulumi-project:
     type: string
     default: ""
 

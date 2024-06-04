@@ -330,6 +330,14 @@ The operator exposes a basic set of prometheus metrics, that we use to create al
 There's also a dashboard that allow to easily view the current state/historical state.
 The dashboard is available in grafana, for exampel for CILR: [Pulumi Operator Dashboard](https://grafana.cilr.network.canton.global/d/QP_wDqDnz/pulumi-operator-stacks-dashboard?orgId=1&from=now-1h&to=now&refresh=30s)
 
+#### Previews
+
+To get the preview of a stack you can run the CCI job on the deployment branch/PR branch with the following arguments:
+
+`run-job` = `preview-changes`
+`cluster` = `<your-cluster>` (eg. `cilr`)
+`pulumi-project` = `canton-network` | `sv-runbook` | `validator-runbook` | `multi-validator`
+
 
 ## Pulumi and Helm
 
