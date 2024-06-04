@@ -658,6 +658,14 @@ class LfValue:
     def get_ans_entry_context_subscription_request(self):
         return self.__get_record_field("reference").get_contract_id()
 
+    # template AnsEntry -> user
+    def get_ans_entry_user(self):
+        return self.__get_record_field("user").__get_party()
+
+    # template AnsEntry -> name
+    def get_ans_entry_name(self):
+        return self.__get_record_field("name").__get_text()
+
     # template SubscriptionIdleState -> reference
     def get_subscription_idle_state_reference(self):
         return self.__get_record_field("reference").get_contract_id()
@@ -1772,8 +1780,9 @@ class State:
         owner = amulet.payload.get_amulet_owner()
         del self.active_contracts[event.contract_id]
         self.active_contracts[amulet_cid] = amulet
+        formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self.get_transaction_logger(transaction).info(
-            f"Unlock: Amulet {amulet} was unlocked"
+            f"Unlock: Amulet {formatted_amulet} was unlocked"
         )
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -1783,8 +1792,9 @@ class State:
         owner = amulet.payload["owner"]
         del self.get_per_party_data(owner).locked_amulets[event.contract_id]
         self.get_per_party_data(owner).amulets[amulet_cid] = amulet
+        formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self.get_transaction_logger(transaction).info(
-            f"ExpireUnlock: Amulet {amulet} was unlocked because lock expired"
+            f"ExpireUnlock: Amulet {formatted_amulet} was unlocked because lock expired"
         )
 
     def handle_dso_rules_amulet_expire(self, transaction, event):
@@ -1794,11 +1804,20 @@ class State:
         expire_summary = (
             event.exercise_result.get_dso_rules_amulet_expire_result_expire_sum()
         )
+        formatted_amulet = self.format_amulet(contract_id, amulet)
         round_number = expire_summary.get_amulet_expire_summary_round()
         self.get_transaction_logger(transaction).info(
-            f"Dso_AmuletExpire: Amulet {amulet} expired in round {round_number}"
+            f"Dso_AmuletExpire: Amulet {formatted_amulet} expired in round {round_number}"
         )
         return HandleTransactionResult.for_open_round(round_number)
+
+    def format_amulet(self, contract_id, amulet):
+        expiring_amount = amulet.payload.get_amulet_amount()
+        owner = amulet.payload.get_amulet_owner()
+        initial_amount = expiring_amount.get_expiring_amount_initial_amount()
+        created_at = expiring_amount.get_expiring_amount_created_at()
+        rate_per_round = expiring_amount.get_expiring_amount_rate_per_round()
+        return f"Amulet owner: {owner}, initial_amount: {initial_amount}, created_at: {created_at}, rate_per_round: {rate_per_round}"
 
     def handle_dso_rules_locked_amulet_expire(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_locked_amulet_expire_cid()
@@ -1808,17 +1827,32 @@ class State:
             event.exercise_result.get_dso_rules_locked_amulet_expire_result_expire_sum()
         )
         round_number = expire_summary.get_amulet_expire_summary_round()
+        formatted_locked_amulet = self.format_locked_amulet(contract_id, lockedAmulet)
         self.get_transaction_logger(transaction).info(
-            f"Dso_LockedAmuletExpire: Locked Amulet {lockedAmulet} expired in round {round_number}"
+            f"Dso_LockedAmuletExpire: Locked Amulet {formatted_locked_amulet} expired in round {round_number}"
         )
         return HandleTransactionResult.for_open_round(round_number)
+
+    def format_locked_amulet(self, contract_id, lockedAmulet):
+        lock = lockedAmulet.payload.get_locked_amulet_time_lock()
+        lock_holders = lock.get_time_lock_holders()
+        expires_at = lock.get_time_lock_expires_at()
+        amulet = lockedAmulet.payload.get_locked_amulet_amulet()
+        owner = amulet.get_amulet_owner()
+        expiring_amount = amulet.get_amulet_amount()
+        initial_amount = expiring_amount.get_expiring_amount_initial_amount()
+        created_at = expiring_amount.get_expiring_amount_created_at()
+        rate_per_round = expiring_amount.get_expiring_amount_rate_per_round()
+        return f"Locked Amulet lock_holders: {lock_holders}, expires_at: {expires_at}, owner: {owner}, initial_amount: {initial_amount}, created_at: {created_at}, rate_per_round: {rate_per_round}"
 
     def handle_dso_rules_expire_ans_entry(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_expire_ans_entry_cid()
         entry = self.active_contracts[contract_id]
         del self.active_contracts[contract_id]
+        user = entry.payload.get_ans_entry_user()
+        name = entry.payload.get_ans_entry_name()
         self.get_transaction_logger(transaction).info(
-            f"Dso_ExpireAnsEntry: AnsEntry {entry} expired"
+            f"Dso_ExpireAnsEntry: Expired AnsEntry name: {name}, user: {user}"
         )
         return HandleTransactionResult.empty()
 
@@ -2027,6 +2061,8 @@ class State:
         assert len(event.child_event_ids) == 1
         amulet_rules_event = transaction.events_by_id[event.child_event_ids[0]]
         rewards = []
+        rewards_lines = []
+        round = 0
         for event_id in amulet_rules_event.child_event_ids:
             event = transaction.events_by_id[event_id]
             if isinstance(event, ExercisedEvent):
@@ -2035,25 +2071,43 @@ class State:
                     case "ValidatorRewardCoupon_DsoExpire":
                         validator_reward_coupon = self.active_contracts[cid]
                         rewards += [validator_reward_coupon]
+                        round = validator_reward_coupon.payload.get_validator_reward_round()
+                        user = validator_reward_coupon.payload.get_validator_reward_user()
+                        amount = validator_reward_coupon.payload.get_validator_reward_amount()
+                        rewards_lines += [f"  validator_activity_record: user: {user}, amount: {amount}"]
                         del self.active_contracts[cid]
                     case "ValidatorFaucetCoupon_DsoExpire":
                         validator_faucet_coupon = self.active_contracts[cid]
                         rewards += [validator_faucet_coupon]
+                        round = validator = validator_faucet_coupon.payload.get_validator_faucet_round()
+                        validator = validator_faucet_coupon.payload.get_validator_faucet_validator()
+                        rewards_lines += [f"  validator_liveness_record: validator: {validator}"]
                         del self.active_contracts[cid]
                     case "AppRewardCoupon_DsoExpire":
                         app_reward_coupon = self.active_contracts[cid]
                         rewards += [app_reward_coupon]
+                        round = app_reward_coupon.payload.get_app_reward_round()
+                        provider = app_reward_coupon.payload.get_app_reward_provider()
+                        featured = "featured" if app_reward_coupon.payload.get_app_reward_featured() else "unfeatured"
+                        amount = app_reward_coupon.payload.get_app_reward_amount()
+                        rewards_lines += [f"  {featured} app_activity_record: provider: {provider}, amount: {amount}"]
                         del self.active_contracts[cid]
                     case "SvRewardCoupon_DsoExpire":
                         sv_reward_coupon = self.active_contracts[cid]
                         rewards += [sv_reward_coupon]
+                        round = sv_reward_coupon.payload.get_sv_reward_coupon_round()
+                        sv = sv_reward_coupon.payload.get_sv_reward_coupon_sv()
+                        beneficiary = sv_reward_coupon.payload.get_sv_reward_coupon_beneficiary()
+                        weight = sv_reward_coupon.payload.get_sv_reward_coupon_weight()
+                        rewards_lines += [f"  sv_activity_record: sv: {sv}, beneficiary: {beneficiary}, weight: {weight}"]
                         del self.active_contracts[cid]
                     case choice:
                         self.get_transaction_logger(transaction).error(
                             f"Unexpected exercise as part of activity record expiry: {event}"
                         )
+        expired_activity_rewards = "\n".join(rewards_lines)
         self.get_transaction_logger(transaction).info(
-            f"ExpireActivityRecords: Expired activity records: {rewards}"
+            f"ExpireActivityRecords: Expired activity records for round {round}:\n{expired_activity_rewards}"
         )
         # Not returning a round means we don't print a summary afterward but that's fine.
         return HandleTransactionResult.empty()
