@@ -3,6 +3,5 @@ API Reference
 
 .. toctree::
 
-   api/cc/index
-   api/wallet/index
+   daml
    cn_app_apis/index

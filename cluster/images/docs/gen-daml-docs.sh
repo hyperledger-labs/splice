@@ -2,16 +2,14 @@
 
 set -eou pipefail
 
-PROJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.."; pwd)"
-
 gen_project_docs () (
     echo "(docs) generating $1"
-    cd "$PROJ_ROOT/$1"
+    cd "$REPO_ROOT/$1"
     local -a DAML_FILES
     readarray -t DAML_FILES < <(find daml -name '*.daml')
-    "${XDG_CACHE_HOME:-$HOME/.cache}/daml-build/${DAML_COMPILER_VERSION}/damlc/damlc" docs --index-template "$PROJ_ROOT/cluster/images/docs/api-templates/$2-index-template.rst" "${DAML_FILES[@]}" --exclude-modules '**.Scripts.**' -f rst -o "$PROJ_ROOT/cluster/images/docs/src/app_dev/api/$2"
+    "${XDG_CACHE_HOME:-$HOME/.cache}/daml-build/${DAML_COMPILER_VERSION}/damlc/damlc" docs --index-template "$REPO_ROOT/cluster/images/docs/api-templates/$2-index-template.rst" "${DAML_FILES[@]}" --exclude-modules '**.Scripts.**' -f rst -o "$REPO_ROOT/cluster/images/docs/src/app_dev/api/$2"
     # Workaround to fix indentation issues in rst output due to https://github.com/digital-asset/daml/issues/16956
-    find "$PROJ_ROOT/cluster/images/docs/src/app_dev/api/$2" -name '*.rst' -exec sed -i -z 's!\( *\)\(Controller\\: [^\n]*map\)\n *\([^\n]*\)\n *\([^\n]*\)\n!\1\2\n\1\3\n\1\4\n!g' {} +
+    find "$REPO_ROOT/cluster/images/docs/src/app_dev/api/$2" -name '*.rst' -exec sed -i -z 's!\( *\)\(Controller\\: [^\n]*map\)\n *\([^\n]*\)\n *\([^\n]*\)\n!\1\2\n\1\3\n\1\4\n!g' {} +
 )
 
 ensure_damlc_exists() {
@@ -32,10 +30,14 @@ ensure_damlc_exists() {
 
 # skip calling sbt when `SKIP_DAML_BUILD` is defined
 if [[ ! -v SKIP_DAML_BUILD ]]; then
-  (cd "$PROJ_ROOT"; sbt --batch splice-amulet-daml/damlBuild splice-wallet-payments-daml/damlBuild splice-amulet-name-service-daml/damlBuild)
+  (cd "$REPO_ROOT"; sbt --batch damlBuild)
 fi
 
 ensure_damlc_exists
 
-gen_project_docs daml/splice-amulet cc
-gen_project_docs daml/splice-wallet-payments wallet
+DAML_PROJECT_FILES="$(find "$REPO_ROOT/daml" -name daml.yaml -not -ipath '*-test*' -not -ipath '*splitwell*' -not -ipath '*app-manager*')"
+for project_file in $DAML_PROJECT_FILES
+do
+    project="$(basename "$(dirname "$project_file")")"
+    gen_project_docs "daml/$project" "$project"
+done

@@ -20,10 +20,10 @@ template AmuletPriceVote with
     dso : Party
     sv : Party
     amuletPrice : Optional Decimal
-    -- ^ Set to None for new svs, but defined thereafter.
+      -- ^ Set to None for new svs, but defined thereafter.
     lastUpdatedAt : Time
-    -- ^ The last time this price was updated. Tracked to limit svs from
-    -- changing their vote more than once per tick.
+      -- ^ The last time this price was updated. Tracked to limit svs from
+      -- changing their vote more than once per tick.
   where
     ensure optional True (0.0 <) amuletPrice
 
