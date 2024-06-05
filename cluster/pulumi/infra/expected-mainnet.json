@@ -166,7 +166,8 @@
     "id": "",
     "inputs": {
       "helmOptions": {
-        "namespace": "cert-manager"
+        "namespace": "cert-manager",
+        "version": "1.14.5"
       },
       "installCRDs": true
     },
