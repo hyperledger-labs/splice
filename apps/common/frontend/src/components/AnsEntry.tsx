@@ -1,5 +1,4 @@
 import React from 'react';
-import { AnsEntry as AnsEntryC } from 'scan-openapi';
 
 import { Typography, TypographyProps } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
@@ -16,25 +15,25 @@ const AnsEntry: React.FC<AnsEntryProps> = props => {
   if (isLoading || isError) {
     return <div>...</div>;
   } else {
-    return <AnsEntryDisplay ansEntry={ansEntry} {...props} />;
+    return <AnsEntryDisplay ansEntryName={ansEntry?.name} {...props} />;
   }
 };
 
-export const AnsEntryDisplay: React.FC<AnsEntryProps & { ansEntry: AnsEntryC | null }> = props => {
-  const { ansEntry, partyId, className, noCopy: _, ...typographyProps } = props;
+export const AnsEntryDisplay: React.FC<AnsEntryProps & { ansEntryName?: string }> = props => {
+  const { ansEntryName, partyId, className, noCopy: _, ...typographyProps } = props;
 
-  if (ansEntry === null) {
+  if (!ansEntryName) {
     return <PartyId {...props} />;
   } else {
     return (
       <div
         style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}
         className={`ans-entry ${className}`}
-        data-selenium-text={`${ansEntry.name} (${partyId})`}
+        data-selenium-text={`${ansEntryName} (${partyId})`}
       >
         <Tooltip title="Directory Entry" style={{ marginRight: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Typography {...typographyProps}>{ansEntry.name}</Typography>
+            <Typography {...typographyProps}>{ansEntryName}</Typography>
           </div>
         </Tooltip>
         <Typography {...typographyProps}>(</Typography>

@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'FAQs', path: 'faqs' },
           ]}
         >
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1} paddingLeft={1}>
             <CurrentUser key="current-user" />
             <FeaturedAppRight key="featured-app-right" />
             <Divider key="divider" orientation="vertical" variant="middle" flexItem />

@@ -10,7 +10,7 @@ const BftAnsEntry: React.FC<AnsEntryProps> = props => {
   if (isLoading || isError) {
     return <div>...</div>;
   } else {
-    return <AnsEntryDisplay ansEntry={ansEntry} {...props} />;
+    return <AnsEntryDisplay ansEntryName={ansEntry?.name} {...props} />;
   }
 };
 

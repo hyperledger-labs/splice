@@ -34,7 +34,13 @@ const FeaturedAppRight: React.FC = () => {
   } else {
     return (
       <DevNetOnly>
-        <Button variant="contained" color="info" onClick={selfGrant} id="self-feature">
+        <Button
+          variant="contained"
+          color="info"
+          onClick={selfGrant}
+          id="self-feature"
+          sx={{ textWrap: 'balance' }}
+        >
           Self-grant featured app rights
         </Button>
       </DevNetOnly>

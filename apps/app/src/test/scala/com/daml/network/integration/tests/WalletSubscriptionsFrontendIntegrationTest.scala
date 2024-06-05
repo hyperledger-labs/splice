@@ -152,7 +152,8 @@ class WalletSubscriptionsFrontendIntegrationTest
           _ => {
             find(className("payment-current-user"))
               .valueOrFail("Current user is not shown")
-              .text should matchText(aliceEntryName1)
+              // the PartyId copy button and parentheses are also there
+              .text should include(aliceEntryName1)
 
             find(className("available-balance"))
               .valueOrFail("Balance is not shown")
