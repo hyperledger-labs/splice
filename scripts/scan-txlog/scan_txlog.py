@@ -697,6 +697,13 @@ class LfValue:
     def get_dso_rules_terminate_subscription_ans_entry_context_cid(self):
         return self.__get_record_field("ansEntryContextCid").get_contract_id()
 
+    # choice DsoRules_TerminateSubscription -> ansEntryContextCid
+    def get_dso_rules_expire_subscription_ans_entry_context_cid(self):
+        return self.__get_record_field("ansEntryContextCid").get_contract_id()
+
+    def get_dso_rules_expire_subscription_subscription_idle_state_cid(self):
+        return self.__get_record_field("subscriptionIdleStateCid").get_contract_id()
+
     # data DsoRules_Amulet_ExpireResult -> expireSum
     def get_dso_rules_amulet_expire_result_expire_sum(self):
         return self.__get_record_field("expireSum")
@@ -1795,7 +1802,7 @@ class State:
         )
         return HandleTransactionResult.for_open_round(round_number)
 
-    def handle_locked_amulet_unlock(self, transaction, event):
+    def handle_locked_amulet_unlock(self, transaction, event, log_prefix="Unlock"):
         summary = event.exercise_result.get_locked_amulet_unlock_result_amulet_sum()
         amulet_cid = summary.get_amulet_summary_amulet()
         round_number = summary.get_amulet_summary_round()
@@ -1805,7 +1812,7 @@ class State:
         self.active_contracts[amulet_cid] = amulet
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self.get_transaction_logger(transaction).info(
-            f"Unlock: Amulet {formatted_amulet} was unlocked"
+            f"{log_prefix}: Amulet {formatted_amulet} was unlocked"
         )
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -1867,17 +1874,6 @@ class State:
         created_at = expiring_amount.get_expiring_amount_created_at()
         rate_per_round = expiring_amount.get_expiring_amount_rate_per_round()
         return f"Locked Amulet lock_holders: {lock_holders}, expires_at: {expires_at}, owner: {owner}, initial_amount: {initial_amount}, created_at: {created_at}, rate_per_round: {rate_per_round}"
-
-    def handle_dso_rules_expire_ans_entry(self, transaction, event):
-        contract_id = event.exercise_argument.get_dso_rules_expire_ans_entry_cid()
-        entry = self.active_contracts[contract_id]
-        del self.active_contracts[contract_id]
-        user = entry.payload.get_ans_entry_user()
-        name = entry.payload.get_ans_entry_name()
-        self.get_transaction_logger(transaction).info(
-            f"Dso_ExpireAnsEntry: Expired AnsEntry name: {name}, user: {user}"
-        )
-        return HandleTransactionResult.empty()
 
     def handle_dso_bootstrap(self, transaction, event):
         rounds = set()
@@ -2072,7 +2068,12 @@ class State:
                             transaction, ans_entry_context_event, renewal=False
                         )
                     case "ANSRARC_RejectEntryInitialPayment":
-                        raise Exception("baz")
+                        for event_id, unlock_event in transaction.events_by_id.items():
+                            if (
+                                    isinstance(unlock_event, ExercisedEvent)
+                                    and unlock_event.choice_name == "LockedAmulet_Unlock"
+                            ):
+                                return self.handle_locked_amulet_unlock(transaction, unlock_event, log_prefix = "Reject Initial Subscription Payment")
                     case tag:
                         self.logger.error(f"Unexpected ARC_AnsEntryContext tag: {tag}")
             case _:
@@ -2250,10 +2251,14 @@ class State:
         ans_entry_context_cid = (
             arg.get_dso_rules_expire_subscription_ans_entry_context_cid()
         )
+        subscriptionIdleStateCid = (
+            arg.get_dso_rules_expire_subscription_subscription_idle_state_cid()
+        )
         ans_entry_context = self.active_contracts[ans_entry_context_cid]
         user = ans_entry_context.payload.get_ans_entry_context_user()
         name = ans_entry_context.payload.get_ans_entry_context_name()
         del self.active_contracts[ans_entry_context_cid]
+        del self.active_contracts[subscriptionIdleStateCid]
         self.get_transaction_logger(transaction).info(
             f"AnsExpireSubscription: Subscription expired for user {user} and entry {name}"
         )
@@ -2293,6 +2298,9 @@ class State:
                 return self.handle_subscription_request_accept_and_make_payment(
                     transaction, event
                 )
+            case "SubscriptionRequest_Reject":
+                # No change to the tracked ACS: only creates a TerminatedSubscription.
+                return HandleTransactionResult.empty()
             case "SubscriptionIdleState_MakePayment":
                 return self.handle_subscription_idle_state_make_payment(
                     transaction, event
@@ -2301,11 +2309,8 @@ class State:
                 return self.handle_dso_rules_collect_entry_renewal_payment(
                     transaction, event
                 )
-            case "DsoRules_ExpireAnsEntry":
-                return self.handle_dso_rules_expire_ans_entry(transaction, event)
             case "DsoRules_ExpireSubscription":
-                # No change to the tracked ACS.
-                return HandleTransactionResult.empty()
+                return self.handle_dso_rules_expire_subscription(transaction, event)
             case "DsoRules_TerminateSubscription":
                 return self.handle_dso_rules_terminate_subscription(transaction, event)
             case "SubscriptionIdleState_CancelSubscription":
