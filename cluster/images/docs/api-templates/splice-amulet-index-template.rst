@@ -1,4 +1,0 @@
-splice-amulet docs
-==================
-
-{{{body}}}

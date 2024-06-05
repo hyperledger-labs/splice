@@ -1,4 +1,0 @@
-splice-util docs
-================
-
-{{{body}}}
