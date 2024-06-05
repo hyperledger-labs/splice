@@ -51,7 +51,7 @@ template SvRewardState with
 
 data NodeState = NodeState with
     synchronizerNodes : SynchronizerNodeConfigMap
-    -- ^ The config for a synchronizer's CometBFT, sequencer, mediator and scan nodes under control of an SV party.
+      -- ^ The config for a synchronizer's CometBFT, sequencer, mediator and scan nodes under control of an SV party.
   deriving (Eq, Show)
 
 -- | State of a node managed by an SV operator party.
@@ -77,16 +77,16 @@ template SvNodeState with
 -- SV node operators can run alerting off of them.
 data SvStatus = SvStatus with
     createdAt : Time
-    -- ^ The wall clock time of the SV node at the time when the SV node started to
-    -- gather the data points in this report to submit them.
+      -- ^ The wall clock time of the SV node at the time when the SV node started to
+      -- gather the data points in this report to submit them.
     cometBftHeight : Int
-    -- ^ The height of the CometBFT chain at the time of submission
+      -- ^ The height of the CometBFT chain at the time of submission
     mediatorSynchronizerTime : Time
-    -- ^ The latest synchronizer time observed on the mediator at the time of submission
+      -- ^ The latest synchronizer time observed on the mediator at the time of submission
     participantSynchronizerTime : Time
-    -- ^ The latest synchronizer time observed on the participant at the time of submission
+      -- ^ The latest synchronizer time observed on the participant at the time of submission
     latestOpenRound : Round
-    -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
+      -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
   deriving (Eq, Show)
 
 -- | A singleton contract per SV party that is used to regularly submit status reports.
@@ -96,13 +96,13 @@ data SvStatus = SvStatus with
 template SvStatusReport with
     dso : Party
     sv : Party
-    -- ^ The SV party that submitted this report.
+      -- ^ The SV party that submitted this report.
     svName : Text
-    -- ^ The name of the SV operator whose operator party was used to submit this report.
+      -- ^ The name of the SV operator whose operator party was used to submit this report.
     number : Int
-    -- ^ The number of this report, starting from 0.
+      -- ^ The number of this report, starting from 0.
     status : Optional SvStatus
-    -- ^ None is used when initially creating the contract upon sv addition.
+      -- ^ None is used when initially creating the contract upon sv addition.
   where
     signatory dso
 

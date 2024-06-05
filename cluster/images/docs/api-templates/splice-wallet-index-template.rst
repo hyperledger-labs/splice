@@ -1,0 +1,4 @@
+splice-wallet docs
+==================
+
+{{{body}}}

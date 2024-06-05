@@ -17,21 +17,21 @@ import Splice.CometBft
 -- physical nodes.
 data DsoDecentralizedSynchronizerConfig = DsoDecentralizedSynchronizerConfig with
     synchronizers : Map.Map Text SynchronizerConfig
-    -- ^ The actual synchronizers, numbered sequentially.
+      -- ^ The actual synchronizers, numbered sequentially.
     lastSynchronizerId : Text
-    -- ^ The last allocated synchronizer Id.
+      -- ^ The last allocated synchronizer Id.
     activeSynchronizerId: Text
-    -- ^ The synchronizer to be used for managing standard DSO and Amulet workflows.
+      -- ^ The synchronizer to be used for managing standard DSO and Amulet workflows.
   deriving (Eq, Show)
 
 -- | The DSO-level configuration of a synchronizer. This contains the shared parameters
 -- of the synchronizer.
 data SynchronizerConfig = SynchronizerConfig with
     state : SynchronizerState
-    -- ^ The state of this synchronizer
+      -- ^ The state of this synchronizer
     cometBftGenesisJson : Text
-    -- ^ The CometBftGenesis json value required for new svs to bring up
-    -- their CometBft nodes for this synchronizer.
+      -- ^ The CometBftGenesis json value required for new svs to bring up
+      -- their CometBft nodes for this synchronizer.
   deriving (Eq, Show)
 
 -- | The state of a synchronizer.
@@ -60,26 +60,26 @@ data SynchronizerState
 -- | Config for a sequencer.
 data SequencerConfig = SequencerConfig with
     migrationId : Int
-    -- ^ The synchronizer migration id corresponding to this sequencer.
+      -- ^ The synchronizer migration id corresponding to this sequencer.
     sequencerId : Text
-    -- ^ The id of the sequencer.
+      -- ^ The id of the sequencer.
     url : Text
-    -- ^ The public accessible url of the sequencer.
+      -- ^ The public accessible url of the sequencer.
     availableAfter : Optional Time
-    -- ^ Any participant should subscribe this sequencer after this time.
-    -- ^ If not set the sequencer is not yet accessible
+      -- ^ Any participant should subscribe this sequencer after this time.
+      -- ^ If not set the sequencer is not yet accessible
   deriving (Eq, Show)
 
 -- | Config for a mediator.
 data MediatorConfig = MediatorConfig with
     mediatorId : Text
-    -- ^ The id of the mediator.
+      -- ^ The id of the mediator.
   deriving (Eq, Show)
 
 -- | Config for a Scan instance.
 data ScanConfig = ScanConfig with
     publicUrl : Text
-    -- ^ The publicly accessible URL of the Scan instance.
+      -- ^ The publicly accessible URL of the Scan instance.
   deriving (Eq, Show)
 
 -- | A map from synchronizer-ids to the configuration of a sv's node for this synchronizer.
@@ -89,16 +89,16 @@ type SynchronizerNodeConfigMap = Map.Map Text SynchronizerNodeConfig
 data SynchronizerNodeConfig = SynchronizerNodeConfig with
 
     cometBft : CometBftConfig
-    -- ^ The configuration of this sv's CometBFT nodes and keys.
+      -- ^ The configuration of this sv's CometBFT nodes and keys.
 
     sequencer : Optional SequencerConfig
-    -- ^ The configuration of this sv's optional local sequencer.
+      -- ^ The configuration of this sv's optional local sequencer.
 
     mediator : Optional MediatorConfig
-    -- ^ The configuration of this sv's optional local mediator.
+      -- ^ The configuration of this sv's optional local mediator.
 
     scan: Optional ScanConfig
-    -- ^ The configuration of this sv's optional Scan instance.
+      -- ^ The configuration of this sv's optional Scan instance.
   deriving (Eq, Show)
 
 noSynchronizerNodes : SynchronizerNodeConfigMap
