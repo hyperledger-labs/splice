@@ -11,7 +11,7 @@
       },
       {
         "name": "report_publisher",
-        "value": "Digital-Asset-*",
+        "value": "Digital-Asset-.*",
         "isEqual": true,
         "isRegex": true
       }
