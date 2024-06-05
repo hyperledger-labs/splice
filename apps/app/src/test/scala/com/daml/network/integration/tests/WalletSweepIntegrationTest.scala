@@ -104,13 +104,7 @@ class WalletSweepIntegrationTest
         s"sv1 should transfer its coins to alice and still have a minimal balance of $minBalanceUsd"
       ) {
         eventually(40.seconds) {
-          val newSv1Balance = BigDecimal(
-            ccToDollars(
-              sv1WalletClient.balance().unlockedQty.bigDecimal,
-              amuletPrice.bigDecimal,
-            )
-          )
-          newSv1Balance should beWithin(minBalanceUsd, maxBalanceUsd)
+          assertSweepCompleted()
           aliceValidatorWalletClient.balance().unlockedQty.longValue should be > aliceBalanceAtStart
         }
       }
@@ -160,7 +154,8 @@ class WalletSweepIntegrationTest
           eventually(40.seconds) {
             aliceValidatorWalletClient.listTransferOffers() shouldBe empty
             aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-            sv1Balance() should beWithin(minBalanceUsd, maxBalanceUsd)
+
+            assertSweepCompleted()
             aliceValidatorWalletClient
               .balance()
               .unlockedQty
@@ -199,13 +194,7 @@ class WalletSweepIntegrationTest
       eventually(40.seconds) {
         aliceValidatorWalletClient.listTransferOffers() shouldBe empty
         aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-        val newSv1Balance = BigDecimal(
-          ccToDollars(
-            sv1WalletClient.balance().unlockedQty.bigDecimal,
-            amuletPrice.bigDecimal,
-          )
-        )
-        newSv1Balance should beWithin(minBalanceUsd, maxBalanceUsd)
+        assertSweepCompleted()
         aliceValidatorWalletClient
           .balance()
           .unlockedQty
@@ -214,14 +203,14 @@ class WalletSweepIntegrationTest
     }
   }
 
-  private def sv1Balance()(implicit env: FixtureParam) = BigDecimal(
+  private def sv1Balance()(implicit env: CNNodeTestConsoleEnvironment) = BigDecimal(
     ccToDollars(
       sv1WalletClient.balance().unlockedQty.bigDecimal,
       amuletPrice.bigDecimal,
     )
   )
 
-  private def sweepAndTransfersAreIdle()(implicit env: FixtureParam) =
+  private def sweepAndTransfersAreIdle()(implicit env: CNNodeTestConsoleEnvironment) =
     clue("There are no outstanding transfer offers to accept or complete") {
       eventually() {
         sv1Balance() shouldBe <(maxBalanceUsd)
@@ -242,4 +231,12 @@ class WalletSweepIntegrationTest
         .trigger[AutoAcceptTransferOffersTrigger]
     )
   }
+
+  private def assertSweepCompleted()(implicit env: CNNodeTestConsoleEnvironment) = {
+    // The merging of the two tapped coins loses 1 x base transfer fee,
+    // but may occur after the amount of the transfer offer is computed.
+    // When that happens, we end up having slightly less than the minimum balance.
+    sv1Balance() should beWithin(minBalanceUsd - smallAmount, minBalanceUsd + smallAmount)
+  }
+
 }

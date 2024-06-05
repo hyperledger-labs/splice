@@ -104,6 +104,12 @@ class WalletSweepTrigger(
               if (transferOfferAlreadyExists) {
                 Future.successful("Transfer offer already exists.")
               } else {
+                logger.info(
+                  s"Creating a transfer offer with trackingId ${task.trackingId} for $amountToSendAfterFeesUsd USD ($amountToSendAfterFeesCC CC)."
+                )
+                logger.debug(
+                  s"Before fees amount: $amountToSendBeforeFeesUsd USD (balance of $balanceUsd, outstanding offers are $sumOfOutstandingTransfersOffersUsd USD, and configured min balance is ${config.minBalanceUsd.value})"
+                )
                 val cmd = install.exercise(
                   _.exerciseWalletAppInstall_CreateTransferOffer(
                     config.receiver,
@@ -166,7 +172,7 @@ class WalletSweepTrigger(
           BigDecimal(c.payload.amount.amount),
           currentAmuletConfig.transferConfig.transferFee,
         )
-          + computeCreateFees(BigDecimal(c.payload.amount.amount), currentAmuletConfig)
+          + computeCreateFees(currentAmuletConfig)
       })
       .sum
   }
@@ -175,7 +181,7 @@ class WalletSweepTrigger(
       amountToSendBeforeFeesUsd: BigDecimal,
       currentAmuletConfig: AmuletConfig[USD],
   ): BigDecimal = {
-    val createFee = computeCreateFees(amountToSendBeforeFeesUsd, currentAmuletConfig)
+    val createFee = computeCreateFees(currentAmuletConfig)
     val transferFee = computeTransferFees(
       amountToSendBeforeFeesUsd,
       currentAmuletConfig.transferConfig.transferFee,
@@ -184,32 +190,31 @@ class WalletSweepTrigger(
   }
 
   private def computeCreateFees(
-      amountCC: BigDecimal,
-      currentAmuletConfig: AmuletConfig[USD],
+      currentAmuletConfig: AmuletConfig[USD]
   ): BigDecimal =
-    BigDecimal(currentAmuletConfig.transferConfig.createFee.fee) * amountCC * 2
+    BigDecimal(currentAmuletConfig.transferConfig.createFee.fee) * 2
 
   private def computeTransferFees(
-      amountCC: BigDecimal,
-      transferFeeConfigCC: SteppedRate,
+      amountUsd: BigDecimal,
+      transferFeeConfigUsd: SteppedRate,
   ): BigDecimal = {
     def go(
         remainder: BigDecimal,
         currentRate: BigDecimal,
-        rate: BigDecimal,
+        total: BigDecimal,
         steps: Seq[Tuple2[java.math.BigDecimal, java.math.BigDecimal]],
     ): BigDecimal =
       steps match {
-        case _ if remainder <= 0 => currentRate
+        case _ if remainder <= 0 => total
         case stepTuple +: steps =>
           val step = stepTuple._1
           val steppedRate = stepTuple._2
           val newRemainder = remainder - step
-          val newRate = remainder.min(step) * currentRate + rate
-          go(newRemainder, steppedRate, newRate, steps)
-        case _ => rate + remainder * currentRate
+          val newTotal = total + remainder.min(step) * currentRate
+          go(newRemainder, steppedRate, newTotal, steps)
+        case _ => total + remainder * currentRate
       }
-    go(amountCC, transferFeeConfigCC.initialRate, 0.0, transferFeeConfigCC.steps.asScala.toSeq)
+    go(amountUsd, transferFeeConfigUsd.initialRate, 0.0, transferFeeConfigUsd.steps.asScala.toSeq)
   }
 }
 
