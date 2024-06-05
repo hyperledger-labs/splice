@@ -146,6 +146,7 @@ class PaginationKey:
 
 @dataclass
 class ScanClient:
+    logger: logging.Logger
     session: aiohttp.ClientSession
     url: str
     page_size: int
@@ -161,13 +162,35 @@ class ScanClient:
         json = await response.json()
         return json["transactions"]
 
+    async def __get_with_retry_on_statuses(
+        self, url, params, max_retries, delay_seconds, statuses
+    ):
+        assert max_retries >= 1
+        retry = 0
+        while retry < max_retries:
+            response = await self.session.get(url, params=params)
+            if response.status in statuses:
+                self.logger.debug(
+                    f"Request to {url} with params {params} failed with status {response.status}, retrying after {delay_seconds} seconds"
+                )
+                retry += 1
+                await asyncio.sleep(delay_seconds)
+            else:
+                break
+        if retry == max_retries:
+            self.logger.error(f"Exceeded max retries {max_retries}, giving up")
+        response.raise_for_status()
+        return await response.json()
+
     async def balance(self, party, round_number):
         params = {"party_id": party, "asOfEndOfRound": round_number}
-        response = await self.session.get(
-            f"{self.url}/api/scan/v0/wallet-balance", params=params
+        json = await self.__get_with_retry_on_statuses(
+            f"{self.url}/api/scan/v0/wallet-balance",
+            params=params,
+            max_retries=30,
+            delay_seconds=0.5,
+            statuses={404},
         )
-        response.raise_for_status()
-        json = await response.json()
         return (party, DamlDecimal(json["wallet_balance"]))
 
     async def party_balances(self, round_number, parties):
@@ -2071,35 +2094,59 @@ class State:
                     case "ValidatorRewardCoupon_DsoExpire":
                         validator_reward_coupon = self.active_contracts[cid]
                         rewards += [validator_reward_coupon]
-                        round = validator_reward_coupon.payload.get_validator_reward_round()
-                        user = validator_reward_coupon.payload.get_validator_reward_user()
-                        amount = validator_reward_coupon.payload.get_validator_reward_amount()
-                        rewards_lines += [f"  validator_activity_record: user: {user}, amount: {amount}"]
+                        round = (
+                            validator_reward_coupon.payload.get_validator_reward_round()
+                        )
+                        user = (
+                            validator_reward_coupon.payload.get_validator_reward_user()
+                        )
+                        amount = (
+                            validator_reward_coupon.payload.get_validator_reward_amount()
+                        )
+                        rewards_lines += [
+                            f"  validator_activity_record: user: {user}, amount: {amount}"
+                        ]
                         del self.active_contracts[cid]
                     case "ValidatorFaucetCoupon_DsoExpire":
                         validator_faucet_coupon = self.active_contracts[cid]
                         rewards += [validator_faucet_coupon]
-                        round = validator = validator_faucet_coupon.payload.get_validator_faucet_round()
-                        validator = validator_faucet_coupon.payload.get_validator_faucet_validator()
-                        rewards_lines += [f"  validator_liveness_record: validator: {validator}"]
+                        round = validator = (
+                            validator_faucet_coupon.payload.get_validator_faucet_round()
+                        )
+                        validator = (
+                            validator_faucet_coupon.payload.get_validator_faucet_validator()
+                        )
+                        rewards_lines += [
+                            f"  validator_liveness_record: validator: {validator}"
+                        ]
                         del self.active_contracts[cid]
                     case "AppRewardCoupon_DsoExpire":
                         app_reward_coupon = self.active_contracts[cid]
                         rewards += [app_reward_coupon]
                         round = app_reward_coupon.payload.get_app_reward_round()
                         provider = app_reward_coupon.payload.get_app_reward_provider()
-                        featured = "featured" if app_reward_coupon.payload.get_app_reward_featured() else "unfeatured"
+                        featured = (
+                            "featured"
+                            if app_reward_coupon.payload.get_app_reward_featured()
+                            else "unfeatured"
+                        )
                         amount = app_reward_coupon.payload.get_app_reward_amount()
-                        rewards_lines += [f"  {featured} app_activity_record: provider: {provider}, amount: {amount}"]
+                        rewards_lines += [
+                            f"  {featured} app_activity_record: provider: {provider}, amount: {amount}"
+                        ]
                         del self.active_contracts[cid]
                     case "SvRewardCoupon_DsoExpire":
                         sv_reward_coupon = self.active_contracts[cid]
                         rewards += [sv_reward_coupon]
                         round = sv_reward_coupon.payload.get_sv_reward_coupon_round()
                         sv = sv_reward_coupon.payload.get_sv_reward_coupon_sv()
-                        beneficiary = sv_reward_coupon.payload.get_sv_reward_coupon_beneficiary()
+                        beneficiary = (
+                            sv_reward_coupon.payload.get_sv_reward_coupon_beneficiary()
+                        )
                         weight = sv_reward_coupon.payload.get_sv_reward_coupon_weight()
-                        rewards_lines += [f"  sv_activity_record: sv: {sv}, beneficiary: {beneficiary}, weight: {weight}"]
+                        rewards_lines += [
+                            f"  sv_activity_record: sv: {sv}, beneficiary: {beneficiary}, weight: {weight}"
+                        ]
                         del self.active_contracts[cid]
                     case choice:
                         self.get_transaction_logger(transaction).error(
@@ -2442,7 +2489,7 @@ async def main():
     per_round_states = {}
     pagination_key = None
     async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(session, args.scan_url, 100)
+        scan_client = ScanClient(logger, session, args.scan_url, 100)
         while True:
             batch = await scan_client.updates(pagination_key)
             logger.debug(
