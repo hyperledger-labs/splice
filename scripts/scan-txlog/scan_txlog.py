@@ -13,6 +13,7 @@ import textwrap
 from typing import Optional
 import sys
 import argparse
+import os
 
 cli_handler = colorlog.StreamHandler()
 cli_handler.setFormatter(
@@ -137,11 +138,15 @@ class PaginationKey:
     def __str__(self):
         return str((self.last_migration_id, self.last_record_time))
 
-    def json(self):
+    def to_json(self):
         return {
             "after_record_time": self.last_record_time,
             "after_migration_id": self.last_migration_id,
         }
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(json["after_migration_id"], json["after_record_time"])
 
 
 @dataclass
@@ -151,10 +156,10 @@ class ScanClient:
     url: str
     page_size: int
 
-    async def updates(self, after):
+    async def updates(self, after: Optional[PaginationKey]):
         payload = {"page_size": self.page_size}
         if after:
-            payload["after"] = after.json()
+            payload["after"] = after.to_json()
         response = await self.session.post(
             f"{self.url}/api/scan/v0/updates", json=payload
         )
@@ -834,8 +839,8 @@ class ExercisedEvent:
     template_id: TemplateId
     choice_name: str
     contract_id: str
-    exercise_argument: dict
-    exercise_result: dict
+    exercise_argument: LfValue
+    exercise_result: LfValue
     child_event_ids: list
     is_consuming: bool
 
@@ -844,8 +849,22 @@ class ExercisedEvent:
 class CreatedEvent:
     template_id: TemplateId
     contract_id: str
-    payload: dict
+    payload: LfValue
 
+    @classmethod
+    def from_json(cls, json):
+        return cls(
+            TemplateId(json["template_id"]),
+            json["contract_id"],
+            LfValue(json["create_arguments"]),
+        )
+
+    def to_json(self):
+        return {
+            "template_id": self.template_id.template_id,
+            "contract_id": self.contract_id,
+            "create_arguments": self.payload.value,
+        }
 
 class Event:
     def parse(json):
@@ -1179,6 +1198,12 @@ class PerPartyState:
 
 # The state at a given record time
 class State:
+    logger: logging.Logger
+    active_contracts: dict[str, CreatedEvent]
+    record_time: datetime
+    ignored_root_creates: list[str]
+    ignored_root_exercises: list[str]
+
     def __init__(
         self,
         logger,
@@ -1201,6 +1226,29 @@ class State:
             self.ignored_root_creates,
             self.ignored_root_exercises,
         )
+
+    @classmethod
+    def from_json(cls, logger, json):
+        return cls(
+            logger,
+            {
+                cid: CreatedEvent.from_json(contract)
+                for cid, contract in json["active_contracts"].items()
+            },
+            datetime.fromisoformat(json["record_time"]),
+            json["ignored_root_creates"],
+            json["ignored_root_exercises"],
+        )
+
+    def to_json(self):
+        return {
+            "active_contracts": {
+                cid: contract.to_json() for cid, contract in self.active_contracts.items()
+            },
+            "record_time": self.record_time.isoformat(),
+            "ignored_root_creates": self.ignored_root_creates,
+            "ignored_root_exercises": self.ignored_root_exercises,
+        }
 
     def summary(self):
         amulets = self.list_contracts(TemplateQualifiedNames.amulet)
@@ -2443,6 +2491,69 @@ class PerPartyBalance:
         return max(total, DamlDecimal("0"))
 
 
+@dataclass
+class AppState:
+    logger: logging.Logger
+    state: State
+    per_round_states: dict[int, State]
+    pagination_key: Optional[PaginationKey]
+
+    @classmethod
+    def empty(cls, logger, args):
+        state = State(logger, {}, None, args.ignore_root_create, args.ignore_root_exercise)
+        return cls(logger, state, {}, None)
+
+    @classmethod
+    def from_json(cls, logger, data):
+        return cls(
+            logger,
+            State.from_json(logger, data["state"]),
+            {
+                int(round_number): State.from_json(logger, round_data)
+                for round_number, round_data in data["per_round_states"].items()
+            },
+            PaginationKey.from_json(data["pagination_key"]),
+        )
+
+    def to_json(self):
+        return {
+            "state": self.state.to_json(),
+            "per_round_states": {
+                str(round_number): round_state.to_json()
+                for round_number, round_state in self.per_round_states.items()
+            },
+            "pagination_key": None if self.pagination_key is None else self.pagination_key.to_json(),
+        }
+
+    @classmethod
+    def create_or_restore_from_cache(cls, logger, args):
+        if args.cache_file_path:
+            if os.path.exists(args.cache_file_path):
+                try:
+                    with open(args.cache_file_path, "r") as file:
+                        data = json.load(file)
+                        logger.info(f"Restoring app state from {args.cache_file_path}")
+                        return AppState.from_json(logger, data)
+                except Exception as e:
+                    logger.error(f"Could not read app state from {args.cache_file_path}: {e}")
+                    sys.exit(-1)
+            else:
+                logger.info(f"File {args.cache_file_path} does not exist, creating new app state")
+                return AppState.empty(logger, args)
+        else:
+            logger.info(f"Caching disabled, creating new app state")
+            return AppState.empty(logger, args)
+
+    def save_to_cache(self, args):
+        if args.cache_file_path:
+            try:
+                with open(args.cache_file_path, "w") as file:
+                    data = self.to_json()
+                    json.dump(data, file)
+                    self.logger.debug(f"Saved app state to {args.cache_file_path}")
+            except Exception as e:
+                self.logger.error(f"Could not save app state to {args.cache_file_path}: {e}")
+
 async def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -2457,18 +2568,31 @@ async def main():
         "--ignore-root-create",
         nargs="*",
         default=[],
+        help="Ignored root create in the form <TemplateQualifiedName>",
     )
     parser.add_argument(
         "--ignore-root-exercise",
         nargs="*",
         default=[],
-        help="Ignored root exercises in the form TemplateQualifiedName:Choice",
+        help="Ignored root exercise in the form <TemplateQualifiedName>:<Choice>",
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
         "--scan-balance-assertions",
         help="Enable comparison against end of round balances reported by scan.",
         action="store_true",
+    )
+    parser.add_argument(
+        "--cache-file-path",
+        help="File path to save application state to. "
+             "If the file exists, processing will resume from the persisted state."
+             "Otherwise, processing will start from beginning of the network.",
+    )
+    parser.add_argument(
+        "--page-size",
+        type=int,
+        default=100,
+        help="Number of transactions to fetch per network request",
     )
     args = parser.parse_args()
 
@@ -2490,15 +2614,15 @@ async def main():
 
     sys.excepthook = handle_exception
 
-    state = State(logger, {}, None, args.ignore_root_create, args.ignore_root_exercise)
-    per_round_states = {}
-    pagination_key = None
+    logger.info(f"Starting scan_txlog with arguments: {args}")
+    app_state = AppState.create_or_restore_from_cache(logger, args)
+
     async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(logger, session, args.scan_url, 100)
+        scan_client = ScanClient(logger, session, args.scan_url, args.page_size)
         while True:
-            batch = await scan_client.updates(pagination_key)
+            batch = await scan_client.updates(app_state.pagination_key)
             logger.debug(
-                f"Processing batch of size {len(batch)} starting at {pagination_key}"
+                f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
             )
             for transaction_json in batch:
                 transaction = TransactionTree.parse(transaction_json)
@@ -2513,25 +2637,25 @@ async def main():
                     logger.debug(
                         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
                     )
-                    previous_state = state.clone(logger)
-                    result = state.handle_transaction(transaction)
+                    previous_state = app_state.state.clone(logger)
+                    result = app_state.state.handle_transaction(transaction)
                     for round_number in result.new_open_rounds:
                         round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
                         round_logger.addHandler(cli_handler)
                         round_logger.addHandler(file_handler)
                         # warning to avoid repeated log messages for the same transaction
                         round_logger.setLevel("WARNING")
-                        per_round_states[round_number] = previous_state.clone(
+                        app_state.per_round_states[round_number] = previous_state.clone(
                             round_logger
                         )
                     if result.for_open_round != None and args.scan_balance_assertions:
-                        for round_number, per_round_state in per_round_states.items():
+                        for round_number, per_round_state in app_state.per_round_states.items():
                             if round_number >= result.for_open_round:
                                 per_round_state.handle_transaction(transaction)
                     if result.new_closed_round and args.scan_balance_assertions:
                         closed_round = result.new_closed_round
-                        round_state = per_round_states[closed_round]
-                        del per_round_states[closed_round]
+                        round_state = app_state.per_round_states[closed_round]
+                        del app_state.per_round_states[closed_round]
                         balances = round_state.balance_end_of_round()
                         lines = [f"effective balances for closed round: {closed_round}"]
                         matches = True
@@ -2553,11 +2677,12 @@ async def main():
                             logger.error(log)
             if len(batch) >= 1:
                 last = batch[-1]
-                pagination_key = PaginationKey(
+                app_state.pagination_key = PaginationKey(
                     last["migration_id"], last["record_time"]
                 )
+                app_state.save_to_cache(args)
             if len(batch) < scan_client.page_size:
-                logger.debug(f"Reached end of stream at {pagination_key}")
+                logger.debug(f"Reached end of stream at {app_state.pagination_key}")
                 break
 
 
