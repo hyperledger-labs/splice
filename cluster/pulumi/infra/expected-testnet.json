@@ -1796,17 +1796,19 @@
         "alertmanager": {
           "alertmanagerSpec": {
             "externalUrl": "https://alertmanager.test.global.canton.network.digitalasset.com",
-            "volumeClaimTemplate": {
-              "spec": {
-                "accessModes": [
-                  "ReadWriteOnce"
-                ],
-                "resources": {
-                  "requests": {
-                    "storage": "5Gi"
-                  }
-                },
-                "storageClassName": "standard-rwo"
+            "storage": {
+              "volumeClaimTemplate": {
+                "spec": {
+                  "accessModes": [
+                    "ReadWriteOnce"
+                  ],
+                  "resources": {
+                    "requests": {
+                      "storage": "5Gi"
+                    }
+                  },
+                  "storageClassName": "standard-rwo"
+                }
               }
             }
           },
@@ -2173,7 +2175,7 @@
               }
             },
             "retention": "1y",
-            "retentionSize": "100GB",
+            "retentionSize": "500GB",
             "serviceMonitorSelectorNilUsesHelmValues": false,
             "storageSpec": {
               "volumeClaimTemplate": {
@@ -2183,7 +2185,7 @@
                   ],
                   "resources": {
                     "requests": {
-                      "storage": "200Gi"
+                      "storage": "600Gi"
                     }
                   },
                   "storageClassName": "premium-rwo"

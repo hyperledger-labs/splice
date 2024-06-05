@@ -211,13 +211,15 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           },
           alertmanagerSpec: {
             externalUrl: alertManagerExternalUrl,
-            volumeClaimTemplate: {
-              spec: {
-                storageClassName: 'standard-rwo',
-                accessModes: ['ReadWriteOnce'],
-                resources: {
-                  requests: {
-                    storage: '5Gi',
+            storage: {
+              volumeClaimTemplate: {
+                spec: {
+                  storageClassName: 'standard-rwo',
+                  accessModes: ['ReadWriteOnce'],
+                  resources: {
+                    requests: {
+                      storage: '5Gi',
+                    },
                   },
                 },
               },
@@ -253,7 +255,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             ],
             enableRemoteWriteReceiver: true,
             retention: '1y',
-            retentionSize: '100GB',
+            retentionSize: '500GB',
             resources: {
               requests: {
                 memory: '12Gi',
@@ -267,7 +269,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
-                      storage: '200Gi',
+                      storage: '600Gi',
                     },
                   },
                 },
