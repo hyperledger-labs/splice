@@ -15,7 +15,11 @@ import {
 
 import * as postgres from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
-import { installValidatorApp, installValidatorSecrets } from './validator';
+import {
+  AutoAcceptTransfersConfig,
+  installValidatorApp,
+  installValidatorSecrets,
+} from './validator';
 
 export async function installValidator1(
   auth0Client: Auth0Client,
@@ -28,7 +32,8 @@ export async function installValidator1(
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
-  topupConfig?: ValidatorTopupConfig
+  topupConfig?: ValidatorTopupConfig,
+  autoAcceptTransfers?: AutoAcceptTransfersConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
@@ -99,6 +104,7 @@ export async function installValidator1(
     svValidator: false,
     scanAddress,
     secrets: validatorSecrets,
+    autoAcceptTransfers: autoAcceptTransfers,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

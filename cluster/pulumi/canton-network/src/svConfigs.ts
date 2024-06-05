@@ -8,6 +8,8 @@ import {
   svCometBftKeysFromSecret,
 } from 'cn-pulumi-common';
 
+import { SweepConfig, sweepConfigFromEnv } from './validator';
+
 export interface StaticSvConfig {
   nodeName: string;
   ingressName: string;
@@ -17,6 +19,7 @@ export interface StaticSvConfig {
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
+  sweep?: SweepConfig;
 }
 
 export type StaticCometBftConfig = {
@@ -78,6 +81,7 @@ const svConfigs: StaticSvConfig[] = isMainNet
             publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
           },
         },
+        sweep: sweepConfigFromEnv('SV1'),
       },
     ]
   : [
@@ -102,6 +106,7 @@ const svConfigs: StaticSvConfig[] = isMainNet
             publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
           },
         },
+        sweep: sweepConfigFromEnv('SV1'),
       },
       {
         // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)

@@ -23,6 +23,7 @@ import { installDocs } from './docs';
 import { Dso } from './dso';
 import { installSplitwell } from './splitwell';
 import svConfigs from './svConfigs';
+import { autoAcceptTransfersConfigFromEnv } from './validator';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
@@ -213,7 +214,8 @@ export async function installCluster(
         ...topupConfig,
         // x10 validator1's traffic targetThroughput for load tester -- see #9064
         targetThroughput: topupConfig.targetThroughput * 10,
-      }
+      },
+      autoAcceptTransfersConfigFromEnv('VALIDATOR1')
     );
   }
 

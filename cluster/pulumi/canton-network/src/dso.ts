@@ -101,6 +101,7 @@ export class Dso extends pulumi.ComponentResource {
         disableOnboardingParticipantPromotionDelay:
           this.args.disableOnboardingParticipantPromotionDelay,
         onboardingPollingInterval: this.args.onboardingPollingInterval,
+        sweep: svConf.sweep,
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
       cometBftSyncSource

@@ -10,8 +10,10 @@ Upcoming
 
 * Configuration
 
-  The  ``wallet-sweep`` and ``auto-accept`` configuration values for a validator app
-  were changed to map party-ids to configurations instead of mapping participant user-names to configurations.
+  * Add support in the Validator app Helm chart for configuring sweeps and auto-accepts of transfer offers.
+
+  * The ``wallet-sweep`` and ``auto-accept`` configuration values for a validator app
+    were changed to map party-ids to configurations instead of mapping participant user-names to configurations.
 
 * Daml
 
@@ -19,7 +21,7 @@ Upcoming
     batches of operations on a user's coin holdings to improve disambuiguation of log entries
     in the wallet transaction log.
 
-  * Fix an issue in the computation of transfer fees where the values were the steps
+  * Fix an issue in the computation of transfer fees where the values of the steps
     were interpreted as the difference between steps as opposed to an absolute value so e.g.
     the fees were computed as ``transferFee(2000) = 0.1 * 100 + 1000 * 0.01 + 900 * 0.001``
     instead of ``transferFee(2000) = 0.1 * 100 + 900 * 0.01 + 1000 * 0.001`` for the default config.

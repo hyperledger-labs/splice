@@ -198,6 +198,30 @@ spec:
           value: |
             canton.validator-apps.validator_backend.enable-wallet = {{ .Values.enableWallet | quote }}
         {{- end }}
+        {{- if .Values.walletSweep }}
+        - name: ADDITIONAL_CONFIG_WALLET_SWEEP
+          value: |
+            canton.validator-apps.validator_backend.wallet-sweep {
+              {{- range $k, $v := .Values.walletSweep }}
+              {{ $k | quote }} {
+                max-balance-usd = {{ $v.maxBalanceUSD }}
+                min-balance-usd = {{ $v.minBalanceUSD }}
+                receiver = {{ $v.receiver | quote }}
+              }
+              {{- end }}
+            }
+        {{- end }}
+        {{- if .Values.autoAcceptTransfers }}
+        - name: ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS
+          value: |
+            canton.validator-apps.validator_backend.auto-accept-transfers {
+              {{- range $k, $v := .Values.autoAcceptTransfers }}
+              {{ $k | quote }} {
+                from-parties = {{ $v.fromParties | toJson }}
+              }
+              {{- end }}
+            }
+        {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}

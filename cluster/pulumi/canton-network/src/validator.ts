@@ -8,6 +8,7 @@ import {
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
   CnInput,
+  config,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
@@ -61,6 +62,8 @@ type BasicValidatorConfig = {
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantAddress: Output<string> | string;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
+  sweep?: SweepConfig;
+  autoAcceptTransfers?: AutoAcceptTransfersConfig;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -73,6 +76,46 @@ export type ValidatorConfig = BasicValidatorConfig & {
     migrating: boolean;
   };
 };
+
+export type AutoAcceptTransfersConfig = {
+  fromParty: string;
+  toParty: string;
+};
+
+export function autoAcceptTransfersConfigFromEnv(
+  nodeName: string
+): AutoAcceptTransfersConfig | undefined {
+  const asJson = config.optionalEnv(`${nodeName}_AUTO_ACCEPT_TRANSFERS`);
+  return asJson && JSON.parse(asJson);
+}
+
+export type SweepConfig = {
+  fromParty: string;
+  toParty: string;
+  maxBalance: number;
+  minBalance: number;
+};
+
+export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
+  const asJson = config.optionalEnv(`${nodeName}_SWEEP`);
+  return asJson && JSON.parse(asJson);
+  // const fromParty = config.optionalEnv(`${nodeName}_SWEEP_FROM`);
+  // const toParty = config.optionalEnv(`${nodeName}_SWEEP_TO`);
+  // const maxBalance = config.optionalEnv(`${nodeName}_SWEEP_MAX_BALANCE`);
+  // const minBalance = config.optionalEnv(`${nodeName}_SWEEP_MIN_BALANCE`);
+  // if (fromParty && toParty && maxBalance && minBalance) {
+  //   return {
+  //     fromParty,
+  //     toParty,
+  //     maxBalance: parseInt(maxBalance),
+  //     minBalance: parseInt(minBalance),
+  //   };
+  // }
+  // if (fromParty || toParty || maxBalance || minBalance) {
+  //   throw new Error(`All sweep config values must be set for ${nodeName}`);
+  // }
+  // return undefined;
+}
 
 type SvValidatorConfig = BasicValidatorConfig & {
   svValidator: true;
@@ -129,6 +172,20 @@ export async function installValidatorApp(
     .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns])
     .concat(config.extraDependsOn || []);
 
+  const walletSweep = config.sweep && {
+    [config.sweep.fromParty]: {
+      maxBalanceUSD: config.sweep.maxBalance,
+      minBalanceUSD: config.sweep.minBalance,
+      receiver: config.sweep.toParty,
+    },
+  };
+
+  const autoAcceptTransfers = config.autoAcceptTransfers && {
+    [config.autoAcceptTransfers.toParty]: {
+      fromParties: [config.autoAcceptTransfers.fromParty],
+    },
+  };
+
   return installCNHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
@@ -178,6 +235,8 @@ export async function installValidatorApp(
         ledgerApiAudience: config.secrets.auth0Client.getCfg().appToApiAudience['participant'],
         jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
       },
+      walletSweep,
+      autoAcceptTransfers,
     },
     defaultVersion,
     { dependsOn }

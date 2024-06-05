@@ -351,6 +351,7 @@ async function installValidator(
     decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
+    sweep: svConfig.sweep,
   });
 
   return validator;

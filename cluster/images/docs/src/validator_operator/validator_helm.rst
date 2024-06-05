@@ -578,8 +578,41 @@ Canton Name Service.
   :width: 600
   :alt: After logged in into the CNS UI
 
-Re-onboard an validator and recover balances of all users it hosts
-------------------------------------------------------------------
+Configuring sweeps and auto-accepts of transfer offers
+------------------------------------------------------
+
+You can optionally configure the validator to automatically create transfer offers
+to other parties on the network whenever the balance of certain parties that it hosts
+exceeds a certain threshold. To do so, uncomment and fill in the following section
+in the ``validator-values.yaml`` file:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: SWEEP_START
+    :end-before: SWEEP_END
+
+Whenever the balance of `<senderPartyID>` exceeds `maxBalanceUSD`, the validator
+will automatically create a transfer offer to `<receiverPartyId>`, for an amount that
+leaves `minBalanceUSD` in the sender's wallet. Note that you will need to know the
+party IDs of both the sender and receiver, which can be copied from the wallet UIs
+of the respective users (in the top right corner). This therefore needs to be applied
+to the Helm chart in a second step after the initial deployment, once the party IDs are known.
+
+Similarly, you can configure the validator to automatically accept transfer offers
+from certain parties on the network. To do so, uncomment and fill in the following section
+in the ``validator-values.yaml`` file:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: AUTO_ACCEPT_START
+    :end-before: AUTO_ACCEPT_END
+
+Whenever the validator receives a transfer offer from `<senderPartyID>` to `<receiverPartyId>`,
+it will automatically accept it. Similarly to sweeps, party IDs must be known in order to
+apply this configuration.
+
+Re-onboard a validator and recover balances of all users it hosts
+-----------------------------------------------------------------
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved by deploying another validator node with control over the validator's participant keys.
 
