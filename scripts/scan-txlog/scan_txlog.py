@@ -33,11 +33,14 @@ import_acs_workflow_id_prefix = "canton-network-acs-import"
 @dataclass
 class TemplateId:
     template_id: str
+    package_id: str
     qualified_name: str
 
     def __init__(self, template_id):
         self.template_id = template_id
-        self.qualified_name = template_id.split(":", 1)[1]
+        (package_id, qualified_name) = template_id.split(":", 1)
+        self.package_id = package_id
+        self.qualified_name = qualified_name
 
     def __str__(self):
         return self.template_id
@@ -257,6 +260,23 @@ class DamlDecimal:
         return self.decimal > other.decimal
 
 
+# Note: This only contains package ids we need to match against
+# but does not attempt to be exhaustive.
+class KnownPackageIds:
+    amulet_0_1_0 = "48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351"
+    amulet_0_1_1 = "67bc95402ad7b08fcdff0ed478308d39c70baca2238c35c5d425a435a8a9e7f7"
+
+    # Returns True if the package id of splice-amulet that the
+    # AmuletRules_Transfer choice was exercised on
+    # does not contain the fix from #12735.
+    @staticmethod
+    def has_broken_transfer_fee_computation(package_id):
+        return package_id in [
+            KnownPackageIds.amulet_0_1_0,
+            KnownPackageIds.amulet_0_1_1,
+        ]
+
+
 @dataclass
 class SteppedRate:
     initial_rate: DamlDecimal
@@ -268,22 +288,90 @@ class SteppedRate:
             [(x * factor, y) for (x, y) in self.steps],
         )
 
-    def charge(self, amount):
+    def get_steps_differences(self, package_id):
+        if KnownPackageIds.has_broken_transfer_fee_computation(package_id):
+            return self.steps
+        else:
+            steps_differences = []
+            total = DamlDecimal(0)
+            for step, stepped_rate in self.steps:
+                steps_differences += [(step - total, stepped_rate)]
+                total += step
+            return steps_differences
+
+    def charge(self, amount, package_id):
+        steps_differences = self.get_steps_differences(package_id)
         remainder = amount
         total = DamlDecimal(0)
         steps_index = 0
         current_rate = self.initial_rate
         while remainder > DamlDecimal(0):
-            if steps_index >= len(self.steps):
+            if steps_index >= len(steps_differences):
                 total += remainder * current_rate
-                remainder = 0
+                remainder = DamlDecimal(0)
             else:
-                (step, stepped_rate) = self.steps[steps_index]
+                (step, stepped_rate) = steps_differences[steps_index]
                 steps_index += 1
                 total += min(remainder, step) * current_rate
                 current_rate = stepped_rate
                 remainder -= step
         return total
+
+
+# TODO(#12755) Replace these assertions by a real unit testing framework
+
+stepped_rate_example = SteppedRate(
+    DamlDecimal("0.1"),
+    [
+        (DamlDecimal("100.0"), DamlDecimal("0.001")),
+        (DamlDecimal("1000.0"), DamlDecimal("0.0001")),
+        (DamlDecimal("1000000.0"), DamlDecimal("0.00001")),
+    ],
+)
+
+assert (
+    stepped_rate_example.get_steps_differences(KnownPackageIds.amulet_0_1_0)
+    == stepped_rate_example.steps
+)
+
+assert stepped_rate_example.get_steps_differences("unknown") == [
+    (DamlDecimal("100.0"), DamlDecimal("0.001")),
+    (DamlDecimal("900.0"), DamlDecimal("0.0001")),
+    (DamlDecimal("998900.0"), DamlDecimal("0.00001")),
+]
+
+test_value = (
+    DamlDecimal("100.0")
+    + DamlDecimal("1000.0")
+    + DamlDecimal("1000000.0")
+    + DamlDecimal("1000000.0")
+)
+
+assert stepped_rate_example.charge(
+    test_value, KnownPackageIds.amulet_0_1_0
+) == DamlDecimal("100.0") * DamlDecimal("0.1") + DamlDecimal("1000.0") * DamlDecimal(
+    "0.001"
+) + DamlDecimal(
+    "1000000.0"
+) * DamlDecimal(
+    "0.0001"
+) + DamlDecimal(
+    "1000000.0"
+) * DamlDecimal(
+    "0.00001"
+)
+
+assert stepped_rate_example.charge(test_value, "unknown") == DamlDecimal(
+    "100.0"
+) * DamlDecimal("0.1") + DamlDecimal("900.0") * DamlDecimal("0.001") + DamlDecimal(
+    "998900.0"
+) * DamlDecimal(
+    "0.0001"
+) + DamlDecimal(
+    "1001200.0"
+) * DamlDecimal(
+    "0.00001"
+)
 
 
 @dataclass
@@ -1568,6 +1656,7 @@ class State:
     def handle_transfer_outputs(
         self,
         transaction,
+        event,
         sender,
         open_round,
         declared_outputs,
@@ -1578,6 +1667,8 @@ class State:
     ):
         assert len(output_amulet_cids) == len(output_fees)
         assert len(declared_outputs) == len(output_fees)
+        assert event.template_id.qualified_name == TemplateQualifiedNames.amulet_rules
+        assert event.choice_name == "AmuletRules_Transfer"
         output_amounts = []
         fee_amounts = []
         output_descriptions = []
@@ -1626,7 +1717,9 @@ class State:
             transfer_fee = (
                 DamlDecimal(0)
                 if sender == owner
-                else transfer_config_cc.transfer_fee.charge(declared_output_amount)
+                else transfer_config_cc.transfer_fee.charge(
+                    declared_output_amount, event.template_id.package_id
+                )
             )
             locking_fee = len(lock_holders) * transfer_config_cc.lock_holder_fee
             create_fee = transfer_config_cc.create_fee
@@ -1699,6 +1792,7 @@ class State:
         (outputs_description, output_amounts, fee_amounts) = (
             self.handle_transfer_outputs(
                 transaction,
+                event,
                 sender,
                 round_contract,
                 declared_outputs,
@@ -2118,10 +2212,14 @@ class State:
                     case "ANSRARC_RejectEntryInitialPayment":
                         for event_id, unlock_event in transaction.events_by_id.items():
                             if (
-                                    isinstance(unlock_event, ExercisedEvent)
-                                    and unlock_event.choice_name == "LockedAmulet_Unlock"
+                                isinstance(unlock_event, ExercisedEvent)
+                                and unlock_event.choice_name == "LockedAmulet_Unlock"
                             ):
-                                return self.handle_locked_amulet_unlock(transaction, unlock_event, log_prefix = "Reject Initial Subscription Payment")
+                                return self.handle_locked_amulet_unlock(
+                                    transaction,
+                                    unlock_event,
+                                    log_prefix="Reject Initial Subscription Payment",
+                                )
                     case tag:
                         self.logger.error(f"Unexpected ARC_AnsEntryContext tag: {tag}")
             case _:

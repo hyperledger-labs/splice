@@ -18,17 +18,17 @@ test = script do
   chargeSteppedRate example 100.0 === 0.01 * 100.0
   -- Values in second step get rate for first step & second step
   chargeSteppedRate example 900.0 === 0.01 * 100.0 + 0.001 * 800.0
-  chargeSteppedRate example 1100.0 === 0.01 * 100.0 + 0.001 * 1000.0
+  chargeSteppedRate example 1100.0 === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 100.0
   -- Values in third step get rates from all steps
-  chargeSteppedRate example 1500.0 === 0.01 * 100.0 + 0.001 * 1000.0 + 400.0 * 0.0001
-  chargeSteppedRate example 1001100.0 === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0
-  chargeSteppedRate example 1001100.0 === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0
+
+  chargeSteppedRate example 1500.0 === 0.01 * 100.0 + 0.001 * 900.0 + 500.0 * 0.0001
+  chargeSteppedRate example 1001100.0 === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1200.0
   -- Values after the last step stick with the last rate for everything after
   -- the last step.
   chargeSteppedRate example (100.0 + 1000.0 + 1000000.0 + 1.0)
-    === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0 + 0.00001 * 1.0
+    === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1201.0
   chargeSteppedRate example (100.0 + 1000.0 + 1000000.0 + 1000000.0)
-    === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0 + 0.00001 * 1000000.0
+    === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1001200.0
 
 testScaledSteppedRate : Script ()
 testScaledSteppedRate = script do

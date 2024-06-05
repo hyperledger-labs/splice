@@ -15,9 +15,27 @@ Upcoming
 
 * Daml
 
-  The ``WalletAppInstall_ExecuteBatch`` choice in ``splice-wallet.dar`` was changed to also record the wallet user party when executing
-  batches of operations on a user's coin holdings to improve disambuiguation of log entries
-  in the wallet transaction log.
+  * The ``WalletAppInstall_ExecuteBatch`` choice in ``splice-wallet.dar`` was changed to also record the wallet user party when executing
+    batches of operations on a user's coin holdings to improve disambuiguation of log entries
+    in the wallet transaction log.
+
+  * Fix an issue in the computation of transfer fees where the values were the steps
+    were interpreted as the difference between steps as opposed to an absolute value so e.g.
+    the fees were computed as ``transferFee(2000) = 0.1 * 100 + 1000 * 0.01 + 900 * 0.001``
+    instead of ``transferFee(2000) = 0.1 * 100 + 900 * 0.01 + 1000 * 0.001`` for the default config.
+
+    This requires a governance vote to upgrade the package configs to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.2
+    amuletNameService  0.1.2
+    dsoGovernance      0.1.3
+    validatorLifecycle 0.1.0
+    wallet             0.1.2
+    walletPayments     0.1.2
+    ================== =======
 
 * Validator admin API
 

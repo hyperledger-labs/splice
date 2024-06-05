@@ -202,7 +202,7 @@ class WalletSweepTrigger(
         remainder: BigDecimal,
         currentRate: BigDecimal,
         total: BigDecimal,
-        steps: Seq[Tuple2[java.math.BigDecimal, java.math.BigDecimal]],
+        steps: Seq[(java.math.BigDecimal, java.math.BigDecimal)],
     ): BigDecimal =
       steps match {
         case _ if remainder <= 0 => total
@@ -214,7 +214,35 @@ class WalletSweepTrigger(
           go(newRemainder, steppedRate, newTotal, steps)
         case _ => total + remainder * currentRate
       }
-    go(amountUsd, transferFeeConfigUsd.initialRate, 0.0, transferFeeConfigUsd.steps.asScala.toSeq)
+
+    // turn [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+    // into [(100.0, 0.001), (900.0, 0.0001), (998900, 0.00001)]
+    // i.e., the step is the remainder after applying all the
+    // previous steps and not the absolute value.
+    // Note that technically this depends on the Daml version since it was changed as part of
+    // #12735. However, we don't care about being that exact in this script so
+    // we use the new version in all cases which is correct as soon as all clusters upgrade
+    // to splice-amulet-0.1.2.
+    def getStepsDifferences(
+        steps: Seq[Tuple2[java.math.BigDecimal, java.math.BigDecimal]]
+    ): Seq[(java.math.BigDecimal, java.math.BigDecimal)] =
+      steps
+        .foldLeft(
+          (BigDecimal(0).bigDecimal, Seq.empty[(java.math.BigDecimal, java.math.BigDecimal)])
+        ) { case ((total, xs), stepTuple) =>
+          val step = stepTuple._1
+          val rate = stepTuple._2
+          (total.add(step), (step.subtract(total), rate) +: xs)
+        }
+        ._2
+        .reverse
+
+    go(
+      amountUsd,
+      transferFeeConfigUsd.initialRate,
+      0.0,
+      getStepsDifferences(transferFeeConfigUsd.steps.asScala.toSeq),
+    )
   }
 }
 
