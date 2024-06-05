@@ -13,8 +13,8 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
-import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeTxLogAppStore, TxLogQueries}
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store
 import com.daml.network.wallet.store.{
@@ -22,6 +22,7 @@ import com.daml.network.wallet.store.{
   TransferOfferTxLogEntry,
   TxLogEntry,
   UserWalletStore,
+  UserWalletTxLogParser,
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -49,7 +50,7 @@ class DbUserWalletStore(
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore[TxLogEntry](
+) extends DbCNNodeTxLogAppStore[TxLogEntry](
       storage = storage,
       acsTableName = WalletTables.acsTableName,
       txLogTableName = WalletTables.txLogTableName,
@@ -70,11 +71,6 @@ class DbUserWalletStore(
       ),
       domainMigrationInfo,
       participantId,
-      // Note: this causes the app to persist the original update stream for each wallet end user.
-      // The data in this stream overlaps with (but is not a subset of) the data in the validator operator
-      // update stream, which is used in the DbValidatorWalletStore.
-      // An alternative would be to use one fused update stream for all local parties, but we don't have that.
-      storeUpdateHistory = true,
     )
     with UserWalletStore
     with AcsTables
@@ -90,6 +86,14 @@ class DbUserWalletStore(
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
   override protected def acsContractFilter = UserWalletStore.contractFilter(key, domainMigrationId)
+
+  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
+    override val parser =
+      new UserWalletTxLogParser(loggerFactory, key.endUserParty)
+    override def entryToRow = WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
+  }
 
   /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
     * and optionally filtered by a set of issuing rounds.

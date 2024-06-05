@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** A class that wires up a single store with an ingestion service, and provides a suitable
   * context for registering triggers against that store.
   */
-abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
+abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore](
     automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
@@ -71,18 +71,16 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     )
   )
 
-  store.updateHistory.foreach(history =>
-    registerService(
-      new UpdateIngestionService(
-        store.updateHistory.getClass.getSimpleName,
-        history.ingestionSink,
-        connection,
-        automationConfig,
-        backoffClock = triggerContext.pollingClock,
-        triggerContext.retryProvider,
-        triggerContext.loggerFactory,
-        ingestFromParticipantBegin = true,
-      )
+  registerService(
+    new UpdateIngestionService(
+      store.updateHistory.getClass.getSimpleName,
+      store.updateHistory.ingestionSink,
+      connection,
+      automationConfig,
+      backoffClock = triggerContext.pollingClock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      ingestFromParticipantBegin = true,
     )
   )
 

@@ -597,28 +597,25 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
-      store.updateHistory.fold[Future[v0.ScanResource.GetUpdateHistoryResponse]](
-        Future.failed(new IllegalStateException("UpdateHistory not available."))
-      ) { updateHistory =>
-        val afterO = request.after.map { after =>
-          (
-            after.afterMigrationId,
-            CantonTimestamp(Timestamp.assertFromString(after.afterRecordTime)),
+      val updateHistory = store.updateHistory
+      val afterO = request.after.map { after =>
+        (
+          after.afterMigrationId,
+          CantonTimestamp(Timestamp.assertFromString(after.afterRecordTime)),
+        )
+      }
+      updateHistory
+        .getUpdates(
+          afterO,
+          PageLimit.tryCreate(request.pageSize),
+        )
+        .map { txs =>
+          definitions.UpdateHistoryResponse(
+            txs.map { case (tx, migrationId) =>
+              ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
+            }.toVector
           )
         }
-        updateHistory
-          .getUpdates(
-            afterO,
-            PageLimit.tryCreate(request.pageSize),
-          )
-          .map { txs =>
-            definitions.UpdateHistoryResponse(
-              txs.map { case (tx, migrationId) =>
-                ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
-              }.toVector
-            )
-          }
-      }
     }
   }
 

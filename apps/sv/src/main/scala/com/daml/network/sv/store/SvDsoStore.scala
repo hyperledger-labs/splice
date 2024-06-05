@@ -36,7 +36,7 @@ import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.store.SvDsoStore.noActiveDsoRules
-import com.daml.network.sv.store.db.{DbSvDsoStore, DsoTables}
+import com.daml.network.sv.store.db.{DbSvDsoStore}
 import com.daml.network.sv.store.db.DsoTables.DsoAcsStoreRowData
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
@@ -56,7 +56,7 @@ import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the DSO party. */
-trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAmuletRules {
+trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
   import SvDsoStore.{amuletRulesFollowers, dsoRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
@@ -67,13 +67,6 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   override lazy val acsContractFilter =
     SvDsoStore.contractFilter(key.dsoParty, domainMigrationId)
-
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser = new DsoTxLogParser(loggerFactory)
-    override def entryToRow = DsoTables.DsoTxLogRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
 
   def key: SvStore.Key
 

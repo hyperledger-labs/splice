@@ -16,10 +16,16 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
-import com.daml.network.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.{
+  OpenMiningRoundTxLogEntry,
+  ScanStore,
+  ScanTxLogParser,
+  SortOrder,
+  TxLogEntry,
+}
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
-import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeTxLogAppStore, TxLogQueries}
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -64,7 +70,7 @@ class DbScanStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore[TxLogEntry](
+) extends DbCNNodeTxLogAppStore[TxLogEntry](
       storage,
       ScanTables.acsTableName,
       ScanTables.txLogTableName,
@@ -81,7 +87,6 @@ class DbScanStore(
       ),
       domainMigrationInfo,
       participantId,
-      storeUpdateHistory = true,
     )
     with ScanStore
     with AcsTables
@@ -94,6 +99,13 @@ class DbScanStore(
 
   import multiDomainAcsStore.waitUntilAcsIngested
   private val storeMetrics = new DbScanStoreMetrics(retryProvider.metricsFactory)
+
+  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
+    override val parser = new ScanTxLogParser(loggerFactory)
+    override def entryToRow = ScanTables.ScanTxLogRowData.fromTxLogEntry
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty

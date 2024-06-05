@@ -179,8 +179,7 @@ class UpdateHistoryIntegrationTest
       eventually() {
         compareHistory(
           sv1Backend.participantClient,
-          sv1ScanBackend.appState.store.updateHistory
-            .getOrElse(throw new RuntimeException("Scan should have history")),
+          sv1ScanBackend.appState.store.updateHistory,
           ledgerBeginSv1,
         )
       }
@@ -194,12 +193,31 @@ class UpdateHistoryIntegrationTest
             .futureValue
             .getOrElse(throw new RuntimeException("Alice wallet should exist"))
             .store
-            .updateHistory
-            .getOrElse(throw new RuntimeException("User wallet should have history")),
+            .updateHistory,
           ledgerBeginAlice,
         )
       }
-
+      eventually() {
+        compareHistory(
+          sv1Backend.participantClient,
+          sv1Backend.appState.svStore.updateHistory,
+          ledgerBeginSv1,
+        )
+      }
+      eventually() {
+        compareHistory(
+          sv1Backend.participantClient,
+          sv1Backend.appState.dsoStore.updateHistory,
+          ledgerBeginSv1,
+        )
+      }
+      eventually() {
+        compareHistory(
+          aliceValidatorBackend.participantClient,
+          aliceValidatorBackend.appState.store.updateHistory,
+          ledgerBeginAlice,
+        )
+      }
     }
   }
 

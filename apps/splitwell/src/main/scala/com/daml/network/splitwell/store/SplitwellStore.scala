@@ -8,7 +8,7 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.splitwell.config.SplitwellSynchronizerConfig
 import com.daml.network.splitwell.store.db.DbSplitwellStore
 import com.daml.network.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -20,7 +20,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
+trait SplitwellStore extends CNNodeAppStore {
   import MultiDomainAcsStore.QueryResult
 
   /** The key identifying the parties considered by this store. */

@@ -5,7 +5,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
 import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
@@ -29,7 +29,7 @@ class DbSvSvStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithoutHistory(
+) extends DbCNNodeAppStore(
       storage,
       DbSvSvStore.tableName,
       // Any change in the store descriptor will lead to previously deployed applications
@@ -44,8 +44,8 @@ class DbSvSvStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
-      domainMigrationInfo,
-      participantId,
+      domainMigrationInfo = domainMigrationInfo,
+      participantId = participantId,
     )
     with SvSvStore
     with AcsTables
@@ -57,7 +57,6 @@ class DbSvSvStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
-
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[

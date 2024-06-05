@@ -4,15 +4,10 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
+import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.store.db.{
-  DbScanStore,
-  ScanAggregatesReader,
-  ScanAggregator,
-  ScanTables,
-}
+import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.util.{
   AssignedContract,
@@ -45,11 +40,7 @@ object SortOrder {
 final case class ScanInfo(publicUrl: String, memberName: String)
 
 /** Utility class grouping the two kinds of stores managed by the DsoApp. */
-trait ScanStore
-    extends CNNodeAppStore[
-      TxLogEntry
-    ]
-    with PackageIdResolver.HasAmuletRules {
+trait ScanStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
 
   def aggregate()(implicit
       tc: TraceContext
@@ -65,13 +56,6 @@ trait ScanStore
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
     ScanStore.contractFilter(key, domainMigrationId)
-
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser = new ScanTxLogParser(loggerFactory)
-    override def entryToRow = ScanTables.ScanTxLogRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
 
   def lookupAmuletRules()(implicit
       tc: TraceContext

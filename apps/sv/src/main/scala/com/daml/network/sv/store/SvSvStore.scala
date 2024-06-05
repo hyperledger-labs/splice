@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice.{svonboarding as so, validatoronboar
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
+import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
@@ -21,7 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
-trait SvSvStore extends CNNodeAppStoreWithoutHistory {
+trait SvSvStore extends CNNodeAppStore {
   import SvSvStore.templatesMovedByMyAutomation
 
   protected val outerLoggerFactory: NamedLoggerFactory

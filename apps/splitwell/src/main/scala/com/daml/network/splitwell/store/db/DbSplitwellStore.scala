@@ -10,7 +10,7 @@ import com.daml.network.splitwell.config.SplitwellSynchronizerConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.{LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -39,7 +39,7 @@ class DbSplitwellStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithoutHistory(
+) extends DbCNNodeAppStore(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
       // Any change in the store descriptor will lead to previously deployed applications
@@ -53,8 +53,8 @@ class DbSplitwellStore(
           "providerParty" -> key.providerParty.toProtoPrimitive
         ),
       ),
-      domainMigrationInfo,
-      participantId,
+      domainMigrationInfo = domainMigrationInfo,
+      participantId = participantId,
     )
     with AcsTables
     with AcsQueries
@@ -62,7 +62,6 @@ class DbSplitwellStore(
     with SplitwellStore {
 
   import MultiDomainAcsStore.*
-
   override lazy val acsContractFilter = SplitwellStore.contractFilter(key)
 
   import multiDomainAcsStore.waitUntilAcsIngested

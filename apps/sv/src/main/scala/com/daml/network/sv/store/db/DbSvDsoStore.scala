@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.splice.validatorlicense.{
 }
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
 import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.splice.dso.svstate.{SvRewardState, SvNodeState}
+import com.daml.network.codegen.java.splice.dso.svstate.{SvNodeState, SvRewardState}
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.svonboarding.{
@@ -33,17 +33,25 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
-import com.daml.network.store.{IngestionSummary, Limit, LimitHelpers, MultiDomainAcsStore}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeTxLogAppStore, TxLogQueries}
+import com.daml.network.store.{
+  IngestionSummary,
+  Limit,
+  LimitHelpers,
+  MultiDomainAcsStore,
+  TxLogStore,
+}
 import com.daml.network.sv.store.TxLogEntry.EntryType
 import com.daml.network.sv.store.{
   AppRewardCouponsSum,
-  SvStore,
+  DsoTxLogParser,
   SvDsoStore,
+  SvStore,
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
 import SvDsoStore.RoundCounterpartyBatch
+
 import scala.jdk.CollectionConverters.*
 import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
@@ -72,7 +80,7 @@ class DbSvDsoStore(
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore[TxLogEntry](
+) extends DbCNNodeTxLogAppStore[TxLogEntry](
       storage,
       DsoTables.acsTableName,
       DsoTables.txLogTableName,
@@ -90,8 +98,6 @@ class DbSvDsoStore(
       ),
       domainMigrationInfo,
       participantId,
-      // We disable the update history for the Sv app, as the same history is already persisted by the Scan app.
-      storeUpdateHistory = false,
     )
     with SvDsoStore
     with AcsTables
@@ -108,6 +114,12 @@ class DbSvDsoStore(
         dsoStoreMetrics.latestOpenMiningRound.updateValue(round.payload.round.number)
       }
     }
+  }
+  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
+    override val parser = new DsoTxLogParser(loggerFactory)
+    override def entryToRow = DsoTables.DsoTxLogRowData.fromTxLogEntry
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
   }
 
   import multiDomainAcsStore.waitUntilAcsIngested

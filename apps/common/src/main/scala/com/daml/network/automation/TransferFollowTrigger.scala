@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class TransferFollowTrigger(
     override protected val context: TriggerContext,
-    store: CNNodeAppStore[_],
+    store: CNNodeAppStore,
     connection: CNLedgerConnection,
     partyId: PartyId,
     retrieve: TraceContext => Future[Seq[LubTask]],

@@ -7,25 +7,22 @@ import scala.concurrent.ExecutionContext
 
 /** Store setup shared by all of our apps
   */
-trait CNNodeAppStore[TXE] extends NamedLogging with AutoCloseable with StoreErrors {
+trait CNNodeAppStore extends NamedLogging with AutoCloseable with StoreErrors {
 
   implicit protected def ec: ExecutionContext
 
   /** Defines which create events are to be ingested into the store. */
   protected def acsContractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData]
 
-  /** Defines how to parse and serialize TxLog entries. */
-  protected def txLogConfig: TxLogStore.Config[TXE]
-
   def domains: DomainStore
 
   def multiDomainAcsStore: MultiDomainAcsStore
 
-  def updateHistory: Option[UpdateHistory]
+  def updateHistory: UpdateHistory
 }
 
-/** A amulet app store whose TxLog is always empty.
-  */
-trait CNNodeAppStoreWithoutHistory extends CNNodeAppStore[Nothing] {
-  override final def txLogConfig = TxLogStore.Config.empty
+trait CNNodeTxLogAppStore[TXE] extends CNNodeAppStore {
+
+  /** Defines how to parse and serialize TxLog entries. */
+  protected def txLogConfig: TxLogStore.Config[TXE]
 }

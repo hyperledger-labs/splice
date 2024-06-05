@@ -11,7 +11,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class OnReadyForAssignTrigger(
-    store: CNNodeAppStore[_]
+    store: CNNodeAppStore
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

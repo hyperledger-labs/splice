@@ -50,6 +50,7 @@ import scala.jdk.OptionConverters.*
 final class UpdateHistory(
     storage: DbStorage,
     domainMigrationInfo: DomainMigrationInfo,
+    storeName: String,
     participantId: ParticipantId,
     val updateStreamParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -92,8 +93,8 @@ final class UpdateHistory(
           _ <- storage
             .update(
               sql"""
-            insert into update_history_descriptors (party, participant_id)
-            values ($updateStreamParty, $participantId)
+            insert into update_history_descriptors (party, participant_id, store_name)
+            values ($updateStreamParty, $participantId, ${lengthLimited(storeName)})
             on conflict do nothing
            """.asUpdate,
               "initialize.1",
@@ -104,7 +105,9 @@ final class UpdateHistory(
               sql"""
              select id
              from update_history_descriptors
-             where party = $updateStreamParty and participant_id = $participantId
+             where party = $updateStreamParty and participant_id = $participantId and store_name = ${lengthLimited(
+                  storeName
+                )}
              """.as[Long].headOption,
               "initialize.2",
             )

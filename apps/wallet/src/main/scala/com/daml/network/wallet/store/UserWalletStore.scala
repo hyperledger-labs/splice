@@ -22,10 +22,10 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.store.{CNNodeAppStore, Limit, PageLimit, TxLogStore}
+import com.daml.network.store.{CNNodeAppStore, Limit, PageLimit}
 import com.daml.network.util.*
 import com.daml.network.wallet.store.UserWalletStore.*
-import com.daml.network.wallet.store.db.{DbUserWalletStore, WalletTables}
+import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -40,7 +40,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
+trait UserWalletStore extends CNNodeAppStore with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -389,14 +389,6 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         .withDescription(s"${companion.TEMPLATE_ID.getEntityName} contract not found")
         .asRuntimeException()
     }
-
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser =
-      new UserWalletTxLogParser(loggerFactory, key.endUserParty)
-    override def entryToRow = WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
 }
 
 object UserWalletStore {

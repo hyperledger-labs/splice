@@ -303,6 +303,34 @@ class UpdateHistoryTest
         }
       }
 
+      "two stores: different store_name, same participant" in {
+        val store1 = mkStore(party1, migration1, participant1, "store2")
+        val store2 = mkStore(party1, migration1, participant1, "store3")
+
+        for {
+          _ <- initStore(store1)
+          _ <- initStore(store2)
+          // Note: same offset (offsets are participant-specific)
+          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
+          updates1 <- updates(store1)
+          updates2 <- updates(store2)
+        } yield {
+          checkUpdates(
+            updates1,
+            Seq(
+              ExpectedCreate(cid1, domain1)
+            ),
+          )
+          checkUpdates(
+            updates2,
+            Seq(
+              ExpectedCreate(cid2, domain1)
+            ),
+          )
+        }
+      }
+
       "two stores: different migration indices" in {
         val store1 = mkStore(party1, migration1, participant1)
         val store2 = mkStore(party1, migration2, participant1)
@@ -549,6 +577,7 @@ class UpdateHistoryTest
       updateStreamParty: PartyId = party1,
       domainMigrationId: Long = migration1,
       participantId: ParticipantId = participant1,
+      storeName: String = storeName1,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
@@ -556,6 +585,7 @@ class UpdateHistoryTest
         domainMigrationId,
         None,
       ),
+      storeName,
       participantId,
       updateStreamParty,
       loggerFactory,
@@ -567,6 +597,7 @@ class UpdateHistoryTest
       _ <- resetAllCnAppTables(storage)
     } yield ()
 
+  private val storeName1 = "store1"
   private val party1 = userParty(1)
   private val party2 = userParty(2)
 

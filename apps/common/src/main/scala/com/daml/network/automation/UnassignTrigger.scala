@@ -20,7 +20,7 @@ import UnassignTrigger.GetTargetDomain
 
 class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
-    store: CNNodeAppStore[_],
+    store: CNNodeAppStore,
     connection: CNLedgerConnection,
     targetDomain: GetTargetDomain,
     partyId: PartyId,

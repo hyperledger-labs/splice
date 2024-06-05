@@ -11,24 +11,25 @@ import com.digitalasset.canton.topology.ParticipantId
 
 import scala.concurrent.ExecutionContext
 
-abstract class DbCNNodeAppStore[TXE](
+abstract class DbCNNodeTxLogAppStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    storeUpdateHistory: Boolean,
 )(implicit
-    protected val ec: ExecutionContext,
+    override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends CNNodeAppStore[TXE] {
-
-  protected def retryProvider: RetryProvider
-  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
-
-  protected def handleIngestionSummary(summary: IngestionSummary): Unit = ()
+) extends DbCNNodeAppStore(
+      storage = storage,
+      acsTableName = acsTableName,
+      storeDescriptor = storeDescriptor,
+      domainMigrationInfo = domainMigrationInfo,
+      participantId = participantId,
+    )
+    with CNNodeTxLogAppStore[TXE] {
 
   override val multiDomainAcsStore: DbMultiDomainAcsStore[TXE] =
     new DbMultiDomainAcsStore(
@@ -44,51 +45,26 @@ abstract class DbCNNodeAppStore[TXE](
       retryProvider,
       handleIngestionSummary,
     )
-
-  override lazy val domains: InMemoryDomainStore =
-    new InMemoryDomainStore(
-      acsContractFilter.ingestionFilter.primaryParty,
-      loggerFactory,
-      retryProvider,
-    )
-
-  // Note: everything deriving from this class has a TxLog, but not all apps need to persist the original
-  // update history. For example, both the SV and Scan apps have a TxLog based on the DSO party, but we
-  // only want one of them to be responsible for persisting the original update history.
-  override lazy val updateHistory: Option[UpdateHistory] =
-    if (storeUpdateHistory)
-      Some(
-        new UpdateHistory(
-          storage,
-          domainMigrationInfo,
-          participantId,
-          acsContractFilter.ingestionFilter.primaryParty,
-          loggerFactory,
-        )
-      )
-    else None
-
-  override def close(): Unit = ()
 }
 
-abstract class DbCNNodeAppStoreWithoutHistory(
+abstract class DbCNNodeAppStore(
     storage: DbStorage,
     acsTableName: String,
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
-    ec: ExecutionContext,
+    protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends CNNodeAppStoreWithoutHistory {
+) extends CNNodeAppStore {
 
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
   protected def handleIngestionSummary(summary: IngestionSummary): Unit = ()
 
-  override val multiDomainAcsStore: DbMultiDomainAcsStore[Nothing] =
+  override val multiDomainAcsStore: DbMultiDomainAcsStore[?] =
     new DbMultiDomainAcsStore[Nothing](
       storage,
       acsTableName,
@@ -110,7 +86,15 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       retryProvider,
     )
 
-  override def updateHistory: Option[UpdateHistory] = None
+  override lazy val updateHistory: UpdateHistory =
+    new UpdateHistory(
+      storage,
+      domainMigrationInfo,
+      storeDescriptor.name,
+      participantId,
+      acsContractFilter.ingestionFilter.primaryParty,
+      loggerFactory,
+    )
 
   override def close(): Unit = ()
 }
