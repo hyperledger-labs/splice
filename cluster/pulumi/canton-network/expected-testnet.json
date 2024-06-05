@@ -979,7 +979,7 @@
             "memory": "1536Mi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "0.2",
             "memory": "1536Mi"
           }
         },
@@ -1770,7 +1770,7 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:+UseG1GC -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=70 -Dscala.concurrent.context.minThreads=8",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1795,10 +1795,10 @@
         "resources": {
           "limits": {
             "cpu": "2",
-            "memory": "1536Mi"
+            "memory": "2048Mi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "0.5",
             "memory": "1536Mi"
           }
         },
