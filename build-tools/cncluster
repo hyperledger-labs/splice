@@ -2435,6 +2435,9 @@ function subcmd_disaster_recovery_test() {
   svIngressNames[4]=4-eng
   local svIngressName
 
+  # TODO(#12765) remove when all clusters are refreshed for sv{1,2,3,4}_validator tokens
+  subcmd_preflight_refresh_auth0_credentials
+
   _cluster_reset
 
   _info "Deploying original domain"
@@ -2450,19 +2453,62 @@ function subcmd_disaster_recovery_test() {
     echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
-  _info "Scaling down cometbft"
-  for sv in "${!svIngressNames[@]}"; do
-    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
+  local taps tapsTokens
+  declare -A taps
+  declare -A tapsTokens
+  taps[sv-${svIngressNames[1]}]=42042042.0
+  tapsTokens[sv-${svIngressNames[1]}]=sv1_validator
+  taps[sv-${svIngressNames[2]}]=21021021.0
+  tapsTokens[sv-${svIngressNames[2]}]=sv2_validator
+  taps[sv-${svIngressNames[3]}]=63063063.0
+  tapsTokens[sv-${svIngressNames[3]}]=sv3_validator
+  taps[sv-${svIngressNames[4]}]=84084084.0
+  tapsTokens[sv-${svIngressNames[4]}]=sv4_validator
+  taps[validator1]=105105105.0
+  tapsTokens[validator1]=validator1
+
+  _info "Tapping coin before disaster"
+  local ingressName
+  for ingressName in "${!taps[@]}"; do
+    _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    # TODO(#12764) remove register when validator does it for us
+    curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/register" \
+         -H "authorization: Bearer ${token}" \
+         -H "content-type: application/json" \
+         --data-raw '{}'
+    curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/tap" \
+         -H "authorization: Bearer ${token}" \
+         -H "content-type: application/json" \
+         --data-raw '{"amount":"'"${taps[$ingressName]}"'"}'
   done
 
-  # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
+  _info "Checking that taps are complete"
+  for ingressName in "${!taps[@]}"; do
+    _info "Checking tap of ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    local coinPrice=0.005
+    local fuzzFactorForFees=0.95
+    totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
+                   -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $coinPrice * $fuzzFactorForFees")" ]; then
+        _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    else
+        _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    fi
+  done
+
+  local sortableDateFormat="+%Y-%m-%dT%R:%S.%NZ"
+  local timeAfterTaps
+  timeAfterTaps=$(date "$sortableDateFormat")
+  _info "Completed taps at $timeAfterTaps"
 
   _info "Finding agreed upon timestamp"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
     token=$(subcmd_get_token sv-"$sv")
     done=0
-    acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
+    acs_time=$(date "$sortableDateFormat")
     while [ $done == 0 ]; do
         _info "Attempting to get ACS from time $acs_time"
         data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
@@ -2473,18 +2519,31 @@ function subcmd_disaster_recovery_test() {
                 _error "Participant has been pruned, ACS snapshot for requested timestamp is not available (look for UNAVAILABLE_ACS_SNAPSHOT in participant log for more details). Consider increasing journal-garbage-collection-delay in the participants"
             elif [[ "$error" == INVALID_ACS_SNAPSHOT_TIMESTAMP* ]]; then
                 _info "SV $sv does not have an ACS snapshot for timestamp, trying an earlier one"
-                acs_time=$(date --date="$acs_time"'-5 seconds' "+%Y-%m-%dT%R:%S.%NZ")
+                acs_time=$(date --date="$acs_time"'-5 seconds' "$sortableDateFormat")
             fi
         else
             _info "SV $sv has an ACS snapshot for timestamp $acs_time"
-            done=1
+            if [[ $timeAfterTaps > $acs_time ]]; then
+                _info "...and SV $sv is too early, last tap was at $timeAfterTaps"
+                acs_time=$(date --date="$timeAfterTaps"'+6 seconds' "$sortableDateFormat")
+                sleep 1
+            else
+                done=1
+            fi
         fi
     done
     date --date "$acs_time" "+%s" >> "$tmpdir/acs_times"
   done
 
+  _info "Scaling down cometbft"
+  for sv in "${!svIngressNames[@]}"; do
+    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
+  done
+
+  # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
+
   earliest=$(sort -n "$tmpdir/acs_times" | head -1)
-  dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "+%Y-%m-%dT%R:%S.%NZ")
+  dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "$sortableDateFormat")
   _info "Decided on timestamp for dumps: $dump_timestamp"
 
   _info "Getting data dumps"
@@ -2536,6 +2595,21 @@ function subcmd_disaster_recovery_test() {
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
   _cluster_apply "$version"
+
+  _info "Checking amulet on restored svs/validators"
+  for ingressName in "${!taps[@]}"; do
+    _info "Checking restore of tap ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    local coinPrice=0.005
+    local fuzzFactorForFees=0.95
+    totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
+                   -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $coinPrice * $fuzzFactorForFees")" ]; then
+        _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    else
+        _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    fi
+  done
 
   # TODO(#12123) Reenable this.
   # _info "Installing Splitwell"

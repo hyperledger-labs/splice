@@ -717,6 +717,7 @@ class ValidatorApp(
       })
       _ <- appInitStep(s"Onboard validator") {
         ValidatorUtil.onboard(
+          // TODO(#12764) also onboard ledgerApiUser if both users are set
           endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
           knownParty = Some(validatorParty),
           automation,
