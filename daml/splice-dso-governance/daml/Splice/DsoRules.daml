@@ -40,12 +40,12 @@ import Splice.Util
 -- There are two processes for executing such actions:
 -- 1. Any SV can request a vote to execute such an action upon which the other SV's
 --    can respond with their votes for whether they accept the execution or not.
---    This process requires 2 * f + 1 votes* for the action to be considered definitive
+--    This process requires votes from 2/3 of all SVs* for the action to be considered definitive
 --    and it can be used for all actions that require confirmation.
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2 * f + 1 confirmations* are visible to the DSO delegate it executes them.
+--    Once 2/3 of all SV'ss confirmations* are visible to the DSO delegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
@@ -128,8 +128,8 @@ data DsoSummary = DsoSummary with
     dsoDelegate : Party
     numSvs : Int
     requiredNumVotes : Int
-    -- | The number of votes required for considering a confirmation, a request for a vote, or
-    -- a DSO delegate election definitive.
+      -- ^ The number of votes required for considering a confirmation, a request for a vote, or
+      -- a DSO delegate election definitive.
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -302,19 +302,19 @@ template VoteRequest
   with
     dso : Party
     requester : Text
-    -- ^ The SV that requested to execute the action.
+      -- ^ The SV that requested to execute the action.
     action : ActionRequiringConfirmation
-    -- ^ The action whose confirmation is required.
+      -- ^ The action whose confirmation is required.
     reason : Reason
-    -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
+      -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
     voteBefore : Time
-    -- ^ The time before which votes are accepted, and SHOULD be submitted.
+      -- ^ The time before which votes are accepted, and SHOULD be submitted.
     votes : Map.Map Text Vote
-    -- ^ The votes cast by current or previous SVs. These may be previous SVs in case
-    -- there was an SV change after the vote was requested.
+      -- ^ The votes cast by current or previous SVs. These may be previous SVs in case
+      -- there was an SV change after the vote was requested.
     trackingCid : Optional (ContractId VoteRequest)
-    -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
-    -- This is always set to the first ContractId of the original vote request (None on creation).
+      -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
+      -- This is always set to the first ContractId of the original vote request (None on creation).
   where
     signatory dso
 
@@ -342,9 +342,9 @@ data VoteRequestOutcome
 data Vote = Vote with
     sv : Party -- ^ The SV party used to submit the vote.
     accept : Bool
-    -- ^ Whether the responder accepted the request to execute the action or not.
+      -- ^ Whether the responder accepted the request to execute the action or not.
     reason : Reason
-    -- ^ The reason for voting this way.
+      -- ^ The reason for voting this way.
   deriving(Eq, Show)
 
 data Reason = Reason with
@@ -359,7 +359,7 @@ data DsoRulesConfig = DsoRulesConfig with
     actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing an SV confirmation
-    voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
+    voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote` s
     dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DSO delegate to complete an action it should take care of
     synchronizerNodeConfigLimits : SynchronizerNodeConfigLimits  -- ^ Limits to enforce on the svs' `SynchronizerNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
@@ -369,9 +369,9 @@ data DsoRulesConfig = DsoRulesConfig with
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
-    -- ^ The time at which the migration is scheduled to start.
+      -- ^ The time at which the migration is scheduled to start.
     migrationId : Int
-    -- ^ The incremental integer ID of the migration.
+      -- ^ The incremental integer ID of the migration.
   deriving (Eq, Show)
 
 data TrafficState = TrafficState with
@@ -757,15 +757,15 @@ template DsoRules with
           lastUpdatedAt = now
         return DsoRules_UpdateAmuletPriceVoteResult with ..
 
-    -- | Garbage-collect AmuletPriceVotes from removed svs and duplicate ones that might
-    -- happen due to a too quick removal and re-addition of a sv.
-    -- We expect this to be run as an OnAssignedContractTrigger for the DsoRules contract.
-    --
-    -- Note: we do not archive the AmuletPriceVote of an SV on its removal,
-    -- as that would allow that SV to block the removal via updating its AmuletPriceVote at the right time.
-    --
-    -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
     nonconsuming choice DsoRules_GarbageCollectAmuletPriceVotes : DsoRules_GarbageCollectAmuletPriceVotesResult
+      -- ^ Garbage-collect AmuletPriceVotes from removed svs and duplicate ones that might
+      -- happen due to a too quick removal and re-addition of a sv.
+      -- We expect this to be run as an OnAssignedContractTrigger for the DsoRules contract.
+      --
+      -- Note: we do not archive the AmuletPriceVote of an SV on its removal,
+      -- as that would allow that SV to block the removal via updating its AmuletPriceVote at the right time.
+      --
+      -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
       with
         nonSvVoteCids : [ContractId AmuletPriceVote]
         duplicateVoteCids : [[ContractId AmuletPriceVote]]
@@ -1134,10 +1134,9 @@ template DsoRules with
         return DsoRules_MergeMemberTrafficContractsResult with
           memberTraffic = result.mergedTrafficCid
 
-
-    -- | Note this choice only exists to clean up duplicate contracts caused by the bug in #12495.
-    -- There should never be duplicates going forward.
     nonconsuming choice DsoRules_MergeSvRewardState : DsoRules_MergeSvRewardStateResult
+      -- ^ Note this choice only exists to clean up duplicate contracts caused by the bug in #12495.
+      -- There should never be duplicates going forward.
       with
         svName : Text
         rewardStateCids : [ContractId SvRewardState]
@@ -1203,10 +1202,10 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
 
 data VotingState a = VotingState with
     rankings : Map.Map a [[a]]
-    -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
+      -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
     loosers : Set.Set a
-    -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
-    -- that would result from filtering the remaining rankings eagerly.
+      -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
+      -- that would result from filtering the remaining rankings eagerly.
   deriving (Eq, Show)
 
 instantRunOffVoting : Ord a => Int -> Int -> [(a, [a])] -> a

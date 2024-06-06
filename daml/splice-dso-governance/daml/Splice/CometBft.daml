@@ -53,7 +53,7 @@ data SequencingKeyConfig = SequencingKeyConfig with
 -- | Config for all CometBFT nodes and keys under the control of a single SV node operator.
 data CometBftConfig = CometBftConfig with
     nodes : Map.Map Text CometBftNodeConfig
-    -- ^ A map from CometBft node-ids to their configuration.
+      -- ^ A map from CometBft node-ids to their configuration.
     governanceKeys : [GovernanceKeyConfig]
     sequencingKeys : [SequencingKeyConfig]
   deriving (Eq, Show)
