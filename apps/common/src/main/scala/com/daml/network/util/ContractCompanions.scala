@@ -46,10 +46,10 @@ object ContractCompanions {
   def lookup(
       templateId: Identifier
   ): Either[String, C] = {
-    val qualifiedName = QualifiedName(templateId.getPackageId, templateId.getEntityName)
+    val qualifiedName = QualifiedName(templateId)
 
     def templateMatches(id: Identifier) =
-      QualifiedName(id.getPackageId, id.getEntityName) == qualifiedName
+      QualifiedName(id) == qualifiedName
 
     val companion = allDecoders
       .collectFirst(
