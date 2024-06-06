@@ -3,8 +3,22 @@
 Release Notes
 =============
 
-0.1.11
+0.1.12
 ------
+
+Note: 0.1.11 was skipped as it contained some issues. Upgrade directly from 0.1.10 to 0.1.12.
+
+* SV and Validator app
+
+  * Added a ``disableIngestUpdateHistoryFromParticipantBegin`` flag to the helm values of the SV and validator app.
+    This was added to account for a change in 0.1.11 that stores more history as backfilling the history on the existing test/devnet clusters
+    is too expensive. This should **only** be enabled on existing Dev/TestNet clusters to avoid issues when upgrading to 0.1.12.
+    It **must not** be enabled on any new cluster or if a node is fully reset.
+
+* Scan
+
+  * Fix a bug where the new update history API in scan was unable to serve data from before
+    the upgrade.
 
 * Include Grafana dashboards and a README on network health in the release bundle.
 
