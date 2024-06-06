@@ -46,6 +46,7 @@ class DbSvSvStore(
       ),
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
+      enableissue12777Workaround = false,
     )
     with SvSvStore
     with AcsTables

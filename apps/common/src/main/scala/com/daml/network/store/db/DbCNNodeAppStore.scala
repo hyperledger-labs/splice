@@ -18,6 +18,7 @@ abstract class DbCNNodeTxLogAppStore[TXE](
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    enableissue12777Workaround: Boolean,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -28,6 +29,7 @@ abstract class DbCNNodeTxLogAppStore[TXE](
       storeDescriptor = storeDescriptor,
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
+      enableissue12777Workaround = enableissue12777Workaround,
     )
     with CNNodeTxLogAppStore[TXE] {
 
@@ -53,6 +55,7 @@ abstract class DbCNNodeAppStore(
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    enableissue12777Workaround: Boolean,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -94,6 +97,7 @@ abstract class DbCNNodeAppStore(
       participantId,
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
+      enableissue12777Workaround,
     )
 
   override def close(): Unit = ()

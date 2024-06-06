@@ -87,6 +87,7 @@ class DbScanStore(
       ),
       domainMigrationInfo,
       participantId,
+      enableissue12777Workaround = true,
     )
     with ScanStore
     with AcsTables

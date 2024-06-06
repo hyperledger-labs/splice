@@ -71,6 +71,7 @@ class DbUserWalletStore(
       ),
       domainMigrationInfo,
       participantId,
+      enableissue12777Workaround = true,
     )
     with UserWalletStore
     with AcsTables

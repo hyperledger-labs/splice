@@ -55,6 +55,7 @@ class DbSplitwellStore(
       ),
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
+      enableissue12777Workaround = false,
     )
     with AcsTables
     with AcsQueries

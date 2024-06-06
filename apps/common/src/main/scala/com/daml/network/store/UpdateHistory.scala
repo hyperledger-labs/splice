@@ -54,6 +54,7 @@ final class UpdateHistory(
     participantId: ParticipantId,
     val updateStreamParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
+    enableissue12777Workaround: Boolean,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -84,12 +85,85 @@ final class UpdateHistory(
         templateIds = Set.empty,
       )
 
+      // TODO(#12780): This can be removed eventually
+      def issue12777Workaround()(implicit tc: TraceContext): Future[Unit] = {
+        val action = for {
+          oldHistoryIdOpt <- sql"""
+             select id
+             from update_history_descriptors
+             where party = $updateStreamParty
+              and participant_id = $participantId
+              and store_name is NULL
+             """
+            .as[Long]
+            .headOption
+          newHistoryIdOpt <- sql"""
+             select id
+             from update_history_descriptors
+             where party = $updateStreamParty
+              and participant_id = $participantId
+              and store_name = ${lengthLimited(storeName)}
+             """
+            .as[Long]
+            .headOption
+          _ <- (oldHistoryIdOpt, newHistoryIdOpt) match {
+            case (Some(oldHistoryId), Some(newHistoryId)) =>
+              logger.info(
+                s"Found old descriptor with id $oldHistoryId and new descriptor with id $newHistoryId where party is $updateStreamParty. " +
+                  s"Deleting data for the new descriptor, and updating the store name on the old descriptor to $storeName."
+              )
+              for {
+                d1 <- sqlu"delete from update_history_exercises where history_id = $newHistoryId"
+                d2 <- sqlu"delete from update_history_creates where history_id = $newHistoryId"
+                d3 <- sqlu"delete from update_history_assignments where history_id = $newHistoryId"
+                d4 <-
+                  sqlu"delete from update_history_unassignments where history_id = $newHistoryId"
+                d5 <- sqlu"delete from update_history_transactions where history_id = $newHistoryId"
+                d6 <-
+                  sqlu"delete from update_history_last_ingested_offsets where history_id = $newHistoryId"
+                d7 <- sqlu"delete from update_history_descriptors where id = $newHistoryId"
+                _ <- sqlu"""
+                  update update_history_descriptors
+                  set store_name = ${lengthLimited(storeName)}
+                  where id = $oldHistoryId
+                """
+              } yield (
+                logger.info(
+                  s"Deleted ($d1 exercise, $d2 create, $d3 assignment, $d4 unassignment, $d5 transaction, $d6 offset, $d7 descriptor) rows."
+                )
+              )
+            case (Some(oldHistoryId), None) =>
+              logger.info(
+                s"Found old descriptor with id $oldHistoryId where party is $updateStreamParty, but no new descriptor. " +
+                  s"Updating the store name on the old descriptor to $storeName."
+              )
+              sqlu"""
+                update update_history_descriptors
+                set store_name = ${lengthLimited(storeName)}
+                where id = $oldHistoryId
+              """
+            case (None, _) =>
+              logger.info(
+                s"No old descriptor found for party $updateStreamParty, nothing to do."
+              )
+              DBIOAction.successful(())
+          }
+        } yield ()
+        storage.queryAndUpdate(action.transactionally, "issue12777Workaround")
+      }
+
       override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
         // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
         for {
+          _ <-
+            if (enableissue12777Workaround) {
+              issue12777Workaround()
+            } else {
+              Future.unit
+            }
           _ <- storage
             .update(
               sql"""

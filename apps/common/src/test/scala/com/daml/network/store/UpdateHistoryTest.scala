@@ -589,6 +589,7 @@ class UpdateHistoryTest
       participantId,
       updateStreamParty,
       loggerFactory,
+      enableissue12777Workaround = true,
     )
   }
 
