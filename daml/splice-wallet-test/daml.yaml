@@ -1,7 +1,7 @@
 sdk-version: 3.0.0-snapshot.20240318.12913.0.v1c415c97
 name: splice-wallet-test
 source: daml
-version: 0.1.1
+version: 0.1.2
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -19,4 +19,5 @@ build-options:
 codegen:
   java:
     package-prefix: com.daml.network.codegen.java
+    decoderClass: com.daml.network.codegen.java.DecoderSpliceWalletTest
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

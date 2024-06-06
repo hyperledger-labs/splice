@@ -54,7 +54,7 @@ scaleFixedFee s f = FixedFee with fee = s * f.fee
 
 -- | A rate defined as a piecewise linear function, e.g.,
 -- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
--- corresponds to 1% of the first 100, 0.1% of the next 1000 and 0.01% of the next 1000000
+-- corresponds to 1% of the first 100, 0.1% between 100 and 1000, 0.01% between 1000 and 1000000
 -- and 0.001% for everything above that.
 data SteppedRate = SteppedRate
   with
@@ -72,7 +72,15 @@ validSteppedRate SteppedRate{initialRate, steps} =
 
 chargeSteppedRate : SteppedRate -> Decimal -> Decimal
 chargeSteppedRate SteppedRate{initialRate, steps} amount =
-  goChargeSteppedRate (amount, initialRate, 0.0) steps
+  goChargeSteppedRate (amount, initialRate, 0.0) stepDifferences
+  where
+    -- turn [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+    -- into [(100.0, 0.001), (900.0, 0.0001), (998900, 0.00001)]
+    -- i.e., the step is the remainder after applying all the
+    -- previous steps and not the absolute value.
+    stepDifferences = reverse $ snd $
+      foldl (\(total, xs) (step, rate) -> (total + step, (step - total, rate) :: xs)) (0.0, []) steps
+
 
 goChargeSteppedRate : (Decimal, Decimal, Decimal) -> [(Decimal, Decimal)] -> Decimal
 goChargeSteppedRate (remainder, _currentRate, rate) _
