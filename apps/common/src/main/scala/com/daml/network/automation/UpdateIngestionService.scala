@@ -48,6 +48,7 @@ class UpdateIngestionService(
           for {
             offset <-
               if (ingestFromParticipantBegin) {
+                logger.debug(s"Starting ingestion from participant begin")
                 val participantBegin = ParticipantOffset(
                   ParticipantOffset.Value.Boundary(
                     ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
@@ -64,10 +65,12 @@ class UpdateIngestionService(
               } else
                 for {
                   acsOffset <- connection.ledgerEnd()
+                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffset")
                   _ <- ingestAcsAndInFlight(acsOffset.value)
                 } yield ParticipantOffset(acsOffset)
           } yield offset
         case Some(offset) =>
+          logger.debug(s"Resuming ingestion from offset: $offset")
           Future.successful(MultiDomainAcsStore.toParticipantOffset(offset))
       }
     } yield new CNLedgerSubscription(

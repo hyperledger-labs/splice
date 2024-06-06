@@ -39,6 +39,7 @@ class UserWalletAutomationService(
     scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
+    ingestUpdateHistoryFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     walletSweep: Option[WalletSweepConfig],
@@ -62,6 +63,7 @@ class UserWalletAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
+      ingestUpdateHistoryFromParticipantBegin,
     ) {
   override def companion = UserWalletAutomationService
 

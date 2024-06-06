@@ -181,6 +181,7 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofMinutes(1),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
+    ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],

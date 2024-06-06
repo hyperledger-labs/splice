@@ -156,6 +156,7 @@ class ScanApp(
         loggerFactory,
         store,
         config.ingestFromParticipantBegin,
+        config.ingestUpdateHistoryFromParticipantBegin,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(

@@ -184,6 +184,7 @@ case class ValidatorAppBackendConfig(
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(),
     ingestFromParticipantBegin: Boolean = true,
+    ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(10),

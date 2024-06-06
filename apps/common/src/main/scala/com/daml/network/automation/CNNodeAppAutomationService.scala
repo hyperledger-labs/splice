@@ -33,7 +33,8 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore](
     packageIdResolver: PackageIdResolver,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean = true,
+    ingestFromParticipantBegin: Boolean,
+    ingestUpdateHistoryFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -80,7 +81,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore](
       backoffClock = triggerContext.pollingClock,
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
-      ingestFromParticipantBegin = true,
+      ingestUpdateHistoryFromParticipantBegin,
     )
   )
 

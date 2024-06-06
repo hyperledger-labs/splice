@@ -57,6 +57,7 @@ class ValidatorAutomationService(
     domainMigrationId: Long,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
+    ingestUpdateHistoryFromParticipantBegin: Boolean,
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -80,6 +81,7 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
+      ingestUpdateHistoryFromParticipantBegin,
     ) {
   override def companion = ValidatorAutomationService
 

@@ -96,6 +96,11 @@ spec:
             - name: CN_APP_SV_AUTH_JWKS_URL
               value: {{ .Values.auth.jwksUrl | quote }}
             {{ end }}
+            {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
+            - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
+              value: |
+                canton.sv-apps.sv.ingest-update-history-from-participant-begin = false
+            {{ end }}
             {{- with .Values.persistence }}
             - name: ADDITIONAL_CONFIG_PERSISTENCE
               value: |

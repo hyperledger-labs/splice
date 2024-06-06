@@ -77,6 +77,7 @@ class SvDsoAutomationService(
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,
+      config.ingestUpdateHistoryFromParticipantBegin,
     ) {
 
   override def companion = SvDsoAutomationService

@@ -21,6 +21,7 @@ class ScanAutomationService(
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
     ingestFromParticipantBegin: Boolean,
+    ingestUpdateHistoryFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -36,6 +37,7 @@ class ScanAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
+      ingestUpdateHistoryFromParticipantBegin,
     ) {
   override def companion = ScanAutomationService
 
