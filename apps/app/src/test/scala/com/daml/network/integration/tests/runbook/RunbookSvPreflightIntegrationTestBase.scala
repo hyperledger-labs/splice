@@ -124,10 +124,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     )
     // Make sure that the SV would've received & claimed SvRewardCoupons
     if (earliestOpenRound >= joinedAsOfRound + 3) {
-      def getTxLogEntries(): (
-          Seq[WalletFrontendTestUtil.FrontendTransaction],
-          Seq[WalletFrontendTestUtil.FrontendTransaction],
-      ) = {
+      def checkPresenceOfEntriesInSvAndValidator(): Unit = {
         withFrontEnd("sv") { implicit webDriver =>
           val (_, svEntries) = actAndCheck(
             s"Logging in to SV wallet at ${walletUrl}", {
@@ -173,21 +170,18 @@ abstract class RunbookSvPreflightIntegrationTestBase
         }
       }
 
-      // The actual amount depends on every SV being available and claiming their rewards.
-      // We only care that validator1 gets part of the SV's coupons.
-      clue("The entries of the SV are proportional to the value of the validator entries") {
+      // Both validator1 and sv can claim more than one coupon at once.
+      // Furthermore, other SVs might not be available to claim their rewards.
+      // Both of these situations make the amounts claimed in a given round to not be constant.
+      // This means the following checks are flaky:
+      // - The amount is 33.33% or 66.67% of what an SV should get: #10785
+      // - The amount of what validator1 gets is proportional to each other: #12392
+      // Thus, the only option is to assert that both SV and validator1 receive SV rewards (svRewardsUsed > 0),
+      // and let other tests (SvTimeBasedRewardCouponIntegrationTest, WeightDistributionForSvTest, TestSvRewards.daml)
+      // verify that the amounts are correct.
+      clue("Both SV and validator1 have received rewards") {
         eventually() {
-          val (svEntries, validatorEntries) = getTxLogEntries()
-          forEvery(svEntries) { svEntry =>
-            // If more than one round has been claimed, there might be more than one entry with the same amount.
-            forAtLeast(1, validatorEntries) { validatorEntry =>
-              val ratio = BigDecimal("0.6667") / BigDecimal("0.3333") // ~2
-              svEntry.svRewardsUsed should beWithin(
-                (validatorEntry.svRewardsUsed - smallAmount) * ratio,
-                (validatorEntry.svRewardsUsed + smallAmount) * ratio,
-              )
-            }
-          }
+          checkPresenceOfEntriesInSvAndValidator()
         }
       }
     } else {
