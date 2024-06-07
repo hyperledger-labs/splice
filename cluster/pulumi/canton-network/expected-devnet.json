@@ -2703,7 +2703,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "initialHoldingFee": 0.0000192901,
         "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 200000,
+          "baseRateBurstAmount": 400000,
           "baseRateBurstWindowMins": 20,
           "extraTrafficPrice": 16.67,
           "minTopupAmount": 200000,
