@@ -40,6 +40,8 @@ class ScanFrontendTimeBasedIntegrationTest
     findAll(className(resultRowClassName)).toSeq.map(seleniumText) shouldBe expected
   }
 
+  private def stripTrailingZeros(num: BigDecimal) = BigDecimal(num.bigDecimal.stripTrailingZeros())
+
   "A scan UI" should {
     "see expected rewards leaderboards" in { implicit env =>
       val (_, bobUserParty) = onboardAliceAndBob()
@@ -268,15 +270,21 @@ class ScanFrontendTimeBasedIntegrationTest
         .payload
         .round
         .number
+      val synchronizerFeesConfig = sv1ScanBackend
+        .getAmuletConfigAsOf(env.environment.clock.now)
+        .decentralizedSynchronizer
+        .fees
+      val trafficAmount = synchronizerFeesConfig.minTopupAmount
+      val (_, trafficCostCc) = CNNodeUtil.synchronizerFees(
+        trafficAmount,
+        synchronizerFeesConfig.extraTrafficPrice,
+        amuletPrice,
+      )
+
       actAndCheck(
         "Buy some traffic in rounds 1&2, and advance enough rounds for round 2 to close", {
           aliceValidatorWalletClient.tap(100.0)
           bobValidatorWalletClient.tap(100.0)
-          val trafficAmount = sv1ScanBackend
-            .getAmuletConfigAsOf(env.environment.clock.now)
-            .decentralizedSynchronizer
-            .fees
-            .minTopupAmount
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
@@ -316,8 +324,10 @@ class ScanFrontendTimeBasedIntegrationTest
           compareLeaderboardTable(
             "synchronizer-fees-leaderboard-row",
             Seq(
-              s"${aliceValidatorWalletParty} 2 20000000 10 CC ${(firstRound + 1).toString}",
-              s"${bobValidatorWalletParty} 1 10000000 5 CC ${(firstRound + 1).toString}",
+              s"${aliceValidatorWalletParty} 2 ${2 * trafficAmount} ${stripTrailingZeros(
+                  2 * trafficCostCc
+                )} CC ${(firstRound + 1).toString}",
+              s"${bobValidatorWalletParty} 1 ${trafficAmount} ${stripTrailingZeros(trafficCostCc)} CC ${(firstRound + 1).toString}",
             ),
           )
         }

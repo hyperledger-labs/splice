@@ -15,11 +15,12 @@ import com.daml.network.wallet.automation.{
 import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 
 import java.time.Duration
 import scala.concurrent.Future
 import scala.util.control.NonFatal
+import scala.jdk.CollectionConverters.*
 
 class WalletBuyTrafficRequestIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -189,8 +190,9 @@ class WalletBuyTrafficRequestIntegrationTest
           }
         }
         clue("Receiving validator's sequencer traffic limit is updated") {
+          val trafficLimitOffset = getTrafficLimitOffset(aliceValidatorBackend.participantClient.id)
+          val expectedTrafficLimit = initialTrafficAmount + minTopupAmount + trafficLimitOffset
           // Note that this check would fail if we do not sync the on-ledger and sequencer traffic states at the beginning of this test.
-          val expectedTrafficLimit = initialTrafficAmount + minTopupAmount
           eventually() {
             getSequencerTrafficLimit(
               aliceValidatorBackend,
@@ -326,21 +328,42 @@ class WalletBuyTrafficRequestIntegrationTest
         .actual
         .totalLimit shouldBe sequencerTrafficLimit
 
+      val trafficLimitOffset = getTrafficLimitOffset(participantId)
+      val diff = sequencerTrafficLimit - purchasedTraffic - trafficLimitOffset
+      logger.debug(
+        s"xxx - Sequencer limit = ${sequencerTrafficLimit}, Purchased amount = ${purchasedTraffic}, offset = ${trafficLimitOffset}"
+      )
       actAndCheck(
         "Create new MemberTraffic if needed", {
-          val diff = sequencerTrafficLimit - purchasedTraffic
           if (diff > 0) {
-            buyMemberTraffic(validatorApp, diff, env.environment.clock.now)
+            clue(s"Creating new MemberTraffic contract for amount $diff") {
+              buyMemberTraffic(validatorApp, diff, env.environment.clock.now)
+            }
           }
         },
       )(
         "See that total purchased traffic is reconciled with sequencer state",
         _ => {
-          purchasedTraffic shouldBe sequencerTrafficLimit
+          purchasedTraffic + trafficLimitOffset shouldBe sequencerTrafficLimit
         },
       )
-      sequencerTrafficLimit
+      purchasedTraffic
     }
+  }
+
+  // The traffic limit offset for a member is the amount of traffic that it consumed in previous test suites against the same Canton instance
+  // that we effectively give back to the member at the beginning of this test. See ReconcileSequencerLimitWithMemberTrafficTrigger for details.
+  private def getTrafficLimitOffset(
+      memberId: Member
+  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
+    sv1Backend
+      .getDsoInfo()
+      .dsoRules
+      .payload
+      .initialTrafficState
+      .asScala
+      .get(memberId.toProtoPrimitive)
+      .fold(0L)(_.consumedTraffic)
   }
 
   private def createValidTrafficRequest(

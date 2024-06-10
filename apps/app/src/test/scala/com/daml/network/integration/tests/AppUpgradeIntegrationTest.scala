@@ -137,8 +137,8 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Check that bob still sees the same wallet tx history") {
-            val txsAfter = bobValidatorWalletClient.listTransactions(None, bobTxsBeforeUpgrade.size)
-            txsAfter shouldBe bobTxsBeforeUpgrade
+            val txsAfter = bobValidatorWalletClient.listTransactions(None, 10)
+            txsAfter should contain allElementsOf bobTxsBeforeUpgrade
           }
 
           clue("Validating that the balance is visible in the upgraded validator") {

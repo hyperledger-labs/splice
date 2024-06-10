@@ -117,13 +117,13 @@ final case class InitialAnsConfig(
 
 final case class SynchronizerFeesConfig(
     extraTrafficPrice: NonNegativeNumeric[BigDecimal] =
-      NonNegativeNumeric.tryCreate(BigDecimal(1.0)),
-    minTopupAmount: NonNegativeLong = NonNegativeLong.tryCreate(10_000_000L),
-    baseRateBurstAmount: NonNegativeLong =
-      NonNegativeLong.tryCreate(100 * 20 * 1000L), // 100 txs of 20KB each (over the burst window)
-    baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-    readVsWriteScalingFactor: PositiveNumeric[Int] =
-      PositiveNumeric.tryCreate(200), // charge 200 per 10,000, i.e., 2% of write cost for every read
+      NonNegativeNumeric.tryCreate(BigDecimal(16.67)),
+    minTopupAmount: NonNegativeLong = NonNegativeLong.tryCreate(200_000L),
+    baseRateBurstAmount: NonNegativeLong = NonNegativeLong.tryCreate(400_000L),
+    baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(20),
+    // charge 4 per 10,000, i.e., 0.04% of write cost for every read.
+    // See https://digitalasset.atlassian.net/wiki/spaces/CN/pages/3305570314/Lab+Log+-+Read+Scaling+Factor+Tuning
+    readVsWriteScalingFactor: PositiveNumeric[Int] = PositiveNumeric.tryCreate(4),
 )
 
 final case class SvDecentralizedSynchronizerConfig(

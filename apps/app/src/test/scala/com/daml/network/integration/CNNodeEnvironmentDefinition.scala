@@ -11,7 +11,7 @@ import com.daml.network.environment.{
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.CommonCNNodeAppInstanceReferences
 import com.digitalasset.canton.admin.api.client.data.User
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
   ClockConfig,
   NonNegativeFiniteDuration,
@@ -168,14 +168,10 @@ case class CNNodeEnvironmentDefinition(
           domainFeesEnabledConfig
             .focus(_.domains.global.buyExtraTraffic.targetThroughput)
             .replace(NonNegativeNumeric.tryCreate(BigDecimal(0)))
-        else if (name.contains("bob"))
-          domainFeesEnabledConfig
-            .focus(_.domains.global.buyExtraTraffic.targetThroughput)
-            .replace(NonNegativeNumeric.tryCreate(BigDecimal(0)))
         else
           domainFeesEnabledConfig
             .focus(_.domains.global.buyExtraTraffic.targetThroughput)
-            .replace(NonNegativeNumeric.tryCreate(BigDecimal(30000)))
+            .replace(NonNegativeNumeric.tryCreate(BigDecimal(100000)))
       }(config)
     )
 
@@ -282,6 +278,13 @@ case class CNNodeEnvironmentDefinition(
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
       .withTrafficTopupsDisabled
+      .addConfigTransform((_, conf) =>
+        CNNodeConfigTransforms
+          .updateAllSvAppFoundCollectiveConfigs_(
+            _.focus(_.initialSynchronizerFeesConfig.baseRateBurstAmount)
+              .replace(NonNegativeLong.tryCreate(2_000_000L))
+          )(conf)
+      )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
   override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =

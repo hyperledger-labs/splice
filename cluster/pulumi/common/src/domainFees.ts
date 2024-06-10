@@ -16,7 +16,7 @@ const domainFeesDefaults: SynchronizerFeesConfig = {
   minTopupAmount: 165_000,
   baseRateBurstAmount: 165_000,
   baseRateBurstWindowMins: 20,
-  readVsWriteScalingFactor: 200,
+  readVsWriteScalingFactor: 4,
 };
 
 function parseNumFromEnv(envVar: string, otherwise: number): number {

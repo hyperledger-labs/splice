@@ -329,7 +329,7 @@ object CNNodeTests extends LazyLogging {
           foundCollective.initialSynchronizerFeesConfig
         case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
             None =>
-          fail("Failed to retrieve defaultTrafficControlConfig from sv1.")
+          fail("Failed to retrieve defaultSynchronizerFeesConfig from sv1.")
       }
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal))(implicit
