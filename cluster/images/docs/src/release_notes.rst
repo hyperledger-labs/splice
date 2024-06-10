@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Docker
+
+  * Switch to using ``eclipse-temurin:17-jdk-jammy`` as the base image as the ``openjdk:17-jdk-slim`` is no longer maintained.
+
 0.1.12
 ------
 

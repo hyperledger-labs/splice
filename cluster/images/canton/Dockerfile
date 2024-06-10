@@ -1,5 +1,5 @@
 # This Dockerfile is a modified version of Canton's Dockerfile
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk-jammy
 
 # Install screen for running the console in a headless server
 RUN apt-get update \
