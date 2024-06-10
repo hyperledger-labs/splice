@@ -93,8 +93,11 @@ function backup_cloudsql() {
 
   _info "Starting backup of $description db ($db_id)"
   until [ $retry_count -gt $MAX_RETRIES ]; do
+    # disabling exit on error to allow for retries
+    set +e
     output=$(gcloud sql backups create --instance "$db_id" --description "$RUN_ID" 2>&1)
     backup_exit_code=$?
+    set -e
 
     if [ $backup_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then

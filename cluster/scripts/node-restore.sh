@@ -149,8 +149,11 @@ function restore_cloudsql_postgres() {
   _info "Restoring CloudSQL DB instance $cloudsql_id from backup $backup_id"
 
   until [ $retry_count -gt $MAX_RETRIES ]; do
+    # disabling exit on error to allow for retries
+    set +e
     output=$(gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet 2>&1)
     restore_exit_code=$?
+    set -e
 
     if [ $restore_exit_code -ne 0 ]; then
       if [[ $output == *"another operation was already in progress"* ]]; then
