@@ -954,6 +954,7 @@ class CreatedEvent:
             "create_arguments": self.payload.value,
         }
 
+
 class Event:
     def parse(json):
         template_id = TemplateId(json["template_id"])
@@ -1331,7 +1332,8 @@ class State:
     def to_json(self):
         return {
             "active_contracts": {
-                cid: contract.to_json() for cid, contract in self.active_contracts.items()
+                cid: contract.to_json()
+                for cid, contract in self.active_contracts.items()
             },
             "record_time": self.record_time.isoformat(),
             "ignored_root_creates": self.ignored_root_creates,
@@ -2598,7 +2600,9 @@ class AppState:
 
     @classmethod
     def empty(cls, logger, args):
-        state = State(logger, {}, None, args.ignore_root_create, args.ignore_root_exercise)
+        state = State(
+            logger, {}, None, args.ignore_root_create, args.ignore_root_exercise
+        )
         return cls(logger, state, {}, None)
 
     @classmethod
@@ -2620,7 +2624,9 @@ class AppState:
                 str(round_number): round_state.to_json()
                 for round_number, round_state in self.per_round_states.items()
             },
-            "pagination_key": None if self.pagination_key is None else self.pagination_key.to_json(),
+            "pagination_key": (
+                None if self.pagination_key is None else self.pagination_key.to_json()
+            ),
         }
 
     @classmethod
@@ -2633,10 +2639,14 @@ class AppState:
                         logger.info(f"Restoring app state from {args.cache_file_path}")
                         return AppState.from_json(logger, data)
                 except Exception as e:
-                    logger.error(f"Could not read app state from {args.cache_file_path}: {e}")
+                    logger.error(
+                        f"Could not read app state from {args.cache_file_path}: {e}"
+                    )
                     sys.exit(-1)
             else:
-                logger.info(f"File {args.cache_file_path} does not exist, creating new app state")
+                logger.info(
+                    f"File {args.cache_file_path} does not exist, creating new app state"
+                )
                 return AppState.empty(logger, args)
         else:
             logger.info(f"Caching disabled, creating new app state")
@@ -2650,7 +2660,10 @@ class AppState:
                     json.dump(data, file)
                     self.logger.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
-                self.logger.error(f"Could not save app state to {args.cache_file_path}: {e}")
+                self.logger.error(
+                    f"Could not save app state to {args.cache_file_path}: {e}"
+                )
+
 
 async def main():
     # Parse command line arguments
@@ -2683,8 +2696,8 @@ async def main():
     parser.add_argument(
         "--cache-file-path",
         help="File path to save application state to. "
-             "If the file exists, processing will resume from the persisted state."
-             "Otherwise, processing will start from beginning of the network.",
+        "If the file exists, processing will resume from the persisted state."
+        "Otherwise, processing will start from beginning of the network.",
     )
     parser.add_argument(
         "--page-size",
@@ -2737,42 +2750,52 @@ async def main():
                     )
                     previous_state = app_state.state.clone(logger)
                     result = app_state.state.handle_transaction(transaction)
-                    for round_number in result.new_open_rounds:
-                        round_logger = colorlog.getLogger(f"scan_txlog_{round_number}")
-                        round_logger.addHandler(cli_handler)
-                        round_logger.addHandler(file_handler)
-                        # warning to avoid repeated log messages for the same transaction
-                        round_logger.setLevel("WARNING")
-                        app_state.per_round_states[round_number] = previous_state.clone(
-                            round_logger
-                        )
-                    if result.for_open_round != None and args.scan_balance_assertions:
-                        for round_number, per_round_state in app_state.per_round_states.items():
-                            if round_number >= result.for_open_round:
-                                per_round_state.handle_transaction(transaction)
-                    if result.new_closed_round and args.scan_balance_assertions:
-                        closed_round = result.new_closed_round
-                        round_state = app_state.per_round_states[closed_round]
-                        del app_state.per_round_states[closed_round]
-                        balances = round_state.balance_end_of_round()
-                        lines = [f"effective balances for closed round: {closed_round}"]
-                        matches = True
-                        scan_party_balances = await scan_client.party_balances(
-                            closed_round, balances.keys()
-                        )
-                        for party, balance in sorted(balances.items()):
-                            computed_balance = balance.effective_for_round(closed_round)
-                            scan_balance = scan_party_balances[party]
-                            matches_for_party = scan_balance == computed_balance
-                            matches &= matches_for_party
-                            lines += [
-                                f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+                    if args.scan_balance_assertions:
+                        for round_number in result.new_open_rounds:
+                            round_logger = colorlog.getLogger(
+                                f"scan_txlog_{round_number}"
+                            )
+                            round_logger.addHandler(cli_handler)
+                            round_logger.addHandler(file_handler)
+                            # warning to avoid repeated log messages for the same transaction
+                            round_logger.setLevel("WARNING")
+                            app_state.per_round_states[round_number] = (
+                                previous_state.clone(round_logger)
+                            )
+                        if result.for_open_round != None:
+                            for (
+                                round_number,
+                                per_round_state,
+                            ) in app_state.per_round_states.items():
+                                if round_number >= result.for_open_round:
+                                    per_round_state.handle_transaction(transaction)
+                        if result.new_closed_round:
+                            closed_round = result.new_closed_round
+                            round_state = app_state.per_round_states[closed_round]
+                            del app_state.per_round_states[closed_round]
+                            balances = round_state.balance_end_of_round()
+                            lines = [
+                                f"effective balances for closed round: {closed_round}"
                             ]
-                        log = "\n".join(lines)
-                        if matches:
-                            logger.info(log)
-                        else:
-                            logger.error(log)
+                            matches = True
+                            scan_party_balances = await scan_client.party_balances(
+                                closed_round, balances.keys()
+                            )
+                            for party, balance in sorted(balances.items()):
+                                computed_balance = balance.effective_for_round(
+                                    closed_round
+                                )
+                                scan_balance = scan_party_balances[party]
+                                matches_for_party = scan_balance == computed_balance
+                                matches &= matches_for_party
+                                lines += [
+                                    f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+                                ]
+                            log = "\n".join(lines)
+                            if matches:
+                                logger.info(log)
+                            else:
+                                logger.error(log)
             if len(batch) >= 1:
                 last = batch[-1]
                 app_state.pagination_key = PaginationKey(
