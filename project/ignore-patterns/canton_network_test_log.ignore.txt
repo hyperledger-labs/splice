@@ -81,4 +81,7 @@ The Prometheus metrics HTTPServer caught an Exception while trying to send the m
 # Simtime failure, see https://github.com/DACH-NY/canton-network-node/issues/11998#issuecomment-2086304594
 INVALID_ARGUMENT.*SequencerTimeoutError
 
+# TODO (#12813): find a way to remove this
+Encountered 4 consecutive transient failures \(polling interval .*
+
 # Make sure to have a trailing newline

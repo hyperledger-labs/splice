@@ -1,10 +1,9 @@
 package com.daml.network.automation
 
-import org.apache.pekko.Done
-import com.daml.network.environment.RetryProvider
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.automation.PollingTrigger.PollingTriggerState
 import com.daml.network.config.AutomationConfig
+import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -13,10 +12,11 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryUtil
+import org.apache.pekko.Done
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Future, Promise, blocking}
-import scala.util.{Failure, Success}
+import scala.concurrent.{blocking, Future, Promise}
+import scala.util.Failure
 
 /** A trigger that regularly executes work.
   *
@@ -87,7 +87,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
-  private val pollingLoopRef = new AtomicReference[Option[Future[Done]]](None)
+  private val pollingLoopRef =
+    new AtomicReference[Option[Future[(PollingTriggerState, Boolean)]]](None)
 
   private val retryable = RetryProvider.RetryableError(
     "pollingTriggerTask",
@@ -95,7 +96,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     Map.empty,
     "transient",
     "non-transient",
-    s"restarting after ${pollingInterval}",
+    s"restarting after $pollingInterval",
     context.metricsFactory,
     mc.labels,
     context.retryProvider,
@@ -113,73 +114,88 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       {
 
         // Construct a future that loops until the Trigger is closing.
-        def pollingLoop(state: PollingTriggerState, previousResult: Future[Boolean]): Future[Done] =
-          LoggerUtil.logOnThrow {
+        def pollingLoop(
+            state: PollingTriggerState
+        ): Unit = LoggerUtil.logOnThrow {
 
-            def exitPollingLoop(): Future[Done] =
-              Future.successful(Done)
-
-            def loopWithDelay(newState: PollingTriggerState): Future[Done] = {
+          def loopWithDelay(newState: PollingTriggerState) = {
+            pollingLoopRef.updateAndGet(_.map(_.flatMap { state =>
               context.retryProvider
                 .scheduleAfterUnlessShutdown(
-                  pollingLoop(newState, Future.successful(true)),
+                  Future.successful(pollingLoop(newState)),
                   context.pollingClock,
                   pollingInterval,
                   pollingJitter,
                 )
-                .onShutdown(Done)
-            }
+                .onShutdown(())
+                .map(_ => state)
+            }))
+          }
 
-            // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
-            previousResult.transformWith {
-              case Failure(ex) =>
-                // Call this to get the default logging
-                val errorKind = retryable.retryOK(Failure(ex), logger, None)
-                // Determine if we need to log a warning due to repeated transient errors
-                val isTransientFailure = errorKind match {
-                  case RetryUtil.NoErrorKind => false
-                  case RetryUtil.TransientErrorKind => true
-                  case RetryUtil.FatalErrorKind => false
-                  case RetryUtil.SpuriousTransientErrorKind => true
-                }
-                val numConsecutiveTransientFailures =
-                  if (isTransientFailure) state.numConsecutiveTransientFailures + 1 else 0
-                val newState =
-                  if (numConsecutiveTransientFailures > context.config.maxNumSilentPollingRetries) {
-                    logger.warn(
-                      s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval ${pollingInterval}).\nThe last one was:",
-                      ex,
-                    )
-                    PollingTrigger.initialPollingTriggerState
-                  } else {
-                    PollingTriggerState(numConsecutiveTransientFailures)
+          if (context.retryProvider.isClosing) {
+            ()
+          } else {
+            def performWork = {
+              performWorkIfNotPaused()
+                .map(
+                  PollingTrigger.initialPollingTriggerState -> _
+                )
+                .recover { case ex =>
+                  // Call this to get the default logging
+                  val errorKind = retryable.retryOK(Failure(ex), logger, None)
+                  // Determine if we need to log a warning due to repeated transient errors
+                  val isTransientFailure = errorKind match {
+                    case RetryUtil.NoErrorKind => false
+                    case RetryUtil.TransientErrorKind => true
+                    case RetryUtil.FatalErrorKind => false
+                    case RetryUtil.SpuriousTransientErrorKind => true
                   }
-                loopWithDelay(newState)
-
-              case Success(workDone) =>
-                if (context.retryProvider.isClosing) {
-                  exitPollingLoop()
-                } else if (workDone) {
-                  // If productive work was done in the previous iteration, then we loop without a delay.
-                  pollingLoop(PollingTrigger.initialPollingTriggerState, performWorkIfNotPaused())
-                } else {
-                  logger.trace(
-                    show"No work performed. Sleeping for ${pollingInterval}"
-                  )
-                  loopWithDelay(PollingTrigger.initialPollingTriggerState)
+                  val numConsecutiveTransientFailures =
+                    if (isTransientFailure) state.numConsecutiveTransientFailures + 1 else 0
+                  val newState =
+                    if (
+                      numConsecutiveTransientFailures > context.config.maxNumSilentPollingRetries
+                    ) {
+                      logger.warn(
+                        s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval $pollingInterval).\nThe last one was:",
+                        ex,
+                      )
+                      PollingTrigger.initialPollingTriggerState
+                    } else {
+                      PollingTriggerState(numConsecutiveTransientFailures)
+                    }
+                  newState -> false
                 }
             }
-          }(loggingContext)
+
+            // Ties the futures performing the work together here, avoiding a recursive flatMap solution
+            // Reason: https://github.com/DACH-NY/canton-network-node/issues/12443
+            // We use updateAndGet even if it can be reapplied during contention because we know there's no contention
+            pollingLoopRef
+              .updateAndGet { current =>
+                val workResult = performWork
+                current match {
+                  case Some(ref) =>
+                    Some(
+                      ref.flatMap(_ => workResult)
+                    )
+                  case None => Some(workResult)
+                }
+              }
+              .foreach(_.foreach { case (state, workDone) =>
+                if (workDone && !context.retryProvider.isClosing) {
+                  pollingLoop(state)
+                } else {
+                  loopWithDelay(state)
+                }
+              })
+          }
+        }
         logger.debug(
           show"Starting trigger polling loop, ${PollingTrigger.ConfigSummary(context.config)}"
         )
 
-        // kick-off the first iteration, and store the handle to its final outcome
-        val loopF =
-          pollingLoop(PollingTrigger.initialPollingTriggerState, Future.successful(true)).transform(
-            context.retryProvider.logTerminationAndRecoverOnShutdown("trigger polling loop", logger)
-          )
-        pollingLoopRef.set(Some(loopF))
+        pollingLoop(PollingTrigger.initialPollingTriggerState)
       }
     }
   }
@@ -188,7 +204,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     Seq(
       AsyncCloseable(
         "trigger polling loop",
-        pollingLoopRef.get().getOrElse(Future.successful(Done)),
+        pollingLoopRef.get().map(_.map(_ => Done)).getOrElse(Future.successful(Done)),
         NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
       )
     )
