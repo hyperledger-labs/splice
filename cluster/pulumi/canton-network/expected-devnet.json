@@ -2561,11 +2561,6 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
-            "name": "SBI-Holdings",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "SV-Nodeops-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
             "rewardWeightBps": 100000
@@ -3491,11 +3486,6 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
-            "name": "SBI-Holdings",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "SV-Nodeops-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
             "rewardWeightBps": 100000
@@ -4392,11 +4382,6 @@
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
-            "name": "SBI-Holdings",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "SV-Nodeops-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
             "rewardWeightBps": 100000
@@ -5292,11 +5277,6 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
-          {
-            "name": "SBI-Holdings",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
-            "rewardWeightBps": 100000
-          },
           {
             "name": "SV-Nodeops-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",

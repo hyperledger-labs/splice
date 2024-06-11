@@ -568,11 +568,6 @@
       "values": {
         "approvedSvIdentities": [
           {
-            "name": "SBI-Holdings",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "SV-Nodeops-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA==",
             "rewardWeightBps": 100000
