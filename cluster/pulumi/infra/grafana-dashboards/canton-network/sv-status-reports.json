@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 60,
+  "id": 113,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -97,7 +97,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
           "datasource": {
@@ -283,7 +283,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
           "datasource": {
@@ -472,8 +472,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -582,8 +581,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -684,8 +682,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "orange",
@@ -797,8 +794,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -896,8 +892,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-red",
-                    "value": null
+                    "color": "dark-red"
                   },
                   {
                     "color": "orange",
@@ -1022,8 +1017,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1124,8 +1118,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "orange",
@@ -1181,7 +1174,7 @@
       "type": "row"
     }
   ],
-  "refresh": "",
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
