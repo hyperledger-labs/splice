@@ -104,6 +104,8 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply_sv $VERSION
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -209,6 +211,8 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply_validator $VERSION
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -256,6 +260,8 @@ jobs:
           cmd: |
             cncluster activate
             cncluster ci_apply_multi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -426,6 +432,8 @@ jobs:
             else
               cncluster ci_apply
             fi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - when:
           condition: << parameters.update_deployment_branch >>
           steps:
@@ -510,6 +518,8 @@ jobs:
               cncluster export_to "$images"
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:
@@ -562,3 +572,5 @@ jobs:
           cmd: |
             cncluster activate
             cncluster infra_up
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>

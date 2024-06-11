@@ -1244,43 +1244,28 @@ commands:
           command: |
             echo "export FAILED_PARALLEL_RUN_URL=\"https://app.circleci.com/pipelines/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/<< pipeline.number >>/workflows/${CIRCLE_WORKFLOW_ID}/jobs/${CIRCLE_BUILD_NUM}/parallel-runs/${CIRCLE_NODE_INDEX}\"" >> "$BASH_ENV"
 
-  # Actually downloading the logs is too slow so we only print the command and ask people
-  # to run it for the apps they really need.
   print_gcloud_logs_commands:
     parameters:
       <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
           when: always
-          cmd_name: Displaying commands to download gcloud logs
+          cmd_name: Displaying google cloud logs link
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep CIRCLE_JOB"
           gce_authenticate: true
           cmd: |
-            # download various interesting logs since "20 minutes ago"
-            duration=1200
+            job_data=$( curl -s --fail -X GET -u "${CIRCLECI_TOKEN}:" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/job" )
+            start=$(jq -r --arg job_name "${CIRCLE_JOB}" '.items[] | select(.name == $job_name) | .started_at' \<<< $job_data)
+            # somehow the start date is considered a secret by circleci, which causes it to be replaced with asterisks
+            # changing the date slightly (subtracting one second) avoids this
+            start_minus_one_second=$(date -u -d"$start -1 second" +"%Y-%m-%dT%H:%M:%S%:z")
             now=$(date -u +%s)
-            now_formatted=$(date -u -d @$now +"%Y-%m-%dT%H:%M:%S")
-            before=$(date -u -d @$((now-duration)) +"%Y-%m-%dT%H:%M:%S")
-            query="timestamp>=\"$before\" AND timestamp<=\"$now_formatted\""
-            apps=(
-              "sv-1 sv-app"
-              "sv-1 participant"
-              "sv-1 scan-app"
-              "sv-2 sv-app"
-              "sv-3 sv-app"
-              "sv-4 sv-app"
-              "validator1 participant"
-              "validator1 validator-app"
-              "splitwell domain"
-              "splitwell participant"
-              "splitwell splitwell-app"
-              "splitwell validator-app"
-            )
-            for app in "${apps[@]}"
-            do
-              echo "# --- Use the following command to download logs for $app '$query':"
-              echo "cncluster gcloud_logs $app '$query'"
-            done
+            now_formatted=$(date -u -d @$now +"%Y-%m-%dT%H:%M:%S%:z")
+            GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
+            url="https://console.cloud.google.com/logs/query;startTime=$start_minus_one_second;endTime=$now_formatted;query=resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22?project=$CLOUDSDK_CORE_PROJECT"
+            echo "Go to the following URL to see the logs since the job start in Google Cloud:"
+            echo "$url"
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
@@ -1500,6 +1485,8 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply_sv $VERSION
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -1605,6 +1592,8 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply_validator $VERSION
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -1652,6 +1641,8 @@ jobs:
           cmd: |
             cncluster activate
             cncluster ci_apply_multi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -1822,6 +1813,8 @@ jobs:
             else
               cncluster ci_apply
             fi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - when:
           condition: << parameters.update_deployment_branch >>
           steps:
@@ -1906,6 +1899,8 @@ jobs:
               cncluster export_to "$images"
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:
@@ -1958,6 +1953,8 @@ jobs:
           cmd: |
             cncluster activate
             cncluster infra_up
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
 
   hard_migration:
     circleci_ip_ranges: true
@@ -2929,6 +2926,8 @@ jobs:
                 cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
                 ;;
             esac
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>

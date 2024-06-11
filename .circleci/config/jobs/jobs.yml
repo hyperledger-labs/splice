@@ -762,6 +762,8 @@ jobs:
                 cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
                 ;;
             esac
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
