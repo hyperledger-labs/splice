@@ -2,7 +2,7 @@ apiVersion: v2
 name: cn-splitwell-app
 type: application
 version: VERSION_NUMBER
-appVersion: IMAGE_TAG
+appVersion: VERSION_NUMBER
 
 description: Canton Network Splitwell App Backend
 

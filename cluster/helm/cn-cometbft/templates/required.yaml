@@ -1,4 +1,3 @@
-{{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.imageName is required." .Values.imageName }}
 

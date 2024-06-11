@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { config, defaultVersion, exactNamespace, imageTagOverride } from 'cn-pulumi-common';
+import { config, defaultVersion, exactNamespace } from 'cn-pulumi-common';
 import exec from 'node:child_process';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {
@@ -7,7 +7,6 @@ export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
   const remoteVersion = defaultVersion.type == 'remote' ? defaultVersion.version : undefined;
   const version =
-    imageTagOverride ||
     remoteVersion ||
     // cannot be used with the operator
     exec.execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`).toString();

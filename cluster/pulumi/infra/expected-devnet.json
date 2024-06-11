@@ -352,7 +352,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",

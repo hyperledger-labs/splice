@@ -13,7 +13,7 @@ for release in releases:
     status = outputs["status"]
     namespace = status["namespace"]
     chart = status["chart"]
-    appVersion = outputs["values"]["cluster"]["imageTag"]
+    appVersion = outputs["version"]
     value = result.get(namespace, {})
     value[chart] = appVersion
     result[namespace] = value

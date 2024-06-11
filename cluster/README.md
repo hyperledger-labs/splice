@@ -302,7 +302,7 @@ To upgrade a cluster controlled by the operator, you need to go
 through the following steps:
 
 1. Run the `publish-public-artifacts` job on CI.
-2. Make a PR to set `CHARTS_VERSION` and `IMAGE_TAG` in the
+2. Make a PR to set `CHARTS_VERSION` in the
    `.envrc.vars` file of the corresponding cluster. For CILR this PR
    should be made against `main`. You can tag that commit with `[skip ci]`.
 3. Tag the merged commit with the tag specified in

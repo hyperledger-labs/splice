@@ -32,19 +32,18 @@ export const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
 
 export const defaultVersion: CnChartVersion = parsedVersion(CHARTS_VERSION);
 
-const imageTagsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
-const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } } =
-  imageTagsFile && loadJsonFromFile(imageTagsFile);
-export const imageTagOverride: string | undefined = config.optionalEnv('IMAGE_TAG');
+const versionsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
+const versionsFromFile: undefined | { [key: string]: { [key: string]: string } } =
+  versionsFile && loadJsonFromFile(versionsFile);
 
 function getVersionOverrideFromVersionsFile(
   nsLogicalName: string,
   chartName: string
 ): string | undefined {
   return (
-    jsonImageVersions &&
-    jsonImageVersions[nsLogicalName] &&
-    jsonImageVersions[nsLogicalName][chartName]
+    versionsFromFile &&
+    versionsFromFile[nsLogicalName] &&
+    versionsFromFile[nsLogicalName][chartName]
   );
 }
 
@@ -65,7 +64,7 @@ export function installCNHelmChartByNamespaceName(
       name,
       namespace: nsMetadataName,
       chart: chartPath(chartName, version),
-      version: versionString(version, nsLogicalName, chartName),
+      version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
       values: cnChartValues(nsLogicalName, version, chartName, values),
       timeout,
@@ -107,16 +106,6 @@ function cnChartValues(
   const chartDefaultValues =
     version.type === 'local' ? loadYamlFromFile(`${chartPath(chartName, version)}values.yaml`) : {};
 
-  const imageVersionFromFile = getVersionOverrideFromVersionsFile(nsLogicalName, chartName);
-  const finalOverride = imageVersionFromFile || imageTagOverride;
-
-  if (imageTagOverride && version.type == 'remote' && version.version != imageTagOverride) {
-    // Mixing versions like this sounds like something that is always a bad idea.
-    throw new Error(
-      `Remote chart version ${version.version} does not match image tag ${imageTagOverride}`
-    );
-  }
-
   const values = _.mergeWith(
     {},
     chartDefaultValues,
@@ -133,13 +122,6 @@ function cnChartValues(
       clusterUrl: CLUSTER_HOSTNAME,
     },
     overrideValues,
-    finalOverride
-      ? {
-          cluster: {
-            imageTag: finalOverride,
-          },
-        }
-      : {},
     (a, b) => (_.isArray(b) ? b : undefined)
   );
 
@@ -162,7 +144,7 @@ export function installCNRunbookHelmChartByNamespaceName(
       name: name,
       namespace: nsMetadataName,
       chart: chartPath(chartName, version),
-      version: versionString(version, nsLogicalName, chartName),
+      version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
@@ -209,7 +191,11 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       : chartName;
 }
 
-function versionString(version: CnChartVersion, nsLogicalName: string, chartPath: string) {
+function versionStringWithPossibleOverride(
+  version: CnChartVersion,
+  nsLogicalName: string,
+  chartPath: string
+) {
   if (version.type === 'local') {
     return undefined;
   } else {

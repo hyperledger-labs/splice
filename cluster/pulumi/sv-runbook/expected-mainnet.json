@@ -646,7 +646,6 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "imageTag": "0.1.8",
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
@@ -858,7 +857,6 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "imageTag": "0.1.8",
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
@@ -915,7 +913,6 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "imageTag": "0.1.8",
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
@@ -970,7 +967,6 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "imageTag": "0.1.8",
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",

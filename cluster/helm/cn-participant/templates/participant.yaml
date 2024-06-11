@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: participant
-        image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/canton-participant:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS

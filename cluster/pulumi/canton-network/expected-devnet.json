@@ -1366,7 +1366,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -1424,7 +1423,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svNamespace": "splitwell"
         },
@@ -1495,7 +1493,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -1584,7 +1581,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -1646,7 +1642,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -1829,7 +1824,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -1978,7 +1972,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2136,7 +2129,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2216,7 +2208,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
@@ -2258,7 +2249,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -2400,7 +2390,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2464,7 +2453,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2645,7 +2633,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2777,7 +2764,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -2920,7 +2906,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3074,7 +3059,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3154,7 +3138,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-2-eng",
           "svNamespace": "sv-2"
@@ -3196,7 +3179,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -3338,7 +3320,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3402,7 +3383,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3583,7 +3563,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3686,7 +3665,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3829,7 +3807,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -3983,7 +3960,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4063,7 +4039,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-3-eng",
           "svNamespace": "sv-3"
@@ -4105,7 +4080,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -4247,7 +4221,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4311,7 +4284,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4492,7 +4464,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4595,7 +4566,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4738,7 +4708,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4892,7 +4861,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -4972,7 +4940,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svIngressName": "sv-4-eng",
           "svNamespace": "sv-4"
@@ -5014,7 +4981,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -5156,7 +5122,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -5220,7 +5185,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -5401,7 +5365,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -5504,7 +5467,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -5888,7 +5850,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet",
           "svNamespace": "validator1"
         },
@@ -5950,7 +5911,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "ingress": "istio-ingress.cluster-ingress",
           "name": "cn-devnet"
         },
@@ -6039,7 +5999,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -6101,7 +6060,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
@@ -6193,7 +6151,6 @@
           "dnsName": "dev.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "dev.global.canton.network.digitalasset.com",
-          "imageTag": "0.0.1-deadbeef",
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",

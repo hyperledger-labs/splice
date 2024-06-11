@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: validator-app
-        image: "{{ .Values.imageRepo }}/validator-app:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/validator-app:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS

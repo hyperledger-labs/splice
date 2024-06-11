@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: splitwell-web-ui
-        image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         env:
         - name: CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID

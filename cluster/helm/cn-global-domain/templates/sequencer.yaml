@@ -38,9 +38,9 @@ spec:
       containers:
         - name: sequencer
         {{- if eq .Values.sequencer.driver.type "cometbft"}}
-          image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Chart.AppVersion }}"
         {{- else}}
-          image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Chart.AppVersion }}"
         {{- end}}
           env:
             - name: JAVA_TOOL_OPTIONS

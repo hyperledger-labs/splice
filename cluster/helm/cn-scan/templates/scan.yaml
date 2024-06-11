@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: scan-app
-        image: "{{ .Values.imageRepo }}/scan-app:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/scan-app:{{ .Chart.AppVersion }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
@@ -170,7 +170,7 @@ spec:
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CN_APP_CNS_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}
-        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         name: scan-web-ui
         ports:

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: splitwell-app
-        image: "{{ .Values.imageRepo }}/splitwell-app:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS

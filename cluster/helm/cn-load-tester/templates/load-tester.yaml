@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: load-tester
-          image: "{{ .Values.imageRepo }}/load-tester:{{ (.Values.cluster).imageTag }}"
+          image: "{{ .Values.imageRepo }}/load-tester:{{ .Chart.AppVersion }}"
           imagePullPolicy: Always
           env:
             - name: EXTERNAL_CONFIG

@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: sv-app
-          image: "{{ .Values.imageRepo }}/sv-app:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/sv-app:{{ .Chart.AppVersion }}"
           imagePullPolicy: "Always"
           env:
             - name: JAVA_TOOL_OPTIONS

@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: mediator
-        image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Chart.AppVersion }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}

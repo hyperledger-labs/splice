@@ -38,7 +38,7 @@ spec:
               value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
             - name: CN_APP_SV_UI_CLUSTER
               value: {{ .Values.clusterUrl | quote }}
-          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ (.Values.cluster).imageTag }}"
+          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Chart.AppVersion }}"
           imagePullPolicy: Always
           name: sv-web-ui
           ports:

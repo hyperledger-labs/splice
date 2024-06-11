@@ -118,9 +118,6 @@ function _infra_up() {
 }
 
 function _cluster_apply() {
-    IMAGE_TAG=$1
-    shift
-
     while [[ $# -gt 0 ]]; do
         case $1 in
             --skip-infra)
@@ -132,10 +129,6 @@ function _cluster_apply() {
                 ;;
         esac
     done
-
-    if [ -n "${IMAGE_TAG:-}" ]; then
-        local -x IMAGE_TAG=${IMAGE_TAG}
-    fi
 
     if [ -z "${skipInfra:-}" ]; then
       _info "Applying Pulumi Infra Stack"
@@ -959,11 +952,9 @@ function subcmd_ci_apply() {
        _info "Bootstrapping cluster from ${BOOTSTRAPPING_CONFIG}"
     fi
 
-    source_image_tag=$(get-snapshot-version)
+    _info "Applying CI deployment: $(get-snapshot-version)"
 
-    _info "Applying CI deployment: ${source_image_tag}"
-
-    _cluster_apply "${source_image_tag}" "$@"
+    _cluster_apply "$@"
 }
 
 ###
@@ -1461,13 +1452,6 @@ function subcmd_apply() {
     done
     set -- "${POSITIONAL_ARGS[@]}"
 
-    local -x IMAGE_TAG
-    IMAGE_TAG=$(get-snapshot-version)
-    if [ -n "${1-}" ]; then
-        _warning "Overriding image tag: ${1-} (was: ${IMAGE_TAG})"
-        local -x IMAGE_TAG=$1
-    fi
-
     subcmd_install_data_export_bucket_key
 
     if [ -n "${preview:-}" ]; then
@@ -1480,15 +1464,13 @@ function subcmd_apply() {
         _prompt_to_confirm
         make -C "${REPO_ROOT}" cluster/build -j
 
-        if [ -z "${IMAGE_TAG:-}" ]; then
-            if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
-                _docker_must_be_running
-                if ! make -C "${REPO_ROOT}" docker-check -j; then
-                    _error "Images missing from artifact registry, cannot apply."
-                fi
-            else
-                _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+        if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
+            _docker_must_be_running
+            if ! make -C "${REPO_ROOT}" docker-check -j; then
+                _error "Images missing from artifact registry, cannot apply."
             fi
+        else
+            _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
         if [ -z "${skipInfra:-}" ]; then
@@ -1606,8 +1588,6 @@ function subcmd_apply_sv(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    local -x CHARTS_VERSION="${2-}"
-
     _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
@@ -1690,8 +1670,6 @@ function subcmd_apply_validator(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    local -x CHARTS_VERSION="${2-}"
-
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
@@ -1772,9 +1750,6 @@ function subcmd_apply_multi() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    local -x IMAGE_TAG
-    IMAGE_TAG=$(get-snapshot-version)
-
     _uses_pulumi_stack multi-validator
     subcmd_pulumi multi-validator up --yes --skip-preview --show-sames "${args[@]}"
 }
@@ -1787,9 +1762,6 @@ function subcmd_ci_apply_multi() {
     if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
-
-    local -x IMAGE_TAG
-    IMAGE_TAG=$(get-snapshot-version)
 
     _uses_pulumi_stack multi-validator
 
@@ -2421,9 +2393,6 @@ function subcmd_hard_domain_migration_migrate() {
 subcommand_whitelist[disaster_recovery_test]='Test disaster recovery in a cluster'
 
 function subcmd_disaster_recovery_test() {
-  local version=""
-  version=$(get-snapshot-version)
-
   local tmpdir
   tmpdir=$(mktemp -d)
 
@@ -2443,7 +2412,7 @@ function subcmd_disaster_recovery_test() {
   _info "Deploying original domain"
   # We test that splitwell can onboard after the DR, so don't deploy it just yet
   export CN_INSTALL_SPLITWELL="false"
-  _cluster_apply "$version"
+  _cluster_apply
 
   _info "Getting identity dumps"
   for sv in "${!svIngressNames[@]}"; do
@@ -2588,13 +2557,13 @@ function subcmd_disaster_recovery_test() {
   export DISABLE_COMETBFT_STATE_SYNC="true"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
-  _cluster_apply "$version"
+  _cluster_apply
 
   _info "Switching to new domain"
   unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
-  _cluster_apply "$version"
+  _cluster_apply
 
   _info "Checking amulet on restored svs/validators"
   for ingressName in "${!taps[@]}"; do
@@ -2614,7 +2583,7 @@ function subcmd_disaster_recovery_test() {
   # TODO(#12123) Reenable this.
   # _info "Installing Splitwell"
   # export CN_INSTALL_SPLITWELL="true"
-  # _cluster_apply "$version"
+  # _cluster_apply
 }
 
 function take_sv_disaster_recovery_dump() {

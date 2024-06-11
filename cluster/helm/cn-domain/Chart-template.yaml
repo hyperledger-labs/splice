@@ -2,7 +2,7 @@ apiVersion: v2
 name: cn-domain
 type: application
 version: VERSION_NUMBER
-appVersion: IMAGE_TAG
+appVersion: VERSION_NUMBER
 
 description: Canton Network Domain
 

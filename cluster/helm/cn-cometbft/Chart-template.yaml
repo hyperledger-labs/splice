@@ -4,4 +4,4 @@ description: Helm chart for a CometBFT node
 
 type: application
 version: VERSION_NUMBER
-appVersion: IMAGE_TAG
+appVersion: VERSION_NUMBER
