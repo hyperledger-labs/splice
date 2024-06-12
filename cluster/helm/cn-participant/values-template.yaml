@@ -8,7 +8,7 @@ resources:
     cpu: "4"
     memory: 32Gi
   requests:
-    cpu: "2"
+    cpu: "1"
     memory: 16Gi
 
 auth:

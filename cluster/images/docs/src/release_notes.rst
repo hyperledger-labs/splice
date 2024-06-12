@@ -14,6 +14,8 @@ Upcoming
 
   * UI containers in the Helm charts now request only 0.1 CPU and 240Mi memory by default.
 
+  * Default participant CPU requests have been lowered from 2 to 1 CPU based on the observed usage under load tests.
+
 * SV app
 
   * ``/v0/admin/domain/data-snapshot`` now includes ``created_at`` and ``migration_id`` in
