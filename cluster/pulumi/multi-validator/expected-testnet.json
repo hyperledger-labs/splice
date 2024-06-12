@@ -3,17 +3,22 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "../../../cluster/helm/cn-cluster-loopback-gateway/",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "multi-validator",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
       "timeout": 480,
       "values": {
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
-      }
+        }
+      },
+      "version": "0.1.10"
     },
     "name": "loopback",
     "provider": "",
