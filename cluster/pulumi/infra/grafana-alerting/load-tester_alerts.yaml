@@ -110,9 +110,95 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          description: ""
-          runbook_url: ""
+          description: ''
+          runbook_url: ''
           summary: The k6 load tester experienced HTTP request failures at a rate past the acceptable threshold
         labels:
           gcloud_filter: ''
+        isPaused: false
+      - uid: ddogbytusmz9cb
+        title: K6 Throughput Below Threshold
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: rate(k6_transfers_completed_total{scenario="generate_load"}[$__rate_interval])
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.95
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: A
+              hide: false
+              reducer: mean
+              refId: B
+              type: reduce
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: ''
+          runbook_url: ''
+          summary: Transaction rate from the k6 load tester is lower than expected threshold
+        labels:
+          '': ''
         isPaused: false
