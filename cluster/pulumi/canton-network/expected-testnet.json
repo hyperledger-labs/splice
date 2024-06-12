@@ -1959,7 +1959,6 @@
           }
         ],
         "failOnAppVersionMismatch": true,
-        "fixedTokens": false,
         "identitiesExport": {
           "bucket": {
             "bucketName": "da-cn-data-dumps",
