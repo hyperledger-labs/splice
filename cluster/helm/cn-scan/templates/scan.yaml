@@ -178,6 +178,9 @@ spec:
           name: scan-ui
           protocol: TCP
         resources:
+          requests:
+            cpu: 0.1
+            memory: 240Mi
           limits:
             cpu: 1
             memory: 1536Mi

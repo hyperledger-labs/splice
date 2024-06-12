@@ -10,6 +10,10 @@ Upcoming
 
   * Switch to using ``eclipse-temurin:17-jdk-jammy`` as the base image as the ``openjdk:17-jdk-slim`` is no longer maintained.
 
+* Deployment
+
+  * UI containers in the Helm charts now request only 0.1 CPU and 240Mi memory by default.
+
 0.1.12
 ------
 
