@@ -32,6 +32,7 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
+import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
 import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.Http
@@ -72,6 +73,7 @@ object CNNodeTests extends LazyLogging {
           config = Tracer(),
           histograms = Seq.empty,
           loggerFactory = NamedLoggerFactory.root,
+          cardinality = MetricStorage.DEFAULT_MAX_CARDINALITY,
         )
         .tap { otel =>
           sys.addShutdownHook {
