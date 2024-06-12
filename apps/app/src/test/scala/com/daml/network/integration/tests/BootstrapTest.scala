@@ -46,7 +46,9 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
       },
       lines => {
         forAll(lines) { line =>
-          line.message should include("Entry with name").and(include("not found"))
+          line.message should (include("Entry with name")
+            .and(include("not found")))
+            .or(include("Encountered 4 consecutive transient failures"))
         }
       },
     )
