@@ -27,7 +27,6 @@ parameters:
       [
         build,
         deploy-cidaily,
-        deploy-cilr,
         deploy-ciupgrade,
         deploy-ciperiodic-migration,
         deploy-ciperiodic-sv-reonboard,
