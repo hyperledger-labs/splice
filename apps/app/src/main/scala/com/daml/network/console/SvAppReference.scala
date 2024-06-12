@@ -127,10 +127,18 @@ abstract class SvAppReference(
   def getDomainDataSnapshot(
       timestamp: Instant,
       partyId: Option[PartyId] = None,
+      migrationId: Option[Long] = None,
       force: Boolean = false,
-  ): DomainDataSnapshot =
+  ): DomainDataSnapshot.Response =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetDomainDataSnapshot(timestamp, partyId, force = force))
+      httpCommand(
+        HttpSvAdminAppClient.GetDomainDataSnapshot(
+          timestamp,
+          partyId,
+          migrationId = migrationId,
+          force = force,
+        )
+      )
     }
 
   @Help.Summary("Get identities of all domain node components")

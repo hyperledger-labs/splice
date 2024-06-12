@@ -2519,7 +2519,8 @@ function subcmd_disaster_recovery_test() {
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
     token=$(subcmd_get_token sv-"$sv")
-    data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&force=true" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+    data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
+           -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
     if [ "$snapshot" == "null" ]; then
         error=$(echo "$data" | jq -r .error)
@@ -2530,7 +2531,7 @@ function subcmd_disaster_recovery_test() {
         fi
     fi
     id=$(cat "$tmpdir/id-${sv}.json")
-    dump=$(echo "{\"migration_id\": 1, \"created_at\": \"$dump_timestamp\"} $id $data" | jq -s add)
+    dump=$(echo "$id $data" | jq -s add)
     echo "$dump" > "$tmpdir/dump${sv}.json"
   done
 
@@ -2599,9 +2600,11 @@ function take_sv_disaster_recovery_dump() {
     fi
     data_dump_file="$output_directory/${namespace}_id_dump.json"
     id_dump_file="$output_directory/${namespace}_data_dump.json"
-    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "Authorization: Bearer $token" > "$data_dump_file"
-    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
-    (echo "{\"migration_id\": $migration_id, \"created_at\": \"$timestamp\"}"; cat "$data_dump_file" "$id_dump_file") | jq -s add > "$output_directory/${namespace}_dump.json"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" \
+         -H "Authorization: Bearer $token" > "$data_dump_file"
+    curl -sSLf "https://sv.$namespace.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp&migration_id=$migration_id" \
+         -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
+    cat "$data_dump_file" "$id_dump_file" | jq -s add > "$output_directory/${namespace}_dump.json"
 }
 
 function take_validator_disaster_recovery_dump() {

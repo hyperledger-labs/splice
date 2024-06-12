@@ -509,10 +509,14 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class GetDomainDataSnapshot(timestamp: Instant, partyId: Option[PartyId], force: Boolean)
-      extends BaseCommand[
+  case class GetDomainDataSnapshot(
+      timestamp: Instant,
+      partyId: Option[PartyId],
+      migrationId: Option[Long],
+      force: Boolean,
+  ) extends BaseCommand[
         http.GetDomainDataSnapshotResponse,
-        DomainDataSnapshot,
+        DomainDataSnapshot.Response,
       ] {
     override def submitRequest(
         client: Client,
@@ -524,6 +528,7 @@ object HttpSvAdminAppClient {
       client.getDomainDataSnapshot(
         timestamp.toString,
         partyId.map(_.toProtoPrimitive),
+        migrationId = migrationId,
         force = Some(force),
         headers = headers,
       )
@@ -531,7 +536,7 @@ object HttpSvAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.GetDomainDataSnapshotResponse.OK(response) =>
-      DomainDataSnapshot.fromHttp(response.dataSnapshot)
+      DomainDataSnapshot.Response.fromHttp(response)
     }
 
   }

@@ -236,7 +236,9 @@ class DisasterRecoveryIntegrationTest
         val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster, force = true))
         svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
-          dump.acsTimestamp should be(timestampBeforeDisaster)
+          dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
+          dump.createdAt should be(timestampBeforeDisaster)
+          dump.migrationId shouldBe 1
           writeMigrationDumpFile(sv, ids, dump)
         }
       },
@@ -253,7 +255,9 @@ class DisasterRecoveryIntegrationTest
               Some(identities.head.dsoPartyId),
               force = true,
             )
-        dump.acsTimestamp should be(timestampBeforeDisaster)
+        dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
+        dump.createdAt should be(timestampBeforeDisaster)
+        dump.migrationId shouldBe 1
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
             writeMigrationDumpFile(sv, ids, dump)
@@ -589,7 +593,7 @@ class DisasterRecoveryIntegrationTest
   private def writeMigrationDumpFile(
       sv: SvAppBackendReference,
       ids: SynchronizerNodeIdentities,
-      dump: DomainDataSnapshot,
+      dump: DomainDataSnapshot.Response,
   ): Unit = {
     val participantIdDumpFile = participantIdentitiesFilePath(sv.name)
     clearOrCreate(participantIdDumpFile)
@@ -600,10 +604,10 @@ class DisasterRecoveryIntegrationTest
     clearOrCreate(fullDumpFile)
 
     val fullDump = DomainMigrationDump(
-      migrationId = 1,
+      migrationId = dump.migrationId,
       ids,
-      dump,
-      createdAt = Instant.now(),
+      dump.dataSnapshot,
+      createdAt = dump.createdAt,
     )
     fullDumpFile.write(fullDump.asJson.spaces2)
   }

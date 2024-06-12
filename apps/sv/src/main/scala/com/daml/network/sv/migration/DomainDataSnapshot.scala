@@ -38,7 +38,18 @@ final case class DomainDataSnapshot(
 }
 
 object DomainDataSnapshot {
+  final case class Response(migrationId: Long, dataSnapshot: DomainDataSnapshot) {
+    def createdAt: dataSnapshot.acsTimestamp.type = dataSnapshot.acsTimestamp
+  }
+
+  object Response {
+    def fromHttp(src: http.GetDomainDataSnapshotResponse): Either[String, Response] = for {
+      dataSnapshot <- DomainDataSnapshot fromHttp src.dataSnapshot
+    } yield Response(src.migrationId, dataSnapshot)
+  }
+
   private val base64Decoder = Base64.getDecoder()
+
   def fromHttp(
       src: http.DomainDataSnapshot
   ): Either[String, DomainDataSnapshot] = {

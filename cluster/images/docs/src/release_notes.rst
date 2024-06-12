@@ -14,6 +14,13 @@ Upcoming
 
   * UI containers in the Helm charts now request only 0.1 CPU and 240Mi memory by default.
 
+* SV app
+
+  * ``/v0/admin/domain/data-snapshot`` now includes ``created_at`` and ``migration_id`` in
+    the response payload, so these no longer need to be added manually when restoring an
+    SV app from backup.  ``migration_id`` is also an optional argument to set the latter,
+    defaulting to 1 + the cluster's current migration ID.
+
 0.1.12
 ------
 

@@ -491,6 +491,7 @@ class HttpSvAdminHandler(
   override def getDomainDataSnapshot(respond: SvAdminResource.GetDomainDataSnapshotResponse.type)(
       timestamp: String,
       partyId: Option[String],
+      migrationId: Option[Long],
       force: Option[Boolean],
   )(
       tuser: TracedUser
@@ -504,8 +505,14 @@ class HttpSvAdminHandler(
           force.getOrElse(false),
         )
         .map { response =>
+          val responseHttp = response.toHttp
           SvAdminResource.GetDomainDataSnapshotResponse.OK(
-            definitions.GetDomainDataSnapshotResponse(response.toHttp)
+            definitions
+              .GetDomainDataSnapshotResponse(
+                responseHttp.acsTimestamp,
+                migrationId getOrElse (config.domainMigrationId + 1),
+                responseHttp,
+              )
           )
         }
     }(traceContext, tracer)

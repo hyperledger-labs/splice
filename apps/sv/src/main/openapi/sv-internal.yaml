@@ -235,6 +235,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: migration_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
         - name: force
           in: query
           required: false
@@ -1196,7 +1202,16 @@ components:
     GetDomainDataSnapshotResponse:
       type: object
       required:
+        - created_at
+        - migration_id
         - data_snapshot
       properties:
+        created_at:
+          description: |
+            equal to data_snapshot.acs_timestamp
+          type: string
+        migration_id:
+          type: integer
+          format: int64
         data_snapshot:
           $ref: "#/components/schemas/DomainDataSnapshot"
