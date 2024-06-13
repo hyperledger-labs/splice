@@ -689,7 +689,7 @@
       "spec": {
         "interval": "5m",
         "ref": {
-          "name": "refs/heads/releases/0.1.x"
+          "name": "refs/heads/deployment/devnet"
         },
         "secretRef": {
           "name": "github"
@@ -700,5 +700,252 @@
     "name": "splice-node",
     "provider": "",
     "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "pulumi.com/v1",
+      "kind": "Stack",
+      "metadata": {
+        "name": "sv-runbook",
+        "namespace": "operator"
+      },
+      "spec": {
+        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "continueResyncOnCommitMatch": true,
+        "destroyOnFinalize": false,
+        "envRefs": {
+          "ARTIFACTORY_PASSWORD": {
+            "secret": {
+              "key": "ARTIFACTORY_PASSWORD",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "ARTIFACTORY_USER": {
+            "secret": {
+              "key": "ARTIFACTORY_USER",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "GCP_CLUSTER_BASENAME": {
+            "literal": {
+              "value": "dev"
+            },
+            "type": "Literal"
+          },
+          "REPO_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace"
+            },
+            "type": "Literal"
+          },
+          "SLACK_ACCESS_TOKEN": {
+            "secret": {
+              "key": "SLACK_ACCESS_TOKEN",
+              "name": "env"
+            },
+            "type": "Secret"
+          }
+        },
+        "fluxSource": {
+          "dir": "cluster/pulumi/sv-runbook",
+          "sourceRef": {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "splice-node"
+          }
+        },
+        "refresh": false,
+        "resyncFrequencySeconds": 300,
+        "retryOnUpdateConflict": true,
+        "stack": "organization/sv-runbook/sv-runbook.dev",
+        "useLocalStackOnly": true
+      }
+    },
+    "name": "sv-runbook",
+    "provider": "",
+    "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "pulumi.com/v1",
+      "kind": "Stack",
+      "metadata": {
+        "name": "validator-runbook",
+        "namespace": "operator"
+      },
+      "spec": {
+        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "continueResyncOnCommitMatch": false,
+        "destroyOnFinalize": false,
+        "envRefs": {
+          "ARTIFACTORY_PASSWORD": {
+            "secret": {
+              "key": "ARTIFACTORY_PASSWORD",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "ARTIFACTORY_USER": {
+            "secret": {
+              "key": "ARTIFACTORY_USER",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "env"
+            },
+            "type": "Secret"
+          },
+          "GCP_CLUSTER_BASENAME": {
+            "literal": {
+              "value": "dev"
+            },
+            "type": "Literal"
+          },
+          "REPO_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace"
+            },
+            "type": "Literal"
+          },
+          "SLACK_ACCESS_TOKEN": {
+            "secret": {
+              "key": "SLACK_ACCESS_TOKEN",
+              "name": "env"
+            },
+            "type": "Secret"
+          }
+        },
+        "fluxSource": {
+          "dir": "cluster/pulumi/validator-runbook",
+          "sourceRef": {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "splice-node"
+          }
+        },
+        "refresh": false,
+        "retryOnUpdateConflict": true,
+        "stack": "organization/validator-runbook/validator-runbook.dev",
+        "useLocalStackOnly": true
+      }
+    },
+    "name": "validator-runbook",
+    "provider": "",
+    "type": "kubernetes:pulumi.com/v1:Stack"
   }
 ]

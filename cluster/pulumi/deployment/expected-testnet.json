@@ -566,7 +566,7 @@
       "spec": {
         "interval": "5m",
         "ref": {
-          "name": "refs/heads/releases/0.1.x"
+          "name": "refs/heads/deployment/testnet"
         },
         "secretRef": {
           "name": "github"

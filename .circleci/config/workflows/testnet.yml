@@ -1,40 +1,4 @@
 workflow:
-  deploy_testnet:
-    when:
-      equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_testnet testnet_health_check"
-      - deploy_cluster:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "testnet"
-          deploy_version: "testnet-next"
-          silence_deployment_alerts: false
-          use_published_artifacts: true
-          requires:
-            - wait_for_previous_pipeline
-      - preflight_check:
-          <<: *main-branch-only
-          <<: *non_devnet_preflight_params
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "testnet"
-          cluster_version: "testnet-next"
-          requires:
-            - deploy_cluster
-
   testnet_health_check:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]

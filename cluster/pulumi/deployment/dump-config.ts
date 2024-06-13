@@ -6,9 +6,6 @@ async function main() {
   await initDumpConfig();
   process.env.GOOGLE_CREDENTIALS = 's3cr3t';
   process.env.SLACK_ACCESS_TOKEN = 's3cr3t';
-  if (!process.env.CN_DEPLOYMENT_FLUX_REF) {
-    process.env.CN_DEPLOYMENT_FLUX_REF = 'refs/heads/releases/0.1.x';
-  }
   process.env.GITHUB_TOKEN = 's3cr3t';
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deployment: typeof import('./src/index') = await import('./src/index');
