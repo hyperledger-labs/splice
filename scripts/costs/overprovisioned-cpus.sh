@@ -5,16 +5,11 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 
-if [ -z "${GCP_CLUSTER_BASENAME:-}" ]; then
-  _error "GCP_CLUSTER_BASENAME is not set. Please run this script from a deployment directory."
-fi
-
-TOKEN=$(gcloud auth print-access-token)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${SCRIPT_DIR}/costs-common.sh"
 CLUSTER=cn-${GCP_CLUSTER_BASENAME}net
 
-data=$(curl -sSL --fail-with-body -d "
-  {
-    \"query\": 'fetch k8s_container
+data=$(get_metrics "fetch k8s_container
               | filter resource.cluster_name =~ \"$CLUSTER\"
               | { metric kubernetes.io/container/cpu/request_cores;
                   metric kubernetes.io/container/cpu/core_usage_time
@@ -27,11 +22,7 @@ data=$(curl -sSL --fail-with-body -d "
               | sub
               | group_by 4w, min(val())
               | top 20
-             '
-  }" \
-  -H "Authorization: Bearer $TOKEN" \
-  --header "Content-Type: application/json" \
-  -X POST "https://monitoring.googleapis.com/v3/projects/${CLOUDSDK_CORE_PROJECT}/timeSeries:query")
+             ")
 
 echo "Top 20 strictly over-provisioned (CPU requests not ever used) containers by CPU usage over the last 4 weeks:"
 

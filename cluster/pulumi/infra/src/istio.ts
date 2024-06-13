@@ -72,8 +72,8 @@ function configureIstiod(
           autoscaleMax: 10,
         },
         meshConfig: {
-          // Turns on envoy logging
-          accessLogFile: '/dev/stdout',
+          // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
+          // accessLogFile: '/dev/stdout',
           // taken from https://github.com/istio/istio/issues/37682
           accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
@@ -317,6 +317,31 @@ function configureGatewayService(
       dependsOn: [gateway],
     }
   );
+  // Turn on envoy access logging on the ingress gateway
+  new k8s.apiextensions.CustomResource(`access-logging${suffix}`, {
+    apiVersion: 'telemetry.istio.io/v1alpha1',
+    kind: 'Telemetry',
+    metadata: {
+      name: `access-logging${suffix}`,
+      namespace: ingressNs.metadata.name,
+    },
+    spec: {
+      accessLogging: [
+        {
+          providers: [
+            {
+              name: 'envoy',
+            },
+          ],
+        },
+      ],
+      selector: {
+        matchLabels: {
+          app: `istio-ingress${suffix}`,
+        },
+      },
+    },
+  });
   return gateway;
 }
 
