@@ -417,18 +417,18 @@ abstract class TopologyAdminConnection(
       }
     }
 
-  def exportTopologySnapshot(
-      domainId: DomainId,
+  private def exportTopologySnapshot(
+      store: TopologyStoreId,
       proposals: Boolean,
-      excludeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
-      filterNamespace: String = "",
+      excludeMappings: Seq[TopologyMappingX.Code],
+      filterNamespace: String,
   )(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
     runCmd(
       TopologyAdminCommandsX.Read.ExportTopologySnapshot(
         BaseQueryX(
-          filterStore = domainId.filterString,
+          filterStore = store.filterName,
           proposals = proposals,
           timeQuery = TimeQuery.Range(from = None, until = None),
           ops = None,
@@ -453,13 +453,12 @@ abstract class TopologyAdminConnection(
   }
 
   def exportAuthorizedStoreSnapshot(
-      domainId: DomainId,
-      participantId: UniqueIdentifier,
+      participantId: UniqueIdentifier
   )(implicit
       tc: TraceContext
   ): Future[ByteString] =
     exportTopologySnapshot(
-      domainId,
+      TopologyStoreId.AuthorizedStore,
       proposals = false,
       excludeMappings = TopologyMappingX.Code.all.diff(
         Seq(

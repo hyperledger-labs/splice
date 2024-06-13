@@ -143,7 +143,6 @@ class ValidatorAutomationService(
     registerTrigger(
       new PeriodicParticipantIdentitiesBackupTrigger(
         config,
-        scanConnection,
         triggerContext,
         participantIdentitiesStore,
       )

@@ -72,18 +72,18 @@ object SynchronizerNodeIdentities {
       domainAlias: DomainAlias,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[SynchronizerNodeIdentities] = {
-    def getNodeIdentitiesDump(adminConnection: TopologyAdminConnection, domainId: DomainId) =
+    def getNodeIdentitiesDump(adminConnection: TopologyAdminConnection) =
       new NodeIdentitiesStore(
         adminConnection,
         None,
         loggerFactory,
-      ).getNodeIdentitiesDump(domainId)
+      ).getNodeIdentitiesDump()
 
     for {
       domainId <- dsoStore.getDsoRules().map(_.domain)
-      participant <- getNodeIdentitiesDump(participantAdminConnection, domainId)
-      sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection, domainId)
-      mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection, domainId)
+      participant <- getNodeIdentitiesDump(participantAdminConnection)
+      sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection)
+      mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection)
     } yield SynchronizerNodeIdentities(
       dsoStore.key.svParty,
       dsoStore.key.dsoParty,

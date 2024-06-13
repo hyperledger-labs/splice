@@ -38,7 +38,7 @@ class DomainMigrationDumpGenerator(
             .asRuntimeException()
         )
         .rethrowT
-      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump(domain)
+      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
       dars <- darExporter.exportAllDars()
       createdAt = Instant.now()
     } yield {
@@ -75,7 +75,7 @@ class DomainMigrationDumpGenerator(
           filterParticipant = participantId.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))
-      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump(domain)
+      nodeIdentities <- nodeIdentityStore.getNodeIdentitiesDump()
       acsSnapshot <- acsExporter.exportAcsAtTimestamp(
         domain,
         timestamp,

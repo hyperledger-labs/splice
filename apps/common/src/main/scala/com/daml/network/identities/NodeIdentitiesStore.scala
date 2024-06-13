@@ -6,7 +6,6 @@ import com.daml.network.environment.{BuildInfo, TopologyAdminConnection}
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -21,7 +20,7 @@ class NodeIdentitiesStore(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def getNodeIdentitiesDump(domain: DomainId)(implicit
+  def getNodeIdentitiesDump()(implicit
       tc: TraceContext
   ): Future[NodeIdentitiesDump] =
     for {
@@ -37,7 +36,7 @@ class NodeIdentitiesStore(
             )
           )
       )
-      authorizedStoreSnapshot <- adminConnection.exportAuthorizedStoreSnapshot(domain, id.uid)
+      authorizedStoreSnapshot <- adminConnection.exportAuthorizedStoreSnapshot(id.uid)
     } yield {
       NodeIdentitiesDump(
         id,
@@ -54,7 +53,7 @@ class NodeIdentitiesStore(
     *
     * @return: the name of the file to which the backup was written
     */
-  def backupNodeIdentities(domain: DomainId)(implicit traceContext: TraceContext): Future[Path] =
+  def backupNodeIdentities()(implicit traceContext: TraceContext): Future[Path] =
     for {
       (dumpConfig, clock) <- Future {
         backup.getOrElse(
@@ -63,7 +62,7 @@ class NodeIdentitiesStore(
           )
         )
       }
-      dump <- getNodeIdentitiesDump(domain)
+      dump <- getNodeIdentitiesDump()
       path <- Future {
         blocking {
           // determine target file
