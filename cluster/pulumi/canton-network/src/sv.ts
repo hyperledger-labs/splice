@@ -382,11 +382,12 @@ function installMigrationIdSpecificComponents(
         defaultPostgres || postgres.installPostgres(xns, `mediator-${migrationId}-pg`, true);
       const participantPostgres =
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
-      const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
-        ? svConfig.onboardingName !== svConfigs[0].onboardingName
+      const logLevel =
+        config.envFlag('CN_DEPLOYMENT_NO_SV_DEBUG') ||
+        (config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') &&
+          svConfig.onboardingName !== svConfigs[0].onboardingName)
           ? 'INFO'
-          : 'DEBUG'
-        : 'DEBUG';
+          : 'DEBUG';
 
       const mustBeManuallyInitialized =
         disableCantonAutoInit ||

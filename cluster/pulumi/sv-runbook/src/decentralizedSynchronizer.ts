@@ -23,7 +23,10 @@ export function installDecentralizedSynchronizerNode(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
-  const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') ? 'INFO' : 'DEBUG';
+  const logLevel =
+    config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') || config.envFlag('CN_DEPLOYMENT_NO_SV_DEBUG')
+      ? 'INFO'
+      : 'DEBUG';
   const cometbft = installCometBftNode(
     svNamespace,
     svName,
