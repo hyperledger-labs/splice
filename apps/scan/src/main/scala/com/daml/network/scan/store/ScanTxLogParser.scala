@@ -63,7 +63,11 @@ class ScanTxLogParser(
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
           case LockedAmuletExpireAmulet(node) =>
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
+          // We track the sum of locked/unlocked so this is a noop.
           case LockedAmuletUnlock(_) =>
+            State.empty
+          // We track the sum of locked/unlocked so this is a noop.
+          case LockedAmuletOwnerExpireLock(_) =>
             State.empty
           case AnsRules_CollectInitialEntryPayment(_) =>
             fromAnsEntryPaymentCollection(

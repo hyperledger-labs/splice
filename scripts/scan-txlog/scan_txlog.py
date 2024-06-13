@@ -672,6 +672,10 @@ class LfValue:
     def get_locked_amulet_unlock_result_amulet_sum(self):
         return self.__get_record_field("amuletSum")
 
+    # data LockedAmulet_OwnerExpireLock -> amuletSum
+    def get_locked_amulet_owner_expire_lock_result_amulet_sum(self):
+        return self.__get_record_field("amuletSum")
+
     # data AmuletCreateSummary -> amulet
     def get_amulet_summary_amulet(self):
         return self.__get_record_field("amulet").get_contract_id()
@@ -1961,15 +1965,19 @@ class State:
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_locked_owner_expire_lock(self, transaction, event):
-        amulet_cid = event.exercise_result["amuletSum"]["amulet"]
+        summary = (
+            event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
+        )
+        amulet_cid = summary.get_amulet_summary_amulet()
+        round_number = summary.get_amulet_summary_round()
         amulet = transaction.by_contract_id[amulet_cid]
-        owner = amulet.payload["owner"]
-        del self.get_per_party_data(owner).locked_amulets[event.contract_id]
-        self.get_per_party_data(owner).amulets[amulet_cid] = amulet
+        del self.active_contracts[event.contract_id]
+        self.active_contracts[amulet_cid] = amulet
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self.get_transaction_logger(transaction).info(
             f"ExpireUnlock: Amulet {formatted_amulet} was unlocked because lock expired"
         )
+        return HandleTransactionResult.for_open_round(round_number)
 
     def handle_dso_rules_amulet_expire(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_amulet_expire_cid()
