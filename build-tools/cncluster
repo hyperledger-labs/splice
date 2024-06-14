@@ -2548,8 +2548,9 @@ function subcmd_disaster_recovery_test() {
   done
 
   token=$(subcmd_get_token validator1)
-  dump=$(curl -sSL --fail-with-body "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&force=true" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
-  echo "$(echo "$dump" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')" '{"migrationId": 1}' | jq -s add > "$tmpdir/dump-validator1.json"
+  dump=$(curl -sSL --fail-with-body "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
+         -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+  echo "$dump" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)' > "$tmpdir/dump-validator1.json"
   pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
 
@@ -2619,7 +2620,7 @@ function take_validator_disaster_recovery_dump() {
         token=$(subcmd_get_token "$namespace")
     fi
     dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq '.data_snapshot | with_entries(if .key == "acs_snapshot" then .key = "acsSnapshot" else if .key == "acs_timestamp" then .key = "acsTimestamp" else . end end)')"
-    echo "$dump" "{\"migrationId\": $migration_id}" | jq -s add > "$output_directory/${namespace}_dump.json"
+    echo "$dump" > "$output_directory/${namespace}_dump.json"
 }
 
 subcommand_whitelist[take_disaster_recovery_dumps]='Take disaster recovery dumps of the specified namespaces'

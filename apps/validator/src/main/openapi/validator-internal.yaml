@@ -126,6 +126,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: migration_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
         - in: query
           name: force
           required: false

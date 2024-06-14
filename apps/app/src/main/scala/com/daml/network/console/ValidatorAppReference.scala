@@ -119,12 +119,14 @@ abstract class ValidatorAppReference(
   @Help.Summary("Extract validator data snapshot")
   def getValidatorDomainDataSnapshot(
       timestamp: String,
+      migrationId: Option[Long] = None,
       force: Boolean = false,
   ): DomainMigrationDump = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.GetValidatorDomainDataSnapshot(
           Instant.parse(timestamp),
+          migrationId = migrationId,
           force = force,
         )
       )

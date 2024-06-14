@@ -399,7 +399,7 @@ class DisasterRecoveryIntegrationTest
               timestampBeforeDisaster.toString,
               force = true,
             )
-
+          validatorDump.migrationId shouldBe 1
           writeValidatorMigrationDumpFile(aliceValidatorBackend, validatorDump)
         }
 
@@ -585,9 +585,7 @@ class DisasterRecoveryIntegrationTest
 
     val fullDumpFile = migrationDumpFilePath(validator.name)
     clearOrCreate(fullDumpFile)
-    val dumpWithMigrationId = dump.copy(migrationId = 1)
-
-    fullDumpFile.write(dumpWithMigrationId.asJson.spaces2)
+    fullDumpFile.write(dump.asJson.spaces2)
   }
 
   private def writeMigrationDumpFile(

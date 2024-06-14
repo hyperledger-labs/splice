@@ -23,6 +23,12 @@ Upcoming
     SV app from backup.  ``migration_id`` is also an optional argument to set the latter,
     defaulting to 1 + the cluster's current migration ID.
 
+* Validator app
+
+  * ``/v0/admin/domain/data-snapshot`` now accepts ``migration_id`` as an argument,
+    overriding ``migrationId`` in the response payload.  The default ``migrationId`` is
+    now 1 + the cluster's current migration ID, rather than only the current migration ID.
+
 * Daml
 
   * Extended the Daml models to report the version number and a
