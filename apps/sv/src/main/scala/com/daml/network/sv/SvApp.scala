@@ -1214,6 +1214,9 @@ object SvApp {
                 _.exerciseDsoRules_OnboardValidator(
                   svParty.toProtoPrimitive,
                   svParty.toProtoPrimitive,
+                  // TODO(#12884) Fill this in
+                  None.toJava,
+                  None.toJava,
                 )
               )
               dsoStoreWithIngestion.connection

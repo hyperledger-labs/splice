@@ -23,6 +23,24 @@ Upcoming
     SV app from backup.  ``migration_id`` is also an optional argument to set the latter,
     defaulting to 1 + the cluster's current migration ID.
 
+* Daml
+
+  * Extended the Daml models to report the version number and a
+    periodic heartbeat of each validator to provide a better overview
+    of the network state and detect potential issues from upgrades
+    earlier. This requires a governance vote to upgrade the package config to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.3
+    amuletNameService  0.1.3
+    dsoGovernance      0.1.4
+    validatorLifecycle 0.1.0
+    wallet             0.1.3
+    walletPayments     0.1.3
+    ================== =======
+
 0.1.12
 ------
 

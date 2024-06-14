@@ -89,6 +89,8 @@ setupValidator' app name = do
     sponsor = sponsorParty
     validator = validatorParty
     faucetState = None
+    version = Some "0.1.0"
+    contactPoint = Some (name <> "@example.com")
 
   userId <- validateUserId name
   -- TODO(#2957): remove read-as DSO party.

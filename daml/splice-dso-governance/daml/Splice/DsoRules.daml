@@ -837,6 +837,8 @@ template DsoRules with
       with
         sponsor : Party
         validator : Party
+        version : Optional Text
+        contactPoint : Optional Text
       controller sponsor
       do
         require "Sponsor is an SV" (sponsor `Map.member` svs)
@@ -846,6 +848,8 @@ template DsoRules with
           sponsor
           validator
           faucetState = None
+          version
+          contactPoint
         return DsoRules_OnboardValidatorResult with ..
 
 

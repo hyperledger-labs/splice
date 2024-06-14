@@ -116,6 +116,8 @@ initDecentralizedSynchronizer isDevNet = do
     submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid $ DsoRules_OnboardValidator with
       sponsor = sv1
       validator = svParty
+      version = Some "0.1.0"
+      contactPoint = Some (svName <> "@example.com")
     (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
     submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
       newSvParty = svParty
@@ -166,10 +168,10 @@ svSubmits app sv mkCommands = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   submitMulti [sv] [app.dso] $ mkCommands dsoRulesCid
 
-onboardValidator : AmuletApp -> Party -> Party -> Script ()
-onboardValidator app sponsor validator = do
+onboardValidator : AmuletApp -> Party -> Text -> Party -> Script ()
+onboardValidator app sponsor validatorName validator = do
   svSubmits app sponsor $ \cid -> exerciseCmd cid $
-    DsoRules_OnboardValidator sponsor validator
+    DsoRules_OnboardValidator sponsor validator (Some "0.1.0") (Some (validatorName <> "@example.com"))
   pure ()
 
 

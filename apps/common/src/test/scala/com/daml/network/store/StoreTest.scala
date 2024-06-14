@@ -242,11 +242,15 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       faucetState: Option[validatorLicenseCodegen.FaucetState] = None,
   ) = {
     val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
+    val dummyVersion = "0.1.0"
+    val dummyContactPoint = s"${validator.uid.id}@example.com"
     val template = new validatorLicenseCodegen.ValidatorLicense(
       validator.toProtoPrimitive,
       sponsor.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       faucetState.toJava,
+      Some(dummyVersion).toJava,
+      Some(dummyContactPoint).toJava,
     )
     contract(
       identifier = templateId,

@@ -36,6 +36,7 @@ import com.google.protobuf.ByteString
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class HttpSvHandler(
     svUserName: String,
@@ -669,6 +670,9 @@ class HttpSvHandler(
           _.exerciseDsoRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
+            // TODO(#12884) Fill this in
+            None.toJava,
+            None.toJava,
           )
         ),
         validatorOnboarding.exercise(

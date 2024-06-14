@@ -1,6 +1,7 @@
 module Splice.ValidatorLicense where
 
 import DA.Action (void)
+import DA.Text as Text
 
 import Splice.Round
 import Splice.Types
@@ -20,6 +21,9 @@ data ValidatorLicense_WithdrawResult = ValidatorLicense_WithdrawResult
 
 data ValidatorLicense_CancelResult = ValidatorLicense_CancelResult
 
+data ValidatorLicense_ReportActiveResult = ValidatorLicense_ReportActiveResult with
+  licenseCid : ContractId ValidatorLicense
+
 data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResult
 
 -- | The existence of a validator license is what makes a validator an (onboarded) validator.
@@ -28,10 +32,15 @@ template ValidatorLicense with
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
     dso : Party                 -- ^ The party representing the operations of the decentralized synchronizer.
     faucetState : Optional FaucetState
+    version: Optional Text -- ^ The version the validator is currently on
+    contactPoint : Optional Text
+      -- ^ A contact point that can be used to reach the operator of the validator in case there are issues with the validator.
+      -- This can be an email address or a slack user name.
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding
 
+    ensure validValidatorLicense this
 
     -- We expect the wallet of the validator to call this choice automatically.
     choice ValidatorLicense_ReceiveFaucetCoupon : ValidatorLicense_ReceiveFaucetCouponResult
@@ -78,6 +87,21 @@ template ValidatorLicense with
       do return ValidatorLicense_CancelResult
 
 
+    choice ValidatorLicense_ReportActive : ValidatorLicense_ReportActiveResult
+      with
+        version : Text
+        contactPoint : Optional Text
+      controller validator
+        do licenseCid <- create this with
+             version = Some version
+             contactPoint
+           pure (ValidatorLicense_ReportActiveResult licenseCid)
+
+validValidatorLicense : ValidatorLicense -> Bool
+validValidatorLicense license =
+  optional True (\contactPoint -> Text.length contactPoint <= 256) license.contactPoint &&
+  optional True (\version -> Text.length version <= 256) license.version
+
 template ValidatorFaucetCoupon with
     dso : Party
     validator : Party
@@ -93,7 +117,6 @@ template ValidatorFaucetCoupon with
          -- Expiry requires proof of the coupon's round being closed, as all rounds advance on their own time.
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return ValidatorFaucetCoupon_DsoExpireResult
-
 
 -- instances
 ------------
