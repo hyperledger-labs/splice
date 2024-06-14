@@ -363,7 +363,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": "26256"
         },
-        "logLevel": "debug",
+        "logLevel": "info",
         "metrics": {
           "enable": true,
           "labels": [
@@ -413,7 +413,7 @@
       "values": {
         "disableAutoInit": false,
         "enablePostgresMetrics": true,
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_2",

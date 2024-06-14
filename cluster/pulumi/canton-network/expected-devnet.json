@@ -2824,7 +2824,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26226
         },
-        "logLevel": "debug",
+        "logLevel": "info",
         "metrics": {
           "enable": true,
           "labels": [
@@ -2946,7 +2946,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_2_mediator",
@@ -3186,7 +3186,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -3642,7 +3642,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26236
         },
-        "logLevel": "debug",
+        "logLevel": "info",
         "metrics": {
           "enable": true,
           "labels": [
@@ -3764,7 +3764,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_2_mediator",
@@ -4004,7 +4004,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
@@ -4460,7 +4460,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26246
         },
-        "logLevel": "debug",
+        "logLevel": "info",
         "metrics": {
           "enable": true,
           "labels": [
@@ -4582,7 +4582,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_2_mediator",
@@ -4822,7 +4822,7 @@
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "logLevel": "DEBUG",
+        "logLevel": "INFO",
         "metrics": {
           "enable": true,
           "migration": {
