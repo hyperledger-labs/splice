@@ -53,7 +53,18 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -UnresolvedAddressException
 -(resource.labels.container_name="sequencer-pg" AND ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
-${conditionalString(enableChaosMesh, '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")')}`,
+-(resource.labels.container_name="participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*")
+-(resource.labels.container_name="participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*")
+-(resource.labels.container_name="participant" AND jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients")
+-(resource.labels.container_name="participant" AND jsonPayload.message=~"channel.*shutdown did not complete gracefully in allotted")
+-(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants")
+-(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message")
+-(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
+-(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash")
+${conditionalString(
+  enableChaosMesh,
+  '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
+)}`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',
@@ -96,7 +107,10 @@ ${conditionalString(enableChaosMesh, '-(resource.labels.namespace_name="multi-va
           comparison: 'COMPARISON_GT',
           //retest period
           duration: '300s',
-          filter: pulumi.interpolate`resource.type="k8s_container" ${conditionalString(enableChaosMesh, 'AND resource.labels.namespace_name != "sv-4" ')} AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
+          filter: pulumi.interpolate`resource.type="k8s_container" ${conditionalString(
+            enableChaosMesh,
+            'AND resource.labels.namespace_name != "sv-4" '
+          )} AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
           trigger: {
             count: alertCount,
           },
