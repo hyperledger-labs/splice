@@ -1727,7 +1727,14 @@
       "values": {
         "global": {
           "istioNamespace": "cluster-ingress",
-          "logAsJson": true
+          "logAsJson": true,
+          "proxy": {
+            "resources": {
+              "limits": {
+                "memory": "4096Mi"
+              }
+            }
+          }
         },
         "meshConfig": {
           "accessLogEncoding": "JSON",

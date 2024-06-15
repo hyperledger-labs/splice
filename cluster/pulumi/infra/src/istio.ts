@@ -67,6 +67,13 @@ function configureIstiod(
         global: {
           istioNamespace: ingressNs.metadata.name,
           logAsJson: true,
+          proxy: {
+            resources: {
+              limits: {
+                memory: '4096Mi',
+              },
+            },
+          },
         },
         pilot: {
           autoscaleMax: 10,
