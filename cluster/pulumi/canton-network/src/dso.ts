@@ -138,11 +138,6 @@ export class Dso extends pulumi.ComponentResource {
     }));
 
     const foundingSvRewardWeightBps = 140_000;
-    const initialTickDurationS = 600;
-    // chosen for $1/360 days at above tick duration
-    const initialHoldingFee =
-      Math.round((100000_00000 * 1.0) / 360.0 / ((24.0 * 60.0 * 60.0) / initialTickDurationS)) /
-      100000_00000;
 
     const runningMigration = this.args.decentralizedSynchronizerUpgradeConfig.isRunningMigration();
     const founder = await this.installSvNode(
@@ -153,8 +148,6 @@ export class Dso extends pulumi.ComponentResource {
             type: 'found-collective',
             foundingSvRewardWeightBps,
             roundZeroDuration: config.optionalEnv('ROUND_ZERO_DURATION'),
-            initialTickDurationS,
-            initialHoldingFee,
           },
       {
         founder: founderCometBftConf,

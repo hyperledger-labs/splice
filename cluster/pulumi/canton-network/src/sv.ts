@@ -83,8 +83,6 @@ export type SvOnboarding =
       type: 'found-collective';
       foundingSvRewardWeightBps: number;
       roundZeroDuration?: string;
-      initialTickDurationS: number;
-      initialHoldingFee: number;
     }
   | {
       type: 'join-with-key';
@@ -463,14 +461,6 @@ function installSvApp(
     onboardingRoundZeroDuration:
       config.onboarding.type == 'found-collective'
         ? config.onboarding.roundZeroDuration
-        : undefined,
-    initialTickDuration:
-      config.onboarding.type == 'found-collective'
-        ? `${config.onboarding.initialTickDurationS} seconds`
-        : undefined,
-    initialHoldingFee:
-      config.onboarding.type == 'found-collective'
-        ? config.onboarding.initialHoldingFee
         : undefined,
     initialSynchronizerFeesConfig:
       config.onboarding.type == 'found-collective' ? initialSynchronizerFeesConfig : undefined,

@@ -969,7 +969,6 @@
           "prefix": "main/sv-1"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "initialHoldingFee": 0.0000192901,
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,
@@ -977,7 +976,6 @@
           "minTopupAmount": 200000,
           "readVsWriteScalingFactor": 200
         },
-        "initialTickDuration": "600 seconds",
         "isDevNet": false,
         "metrics": {
           "enable": true
