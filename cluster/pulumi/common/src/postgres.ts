@@ -33,7 +33,7 @@ function generatePassword(name: string, opts?: pulumi.ResourceOptions): random.R
 }
 
 export interface Postgres extends pulumi.Resource {
-  readonly instanceName: string;
+  readonly name: string;
   readonly namespace: ExactNamespace;
 
   readonly address: pulumi.Output<string>;
@@ -41,27 +41,22 @@ export interface Postgres extends pulumi.Resource {
 }
 
 export class CloudPostgres extends pulumi.ComponentResource implements Postgres {
-  instanceName: string;
+  name: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   secretName: string;
 
   private readonly pgSvc: gcp.sql.DatabaseInstance;
 
-  constructor(xns: ExactNamespace, instanceName: string, alias: string, secretName: string) {
-    const instanceLogicalName = xns.logicalName + '-' + instanceName;
-    const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
-    const baseOpts = {
-      protect: protectCloudSql,
-      aliases: [{ name: instanceLogicalNameAlias }],
-    };
-    super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
-    this.instanceName = instanceName;
+  constructor(xns: ExactNamespace, name: string, secretName: string) {
+    const logicalName = xns.logicalName + '-' + name;
+    super('canton:cloud:postgres', logicalName);
+    this.name = name;
     this.namespace = xns;
     this.secretName = secretName;
 
     this.pgSvc = new gcp.sql.DatabaseInstance(
-      instanceLogicalName,
+      logicalName,
       {
         databaseVersion: 'POSTGRES_14',
         deletionProtection: false,
@@ -90,13 +85,16 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           },
         },
       },
-      { ...baseOpts, parent: this }
+      {
+        parent: this,
+        protect: protectCloudSql,
+      }
     );
 
     this.address = this.pgSvc.privateIpAddress;
 
     const pgDB = new gcp.sql.Database(
-      `${this.namespace.logicalName}-db-${this.instanceName}-cantonnet`,
+      `${this.namespace.logicalName}-db-${this.name}-cantonnet`,
       {
         instance: this.pgSvc.name,
         name: 'cantonnet',
@@ -105,19 +103,17 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         parent: this,
         deletedWith: this.pgSvc,
         protect: protectCloudSql,
-        aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
       }
     );
 
-    const password = generatePassword(`${instanceLogicalName}-passwd`, {
+    const password = generatePassword(`${logicalName}-passwd`, {
       parent: this,
       protect: protectCloudSql,
-      aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
     new gcp.sql.User(
-      `user-${instanceLogicalName}`,
+      `user-${logicalName}`,
       {
         instance: this.pgSvc.name,
         name: 'cnadmin',
@@ -128,7 +124,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletedWith: pgDB,
         dependsOn: [passwordSecret],
         protect: protectCloudSql,
-        aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
       }
     );
 
@@ -140,43 +135,27 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
 }
 
 export class CNPostgres extends pulumi.ComponentResource implements Postgres {
-  instanceName: string;
+  name: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   pg: Release;
   secretName: string;
 
-  constructor(
-    xns: ExactNamespace,
-    instanceName: string,
-    alias: string,
-    secretName: string,
-    values?: ChartValues
-  ) {
-    const logicalName = xns.logicalName + '-' + instanceName;
-    const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
-    const baseOpts = {
-      protect: protectCloudSql,
-      aliases: [{ name: logicalNameAlias }],
-    };
-    super('canton:network:postgres', logicalName, [], baseOpts);
+  constructor(xns: ExactNamespace, name: string, secretName: string, values?: ChartValues) {
+    const logicalName = xns.logicalName + '-' + name;
+    super('canton:network:postgres', logicalName, [], { protect: protectCloudSql });
 
-    this.instanceName = instanceName;
+    this.name = name;
     this.namespace = xns;
     this.secretName = secretName;
-    this.address = pulumi.output(
-      `${this.instanceName}.${this.namespace.logicalName}.svc.cluster.local`
-    );
-    const password = generatePassword(`${logicalName}-passwd`, {
-      parent: this,
-      aliases: [{ name: logicalNameAlias }],
-    }).result;
+    this.address = pulumi.output(`${this.name}.${this.namespace.logicalName}.svc.cluster.local`);
+    const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
     const pg = installCNHelmChart(
       xns,
-      instanceName,
+      name,
       'cn-postgres',
       _.merge(values || {}, {
         db: {
@@ -187,12 +166,12 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
       }),
       defaultVersion,
-      { ...baseOpts, dependsOn: [passwordSecret] }
+      { dependsOn: [passwordSecret] }
     );
     this.pg = pg;
 
     this.registerOutputs({
-      address: pg.id.apply(() => `${instanceName}.${xns.logicalName}.svc.cluster.local`),
+      address: pg.id.apply(() => `${name}.${xns.logicalName}.svc.cluster.local`),
       secretName: this.secretName,
     });
   }
@@ -202,16 +181,15 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
 
 export function installPostgres(
   xns: ExactNamespace,
-  instanceName: string,
-  alias: string,
+  name: string,
   uniqueSecretName = false
 ): Postgres {
   let ret: Postgres;
-  const secretName = uniqueSecretName ? alias + '-secrets' : 'postgres-secrets';
+  const secretName = uniqueSecretName ? name + '-secrets' : 'postgres-secrets';
   if (enableCloudSql) {
-    ret = new CloudPostgres(xns, instanceName, alias, secretName);
+    ret = new CloudPostgres(xns, name, secretName);
   } else {
-    ret = new CNPostgres(xns, instanceName, alias, secretName);
+    ret = new CNPostgres(xns, name, secretName);
   }
   return ret;
 }

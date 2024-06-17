@@ -51,11 +51,10 @@ export async function installValidator1(
   );
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(xns, 'postgres', 'postgres', false)
+    ? postgres.installPostgres(xns, 'postgres', false)
     : undefined;
 
-  const validatorPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `validator-pg`, `validator-pg`, true);
+  const validatorPostgres = defaultPostgres || postgres.installPostgres(xns, `validator-pg`, true);
   const validatorDbName = `validator1`;
 
   const validatorSecrets = await installValidatorSecrets({
@@ -95,7 +94,7 @@ export async function installValidator1(
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
-      postgresName: validatorPostgres.instanceName,
+      postgresName: validatorPostgres.name,
     },
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,

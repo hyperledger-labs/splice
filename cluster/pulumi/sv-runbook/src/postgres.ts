@@ -17,14 +17,14 @@ export function installPostgres(
   selfHostedValuesFile: string
 ): CNPostgres | CloudPostgres {
   if (cloudSqlEnabled) {
-    return new CloudPostgres(xns, name, name, secretName);
+    return new CloudPostgres(xns, name, secretName);
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`
     );
     const volumeSizeOverride = determineVolumeSizeOverride(valuesFromFile.db?.volumeSize);
     const values = _.merge(valuesFromFile || {}, { db: { volumeSize: volumeSizeOverride } });
-    return new CNPostgres(xns, name, name, secretName, values);
+    return new CNPostgres(xns, name, secretName, values);
   }
 }
 

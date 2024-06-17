@@ -35,7 +35,7 @@ export async function installSplitwell(
 
   const sharedPostgres = splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'splitwell-pg', 'splitwell-pg', splitPostgresInstances);
+    : postgres.installPostgres(xns, 'splitwell-pg', splitPostgresInstances);
 
   const loopback = installCNHelmChart(
     xns,
@@ -63,7 +63,7 @@ export async function installSplitwell(
     dependsOn.concat([loopback])
   );
 
-  const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);
+  const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', true);
   const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
@@ -95,8 +95,7 @@ export async function installSplitwell(
     { dependsOn: dependsOn.concat([participant]) }
   );
 
-  const validatorPostgres =
-    sharedPostgres || postgres.installPostgres(xns, 'validator-pg', 'validator-pg', true);
+  const validatorPostgres = sharedPostgres || postgres.installPostgres(xns, 'validator-pg', true);
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = dependsOn.concat([
@@ -134,7 +133,7 @@ export async function installSplitwell(
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
-      postgresName: validatorPostgres.instanceName,
+      postgresName: validatorPostgres.name,
     },
     scanAddress: scanAddress,
     secrets: {

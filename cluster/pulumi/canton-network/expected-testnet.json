@@ -756,7 +756,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "splitwell-db-participant-pg-cantonnet",
+    "name": "splitwell-db-participant-2-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -814,6 +814,59 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "splitwell-participant-2-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "splitwell-participant-2-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "splitwell-participant-2-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "cn-participant",
       "compat": "true",
       "name": "participant-2",
@@ -856,7 +909,7 @@
         },
         "persistence": {
           "databaseName": "participant_2",
-          "postgresName": "participant-pg",
+          "postgresName": "participant-2-pg",
           "schema": "participant",
           "secretName": "participant-2-pg-secrets"
         }
@@ -866,59 +919,6 @@
     "name": "splitwell-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "splitwell-participant-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "splitwell-participant-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "test"
-        }
-      }
-    },
-    "name": "splitwell-participant-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -1336,7 +1336,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-mediator-pg-cantonnet",
+    "name": "sv-1-db-mediator-2-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1346,7 +1346,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-participant-pg-cantonnet",
+    "name": "sv-1-db-participant-2-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1356,7 +1356,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-sequencer-pg-cantonnet",
+    "name": "sv-1-db-sequencer-2-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1398,7 +1398,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_2_mediator",
-            "postgresName": "mediator-pg",
+            "postgresName": "mediator-2-pg",
             "secretName": "mediator-2-pg-secrets"
           }
         },
@@ -1418,7 +1418,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_2_sequencer",
-            "postgresName": "sequencer-pg",
+            "postgresName": "sequencer-2-pg",
             "secretName": "sequencer-2-pg-secrets"
           }
         }
@@ -1507,7 +1507,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-pg-passwd",
+    "name": "sv-1-mediator-2-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1515,7 +1515,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-mediator-pg",
+    "name": "sv-1-mediator-2-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1548,7 +1548,60 @@
         }
       }
     },
-    "name": "sv-1-mediator-pg",
+    "name": "sv-1-mediator-2-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-participant-2-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-participant-2-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "sv-1-participant-2-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1599,7 +1652,7 @@
         },
         "persistence": {
           "databaseName": "participant_2",
-          "postgresName": "participant-pg",
+          "postgresName": "participant-2-pg",
           "schema": "participant",
           "secretName": "participant-2-pg-secrets"
         }
@@ -1609,59 +1662,6 @@
     "name": "sv-1-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-participant-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-participant-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "test"
-        }
-      }
-    },
-    "name": "sv-1-participant-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -1721,7 +1721,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-pg-passwd",
+    "name": "sv-1-sequencer-2-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1729,7 +1729,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-sequencer-pg",
+    "name": "sv-1-sequencer-2-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1762,7 +1762,7 @@
         }
       }
     },
-    "name": "sv-1-sequencer-pg",
+    "name": "sv-1-sequencer-2-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -2033,7 +2033,7 @@
         "value": null
       }
     },
-    "name": "user-splitwell-participant-pg",
+    "name": "user-splitwell-participant-2-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -2089,7 +2089,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-pg",
+    "name": "user-sv-1-mediator-2-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -2103,7 +2103,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-pg",
+    "name": "user-sv-1-participant-2-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -2117,7 +2117,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-pg",
+    "name": "user-sv-1-sequencer-2-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -2131,7 +2131,7 @@
         "value": null
       }
     },
-    "name": "user-validator1-participant-pg",
+    "name": "user-validator1-participant-2-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -2193,7 +2193,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "validator1-db-participant-pg-cantonnet",
+    "name": "validator1-db-participant-2-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -2241,6 +2241,59 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-participant-2-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-participant-2-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "us-central1",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "test"
+        }
+      }
+    },
+    "name": "validator1-participant-2-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "cn-participant",
       "compat": "true",
       "name": "participant-2",
@@ -2283,7 +2336,7 @@
         },
         "persistence": {
           "databaseName": "participant_2",
-          "postgresName": "participant-pg",
+          "postgresName": "participant-2-pg",
           "schema": "participant",
           "secretName": "participant-2-pg-secrets"
         }
@@ -2293,59 +2346,6 @@
     "name": "validator1-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "validator1-participant-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "validator1-participant-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "test"
-        }
-      }
-    },
-    "name": "validator1-participant-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
