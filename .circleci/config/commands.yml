@@ -1200,3 +1200,45 @@ commands:
           name: Print TARGET_CLUSTER for debugging
           command: echo "TARGET_CLUSTER set to $TARGET_CLUSTER"
           when: << parameters.when >>
+
+  preview_pulumi:
+    parameters:
+      <<: *cluster-parameter
+      project:
+        type: string
+      when_env:
+        type: string
+        default: ""
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Run preview << parameters.project >> on cluster << parameters.cluster >>
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep SLACK_ACCESS_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
+          gce_authenticate: true
+          cmd: |
+            if [ -z "<< parameters.when_env >>" ] || (env-bool "<< parameters.when_env >>"); then
+              cncluster activate
+              export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
+              # overwrite the use of internal DNS in the config file directly
+              sed -i 's/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
+              cncluster pulumi << parameters.project >> preview --diff
+            else
+              echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
+            fi

@@ -16,5 +16,5 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          project: << pipeline.parameters.pulumi-project >>

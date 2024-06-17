@@ -101,10 +101,6 @@ parameters:
   upgrade-version:
     type: string
     default: ""
-  # The pulumi project to be used in the `preview_pulumi_changes` job
-  pulumi-project:
-    type: string
-    default: ""
 
 notify-fail: &notify-fail
   context: slack-context

@@ -106,10 +106,6 @@ parameters:
   upgrade-version:
     type: string
     default: ""
-  # The pulumi project to be used in the `preview_pulumi_changes` job
-  pulumi-project:
-    type: string
-    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -1378,6 +1374,48 @@ commands:
           name: Print TARGET_CLUSTER for debugging
           command: echo "TARGET_CLUSTER set to $TARGET_CLUSTER"
           when: << parameters.when >>
+
+  preview_pulumi:
+    parameters:
+      <<: *cluster-parameter
+      project:
+        type: string
+      when_env:
+        type: string
+        default: ""
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Run preview << parameters.project >> on cluster << parameters.cluster >>
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep SLACK_ACCESS_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
+          gce_authenticate: true
+          cmd: |
+            if [ -z "<< parameters.when_env >>" ] || (env-bool "<< parameters.when_env >>"); then
+              cncluster activate
+              export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
+              # overwrite the use of internal DNS in the config file directly
+              sed -i 's/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
+              cncluster pulumi << parameters.project >> preview --diff
+            else
+              echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
+            fi
 jobs:
   deploy_sv_runbook:
     machine:
@@ -3481,12 +3519,12 @@ jobs:
   preview_pulumi_changes:
     parameters:
       <<: *cluster-parameter
-      project:
-        type: string
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
       - setup_nix
@@ -3496,32 +3534,28 @@ jobs:
           cmd: |
             make -j cluster/pulumi/build
           cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Run preview
+      # required for the sv-runbook preview to connect to validator1
+      - setup_vpn
+      - setup_vpn_routes:
           cluster: << parameters.cluster >>
-          additional_nix_args: >
-             --keep GITHUB_TOKEN
-             --keep SLACK_ACCESS_TOKEN
-             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-             --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
-             --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
-             --keep ARTIFACTORY_USER
-             --keep ARTIFACTORY_PASSWORD
-             --keep K6_USERS_PASSWORD
-             --keep K6_VALIDATOR_ADMIN_USERNAME
-             --keep K6_VALIDATOR_ADMIN_PASSWORD
-          gce_authenticate: true
-          cmd: |
-            cncluster activate
-            export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
-            cncluster pulumi << parameters.project >> preview --diff
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "canton-network"
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "infra"
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "sv-runbook"
+          when_env: "CN_DEPLOY_SV_RUNBOOK"
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "multi-validator"
+          when_env: "CN_DEPLOY_MULTI_VALIDATOR"
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "validator-runbook"
+          when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
 
 
   reset_cluster:
@@ -6050,8 +6084,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          project: << pipeline.parameters.pulumi-project >>
 
   testnet_health_check:
     when:
