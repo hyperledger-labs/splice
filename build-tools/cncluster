@@ -2735,6 +2735,7 @@ function subcmd_list_sv_cometbft_addresses() {
 subcommand_whitelist[unprotect_dbs]='Unprotects all DB resources corresponding to the given migration id'
 
 function subcmd_unprotect_dbs() {
+  # TODO (#12883): migration id should no longer be required
   migration_id="${1:-}"
 
   if [ "$#" -lt 2 ]; then
@@ -2765,7 +2766,11 @@ function subcmd_unprotect_dbs() {
     fi
     for db in "${protected_dbs[@]}";
     do
-      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-pg-cantonnet" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-pg-passwd" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/databaseInstance:DatabaseInstance::$ns-$db-pg" --yes || true
+      # TODO (#12883): these are legacy, delete them once all clusters have been renamed and have the alias.
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-$migration_id-pg-cantonnet" --yes || true
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-$migration_id-pg-passwd" --yes || true

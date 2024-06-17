@@ -30,12 +30,17 @@ export function installMigrationSpecificValidatorParticipant(
   logLevel?: LogLevel,
   dependsOn: pulumi.Resource[] = []
 ): Release {
+  const participantPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      'participant-pg',
+      `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
   return installMigrationIdSpecificComponent(
     decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
-      const participantPostgres =
-        defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
-
       return installParticipant(
         xns,
         `participant-${migrationId}`,
@@ -85,7 +90,7 @@ export function installParticipant(
         schema: 'participant',
         host: postgres.address,
         secretName: postgres.secretName,
-        postgresName: postgres.name,
+        postgresName: postgres.instanceName,
       },
       participantAdminUserNameFrom,
       disableAutoInit,
