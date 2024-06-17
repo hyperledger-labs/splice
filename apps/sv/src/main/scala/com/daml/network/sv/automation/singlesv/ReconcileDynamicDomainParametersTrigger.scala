@@ -7,12 +7,13 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerConfig
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTrigger.Task
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AmuletConfigSchedule
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
-import com.digitalasset.canton.config.PositiveDurationSeconds
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.tracing.TraceContext
@@ -21,6 +22,8 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** A trigger to reconcile the domain config from the AmuletConfig to the dynamic domain parameters
   */
@@ -28,7 +31,6 @@ class ReconcileDynamicDomainParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
-    acsCommitmentReconcilationInterval: PositiveDurationSeconds,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -42,9 +44,20 @@ class ReconcileDynamicDomainParametersTrigger(
       decentralizedSynchronizerId <- store.getAmuletRulesDomain()(tc)
       amuletRules <- store.getAmuletRules()
       amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(context.clock.now)
+      dsoRules <- store.getDsoRules()
+      decentralizedSynchronizerConfig =
+        dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala
+          .get(decentralizedSynchronizerId.toProtoPrimitive)
       state <- participantAdminConnection.getDomainParametersState(decentralizedSynchronizerId)
-      updatedConfig = updateDomainParameters(state.mapping.parameters, amuletConfig)
-    } yield if (state.mapping.parameters != updatedConfig) Seq(Task(amuletConfig)) else Seq.empty
+      updatedConfig = updateDomainParameters(
+        state.mapping.parameters,
+        amuletConfig,
+        decentralizedSynchronizerConfig,
+      )
+    } yield
+      if (state.mapping.parameters != updatedConfig)
+        Seq(Task(amuletConfig, decentralizedSynchronizerConfig))
+      else Seq.empty
   }
 
   override protected def completeTask(
@@ -55,7 +68,7 @@ class ReconcileDynamicDomainParametersTrigger(
       participantId <- participantAdminConnection.getId()
       _ <- participantAdminConnection.ensureDomainParameters(
         decentralizedSynchronizerId,
-        updateDomainParameters(_, task.amuletConfig),
+        updateDomainParameters(_, task.amuletConfig, task.synchronizerConfig),
         participantId.namespace.fingerprint,
       )
     } yield {
@@ -74,6 +87,7 @@ class ReconcileDynamicDomainParametersTrigger(
   private def updateDomainParameters(
       existingDomainParameters: DynamicDomainParameters,
       amuletConfig: AmuletConfig[USD],
+      synchronizerConfig: Option[SynchronizerConfig],
   ): DynamicDomainParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     existingDomainParameters.tryUpdate(
@@ -89,16 +103,27 @@ class ReconcileDynamicDomainParametersTrigger(
             ),
           )
         },
-      reconciliationInterval = PositiveSeconds.fromConfig(acsCommitmentReconcilationInterval),
+      reconciliationInterval = synchronizerConfig
+        .flatMap(_.acsCommitmentReconciliationInterval.toScala)
+        .fold(
+          PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval)
+        )(PositiveSeconds.tryOfSeconds(_)),
     )
   }
 }
 
 object ReconcileSynchronizerFeesConfigTrigger {
-  case class Task(amuletConfig: AmuletConfig[USD]) extends PrettyPrinting {
+  case class Task(amuletConfig: AmuletConfig[USD], synchronizerConfig: Option[SynchronizerConfig])
+      extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = {
-      prettyOfClass(param("globalFeesConfig", _.amuletConfig.decentralizedSynchronizer.fees))
+      prettyOfClass(
+        param("globalFeesConfig", _.amuletConfig.decentralizedSynchronizer.fees),
+        param(
+          "acsCommitmentreconciliationInterval",
+          _.synchronizerConfig.flatMap(_.acsCommitmentReconciliationInterval.toScala),
+        ),
+      )
     }
   }
 }

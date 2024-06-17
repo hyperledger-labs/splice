@@ -32,6 +32,9 @@ data SynchronizerConfig = SynchronizerConfig with
     cometBftGenesisJson : Text
       -- ^ The CometBftGenesis json value required for new svs to bring up
       -- their CometBft nodes for this synchronizer.
+    acsCommitmentReconciliationInterval : Optional Int
+      -- ^ Participants connected to the decentralized synchronizer exchange ACS commitment messages
+      -- every reconciliation interval seconds.
   deriving (Eq, Show)
 
 -- | The state of a synchronizer.

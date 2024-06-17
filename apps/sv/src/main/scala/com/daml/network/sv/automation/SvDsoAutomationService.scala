@@ -319,7 +319,6 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        config.acsCommitmentReconcilationInterval,
       )
     )
   }

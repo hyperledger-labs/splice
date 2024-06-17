@@ -7,13 +7,13 @@ import com.daml.network.codegen.java.splice.cometbft.{
   CometBftNodeConfig,
 }
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
-  SynchronizerConfig,
-  SynchronizerNodeConfig,
-  SynchronizerNodeConfigLimits,
+  DsoDecentralizedSynchronizerConfig,
   MediatorConfig,
   ScanConfig,
   SequencerConfig,
-  DsoDecentralizedSynchronizerConfig,
+  SynchronizerConfig,
+  SynchronizerNodeConfig,
+  SynchronizerNodeConfigLimits,
 }
 import com.daml.network.codegen.java.splice.dsorules.DsoRulesConfig
 import com.daml.network.codegen.java.splice.{cometbft, dso}
@@ -21,7 +21,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -31,7 +31,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
-import java.time.{Duration as JavaDuration}
+import java.time.Duration as JavaDuration
 import java.util.{Base64, Optional}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,6 +42,12 @@ object SvUtil {
 
   // Assumption: the founder node is run by the foundation
   val DefaultFoundingNodeWeight: Long = 10_000L
+
+  // We set the reconciliation interval for ACS commitments to 30 mins by default to ensure that
+  // frequent ACS commitments do not eat up the base rate traffic and prevent validators from topping up
+  // (See #12107).
+  val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
+    PositiveDurationSeconds.ofMinutes(30)
 
   def weightDistributionForSv(
       memberSvRewardWeightBps: Long,
@@ -94,11 +100,11 @@ object SvUtil {
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
           "TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.",
           // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
+          Optional.of(defaultAcsCommitmentReconciliationInterval.duration.toSeconds),
         )
       ).asJava,
       domainId.toProtoPrimitive, // lastDomainId
       domainId.toProtoPrimitive, // activeSynchronizer
-
     )
 
   case class LocalSequencerConfig(sequencerId: String, url: String, migrationId: Long)

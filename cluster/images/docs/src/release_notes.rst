@@ -34,7 +34,12 @@ Upcoming
   * Extended the Daml models to report the version number and a
     periodic heartbeat of each validator to provide a better overview
     of the network state and detect potential issues from upgrades
-    earlier. This requires a governance vote to upgrade the package config to:
+    earlier.
+  * The frequency of ACS commitments can now be modified via a
+    "Set DsoRules configuration" governance by changing the newly added ``acsCommitmentReconciliationInterval`` configuration
+    parameter in the DsoRules (set by default to 30 minutes).
+
+    This requires a governance vote to upgrade the package config to:
 
     ================== =======
     name               version

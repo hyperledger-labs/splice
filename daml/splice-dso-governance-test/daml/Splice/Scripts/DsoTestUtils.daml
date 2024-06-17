@@ -49,6 +49,7 @@ initDecentralizedSynchronizer isDevNet = do
   let initialSynchronizerConfig = SynchronizerConfig with
         state = DS_Operational
         cometBftGenesisJson = "<genesis-json>"
+        acsCommitmentReconciliationInterval = Some 1800
   let initialDsoDecentralizedSynchronizerConfig =  DsoDecentralizedSynchronizerConfig with
         synchronizers = Map.fromList [("synchronizer-id", initialSynchronizerConfig)]
         lastSynchronizerId = "synchronizer-id"

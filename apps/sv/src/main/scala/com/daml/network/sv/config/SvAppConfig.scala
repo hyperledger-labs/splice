@@ -187,11 +187,6 @@ case class SvAppBackendConfig(
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(10),
-    // We set the reconciliation interval for ACS commitments to 30 mins to ensure that frequent ACS commitments
-    // do not eat up the base rate traffic and prevent validators from topping up (See #12107).
-    // TODO(#12194) Remove this once this is specified in AmuletConfig.
-    acsCommitmentReconcilationInterval: PositiveDurationSeconds =
-      PositiveDurationSeconds.ofMinutes(30),
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

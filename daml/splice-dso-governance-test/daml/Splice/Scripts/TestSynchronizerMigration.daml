@@ -27,7 +27,10 @@ testSynchronizerMigration = do
   let newSynchronizerId = "new-synchronizer-id"
   executeDsoRulesConfigChange app $ \config ->
     let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
-        newSynchronizerConfig = SynchronizerConfig with state = DS_Bootstrapping; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+        newSynchronizerConfig = SynchronizerConfig with
+          state = DS_Bootstrapping
+          cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+          acsCommitmentReconciliationInterval = Some 1800
         newDecentralizedSynchronizerConfig = decentralizedSynchronizerConfig with
           synchronizers = Map.insert newSynchronizerId newSynchronizerConfig decentralizedSynchronizerConfig.synchronizers
           lastSynchronizerId = newSynchronizerId
@@ -54,7 +57,10 @@ testSynchronizerMigration = do
   -- SVs mark the synchronizer as operational
   executeDsoRulesConfigChange app $ \config ->
     let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
-        newSynchronizerConfig = SynchronizerConfig with state = DS_Operational; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+        newSynchronizerConfig = SynchronizerConfig with
+          state = DS_Operational
+          cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+          acsCommitmentReconciliationInterval = Some 1800
         newDecentralizedSynchronizerConfig = decentralizedSynchronizerConfig with
           synchronizers = Map.insert newSynchronizerId newSynchronizerConfig decentralizedSynchronizerConfig.synchronizers
           lastSynchronizerId = newSynchronizerId

@@ -317,7 +317,7 @@ class FoundingNodeInitializer(
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
-            PositiveSeconds.fromConfig(config.acsCommitmentReconcilationInterval),
+            PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
         )
         for {
           _ <- retryProvider.ensureThatO(
