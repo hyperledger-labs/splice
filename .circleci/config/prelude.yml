@@ -52,6 +52,7 @@ parameters:
         restore-validator-cidaily-testnet,
         backup-devnet,
         backup-testnet,
+        backup-mainnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,

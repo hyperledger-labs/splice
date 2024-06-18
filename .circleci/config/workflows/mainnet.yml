@@ -1,0 +1,18 @@
+workflow:
+  backup_mainnet:
+    when:
+      equal: [ backup-mainnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_cluster:
+          filters:
+            branches:
+              only:
+                - deployment/mainnet
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          cluster: "mainnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline

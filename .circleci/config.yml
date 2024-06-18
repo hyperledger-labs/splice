@@ -57,6 +57,7 @@ parameters:
         restore-validator-cidaily-testnet,
         backup-devnet,
         backup-testnet,
+        backup-mainnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -6066,6 +6067,24 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+
+  backup_mainnet:
+    when:
+      equal: [ backup-mainnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_cluster:
+          filters:
+            branches:
+              only:
+                - deployment/mainnet
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          cluster: "mainnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
 
   update_deployment:
     when:
