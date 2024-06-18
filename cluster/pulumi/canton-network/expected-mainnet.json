@@ -1076,7 +1076,14 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|663d6fd6902e3665a5dc1ad1"
+        "validatorWalletUser": "auth0|663d6fd6902e3665a5dc1ad1",
+        "walletSweep": {
+          "Digital-Asset-2::12201fb4bd489a988bbbd7998de69b5782c552de7b309833a57806c26c273eccff71": {
+            "maxBalanceUSD": 3000,
+            "minBalanceUSD": 100,
+            "receiver": "validator_validator_service_user::1220c0069a820ff9455baac9f754fb3ca73a306863a7b68c84e39aca3ecad3b3c643"
+          }
+        }
       },
       "version": "0.1.8"
     },
