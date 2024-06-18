@@ -84,13 +84,17 @@ setupValidator' : AmuletApp -> Text -> Script AmuletUser
 setupValidator' app name = do
   validatorParty <- allocatePartyWithHint name (PartyIdHint name)
   sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
+  now <- getTime
   submitMulti [validatorParty, app.dso] [] $ createCmd ValidatorLicense with
     dso = app.dso
     sponsor = sponsorParty
     validator = validatorParty
     faucetState = None
-    version = Some "0.1.0"
-    contactPoint = Some (name <> "@example.com")
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = name <> "@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
 
   userId <- validateUserId name
   -- TODO(#2957): remove read-as DSO party.

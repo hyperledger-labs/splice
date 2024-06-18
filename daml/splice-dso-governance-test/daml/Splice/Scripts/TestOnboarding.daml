@@ -27,6 +27,8 @@ testOnboardValidator = do
   -- a new validator prepares his participant
   v1 <- allocateParty "v1"
 
+  now <- getTime
+
   -- sv2 (not the DSO delegate) onboards the new validator
   onboardValidator app sv2 "v1" v1
 
@@ -37,26 +39,61 @@ testOnboardValidator = do
     sponsor = sv2
     dso
     faucetState = None
-    version = Some "0.1.0"
-    contactPoint = Some "v1@example.com"
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = "v1@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
 
   -- so v1 is onboarded!
 
   -- v1 can update its version and contact point
 
-  submit v1 $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive with
+  -- fails without advancing the time
+  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
     version = "0.2.0"
-    contactPoint = Some "v1@example2.com"
+    contactPoint = "v1@example2.com"
+
+  passTime (hours 1)
+  metadataUpdateTime <- getTime
+
+  -- works after advancing time
+  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
+    version = "0.2.0"
+    contactPoint = "v1@example2.com"
 
   -- license is updated
+  [(validatorLicenseCid, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = Some ValidatorLicenseMetadata with
+      lastUpdatedAt = metadataUpdateTime
+      version = "0.2.0"
+      contactPoint = "v1@example2.com"
+    lastActiveAt = Some metadataUpdateTime
+
+
+  -- activity cannot be reported without advancing time
+  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+
+  passTime (hours 1)
+  now <- getTime
+
+  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
   [(_, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   validatorLicense === ValidatorLicense with
     validator = v1
     sponsor = sv2
     dso
     faucetState = None
-    version = Some "0.2.0"
-    contactPoint = Some "v1@example2.com"
+    metadata = Some ValidatorLicenseMetadata with
+      lastUpdatedAt = metadataUpdateTime
+      version = "0.2.0"
+      contactPoint = "v1@example2.com"
+    lastActiveAt = Some now
   pure ()
 
 testSvOnboarding : Script ()

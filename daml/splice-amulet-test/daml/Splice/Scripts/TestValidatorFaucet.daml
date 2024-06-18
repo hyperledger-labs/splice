@@ -35,9 +35,12 @@ test_ValidatorFaucet = do
 
     -- round0 can be received
     passTime (hours 1)
+    now <- getTime
     result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round0._1
     let faucetCid = result.licenseCid
+    Some faucet <- queryContractId @ValidatorLicense aliceValidator.primaryParty faucetCid
+    faucet.lastActiveAt === Some now
     checkRewardCouponsExist (round0._2.round)
 
     -- but not twice

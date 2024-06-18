@@ -249,8 +249,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       sponsor.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       faucetState.toJava,
-      Some(dummyVersion).toJava,
-      Some(dummyContactPoint).toJava,
+      Some(
+        new validatorLicenseCodegen.ValidatorLicenseMetadata(
+          defaultEffectiveAt,
+          dummyVersion,
+          dummyContactPoint,
+        )
+      ).toJava,
+      Some(defaultEffectiveAt).toJava,
     )
     contract(
       identifier = templateId,
