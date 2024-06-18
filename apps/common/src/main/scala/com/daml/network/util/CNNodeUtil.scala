@@ -227,7 +227,7 @@ object CNNodeUtil {
   private val dummyMinTopupAmount = 1_000_000L
   private val dummyBaseRateBurstAmount = 10 * 20 * 1000L
   private val dummyBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
-  private val dummyReadVsWriteScalingFactor = 200
+  private val dummyReadVsWriteScalingFactor = 4
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
 
@@ -393,12 +393,12 @@ object CNNodeUtil {
     )
   }
 
-  def domainFeesConfig(
-      baseRateBurstAmount: Long = dummyBaseRateBurstAmount,
-      baseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
-      readVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
-      extraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
-      minTopupAmount: Long = dummyMinTopupAmount,
+  private def domainFeesConfig(
+      baseRateBurstAmount: Long,
+      baseRateBurstWindow: NonNegativeFiniteDuration,
+      readVsWriteScalingFactor: Int,
+      extraTrafficPrice: BigDecimal,
+      minTopupAmount: Long,
   ) = {
     new SynchronizerFeesConfig(
       baseRateLimits(baseRateBurstAmount, baseRateBurstWindow),

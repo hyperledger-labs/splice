@@ -145,4 +145,4 @@ defaultSynchronizerFeesConfig = SynchronizerFeesConfig with
     baseRateTrafficLimits = defaultBaseRateTrafficLimits
     minTopupAmount = 1_000_000 -- 1MB
     extraTrafficPrice = 1.0
-    readVsWriteScalingFactor = 200 -- charge 200 per 10,000, i.e., 2% of write cost for every read
+    readVsWriteScalingFactor = 4 -- charge 4 per 10,000, i.e., 0.04% of write cost for every read

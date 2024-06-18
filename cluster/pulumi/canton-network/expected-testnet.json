@@ -1894,7 +1894,7 @@
           "baseRateBurstWindowMins": 20,
           "extraTrafficPrice": 16.67,
           "minTopupAmount": 200000,
-          "readVsWriteScalingFactor": 200
+          "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
         "metrics": {

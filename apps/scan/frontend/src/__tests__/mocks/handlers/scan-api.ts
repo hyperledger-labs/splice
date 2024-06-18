@@ -207,7 +207,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                         },
                       },
                       extraTrafficPrice: '1.0',
-                      readVsWriteScalingFactor: '200',
+                      readVsWriteScalingFactor: '4',
                       minTopupAmount: '1000',
                     },
                   },

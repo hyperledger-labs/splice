@@ -12,9 +12,9 @@ export type SynchronizerFeesConfig = {
 // assuming a network with 4-6 SVs and formula(s) outlined in #11286
 // These should generally be kept in sync with the values defined in the SynchronizerFeesConfig in SvAppConfig.scala
 const domainFeesDefaults: SynchronizerFeesConfig = {
-  extraTrafficPrice: 20.0,
-  minTopupAmount: 165_000,
-  baseRateBurstAmount: 165_000,
+  extraTrafficPrice: 16.67,
+  minTopupAmount: 200_000,
+  baseRateBurstAmount: 200_000,
   baseRateBurstWindowMins: 20,
   readVsWriteScalingFactor: 4,
 };
