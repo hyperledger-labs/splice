@@ -8,11 +8,12 @@ workflow:
             branches:
               only:
                 - deployment/mainnet
+          include_splitwell: false
+          include_validator1: false
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
+          parallelism: 1
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - wait_for_previous_pipeline
