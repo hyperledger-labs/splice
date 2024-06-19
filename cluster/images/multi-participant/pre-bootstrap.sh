@@ -104,6 +104,8 @@ canton.participants.participant_$index = {
           max-commands-in-flight = 30 # default = 256
         }
     }
+
+    topology.broadcast-batch-size = 1
 }
 EOF
 }
