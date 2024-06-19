@@ -308,7 +308,8 @@ class SvReonboardingIntegrationTest
             _ => sv1Backend.listVoteRequests().loneElement.contractId,
           )
 
-          Seq(sv2Backend, sv3Backend).foreach { sv =>
+          // We need SV4's vote here for immediate offboarding
+          Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
             eventually() {
               sv.listVoteRequests() should have size 1
             }

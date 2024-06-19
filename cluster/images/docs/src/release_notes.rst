@@ -38,8 +38,13 @@ Upcoming
   * The frequency of ACS commitments can now be modified via a
     "Set DsoRules configuration" governance by changing the newly added ``acsCommitmentReconciliationInterval`` configuration
     parameter in the DsoRules (set by default to 30 minutes).
+  * Removed a special case for ``SRARC_OffboardSv`` in the ``DsoRules_CloseVoteRequest`` choice in ``splice-dso-governance.dar``,
+    so that offboarding an SV before the vote request expires is now only possible if **all** current SVs agree,
+    **including** the SV that is being offboarded.
+    Prior to this change, the offboarding would become effective before the set expiration time once all SVs except the SV to be offboarded had voted.
+    This complicated the coordination around giving SVs sufficient time to address the offboarding reason and prevent the offboarding.
 
-    This requires a governance vote to upgrade the package config to:
+  * The Daml changes in this release require a governance vote to upgrade the package configs to:
 
     ================== =======
     name               version

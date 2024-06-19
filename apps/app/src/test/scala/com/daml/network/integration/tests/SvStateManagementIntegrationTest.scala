@@ -27,10 +27,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.sv.automation.leaderbased.{
-  CloseVoteRequestTrigger,
-  CloseVoteRequestWithEarlyClosingTrigger,
-}
+import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 import com.daml.network.util.Codec
 
 import java.time.Instant
@@ -79,8 +76,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       },
     )
     actAndCheck(
-      "sv1 updates his vote, sv2 and sv3 reject the vote request",
-      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
+      "sv1 updates his vote, sv2, sv3 and sv4 reject the vote request",
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
         sv.castVote(
           voteRequest.contractId,
           false,
@@ -288,7 +285,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-        Seq(sv2Backend, sv4Backend).foreach { sv =>
+        // We need SV3's vote here for immediate offboarding
+        Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
           clue(s"${sv.name} accepts vote") {
             getTrackingId(voteRequest) shouldBe voteRequest.contractId
             eventuallySucceeds() {
@@ -578,7 +576,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       },
     )
     clue("Resuming vote request expiration automation") {
-      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestWithEarlyClosingTrigger].resume()
+      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
     }
     clue("Eventually the vote request expires and gets archived") {
       eventually() {

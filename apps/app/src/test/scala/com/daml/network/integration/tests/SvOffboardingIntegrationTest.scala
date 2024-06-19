@@ -123,11 +123,13 @@ class SvOffboardingIntegrationTest
       )
 
       actAndCheck(
-        "SV3 votes on removing sv4", {
+        // We need SV4's vote here for immediate offboarding
+        "SV3 and SV4 vote on removing sv4", {
           sv3Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv4Backend.castVote(voteRequestCid4, true, "url", "description")
         },
       )(
-        "The majority voted yet, thus the trigger should remove the dso party hosting for sv4",
+        "Everyone voted, thus the trigger should remove the dso party hosting for sv4",
         _ => {
           sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 3
           suppressFailedClues(loggerFactory) {

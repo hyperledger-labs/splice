@@ -199,22 +199,35 @@ testRacingSvRemoval = do
   let (req1, req2, req3) = (result1.voteRequest, result2.voteRequest, result3.voteRequest)
 
   -- sv3 and sv4 are not happy with either of them, and accept both removal requests
+  -- sv1 and sv2 accept both requests as well, so we can better test races
   [req1, req2, req3] <- forA [req1, req2, req3] $ \requestCid -> do
-    result <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    result1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
       requestCid
+      vote = Vote with
+        sv = sv1
+        accept = True
+        reason = Reason with url = ""; body = "OK, let them go"
+    result2 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+      requestCid = result1.voteRequest
+      vote = Vote with
+        sv = sv2
+        accept = True
+        reason = Reason with url = ""; body = "OK, let them go"
+    result3 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+      requestCid = result2.voteRequest
       vote = Vote with
         sv = sv3
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
-    requestCid <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
-      requestCid = result.voteRequest
+    result4 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+      requestCid = result3.voteRequest
       vote = Vote with
         sv = sv4
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
-    pure requestCid.voteRequest
+    pure result4.voteRequest
 
-  -- sv1 attempts to immediatly accept the request to remove sv2, which succeeds as SV2 is not required to vote for its own offboarding
+  -- sv1 attempts to immediatly accept the request to remove sv2
   now <- getTime
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req1
@@ -222,7 +235,7 @@ testRacingSvRemoval = do
 
   result.completedAt === now
   result.offboardedVoters === []
-  result.abstainingSvs === ["sv2"]
+  result.abstainingSvs === []
   result.outcome === VRO_Accepted with effectiveAt = now
 
   -- and it eagerly accepts its other vote request as well
@@ -232,7 +245,7 @@ testRacingSvRemoval = do
     amuletRulesCid = None
 
   result.completedAt === now
-  result.offboardedVoters === []
+  result.offboardedVoters === ["sv2"]
   result.abstainingSvs === []
   result.outcome === VRO_AcceptedButActionFailed with description = "Not a sv"
 
@@ -244,7 +257,7 @@ testRacingSvRemoval = do
 
   result.completedAt === now
   result.offboardedVoters === ["sv2"]
-  result.abstainingSvs === ["sv1"]
+  result.abstainingSvs === []
   result.outcome === VRO_Accepted with effectiveAt = now
 
   -- There are only two svs left, and sv3 is the new DSO delegate

@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.{
@@ -113,7 +114,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       action,
       "url",
       "description",
-      sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+      // The offboarding becomes effective after the timeout set here, unless we have SV4 vote as well.
+      new RelTime(30_000_000),
     )
     val trackingCid = sv1Backend.getLatestVoteRequestTrackingCid()
     Seq(sv2Backend, sv3Backend).foreach { sv =>

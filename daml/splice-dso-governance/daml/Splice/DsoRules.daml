@@ -718,12 +718,8 @@ template DsoRules with
               else pure VRO_Expired
         -- check if the request is ready to be closed
         when (now < request.voteBefore) $ do
-          let svBeingOffboarded = case request.action of
-                ARC_DsoRules (SRARC_OffboardSv (DsoRules_OffboardSv with sv)) ->
-                  fmap (.name) (Map.lookup sv svs)
-                _ -> None
-          require "All svs (except one being offboarded) must have voted to allow early closing" $
-            all (\m -> Some m == svBeingOffboarded || m `Map.member` request.votes) activeSvs
+          require "All svs must have voted to allow early closing" $
+            all (\m -> m `Map.member` request.votes) activeSvs
           require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
         -- report the result
         pure DsoRules_CloseVoteRequestResult with
