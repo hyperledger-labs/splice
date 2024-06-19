@@ -30,7 +30,7 @@ object RetryFor {
     * Retries a bounded number of times.
     */
   val WaitingOnInitDependency: RetryFor = RetryFor(
-    maxRetries = 60,
+    maxRetries = 120,
     initialDelay = 200.millis,
     maxDelay = 5.seconds,
     resetRetriesAfter = None,
