@@ -2087,6 +2087,8 @@ jobs:
 
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -2193,6 +2195,8 @@ jobs:
 
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
