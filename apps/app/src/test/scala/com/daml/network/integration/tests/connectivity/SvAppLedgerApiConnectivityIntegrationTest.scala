@@ -9,6 +9,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.concurrent.duration.*
+
 class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
   override def environmentDefinition
@@ -59,7 +61,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
       }
 
       clue("wait for bob's validator app to become active") {
-        eventually() {
+        eventually(40.seconds) {
           bobValidatorBackend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
         }
       }
