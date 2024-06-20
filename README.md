@@ -14,7 +14,7 @@
       - [`sbt` Tips\&Tricks](#sbt-tipstricks)
   - [Contributing Changes](#contributing-changes)
     - [Contributing as a New Joiner](#contributing-as-a-new-joiner)
-    - [The Support Rotation](#the-support-rotation)
+    - [Monitoring Rotation](#monitoring-rotation)
     - [Contribution Guide](#contribution-guide)
     - [Branch naming](#branch-naming)
     - [Unused Import Warnings](#unused-import-warnings)
@@ -363,24 +363,16 @@ Things sometimes go wrong with `sbt` in ways that are hard to debug. This sectio
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
 buddy for help with getting started on the code base.
 
-### The Support Rotation
+### Monitoring Rotation
 
-(AKA "Flake Rotation", "Flaky Test Duty")
+(The current incarnation of what we used to call "Support Rotation", "Flake Rotation", "Flaky Test Duty", ...)
 
-Important resources:
-- [flake checklist](support/FLAKE_CHECKLIST.md)
-- [preflight checklist](support/PREFLIGHT_CHECKLIST.md)
+The Canton Network team has a weekly monitoring rotation.
+A pair of engineers is explicitly assigned each week (currently Wednesday to Wednesday) to be responsible for driving the resolution of failures that occur in our test and production environments.
+For the engineers on monitoring duty, this work is their priority over any other issues on which they may be working,
+with failures on partner-facing networks (especially `mainnet`, but also `testnet` and `devnet`) taking priority over other types of failures.
 
-The Canton Network team has a formal support rotation.
-Each of our weekly sprints has a pair of engineers
-assigned to be responsible during the sprint for driving the
-resolution of test and cluster failures that occur in our test environments
-(`cimain`, `devnet`, `testnet` and others) during that sprint.  For the
-engineers on support duty, this work is their priority over any other
-issues on which they may be working,
-with failures of partner-facing clusters (`testnet` and `devnet`) taking priority over other types of failures.
-
-The job of an engineer on support duty is to _drive the resolution_ of
+The job of an engineer on monitoring duty is to _drive the resolution_ of
 failures. This does not mean that these engineers must
 fix all problems themselves, nor does it mean that everything
 should be fixed. Driving the resolution means clearly communicating
@@ -393,6 +385,19 @@ that a specific failure isn't worth the time to fix. This is fine, as
 long as there is consensus on the decision and it is clearly
 communicated.
 
+In a nutshell, the responsibilities of an engineer on monitoring duty are:
+
+1. Monitor and triage failures reported on (in priority order):
+   1. [#team-canton-network-mainnet-deployment](https://daholdings.slack.com/archives/C0731SHS3HB)
+   2. [#team-canton-network-dev-testnet-deployment](https://daholdings.slack.com/archives/C06SMCCBYQH)
+   3. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
+   4. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
+   5. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
+2. Drive resolution of failures - delegate and/or alert others about frequent and disruptive failures.
+3. Escalate to “manager on duty” if too much is going on and we need additional monitoring help.
+4. (lower prio) Resolve issues yourself.
+5. (at end of rotation) Do an explicit handover to the next monitoring team.
+
 This is an excellent opportunity to learn about parts of the Canton
 Network that may be outside your usual area of expertise. This
 includes other parts of the software stack, our build and deployment
@@ -401,41 +406,38 @@ way to be intentional about addressing the current 'least stable'
 parts of our code base, with an idea of improving reliability for our
 customers.
 
-Support duty is assigneed based on the [team holiday calendar](https://docs.google.com/spreadsheets/d/1Sp12aNj-bPAuPD9aEnH_xk031dADiGHdQdJlCGxhW3k/edit#gid=1174224054).
-Please consult this spreadsheet to understand when you are on duty. There are
-pairs of weeks highlighted to indicate the schedule - support duty
-begins with the sprint starting on the Wednesday of the first week and
-ends with the sprint on Wednesday of the second week. At each boundary,
-the outgoing and incoming engineers on support duty rotation must
-have a brief touchpoint meeting to go over any issues still under resolution.
+Monitoring duty is organized based on the [CN Monitoring Rotation](https://docs.google.com/document/d/1VXC1RClOC9CLIjR4-so7sn12Tl9csqD7kGObj6QAZ0Q/edit) Google doc.
+Each monitoring week has a manager assigned to it (typically Martin or Ray).
+The manager on duty's responsibility is:
 
-Important: we rely on there always being two engineers available on support duty.
-Thus, engineers on support duty that have a day off are required to
-ask another engineer to substitute for them.
+- Making sure that two engineers are scheduled to be on rotation for the week (and that those engineers are aware of this).
+- Being a single point of contact in case of concerns about the current failures situation (both for the engineers on rotation and other team members).
+- Assisting the engineers on monitoring rotation by marshalling additional resources (for both triaging and resolution work) when needed.
 
-For engineers on support duty, the resolution process is as follows.
+Monitoring rotation currently begins and ends on Wednesdays.
+At each boundary, the outgoing and incoming engineers on monitoring duty rotation must have a brief touchpoint meeting to go over any issues still under resolution.
 
-* When there is a Slack message on [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
-  indicating a failure follow the checklist [for flakes](support/FLAKE_CHECKLIST.md).
+Important: we rely on there always being two engineers available on monitoring duty.
+Thus, engineers on monitoring duty that have a day off should ensure that another engineer will substitute for them.
+
+For engineers on monitoring duty, the resolution process is as follows.
+
+* When there is a Slack message on a channel you are monitoring that indicates a failure, follow the checklist [for flakes](support/FLAKE_CHECKLIST.md).
 * PR's for any fixes should also be linked to the issue.
 * For failures that are not frequent enough to warrant a fix, the
-  issue in Github should be labeled "infrequent/no repo".
+  issue in Github should be labeled "infrequent/no repro".
+* For failures that are especially disruptive, the
+  issue in Github can be labeled "now" to signal its importance.
 
-We will periodically review the flaky test log in the Github milestone
-to look for systemic issues that might be underlying more than one
-flaky test and can be more holistically resolved.
+Further reading:
+- [alerts checklist](support/ALERTS_CHECKLIST.md)
+- [flake checklist](support/FLAKE_CHECKLIST.md)
+- [preflight checklist](support/PREFLIGHT_CHECKLIST.md)
+- [network health](network-health/NETWORK_HEALTH.md)
+- [operating on production clusters](OPERATIONS.md)
+- [strategies for reacting to a failed TestNet or DevNet deployment](cluster/README.md#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment)
 
-In addition to driving the elimination of flakes in our test setup,
-the engineers on support duty are also the first line of defence when it comes to keeping our cluster deployments healthy.
-For any deployment or preflight failures follow the [preflight checklist](support/PREFLIGHT_CHECKLIST.md) to identify the root cause.
-The `DevNet` and `TestNet` clusters are especially noteworthy in this context, as they are used by our external partners.
-**At least one engineer on support rotation that resides in the European timezone must be online at 9:00 AM CET/CEST
-on Mondays**,
-to be available to respond in case the weekly redeployment of one of these clusters failed.
-As above, "respond" does not have to mean "resolve themselves".
-To the contrary - given the more sensitive nature of partner-facing clusters, engineers are encouraged to seek out help and additional pairs of eyes.
-All engineers on the Canton Network team are advised to familiarize themselves with the [cluster README](cluster/README.md),
-for [advice and best practices around recovering from a failed deployment](cluster/README.md#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment) of a `TestNet` or `DevNet` cluster.
+For **support** duty, also during off hours, see [CN L3 Support](https://docs.google.com/document/d/1mc60ha2SwiTsEzGDzpOcY4eh_RKFPy415FvB5K-4XkA/edit).
 
 ### Contribution Guide
 
