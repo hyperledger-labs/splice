@@ -622,6 +622,10 @@ components:
           type: string
         secret:
           type: string
+        version:
+          type: string
+        contact_point:
+          type: string
 
     CometBftNodeStatusOrErrorResponse:
       oneOf:

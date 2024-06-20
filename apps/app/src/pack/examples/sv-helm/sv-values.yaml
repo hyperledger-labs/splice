@@ -57,3 +57,9 @@ extraBeneficiaries:
   #   percentage: 10.0
   # - partyId: "BENEFICIARY_2_PARTY_ID"
   #   percentage: 33.33
+
+# Contact point for your SV node that can be used by other node operators
+# to reach you if there are issues with your node.
+# This can be a slack username or an email address.
+# If you do not wish to share this, set it to an empty string.
+contactPoint: "YOUR_CONTACT_POINT"

@@ -231,6 +231,8 @@ spec:
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "cn-util-lib.log-level" .Values | indent 8}}
+        - name: CN_APP_CONTACT_POINT
+          value: {{ .Values.contactPoint | quote }}
         ports:
         - containerPort: 5003
           name: val-http

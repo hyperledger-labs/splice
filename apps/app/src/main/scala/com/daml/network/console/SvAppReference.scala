@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.network.environment.{BuildInfo, CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
@@ -37,9 +37,11 @@ abstract class SvAppReference(
   override def basePath = "/api/sv"
   override protected val instanceType = "SV Client"
 
-  def onboardValidator(validator: PartyId, secret: String): Unit =
+  def onboardValidator(validator: PartyId, secret: String, contactPoint: String): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.OnboardValidator(validator, secret))
+      httpCommand(
+        HttpSvAppClient.OnboardValidator(validator, secret, BuildInfo.compiledVersion, contactPoint)
+      )
     }
 
   def startSvOnboarding(token: String): Unit =

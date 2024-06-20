@@ -195,6 +195,9 @@ case class ValidatorAppBackendConfig(
     /** The configuration for auto-accepting transfers from other parties
       */
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig] = Map.empty,
+    // We don't make this optional to encourage users to think about it at least. They
+    // can always set it to an empty string.
+    contactPoint: String,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

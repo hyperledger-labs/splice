@@ -176,7 +176,11 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "onboard new validator using the secret",
-          sv1Backend.onboardValidator(newValidatorParty, newSecret),
+          sv1Backend.onboardValidator(
+            newValidatorParty,
+            newSecret,
+            s"${newValidatorParty.uid.id}@example.com",
+          ),
         )(
           "a new validator row is added",
           _ => {

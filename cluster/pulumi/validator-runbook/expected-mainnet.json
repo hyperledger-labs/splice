@@ -397,6 +397,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "db": {},
         "enablePostgresMetrics": true,
         "enableWallet": true,

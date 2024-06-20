@@ -33,6 +33,7 @@ import {
   config,
   preApproveValidatorRunbook,
   clusterSmallDisk,
+  daContactPoint,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -230,6 +231,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
+      YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,

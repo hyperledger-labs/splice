@@ -37,6 +37,7 @@ import {
   ApprovedSvIdentity,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   config,
+  daContactPoint,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -514,6 +515,7 @@ function installSvApp(
       audience: config.auth0Client.getCfg().appToApiAudience['sv'],
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
+    contactPoint: daContactPoint,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

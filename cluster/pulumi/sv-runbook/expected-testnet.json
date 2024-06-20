@@ -734,6 +734,7 @@
           "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -1026,6 +1027,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,

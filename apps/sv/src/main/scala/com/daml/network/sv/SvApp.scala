@@ -410,7 +410,7 @@ class SvApp(
         //    we ensure that the party migration has been completed before the contract is created.
         // 2. Concurrent DAR uploads currently break Canton's topology state management.
         appInitStep("Initialize validator") {
-          SvApp.initializeValidator(dsoAutomation, config, retryProvider, logger)
+          SvApp.initializeValidator(dsoAutomation, config, retryProvider, logger, clock)
         },
         // Ensure Daml-level invariants for the SV
         // ----------------------------------------
@@ -1190,6 +1190,7 @@ object SvApp {
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
+      clock: Clock,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val store = dsoStoreWithIngestion.store
     val svParty = store.key.svParty
@@ -1210,36 +1211,45 @@ object SvApp {
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
-              val cmd = dsoRules.exercise(
-                _.exerciseDsoRules_OnboardValidator(
-                  svParty.toProtoPrimitive,
-                  svParty.toProtoPrimitive,
-                  // TODO(#12884) Fill this in
-                  None.toJava,
-                  None.toJava,
-                )
-              )
-              dsoStoreWithIngestion.connection
-                .submit(
-                  actAs = Seq(svParty),
-                  readAs = Seq(store.key.dsoParty),
-                  cmd,
-                )
-                .withDedup(
-                  commandId = CNLedgerConnection.CommandId(
-                    "com.daml.network.sv.createSvValidatorLicense",
-                    Seq(
-                      store.key.dsoParty,
-                      svParty,
-                    ),
+              for {
+                amuletRules <- store.getAmuletRules().map(_.payload)
+                now = clock.now
+                supportsValidatorLicenseMetadata = PackageIdResolver
+                  .supportsValidatorLicenseMetadata(
+                    now,
+                    amuletRules,
+                  )
+                cmd = dsoRules.exercise(
+                  _.exerciseDsoRules_OnboardValidator(
                     svParty.toProtoPrimitive,
-                  ),
-                  deduplicationOffset = offset,
+                    svParty.toProtoPrimitive,
+                    Some(BuildInfo.compiledVersion)
+                      .filter(_ => supportsValidatorLicenseMetadata)
+                      .toJava,
+                    Some(config.contactPoint).filter(_ => supportsValidatorLicenseMetadata).toJava,
+                  )
                 )
-                .yieldUnit()
-                .map { _ =>
-                  logger.info("Created validator license for SV party")
-                }
+                _ <- dsoStoreWithIngestion.connection
+                  .submit(
+                    actAs = Seq(svParty),
+                    readAs = Seq(store.key.dsoParty),
+                    cmd,
+                  )
+                  .withDedup(
+                    commandId = CNLedgerConnection.CommandId(
+                      "com.daml.network.sv.createSvValidatorLicense",
+                      Seq(
+                        store.key.dsoParty,
+                        svParty,
+                      ),
+                      svParty.toProtoPrimitive,
+                    ),
+                    deduplicationOffset = offset,
+                  )
+                  .yieldUnit()
+              } yield {
+                logger.info("Created validator license for SV party")
+              }
           }
         } yield (),
         logger,

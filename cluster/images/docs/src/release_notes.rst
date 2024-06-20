@@ -16,6 +16,13 @@ Upcoming
 
   * Default participant CPU requests have been lowered from 2 to 1 CPU based on the observed usage under load tests.
 
+  * Validator and SV helm charts have a new required ``contactPoint``
+    field that must be set in ``validator-values.yaml`` and
+    ``sv-values.yaml``. This should point to a Slack username or email
+    address that can be used by other node operators to contact you in
+    case there are issues with your node. If you do not want to share
+    this, set it to an empty string.
+
 * SV app
 
   * ``/v0/admin/domain/data-snapshot`` now includes ``created_at`` and ``migration_id`` in

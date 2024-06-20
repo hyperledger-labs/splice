@@ -361,6 +361,7 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+- Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. If you do not want to share
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
 Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` as follows:
@@ -667,4 +668,3 @@ You can configure to restore the validator and participant with the dump file yo
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
     :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
-

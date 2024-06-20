@@ -60,6 +60,7 @@ class ValidatorAutomationService(
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
+    contactPoint: String,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -196,6 +197,25 @@ class ValidatorAutomationService(
       scanConnection,
       prevetDuration,
       triggerContext,
+    )
+  )
+
+  registerTrigger(
+    new ValidatorLicenseMetadataTrigger(
+      triggerContext,
+      connection,
+      store,
+      scanConnection,
+      contactPoint,
+    )
+  )
+
+  registerTrigger(
+    new ValidatorLicenseActivityTrigger(
+      triggerContext,
+      connection,
+      store,
+      scanConnection,
     )
   )
 

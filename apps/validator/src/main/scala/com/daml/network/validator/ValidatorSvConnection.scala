@@ -2,7 +2,7 @@ package com.daml.network.validator
 
 import cats.data.EitherT
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
-import com.daml.network.environment.{HttpAppConnection, RetryProvider}
+import com.daml.network.environment.{BuildInfo, HttpAppConnection, RetryProvider}
 import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
@@ -31,13 +31,13 @@ final class ValidatorSvConnection private (
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */
-  def onboardValidator(validator: PartyId, secret: String)(implicit
+  def onboardValidator(validator: PartyId, secret: String, contactPoint: String)(implicit
       httpClient: CNHttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Unit] =
-    runHttpCmd(config.url, OnboardValidator(validator, secret))
+    runHttpCmd(config.url, OnboardValidator(validator, secret, contactPoint))
 }
 
 object ValidatorSvConnection {
@@ -59,14 +59,19 @@ object ValidatorSvConnection {
       retryConnectionOnInitialFailure,
     )
 
-  case class OnboardValidator(candidate: PartyId, secret: String)
+  case class OnboardValidator(candidate: PartyId, secret: String, contactPoint: String)
       extends BaseCommand[http.OnboardValidatorResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardValidatorResponse] =
       client.onboardValidator(
-        body = definitions.OnboardValidatorRequest(candidate.toProtoPrimitive, secret),
+        body = definitions.OnboardValidatorRequest(
+          candidate.toProtoPrimitive,
+          secret,
+          Some(BuildInfo.compiledVersion),
+          Some(contactPoint),
+        ),
         headers = headers,
       )
 

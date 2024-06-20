@@ -944,6 +944,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -1036,6 +1037,7 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,

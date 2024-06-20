@@ -60,15 +60,24 @@ object HttpSvAppClient {
     ) extends SvOnboardingStatus
   }
 
-  case class OnboardValidator(candidate: PartyId, secret: String)
-      extends BaseCommand[http.OnboardValidatorResponse, Unit] {
+  case class OnboardValidator(
+      candidate: PartyId,
+      secret: String,
+      version: String,
+      contactPoint: String,
+  ) extends BaseCommand[http.OnboardValidatorResponse, Unit] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardValidatorResponse] =
       client.onboardValidator(
-        body = definitions.OnboardValidatorRequest(candidate.toProtoPrimitive, secret),
+        body = definitions.OnboardValidatorRequest(
+          candidate.toProtoPrimitive,
+          secret,
+          Some(version),
+          Some(contactPoint),
+        ),
         headers = headers,
       )
 

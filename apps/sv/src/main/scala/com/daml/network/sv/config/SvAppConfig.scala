@@ -187,6 +187,10 @@ case class SvAppBackendConfig(
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(10),
+    // Duplicated with the validator config since the SV app sets up the ValidatorLicense.
+    // We don't make this optional to encourage users to think about it at least. They
+    // can always set it to an empty string.
+    contactPoint: String,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

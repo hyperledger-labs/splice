@@ -4,6 +4,7 @@ import com.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -231,4 +232,13 @@ object PackageIdResolver {
     final case object SpliceWallet extends Package
     final case object SpliceWalletPayments extends Package
   }
+
+  def supportsValidatorLicenseMetadata(now: CantonTimestamp, amuletRules: AmuletRules): Boolean = {
+    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
+    val spliceAmuletVersion = PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
+    spliceAmuletVersion >= DarResources.amulet_0_1_3.metadata.version
+  }
+
+  def supportsValidatorLicenseActivity(now: CantonTimestamp, amuletRules: AmuletRules): Boolean =
+    supportsValidatorLicenseMetadata(now, amuletRules)
 }

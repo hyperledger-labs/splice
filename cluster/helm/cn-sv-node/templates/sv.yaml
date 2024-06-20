@@ -255,6 +255,8 @@ spec:
               value: {{ .Values.failOnAppVersionMismatch | quote }}
             {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
             {{- include "cn-util-lib.log-level" .Values | indent 12}}
+            - name: CN_APP_CONTACT_POINT
+              value: {{ .Values.contactPoint | quote }}
           ports:
             - name: sv-api
               containerPort: 5014

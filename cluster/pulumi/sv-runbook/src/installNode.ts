@@ -38,6 +38,7 @@ import {
   disableCantonAutoInit,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
+  daContactPoint,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -289,6 +290,7 @@ async function installSvAndValidator(
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+      YOUR_CONTACT_POINT: daContactPoint,
     }
   );
 
@@ -403,6 +405,7 @@ async function installSvAndValidator(
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
+      YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,

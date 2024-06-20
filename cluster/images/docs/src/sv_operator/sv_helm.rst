@@ -568,6 +568,8 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+- Replace ``YOUR_CONTACT_POINT`` by the same contact point that you used in ``sv-values.yaml``.
+  this, set it to an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If your validator is not supposed to hold any CC, you should disable the wallet by setting `enableWallet` to `false`.
   Note that if the wallet is disabled, you shouldn't install the wallet or CNS UIs, as they won't work.
@@ -604,6 +606,8 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
   and the ``sequencerPruningConfig.retentionPeriod`` to ``30 days``.
   The pruning interval is the time between two consecutive prunings,
   and the retention period is the time for which the sequencer will retain the data.
+- Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. If you do not want to share
+  this, set it to an empty string.
 - If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the `extraBeneficiaries` section with the desired parties and the percentage of the reward that corresponds to them.
   Note that the party you register must be known on the network for the reward coupon issuance to succeed.
   Furthermore, that party must be hosted on a validator node for its wallet to collect the SV reward coupons. That collection will happen automatically if the wallet is running.

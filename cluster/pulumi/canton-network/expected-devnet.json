@@ -1813,6 +1813,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2561,6 +2562,7 @@
           "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -2674,6 +2676,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -3418,6 +3421,7 @@
           "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -3504,6 +3508,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -4241,6 +4246,7 @@
           "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -4327,6 +4333,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -5064,6 +5071,7 @@
           "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -5150,6 +5158,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
@@ -5808,6 +5817,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

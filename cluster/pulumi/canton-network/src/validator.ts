@@ -9,6 +9,7 @@ import {
   CLUSTER_BASENAME,
   CnInput,
   config,
+  daContactPoint,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
@@ -237,6 +238,7 @@ export async function installValidatorApp(
       },
       walletSweep,
       autoAcceptTransfers,
+      contactPoint: daContactPoint,
     },
     defaultVersion,
     { dependsOn }

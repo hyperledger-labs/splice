@@ -93,7 +93,7 @@ class HttpSvHandler(
                 _ <- retryProvider.retryForClientCalls(
                   "onboard_validator",
                   "onboard validator via DsoRules",
-                  onboardValidator(partyId, body.secret, vo),
+                  onboardValidator(partyId, body.secret, vo, body.version, body.contactPoint),
                   logger,
                 )
               } yield v0.SvResource.OnboardValidatorResponseOK
@@ -662,17 +662,24 @@ class HttpSvHandler(
       candidateParty: PartyId,
       secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
+      version: Option[String],
+      contactPoint: Option[String],
   )(implicit tc: TraceContext): Future[Unit] =
     for {
       dsoRules <- dsoStore.getDsoRules()
+      amuletRules <- dsoStore.getAmuletRules()
+      now = clock.now
+      supportsValidatorLicenseMetadata = PackageIdResolver.supportsValidatorLicenseMetadata(
+        now,
+        amuletRules.payload,
+      )
       cmds = Seq(
         dsoRules.exercise(
           _.exerciseDsoRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
-            // TODO(#12884) Fill this in
-            None.toJava,
-            None.toJava,
+            version.filter(_ => supportsValidatorLicenseMetadata).toJava,
+            contactPoint.filter(_ => supportsValidatorLicenseMetadata).toJava,
           )
         ),
         validatorOnboarding.exercise(

@@ -221,3 +221,5 @@ export function sanitizedForPostgres(value: string): string {
 export function conditionalString(condition: boolean, value: string): string {
   return condition ? value : '';
 }
+
+export const daContactPoint = 'sv-support@digitalasset.com';

@@ -465,7 +465,7 @@ class ValidatorApp(
       RetryFor.WaitingOnInitDependency,
       "request_onboarding",
       "request onboarding",
-      withSvConnection(svConfig)(_.onboardValidator(validatorParty, secret)),
+      withSvConnection(svConfig)(_.onboardValidator(validatorParty, secret, config.contactPoint)),
       logger,
     )
   }
@@ -700,6 +700,7 @@ class ValidatorApp(
         config.ingestUpdateHistoryFromParticipantBegin,
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
+        config.contactPoint,
         loggerFactory,
       )
       domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {

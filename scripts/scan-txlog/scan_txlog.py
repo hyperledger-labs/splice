@@ -2430,6 +2430,10 @@ class State:
                 return self.handle_receive_sv_reward_coupon(transaction, event)
             case "ValidatorLicense_ReceiveFaucetCoupon":
                 return self.handle_receive_validator_faucet_coupon(transaction, event)
+            case "ValidatorLicense_UpdateMetadata":
+                return HandleTransactionResult.empty()
+            case "ValidatorLicense_ReportActive":
+                return HandleTransactionResult.empty()
             case "AmuletRules_Transfer":
                 return self.handle_transfer(transaction, event)
             case "AmuletRules_DevNet_Tap":
