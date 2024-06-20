@@ -128,6 +128,8 @@ canton.validator-apps.validator_backend_$index = {
     domain-migration-id =\${CN_APP_VALIDATOR_MIGRATION_ID}
 
     sv-validator = \${?CN_APP_VALIDATOR_SV_VALIDATOR}
+
+    contact-point = \${CN_APP_CONTACT_POINT}
 }
 EOF
 }

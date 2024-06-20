@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   DecentralizedSynchronizerMigrationConfig,
+  daContactPoint,
   generatePortSequence,
   numNodesPerInstance,
 } from 'cn-pulumi-common';
@@ -72,6 +73,10 @@ export class MultiValidator extends MultiNodeDeployment {
             {
               name: 'CN_APP_VALIDATOR_MIGRATION_ID',
               value: decentralizedSynchronizerUpgradeConfig.active.migrationId.toString(),
+            },
+            {
+              name: 'CN_APP_CONTACT_POINT',
+              value: daContactPoint,
             },
           ],
           ports: ports.map(port => ({
