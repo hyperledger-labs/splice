@@ -20,8 +20,8 @@ interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
   container: {
     env: k8s.types.input.core.v1.EnvVar[];
     ports: k8s.types.input.core.v1.ContainerPort[];
-    livenessProbe?: k8s.types.input.core.v1.Probe;
-    readinessProbe?: k8s.types.input.core.v1.Probe;
+    livenessProbe: k8s.types.input.core.v1.Probe;
+    readinessProbe: k8s.types.input.core.v1.Probe;
     resources: k8s.types.input.core.v1.ResourceRequirements;
   };
   serviceSpec: k8s.types.input.core.v1.ServiceSpec;
@@ -31,7 +31,12 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
   deployment: k8s.apps.v1.Deployment;
   service: k8s.core.v1.Service;
 
-  constructor(name: string, args: MultiNodeDeploymentArgs, opts?: pulumi.ComponentResourceOptions) {
+  constructor(
+    name: string,
+    args: MultiNodeDeploymentArgs,
+    opts?: pulumi.ComponentResourceOptions,
+    javaOpts?: string
+  ) {
     super('canton:network:Deployment', name, {}, opts);
 
     const newOpts = { ...opts, parent: this, dependsOn: [args.namespace] };
@@ -98,7 +103,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     {
                       name: 'JAVA_TOOL_OPTIONS',
                       value:
-                        '-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16 ' +
+                        `-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 ${javaOpts || ''} ` +
                         jmxOptions(),
                     },
                   ],
