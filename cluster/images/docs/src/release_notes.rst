@@ -36,6 +36,11 @@ Upcoming
     overriding ``migrationId`` in the response payload.  The default ``migrationId`` is
     now 1 + the cluster's current migration ID, rather than only the current migration ID.
 
+* Scan app
+
+  * Improved performance of the per-party ACS endpoint that is used
+    when reonboarding a validator from the identity backup.
+
 * Daml
 
   * Extended the Daml models to report the version number and a

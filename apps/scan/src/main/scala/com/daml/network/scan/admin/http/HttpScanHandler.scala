@@ -834,17 +834,18 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
-        // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries
-        // so filtering an DSO snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
-        // for that party to recover.
+        // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries.
+        // This means the SV participants ingest data for that party and we can take a snapshot for that party.
+        // To make sure the snapshot is the same regardless of which SV is queried, we filter it down to
+        // contracts that the DSO party is also a stakeholder on.
         // It does however lose third-party application data that the DSO party is not a stakeholder on. Supporting that requires
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.key.dsoParty))
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(partyId))
       } yield {
         val filteredAcsSnapshot =
-          filterAcsSnapshot(acsSnapshot, partyId)
+          filterAcsSnapshot(acsSnapshot, store.key.dsoParty)
         v0.ScanResource.GetAcsSnapshotResponse.OK(
           definitions.GetAcsSnapshotResponse(
             Base64.getEncoder.encodeToString(filteredAcsSnapshot.toByteArray)
