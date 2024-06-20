@@ -630,8 +630,15 @@ This file will be used as an identities bootstrap dump for the new validator.
 We can deploy a new validator node to which the data will be recovered.
 
 Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
-While doing so, please follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
-Use the separate JSON file prepared previously.
+
+While doing so, please note the following:
+
+.. TODO(#12353) the disableAutoInit step should become obsolete
+
+* Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` so that ``disableAutoInit`` is set to ``true``.
+  This will ensure that the Canton participant does not generate new :ref:`identities <validator-upgrades-state>` for itself and instead remains ready to be initialized with the identities from the backup.
+* Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
+  Use the separate JSON file prepared previously.
 
 Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
 Confirm that the wallet balance is as expected. It should be the same as the amount that the original validator wallet user owned.

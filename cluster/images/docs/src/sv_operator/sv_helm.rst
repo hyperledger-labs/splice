@@ -984,10 +984,12 @@ Repeat the steps described in :ref:`helm-validator-install` for installing the v
 
 While doing so, please note the following:
 
+.. TODO(#12353) the disableAutoInit step should become obsolete
+
 * Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` so that ``disableAutoInit`` is set to ``true``.
   This will ensure that the Canton participant does not generate new :ref:`identities <validator-upgrades-state>` for itself and instead remains ready to be initialized with the identities from the backup.
 * Modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
-* Follow notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
+* Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
   Use the separate JSON file prepared previously.
 
 Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
