@@ -74,7 +74,7 @@ final class DomainTimeStore(
             None
           } else {
             logger.info(
-              show"Domain time delay is currently $currentDelay, waiting until delay is below ${allowedDomainTimeDelay}. This is expected if the node restored from backup"
+              show"Domain time delay is currently $currentDelay ($now - $domainTime), waiting until delay is below ${allowedDomainTimeDelay}. This is expected if the node restored from backup"
             )
             state.delayPromise match {
               case Some(promise) => Some(promise)
@@ -100,13 +100,13 @@ final class DomainTimeStore(
             val delay = now - time
             if (delay.compareTo(allowedDomainTimeDelay.asJava) <= 0) {
               logger.info(
-                show"Domain time delay is now $delay which is below the configured max delay ${allowedDomainTimeDelay}"
+                show"Domain time delay is now $delay ($now - $time) which is below the configured max delay ${allowedDomainTimeDelay}"
               )
               promise.success(())
               state = newState.copy(delayPromise = None)
             } else {
               logger.info(
-                show"Domain time delay is now $delay which is still above the configured max delay ${allowedDomainTimeDelay}"
+                show"Domain time delay is now $delay ($now - $time) which is still above the configured max delay ${allowedDomainTimeDelay}"
               )
               state = newState
             }
