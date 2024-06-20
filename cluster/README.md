@@ -75,6 +75,7 @@
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
     - [Participating in a hard domain migration](#participating-in-a-hard-domain-migration)
+      - [Via the Pulumi operator](#via-the-pulumi-operator)
       - [Manual steps](#manual-steps)
       - [Checking the readiness of partners](#checking-the-readiness-of-partners)
       - [New domain readiness checks](#new-domain-readiness-checks)
@@ -1573,33 +1574,24 @@ The following steps assume that:
 - The cluster is already deployed and is at migration ID 0.
 - We already know that a migration will take place.
 
-#### Manual steps
+See also: [Operating on Production Clusters](./OPERATIONS.md)
+
+#### Via the Pulumi operator
 
 1. Start a Slack thread on which you document the steps you take.
-   Make sure there is at least one CN engineer around for a second pair of eyes, in case there are problems.
-1. Checkout the deployment branch of the cluster undergoing the migration:
-   `git branch -D deployment/<cluster>` (to avoid accidentally using an old state)
-   followed by `git fetch && git checkout deployment/<cluster>`.
-1. Change into the deployment directory of the cluster undergoing the migration.
-1. Run `git fetch --tags -f` to make sure that we'll be using the correct version.
-   To check, run `get-snapshot-version` and compare the result with
-   `curl "https://${GCP_CLUSTER_HOSTNAME}/version"` - they should be the same.
-   You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
-   in case you have made local changes to the repo (that you can confirm are harmless).
-1. The `cncluster` commands below can use helm charts published to artifactory.
-   If you want to use local charts instead you can pass `local` instead of a version string (`local` is also the default).
-   If you will be using local charts you'll want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local charts to the target version.
-1. Set `export CI=true` to convince `cncluster` to let you work on non-scratch clusters manually.
-1. Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
-   Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),
-   each with a preview that you should check and must confirm.
-   Once the pulumi steps have completed successfully and you can confirm that the cluster is (still) healthy
-   (no alerts, health check failures etc.), report to our partners that you have completed this step (setting a good example).
+   Make sure there is at least one CN engineer around for a second pair of eyes.
+1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following environment variables for your target cluster:
+   * `export GLOBAL_DOMAIN_UPGRADE_VERSION=` the version we're migrating to
+   * `export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=` the migration ID we're migrating to
+   * `export DISABLE_CANTON_AUTO_INIT="true"` for a slightly faster migrate step; will be removed with [#12353](https://github.com/DACH-NY/canton-network-node/issues/12353)
+   * `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
+1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
 1. Coordinate with all other SVs to schedule a migration via governance vote.
    For testing (or if our SVs have a governance majority) you can also run `cncluster hard_domain_migration_trigger`.
-1. Deactivate our periodic health checks for the target cluster by merging a PR to `main`
+1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed about the scheduled hard migration, the expected downtime associated with that, and the expected version and migration ID after the migration.
+1. Deactivate our periodic health checks and backups for the target cluster by merging a PR to `main`
    (close to the scheduled synchronizer pausing date).
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
 1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
@@ -1614,7 +1606,59 @@ The following steps assume that:
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
-1. Run `cncluster hard_domain_migration_migrate` to set up our apps for migrating.
+1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that reverts all changes from the "prepare" step and then sets the following environment variables for your target cluster:
+   * `export CHARTS_VERSION=` the version we're migrating to
+   * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION`
+   * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
+   * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
+   * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
+1. Wait for the operator to apply your changes from the migrate step.
+   The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
+   (Check the logs of failing pods to be sure that there is no other problem.)
+   To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
+   you can filter participant logs for `Persisted.*DomainParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   and inspect the (number of) signatures on the latest of those entries
+   (you need slightly over 2/3 of SVs to sign this).
+1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
+   Communicate the result of your check to the rest of the DSO to conclude the migration.
+1. [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
+   so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
+   is set to reflect the expected migration ID after completing the migration.
+   If periodic SV runbook redeployments are scheduled for the target cluster, you can fix them by adding the
+   `global_domain_active_migration_id: 1` parameter to the triggered `deploy_sv_runbook` job.
+   After merging your patches to the cluster deployment branch,
+   the periodic checks and deployments should be able to complete successfully again.
+   Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
+1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
+1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps here so that only the following environment variables remain:
+   * `export CHARTS_VERSION=` the version we're on after the migration
+   * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're on after the migration
+
+#### Manual steps
+
+**Deprecated!**
+Don't use for production clusters!
+If this is the case: Please nevertheless complete all steps from the [operator-based runbook](#via-the-pulumi-operator) that are not related to "prepare" or "migrate".
+
+1. Checkout the deployment branch of the cluster undergoing the migration:
+   `git branch -D deployment/<cluster>` (to avoid accidentally using an old state)
+   followed by `git fetch && git checkout deployment/<cluster>`.
+1. Change into the deployment directory of the cluster undergoing the migration.
+1. Run `git fetch --tags -f` to make sure that we'll be using the correct version.
+   To check, run `get-snapshot-version` and compare the result with
+   `curl "https://${GCP_CLUSTER_HOSTNAME}/version"` - they should be the same.
+   You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
+   in case you have made local changes to the repo (that you can confirm are harmless).
+1. The `cncluster` commands below can use helm charts published to artifactory.
+   If you want to use local charts instead you can pass `local` instead of a version string (`local` is also the default).
+   If you will be using local charts you'll want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local charts to the target version.
+1. **Prepare:** Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
+   Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),
+   each with a preview that you should check and must confirm.
+   Once the pulumi steps have completed successfully and you can confirm that the cluster is (still) healthy
+   (no alerts, health check failures etc.), report to our partners that you have completed this step (setting a good example).
+1. **Migrate:** Run `cncluster hard_domain_migration_migrate` to set up our apps for migrating.
    Note that this command contains multiple `pulumi up` steps
    (one for the main deployment, one for the runbook SV, one for the runbook validator),
    each with a preview that you should check and must confirm.
@@ -1628,39 +1672,38 @@ The following steps assume that:
    ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
    and inspect the (number of) signatures on the latest of those entries
    (you need slightly over 2/3 of SVs to sign this).
-1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
-   Communicate the result of your check to the rest of the DSO to conclude the migration.
-1. [Patch](patching-healthchecks-against-a-deployed-cluster) our health checks
-   so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check` and `preflight_validator_check` jobs
-   is set to reflect the expected migration ID after completing the migration.
-   If periodic SV runbook redeployments are scheduled for the target cluster, you can fix them by adding the
-   `global_domain_active_migration_id: 1` parameter to the triggered `deploy_sv_runbook` job.
-   After merging your patches to the cluster deployment branch,
-   the periodic checks and deployments should be able to complete successfully again.
-   Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 
 #### Checking the readiness of partners
 
-In addition to inquiring about the status of partners on [Slack](https://daholdings.slack.com/archives/C05E70BCSDA),
-here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
+1. Partners self-report their readiness on [Slack](https://daholdings.slack.com/archives/C05E70BCSDA).
 
-```
-curl https://sv.sv-2.dev.network.canton.global/api/sv/v0/dso | jq '.sv_node_states | .[] | .payload.state.synchronizerNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
-```
+1. Partners have upgraded to the version we expect *before* the migration (i.e., they are not on an older version). Hacky oneliner:
 
-This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
-So use this with many grains of salt and clarify with partners for which the checks fail that our assumptions are correct in their case.
+   ```
+   curl -s https://scan.sv-2.global.canton.network.digitalasset.com/api/scan/v0/scans | jq '.scans.[].scans.[].publicUrl' -r | xargs -n 1 sh -c 'echo -n "$0 ";  curl -s $0/api/scan/version | jq \'.version\''
+   ```
 
-For CometBFT, you can also check the CometBFT [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their new CometBFT nodes (add +1 to also count the node you are viewing).
+1. Partners' new sequencer and CometBFT nodes are reachable (before the actual migration has taken place). Hacky oneliner (with explanations below):
 
-Also note that pre-migration, the sequencer URLs of correctly set up sequencers will return the following (and this is fine):
+   ```
+   curl -s https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/dso | jq '.sv_node_states.[].payload.state.synchronizerNodes.[0].[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+   ```
 
-```
-Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: 111
-```
+   This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that we're running this check from an IP range that should be whitelisted (SBI rightfully don't whitelist our VPN for their CometBFT ingress, for example), that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
+   So use this with many grains of salt and clarify with partners for which of the checks fail that our assumptions are correct in their case.
 
-We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer should have been deployed with `autoInit=false`.
+   For CometBFT, you can also check the CometBFT [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+   If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their new CometBFT nodes (add +1 to also count the node you are viewing).
+
+   Also note that pre-migration, the sequencer URLs of correctly set up sequencers can return the following (and this is fine):
+
+   ```
+   Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: 111
+   ```
+
+   We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer should have been deployed with `autoInit=false`.
+   Other errors on this connection might also be fine.
+   Results of this check that are certainly not fine include the sequencer reporting to be `SERVING` (they probably started it with `autoInit=true`) or us hitting an HTML page instead of an gRPC endpoint (possible ingress misconfiguration).
 
 #### New domain readiness checks
 
@@ -1669,6 +1712,8 @@ We expect to get an error here because the sequencer's public API should not be 
 3. In the participant logs of one of our SVs, we see `Commitment correct` messages for all SV participants.
    If we're in sync with all other SVs it's reasonable to assume they're also in sync with each other.
 4. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
+
+See [Network Health](./network-health/NETWORK_HEALTH.md) for further investigation if any of these checks fail.
 
 ## Interacting with Canton Network UIs
 
