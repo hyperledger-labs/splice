@@ -188,6 +188,8 @@ In order to use their time effectively, create an GitHub issue for your problem 
 - [ ] The Canton version (commit height) we were using.
       Have a look at `version` in `nix/canton-sources.json` - the `9d36b99f`
       in `2.7.0-snapshot.20230726.10871.0.v9d36b99f` is what the Canton team is typically interested in.
+- [ ] The priority/severity of the issue (e.g.: it has impact on production clusters/customers, it is blocking us from consuming new Canton upgrades, it makes our current CI very flaky, it has only occured once so far, …)
+- [ ] (optional) If you would like to pair with a member of the Canton team for futher debugging (a potential learning opportunity for both sides) you can signal this directly on the issue.
 
 If you create the issue in the Canton repository, make sure that it is
 assigned to the [Canton Ledgers Support Issues](https://github.com/orgs/DACH-NY/projects/30/views/1)
@@ -198,8 +200,5 @@ create corresponding issues on their side.
 After documenting as much information as you can about the issue, ping
 the corresponding Canton team member that is on the support rotation
 this week. This can be found in the description of the
-[#team-canton](https://daholdings.slack.com/archives/C044LUG7CKT)
-channel:
-
-- Reference your GH issue.
-- Note the severity of the issue for us (e.g., it is blocking us from consuming new Canton upgrades, it makes our current CI very flaky, it has only occured once so far, …)
+[#team-canton](https://daholdings.slack.com/archives/C044LUG7CKT) channel.
+Don't forget to reference your GH issue.
