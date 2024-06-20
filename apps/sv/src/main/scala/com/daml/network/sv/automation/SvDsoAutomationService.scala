@@ -200,10 +200,16 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new ReportMetricsExportTrigger(
+      new ReportSvStatusMetricsExportTrigger(
         triggerContext,
         dsoStore,
         cometBft,
+      )
+    )
+    registerTrigger(
+      new ReportValidatorLicenseMetricsExportTrigger(
+        triggerContext,
+        dsoStore,
       )
     )
     registerTrigger(
@@ -447,7 +453,8 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[LocalSequencerConnectionsTrigger],
       aTrigger[SequencerPruningTrigger],
       aTrigger[SubmitSvStatusReportTrigger],
-      aTrigger[ReportMetricsExportTrigger],
+      aTrigger[ReportSvStatusMetricsExportTrigger],
+      aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicDomainParametersTrigger],
     )
 }

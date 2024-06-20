@@ -69,6 +69,11 @@ Upcoming
     walletPayments     0.1.3
     ================== =======
 
+* Dashboards
+
+  Added a new Validator License dashboard that displays the version and contact point of all validators. This can be useful
+  to judge the impact of an upgrade.
+
 0.1.12
 ------
 

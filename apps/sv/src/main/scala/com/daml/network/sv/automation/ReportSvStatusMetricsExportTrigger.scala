@@ -11,7 +11,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
 import com.daml.network.environment.CNMetrics
-import com.daml.network.sv.automation.ReportMetricsExportTrigger.{
+import com.daml.network.sv.automation.ReportSvStatusMetricsExportTrigger.{
   SvCometBftMetrics,
   SvStatusMetrics,
 }
@@ -32,7 +32,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** A trigger to export the SvStatus reports as metrics. */
-class ReportMetricsExportTrigger(
+class ReportSvStatusMetricsExportTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     cometBftNode: Option[CometBftNode],
@@ -47,10 +47,11 @@ class ReportMetricsExportTrigger(
 
   private val svCometBftMetrics = new SvCometBftMetrics(context.metricsFactory)
 
-  private val perSvStatusMetrics: TrieMap[ReportMetricsExportTrigger.SvId, SvStatusMetrics] =
+  private val perSvStatusMetrics
+      : TrieMap[ReportSvStatusMetricsExportTrigger.SvId, SvStatusMetrics] =
     TrieMap.empty
 
-  private def getSvStatusMetrics(svId: ReportMetricsExportTrigger.SvId): SvStatusMetrics =
+  private def getSvStatusMetrics(svId: ReportSvStatusMetricsExportTrigger.SvId): SvStatusMetrics =
     perSvStatusMetrics.getOrElse(
       svId,
       // We must synchronize here to avoid allocating the metrics for the same sv multiple times, which would lead to
@@ -63,7 +64,7 @@ class ReportMetricsExportTrigger(
     )
 
   private def closeAllOffboardedSvMetrics(
-      svIdsFromDsoRules: Set[ReportMetricsExportTrigger.SvId]
+      svIdsFromDsoRules: Set[ReportSvStatusMetricsExportTrigger.SvId]
   )(implicit tc: TraceContext): Unit = {
 
     val svIdsToClose = perSvStatusMetrics.keySet.toSet -- svIdsFromDsoRules
@@ -85,14 +86,14 @@ class ReportMetricsExportTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
     svIdsFromDsoRules = dsoRules.payload.svs.asScala.map { case (svParty, svInfo) =>
-      ReportMetricsExportTrigger.SvId(svParty, svInfo.name)
+      ReportSvStatusMetricsExportTrigger.SvId(svParty, svInfo.name)
     }.toSet
     // Note: We rely on there always being other SVs that still update their status reports. This is a reasonable assumption:
     // If no status reports go through the domain, we get alerts anyway so it doesn't matter much whether one SV is
     // removed or not.
     _ = closeAllOffboardedSvMetrics(svIdsFromDsoRules)
     report = task.payload
-    svId = ReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
+    svId = ReportSvStatusMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
     (earliestBlockHeight, latestBlockHeight) <- cometBftNode match {
       case None => Future.successful((0L, 0L))
       case Some(cometBftNode) =>
@@ -144,7 +145,7 @@ class ReportMetricsExportTrigger(
       )
 }
 
-object ReportMetricsExportTrigger {
+object ReportSvStatusMetricsExportTrigger {
 
   private case class SvId(svParty: String, svName: String)
 
