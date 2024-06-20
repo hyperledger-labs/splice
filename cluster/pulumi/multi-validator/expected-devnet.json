@@ -2269,6 +2269,10 @@
                     "value": "2"
                   },
                   {
+                    "name": "CN_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2607,6 +2611,10 @@
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
                     "value": "2"
+                  },
+                  {
+                    "name": "CN_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
                   },
                   {
                     "name": "NUM_NODES",
@@ -2949,6 +2957,10 @@
                     "value": "2"
                   },
                   {
+                    "name": "CN_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3289,6 +3301,10 @@
                     "value": "2"
                   },
                   {
+                    "name": "CN_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3627,6 +3643,10 @@
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
                     "value": "2"
+                  },
+                  {
+                    "name": "CN_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
                   },
                   {
                     "name": "NUM_NODES",
