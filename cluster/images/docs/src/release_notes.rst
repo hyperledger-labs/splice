@@ -36,6 +36,15 @@ Upcoming
     overriding ``migrationId`` in the response payload.  The default ``migrationId`` is
     now 1 + the cluster's current migration ID, rather than only the current migration ID.
 
+  * The migration dump format has changed; the JSON keys ``acsSnapshot``,
+    ``acsTimestamp``, ``migrationId``, ``domainId``, and ``createdAt`` have changed to
+    ``acs_snapshot``, ``acs_timestamp``, ``migration_id``, ``domain_id``, and
+    ``created_at``, respectively. The format of ``/v0/admin/domain/data-snapshot`` has
+    been fixed where it mismatched the migration dump import format so that backups do not
+    need to be patched to be restored. Previous backups can be patched to be restored in
+    this format by making the above key changes with a straightforward ``jq`` command, if
+    necessary.
+
 * Scan app
 
   * Improved performance of the per-party ACS endpoint that is used

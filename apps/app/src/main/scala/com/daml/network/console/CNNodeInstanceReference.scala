@@ -114,7 +114,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
 
   def httpClientConfig: NetworkAppClientConfig
 
-  override protected[console] def httpCommand[Result](
+  override protected[network] def httpCommand[Result](
       httpCommand: HttpCommand[_, Result]
   ): ConsoleCommandResult[Result] =
     cnNodeConsoleEnvironment.httpCommandRunner.runCommand(

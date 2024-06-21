@@ -39,7 +39,7 @@ trait HttpCommand[Res, Result] {
       headers: List[HttpHeader],
   ): EitherT[Future, Either[Throwable, HttpResponse], Res]
 
-  def handleResponse(
+  final def handleResponse(
       response: Res
   )(implicit decoder: TemplateJsonDecoder): Either[String, Result] = {
     this.handleOk().apply(response)
@@ -49,6 +49,32 @@ trait HttpCommand[Res, Result] {
   protected def handleOk()(implicit
       decoder: TemplateJsonDecoder
   ): PartialFunction[Res, Either[String, Result]]
+
+  private[network] final def withRawResponse
+      : HttpCommand[Res, Res] { type Client = HttpCommand.this.Client } = {
+    val self: this.type = this
+    new HttpCommand[Res, Res] {
+      type Client = self.Client
+
+      override def createClient(host: String)(implicit
+          httpClient: CNHttpClient,
+          tc: TraceContext,
+          ec: ExecutionContext,
+          mat: Materializer,
+      ) = self.createClient(host)
+
+      override def submitRequest(
+          client: Client,
+          headers: List[HttpHeader],
+      ) = self.submitRequest(client, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ) = { case res => Right(res) }
+
+      override def fullName = self.fullName
+    }
+  }
 
   def fullName: String =
     // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions

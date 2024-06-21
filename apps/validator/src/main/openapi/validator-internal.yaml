@@ -902,9 +902,9 @@ components:
         - acs_snapshot
         - acs_timestamp
         - dars
-        - migrationId
-        - domainId
-        - createdAt
+        - migration_id
+        - domain_id
+        - created_at
       properties:
         participant:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
@@ -918,23 +918,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
-        migrationId:
+        migration_id:
           type: integer
           format: int64
-        domainId:
+        domain_id:
           type: string
-        createdAt:
+        created_at:
           type: string
 
     GetValidatorDomainDataSnapshotResponse:
       type: object
       required:
         - data_snapshot
-        - migrationId
+        - migration_id
       properties:
         data_snapshot:
           $ref: "#/components/schemas/DomainMigrationDump"
-        migrationId:
+        migration_id:
           type: integer
           format: int64
 

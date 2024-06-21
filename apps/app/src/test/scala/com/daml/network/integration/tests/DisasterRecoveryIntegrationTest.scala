@@ -393,6 +393,27 @@ class DisasterRecoveryIntegrationTest
           getAndWriteDumps(identities, timestampBeforeDisaster)
         }
 
+        withClueAndLog("Testing restore from HTTP validator dump") {
+          import com.daml.network.validator.admin.api.client.commands.HttpValidatorAdminAppClient.GetValidatorDomainDataSnapshot
+          val validatorRawDump = aliceValidatorBackend.httpCommand(
+            GetValidatorDomainDataSnapshot(
+              timestampBeforeDisaster,
+              migrationId = None,
+              force = true,
+            ).withRawResponse
+          )
+          val validatorRawDumpJson =
+            validatorRawDump.toEither.value
+              .fold(Right(_), Left(_))
+              .value
+              .asJsonObject
+              .apply("data_snapshot")
+              .value
+          io.circe.parser
+            .decode[ValidatorDomainMigrationDump](validatorRawDumpJson.noSpaces)
+            .value
+        }
+
         withClueAndLog("Getting and writing disaster recovery dumps for validator") {
           val validatorDump =
             aliceValidatorBackend.getValidatorDomainDataSnapshot(
