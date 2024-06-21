@@ -26,12 +26,13 @@ trait TriggerTestUtil { self: BaseTest =>
 
   // The trigger that advances rounds, running in the sv app
   // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
-  def trigger(implicit env: CNNodeTestConsoleEnvironment) = sv1Backend.leaderBasedAutomation
-    .trigger[AdvanceOpenMiningRoundTrigger]
+  private def advanceOpenMiningRoundTrigger(implicit env: CNNodeTestConsoleEnvironment) =
+    sv1Backend.leaderBasedAutomation
+      .trigger[AdvanceOpenMiningRoundTrigger]
 
   def advanceRoundsByOneTickViaAutomation(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     eventually() {
-      trigger.runOnce().futureValue should be(true)
+      advanceOpenMiningRoundTrigger.runOnce().futureValue should be(true)
     }
   }
 }

@@ -21,7 +21,10 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.confirmation.AnsSubscriptionInitialPaymentTrigger
-import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
+import com.daml.network.sv.automation.leaderbased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.util.{Contract, SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
@@ -75,6 +78,7 @@ class WalletManualRoundsIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+            .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
         )(config)
       )
 
@@ -304,7 +308,6 @@ class WalletManualRoundsIntegrationTest
       )
 
       aliceWalletClient.tap(20.0)
-      val tapRound = aliceWalletClient.balance().round
 
       eventually() {
         aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
@@ -326,39 +329,50 @@ class WalletManualRoundsIntegrationTest
         _ => aliceWalletClient.listAppPaymentRequests() should have length 1,
       )
 
-      actAndCheck(
+      val (_, rewardRound) = actAndCheck(
         "Alice accepts the payment request",
         aliceWalletClient
           .listAppPaymentRequests()
           .map(req => aliceWalletClient.acceptAppPaymentRequest(req.contractId)),
       )(
-        "Request no longer exists",
-        _ => aliceWalletClient.listAppPaymentRequests() should have length 0,
-      )
-
-      actAndCheck(
-        "Advance rounds until reward coupons are issued",
-        Seq(1, 2).foreach(_ => advanceRoundsByOneTickViaAutomation),
-      )(
-        "Wait for reward coupons",
+        "Request no longer exists and validator has one unfeatured app reward",
         _ => {
-          aliceValidatorWalletClient
-            .listAppRewardCoupons() should have length 1 // Award for the first (locking) leg goes to the sender's validator
+          aliceWalletClient.listAppPaymentRequests() should have length 0
+          inside(aliceValidatorWalletClient.listAppRewardCoupons()) { case Seq(c) =>
+            // Award for the first (locking) leg goes to the sender's validator
+            // The wallet is not a featured app, so no featured app reward even if the validator party is featured!
+            c.payload.featured shouldBe false
+            c.payload.round
+          }
         },
       )
 
-      inside(aliceValidatorWalletClient.listAppRewardCoupons()) { case Seq(c) =>
-        // The wallet is not a featured app, so no featured app reward even if the validator party is featured!
-        c.payload.featured shouldBe false
+      clue(s"Reward round $rewardRound is the newest open round") {
+        val openRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
+        openRounds.map(_.payload.round.number) should contain theSameElementsAs Seq(
+          rewardRound.number - 2,
+          rewardRound.number - 1,
+          rewardRound.number,
+        )
       }
 
-      eventually() {
-        val balance = aliceValidatorWalletClient.balance()
-        balance.round shouldBe tapRound + 2
-      }
-
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-        Seq(1, 2).foreach(_ => advanceRoundsByOneTickViaAutomation),
+      loggerFactory.assertEventuallyLogsSeq(
+        SuppressionRule.LevelAndAbove(Level.INFO) && SuppressionRule.LoggerNameContains(
+          "validator=aliceValidator"
+        )
+      )(
+        {
+          actAndCheck(
+            "Advance rounds by 3 ticks",
+            Seq(1, 2, 3).foreach(_ => advanceRoundsByOneTickViaAutomation),
+          )(
+            s"Round $rewardRound is in issuing state",
+            _ => {
+              val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+              issuingRounds.map(_.payload.round) should contain(rewardRound)
+            },
+          )
+        },
         entries => {
           forAtLeast(1, entries) { line =>
             line.message should (include(
