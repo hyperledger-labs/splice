@@ -72,7 +72,30 @@ class ParticipantAdminConnection(
 
   def getDomainId(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext
-  ): Future[DomainId] = runCmd(ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias))
+  ): Future[DomainId] =
+    // We avoid ParticipantAdminCommands.DomainConnectivity.GetDomainId which tries to make
+    // a new request to the sequencer to query the domain id. ListConnectedDomains
+    // on the other hand relies on a cache
+    listConnectedDomains().map(
+      _.find(
+        _.domainAlias == domainAlias
+      ).fold(
+        throw Status.NOT_FOUND
+          .withDescription(s"Domain with alias $domainAlias is not connected")
+          .asRuntimeException()
+      )(_.domainId)
+    )
+
+  /** Usually you want getDomainId instead which is much faster if the domain is connected
+    *  but in some cases we want to check the domain id
+    * without risking a full domain connection.
+    */
+  def getDomainIdWithoutConnecting(domainAlias: DomainAlias)(implicit
+      traceContext: TraceContext
+  ): Future[DomainId] =
+    runCmd(
+      ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias)
+    )
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext

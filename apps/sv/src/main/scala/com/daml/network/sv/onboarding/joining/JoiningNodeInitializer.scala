@@ -822,7 +822,7 @@ class JoiningNodeInitializer(
       "connect_domain",
       "Connect to global domain if not migrating party",
       for {
-        decentralizedSynchronizerId <- participantAdminConnection.getDomainId(
+        decentralizedSynchronizerId <- participantAdminConnection.getDomainIdWithoutConnecting(
           config.domains.global.alias
         )
         participantId <- participantAdminConnection.getParticipantId()
