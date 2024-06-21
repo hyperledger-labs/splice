@@ -5023,6 +5023,7 @@ workflows:
             - reset_cluster
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
+          reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
@@ -5045,6 +5046,7 @@ workflows:
              - deploy_cluster_for_upgrade
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
+          reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
           <<: *main-branch-only
           context:
