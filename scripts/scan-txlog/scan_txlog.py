@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its
+# affiliates. All rights reserved.
+#
+# This code is DA Background Intellectual Property as defined in the
+# Master Product Agreement between DA and the client.
+
 import aiohttp
 import asyncio
 import colorlog
@@ -987,6 +993,7 @@ class TransactionTree:
     record_time: str
     update_id: str
     workflow_id: str
+    synchronizer_id: str
 
     def __init__(
         self,
@@ -996,6 +1003,7 @@ class TransactionTree:
         record_time,
         update_id,
         workflow_id,
+        synchronizer_id,
     ):
         self.root_event_ids = root_event_ids
         self.events_by_id = events_by_id
@@ -1008,6 +1016,7 @@ class TransactionTree:
             for event in self.events_by_id.values()
             if isinstance(event, CreatedEvent)
         }
+        self.synchronizer_id = synchronizer_id
 
     def parse(json):
         return TransactionTree(
@@ -1020,6 +1029,7 @@ class TransactionTree:
             json["record_time"],
             json["update_id"],
             json["workflow_id"],
+            json["synchronizer_id"]
         )
 
     def is_acs_import(self):
@@ -2609,13 +2619,14 @@ class AppState:
     state: State
     per_round_states: dict[int, State]
     pagination_key: Optional[PaginationKey]
+    synchronizer_id: Optional[str]
 
     @classmethod
     def empty(cls, logger, args):
         state = State(
             logger, {}, None, args.ignore_root_create, args.ignore_root_exercise
         )
-        return cls(logger, state, {}, None)
+        return cls(logger, state, {}, None, None)
 
     @classmethod
     def from_json(cls, logger, data):
@@ -2627,6 +2638,7 @@ class AppState:
                 for round_number, round_data in data["per_round_states"].items()
             },
             PaginationKey.from_json(data["pagination_key"]),
+            data.get('synchronizer_id')
         )
 
     def to_json(self):
@@ -2639,30 +2651,32 @@ class AppState:
             "pagination_key": (
                 None if self.pagination_key is None else self.pagination_key.to_json()
             ),
+            "synchronizer_id": self.synchronizer_id
         }
 
     @classmethod
     def create_or_restore_from_cache(cls, logger, args):
-        if args.cache_file_path:
-            if os.path.exists(args.cache_file_path):
-                try:
-                    with open(args.cache_file_path, "r") as file:
-                        data = json.load(file)
-                        logger.info(f"Restoring app state from {args.cache_file_path}")
-                        return AppState.from_json(logger, data)
-                except Exception as e:
-                    logger.error(
-                        f"Could not read app state from {args.cache_file_path}: {e}"
-                    )
-                    sys.exit(-1)
-            else:
-                logger.info(
-                    f"File {args.cache_file_path} does not exist, creating new app state"
-                )
-                return AppState.empty(logger, args)
-        else:
+        if args.cache_file_path is None:
             logger.info(f"Caching disabled, creating new app state")
             return AppState.empty(logger, args)
+
+        if not os.path.exists(args.cache_file_path):
+            logger.info(
+                f"File {args.cache_file_path} does not exist, creating new app state"
+            )
+            return AppState.empty(logger, args)
+
+        try:
+            with open(args.cache_file_path, "r") as file:
+                data = json.load(file)
+                logger.info(f"Restoring app state from {args.cache_file_path}")
+                return AppState.from_json(logger, data)
+
+        except Exception as e:
+            logger.error(
+                f"Could not read app state from {args.cache_file_path}: {e}"
+            )
+            sys.exit(-1)
 
     def save_to_cache(self, args):
         if args.cache_file_path:
@@ -2676,6 +2690,18 @@ class AppState:
                     f"Could not save app state to {args.cache_file_path}: {e}"
                 )
 
+    def check_synchronizer_id(self, sid):
+        if self.synchronizer_id is None:
+            self.synchronizer_id = sid
+            return
+
+        if self.synchronizer_id != sid:
+            self.logger.error(
+                f"Synchronizer ID mismatch between cache file and environment: "
+                f"({self.synchronizer_id}!={sid}). Please reset the local cache "
+                f"and retry."
+            )
+            sys.exit(-1)
 
 async def main():
     # Parse command line arguments
@@ -2719,6 +2745,7 @@ async def main():
     )
     args = parser.parse_args()
 
+
     # Set up logging
     logger = colorlog.getLogger("scan_txlog")
     logger.addHandler(cli_handler)
@@ -2761,6 +2788,7 @@ async def main():
                         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
                     )
                     previous_state = app_state.state.clone(logger)
+                    app_state.check_synchronizer_id(transaction.synchronizer_id)
                     result = app_state.state.handle_transaction(transaction)
                     if args.scan_balance_assertions:
                         for round_number in result.new_open_rounds:
