@@ -201,6 +201,7 @@ workflow:
       # before the daml upgrade vote is effective
       - deploy_sv_runbook:
           name: "upgrade_sv_runbook_after_daml_upgrade"
+          reset_cluster: false
           <<: *main-branch-only
           context:
             - artifactory
@@ -211,6 +212,7 @@ workflow:
             - preflight_daml_upgrade
       - deploy_validator_runbook:
           name: "upgrade_validator_runbook_after_daml_upgrade"
+          reset_cluster: false
           <<: *main-branch-only
           context:
             - artifactory
