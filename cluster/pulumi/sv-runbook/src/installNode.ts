@@ -176,7 +176,7 @@ function persistenceForPostgres(pg: CNPostgres | CloudPostgres, values: ChartVal
       ...values?.persistence,
       host: pg.address,
       secretName: pg.secretName,
-      postgresName: pg.name,
+      postgresName: pg.instanceName,
     },
     enablePostgresMetrics: true,
   };

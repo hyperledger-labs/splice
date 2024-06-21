@@ -254,27 +254,28 @@
           cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+      # TODO (#12393): reenable, this restore nukes the database of migration ID 1, which breaks.
+#      - restore_node:
+#          name: "restore_node_after_migration"
+#          <<: *main-branch-never
+#          cluster: "user-selected-scratchnet"
+#          namespace_name: "sv-3"
+#          expected_migration_id: 1
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          requires:
+#            - preflight_sv_check_migrated
+#            - preflight_validator_check_migrated
+#            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
-            - restore_node_after_migration
+            # TODO (#12393): readd: - restore_node_after_migration
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated

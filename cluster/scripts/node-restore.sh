@@ -7,10 +7,9 @@ source "${TOOLS_LIB}/libcli.source"
 source "${REPO_ROOT}/cluster/scripts/utils.source"
 
 declare -A component_to_deployments
-component_to_deployments["sequencer-0"]="global-domain-0-sequencer"
-component_to_deployments["mediator-0"]="global-domain-0-mediator"
-component_to_deployments["participant"]="participant"
-component_to_deployments["participant-0"]="participant-0"
+component_to_deployments["sequencer"]="global-domain-0-sequencer"
+component_to_deployments["mediator"]="global-domain-0-mediator"
+component_to_deployments["participant"]="participant-0"
 component_to_deployments["cometbft-0"]="global-domain-0-cometbft"
 component_to_deployments["cn-apps"]="validator-app scan-app sv-app"
 component_to_deployments["validator"]="validator-app"

@@ -243,24 +243,24 @@ function main() {
     backup_component "$namespace" "validator" "$requested_component" "$migration_id"
     wait_for_backup "$namespace" "validator" "$requested_component" "$migration_id"
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
-    wait_for_backup "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
+    backup_component "$namespace" "participant" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id"
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
     backup_component "$namespace" "cn-apps" "$requested_component" "$migration_id"
-    backup_component "$namespace" "mediator-$migration_id" "$requested_component" "$migration_id"
-    backup_component "$namespace" "sequencer-$migration_id" "$requested_component" "$migration_id"
+    backup_component "$namespace" "mediator" "$requested_component" "$migration_id"
+    backup_component "$namespace" "sequencer" "$requested_component" "$migration_id"
     backup_component "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id"
 
     wait_for_backup "$namespace" "cn-apps" "$requested_component" "$migration_id"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
+    backup_component "$namespace" "participant" "$requested_component" "$migration_id"
 
-    wait_for_backup "$namespace" "participant-$migration_id" "$requested_component" "$migration_id"
-    wait_for_backup "$namespace" "mediator-$migration_id" "$requested_component" "$migration_id"
-    wait_for_backup "$namespace" "sequencer-$migration_id" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "mediator" "$requested_component" "$migration_id"
+    wait_for_backup "$namespace" "sequencer" "$requested_component" "$migration_id"
     wait_for_backup "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id"
   else
     usage

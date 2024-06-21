@@ -184,19 +184,20 @@ workflow:
           migration_id: 1
           requires:
             - migrate_cluster
-      - restore_node:
-          <<: *main-branch-only
-          cluster: "ciperiodic"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+       # TODO (#12393): reenable, this restore nukes the database of migration ID 1,
+#      - restore_node:
+#          <<: *main-branch-only
+#          cluster: "ciperiodic"
+#          namespace_name: "sv-3"
+#          expected_migration_id: 1
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          requires:
+#            - preflight_sv_check_migrated
+#            - preflight_validator_check_migrated
+#            - preflight_check_migrated
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           <<: *main-branch-only
@@ -208,8 +209,9 @@ workflow:
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
-          requires:
-            - restore_node
+          # TODO (#12393): uncomment
+#          requires:
+#            - restore_node
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           <<: *main-branch-only
