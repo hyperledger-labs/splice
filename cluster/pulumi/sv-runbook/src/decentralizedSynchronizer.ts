@@ -79,7 +79,7 @@ export function installDecentralizedSynchronizerNode(
             persistence: {
               ...decentralizedSynchronizerValues.sequencer.persistence,
               host: sequencerPg.address,
-              postgresName: sequencerPg.name,
+              postgresName: sequencerPg.instanceName,
             },
           },
           mediator: {
@@ -87,7 +87,7 @@ export function installDecentralizedSynchronizerNode(
             persistence: {
               ...decentralizedSynchronizerValues.mediator.persistence,
               host: mediatorPg.address,
-              postgresName: mediatorPg.name,
+              postgresName: mediatorPg.instanceName,
             },
           },
           enablePostgresMetrics: true,

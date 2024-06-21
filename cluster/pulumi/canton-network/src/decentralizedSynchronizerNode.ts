@@ -86,7 +86,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             databaseName: sequencerDbName,
             secretName: sequencerPostgres.secretName,
             host: sequencerPostgres.address,
-            postgresName: sequencerPostgres.name,
+            postgresName: sequencerPostgres.instanceName,
           },
           driver: {
             type: 'cometbft',
@@ -101,7 +101,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             databaseName: mediatorDbName,
             secretName: mediatorPostgres.secretName,
             host: mediatorPostgres.address,
-            postgresName: mediatorPostgres.name,
+            postgresName: mediatorPostgres.instanceName,
           },
         },
         metrics: {

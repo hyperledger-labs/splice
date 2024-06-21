@@ -219,9 +219,10 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', false);
+    : postgres.installPostgres(xns, 'postgres', 'postgres', false);
 
-  const appsPostgres = defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, true);
+  const appsPostgres =
+    defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, true);
   const activeMigrationComponents = installMigrationIdSpecificComponents(
     xns,
     decentralizedSynchronizerUpgradeConfig,
@@ -305,7 +306,7 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
     schema: dbNameO,
     user: pulumi.Output.create('cnadmin'),
     port: pulumi.Output.create(5432),
-    postgresName: postgresDb.name,
+    postgresName: postgresDb.instanceName,
   };
 }
 
@@ -373,15 +374,33 @@ function installMigrationIdSpecificComponents(
   },
   svConfig: SvConfig
 ) {
+  const sequencerPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      'sequencer-pg',
+      `sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
+  const mediatorPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      'mediator-pg',
+      `mediator-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
+  const participantPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      'participant-pg',
+      `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
   return installMigrationIdSpecificComponent(
     decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
-      const sequencerPostgres =
-        defaultPostgres || postgres.installPostgres(xns, `sequencer-${migrationId}-pg`, true);
-      const mediatorPostgres =
-        defaultPostgres || postgres.installPostgres(xns, `mediator-${migrationId}-pg`, true);
-      const participantPostgres =
-        defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
       const logLevel = config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG')
         ? svConfig.onboardingName !== svConfigs[0].onboardingName
           ? 'INFO'

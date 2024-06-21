@@ -2217,12 +2217,12 @@ subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
 function subcmd_backup_nodes() {
     _cluster_must_exist
 
-    migration_id=$1
-
     if [ "$#" -lt 1 ]; then
        echo "Usage: $0 <migration_id> [node...]"
        exit 1
     fi
+
+    migration_id=$1
 
     if [ $# -eq 1 ]; then
         nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
@@ -2300,11 +2300,11 @@ function subcmd_restore_node() {
             _info "Silencing SV report creation alerts for $sv_name for 1 hour"
             subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer-0 participant-0 mediator-0 cn-apps
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer participant mediator cn-apps
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant-0 validator
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant validator
             ;;
         *)
             _error "Unknown node $node"
@@ -2737,6 +2737,7 @@ function subcmd_list_sv_cometbft_addresses() {
 subcommand_whitelist[unprotect_dbs]='Unprotects all DB resources corresponding to the given migration id'
 
 function subcmd_unprotect_dbs() {
+  # TODO (#12883): migration id should no longer be required
   migration_id="${1:-}"
 
   if [ "$#" -lt 2 ]; then
@@ -2767,7 +2768,11 @@ function subcmd_unprotect_dbs() {
     fi
     for db in "${protected_dbs[@]}";
     do
-      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-pg" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-pg-cantonnet" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-pg-passwd" --yes || true
+      subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/databaseInstance:DatabaseInstance::$ns-$db-pg" --yes || true
+      # TODO (#12883): these are legacy, delete them once all clusters have been renamed and have the alias.
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-$migration_id-pg" --yes || true
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-$migration_id-pg-cantonnet" --yes || true
       subcmd_pulumi canton-network state unprotect "urn:pulumi:canton-network.$GCP_CLUSTER_BASENAME::canton-network::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-$migration_id-pg-passwd" --yes || true

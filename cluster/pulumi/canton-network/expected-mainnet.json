@@ -170,12 +170,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-0-pg-secrets",
+        "name": "mediator-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-mediator-0-pg-secrets",
+    "name": "cn-app-sv-1-mediator-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -192,12 +192,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-0-pg-secrets",
+        "name": "participant-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-participant-0-pg-secrets",
+    "name": "cn-app-sv-1-participant-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -214,12 +214,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "sequencer-0-pg-secrets",
+        "name": "sequencer-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-sequencer-0-pg-secrets",
+    "name": "cn-app-sv-1-sequencer-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -444,7 +444,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-mediator-0-pg-cantonnet",
+    "name": "sv-1-db-mediator-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -454,7 +454,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-participant-0-pg-cantonnet",
+    "name": "sv-1-db-participant-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -464,7 +464,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-sequencer-0-pg-cantonnet",
+    "name": "sv-1-db-sequencer-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -507,8 +507,8 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_0_mediator",
-            "postgresName": "mediator-0-pg",
-            "secretName": "mediator-0-pg-secrets"
+            "postgresName": "mediator-pg",
+            "secretName": "mediator-pg-secrets"
           }
         },
         "metrics": {
@@ -527,8 +527,8 @@
           },
           "persistence": {
             "databaseName": "global_domain_0_sequencer",
-            "postgresName": "sequencer-0-pg",
-            "secretName": "sequencer-0-pg-secrets"
+            "postgresName": "sequencer-pg",
+            "secretName": "sequencer-pg-secrets"
           }
         }
       },
@@ -618,7 +618,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-0-pg-passwd",
+    "name": "sv-1-mediator-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -626,7 +626,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-mediator-0-pg",
+    "name": "sv-1-mediator-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -659,60 +659,7 @@
         }
       }
     },
-    "name": "sv-1-mediator-0-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-participant-0-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-participant-0-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "europe-west4",
-      "settings": {
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "europe-west4-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "main"
-        }
-      }
-    },
-    "name": "sv-1-participant-0-pg",
+    "name": "sv-1-mediator-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -764,9 +711,9 @@
         },
         "persistence": {
           "databaseName": "participant_0",
-          "postgresName": "participant-0-pg",
+          "postgresName": "participant-pg",
           "schema": "participant",
-          "secretName": "participant-0-pg-secrets"
+          "secretName": "participant-pg-secrets"
         }
       },
       "version": "0.1.8"
@@ -774,6 +721,59 @@
     "name": "sv-1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-participant-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-participant-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": false,
+      "region": "europe-west4",
+      "settings": {
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "europe-west4-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "main"
+        }
+      }
+    },
+    "name": "sv-1-participant-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
   {
     "custom": true,
@@ -834,7 +834,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-0-pg-passwd",
+    "name": "sv-1-sequencer-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -842,7 +842,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-sequencer-0-pg",
+    "name": "sv-1-sequencer-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -875,7 +875,7 @@
         }
       }
     },
-    "name": "sv-1-sequencer-0-pg",
+    "name": "sv-1-sequencer-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1136,7 +1136,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-0-pg",
+    "name": "user-sv-1-mediator-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1150,7 +1150,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-0-pg",
+    "name": "user-sv-1-participant-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -1164,7 +1164,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-0-pg",
+    "name": "user-sv-1-sequencer-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   }
