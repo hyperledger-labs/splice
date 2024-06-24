@@ -5,7 +5,7 @@
     "parameters" : {
       "branch" : "main",
       "run-job": "deploy-ciperiodic-migration",
-      "base-version": "e5e6793fae5d8ac1f1d234e4298f890dada28a6a"
+      "base-version": "94f032dd829612e227ce42bede869dada468a69d"
     },
     "timetable" : {
       "per-hour" : 1,
