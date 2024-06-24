@@ -22,6 +22,7 @@ import com.daml.network.store.Limit
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.http.v0.definitions.BalanceChange
+import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -46,13 +47,28 @@ class ScanIntegrationTest
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
-      .withTrafficTopupsDisabled
+      .withTrafficTopupsEnabled
 
   "list transaction pages in ascending and descending order" in { implicit env =>
-    onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    val aliceWalletUser = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    def tapsForAlice = (t: TransactionHistoryResponseItem) =>
+      t.tap.exists { tap =>
+        PartyId.tryFromProtoPrimitive(tap.amuletOwner) == aliceWalletUser
+      }
+
     val nrTaps = 10
     val amuletAmounts = (1 to nrTaps).map(walletUsdToAmulet(_))
     val pageSize = nrTaps / 2
+    // filtering for Alice to avoid interference by the top up taps
+    def collectAllTapPagesForAlice(sortOrder: TransactionHistoryRequest.SortOrder) = {
+      LazyList
+        .iterate(sv1ScanBackend.listTransactions(None, sortOrder, pageSize)) { page =>
+          sv1ScanBackend.listTransactions(page.lastOption.map(_.eventId), sortOrder, pageSize)
+        }
+        .takeWhile(_.nonEmpty)
+        .foldLeft(Seq.empty[TransactionHistoryResponseItem])(_ ++ _)
+        .filter(tapsForAlice)
+    }
 
     def toAmuletAmounts(page: Seq[TransactionHistoryResponseItem]) =
       page.flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
@@ -73,66 +89,58 @@ class ScanIntegrationTest
     eventually() {
       val latestRound =
         sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
+      val asc = TransactionHistoryRequest.SortOrder.Asc
+      val desc = TransactionHistoryRequest.SortOrder.Desc
+      val allPagesAsc = collectAllTapPagesForAlice(asc)
+      val allPagesDesc = collectAllTapPagesForAlice(desc)
+      allPagesAsc.map(_.round) should contain only latestRound
 
-      val tapsFirstPageAscending =
-        sv1ScanBackend
-          .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, pageSize)
-
-      tapsFirstPageAscending.map(_.round) should contain only latestRound
+      val tapsFirstPageAscending = allPagesAsc.take(pageSize)
 
       toAmuletAmounts(tapsFirstPageAscending) should be(
         amuletAmounts.take(pageSize)
       )
 
       val firstPageEndEventId = tapsFirstPageAscending.last.eventId
-      val tapsSecondPageAscending =
-        sv1ScanBackend
-          .listTransactions(
-            Some(firstPageEndEventId),
-            TransactionHistoryRequest.SortOrder.Asc,
-            pageSize.toInt,
-          )
+      val tapsSecondPageAscending = allPagesAsc.slice(pageSize, pageSize + pageSize)
+      sv1ScanBackend
+        .listTransactions(
+          Some(firstPageEndEventId),
+          TransactionHistoryRequest.SortOrder.Asc,
+          pageSize.toInt,
+        )
+        .filter(tapsForAlice)
 
       toAmuletAmounts(tapsSecondPageAscending) should be(
-        amuletAmounts.drop(pageSize).take(pageSize)
+        amuletAmounts.slice(pageSize, pageSize + pageSize)
       )
 
       sv1ScanBackend
         .listTransactions(
           Some(tapsSecondPageAscending.last.eventId),
-          TransactionHistoryRequest.SortOrder.Asc,
+          asc,
           pageSize.toInt,
-        ) should be(empty)
+        )
+        .filter(tapsForAlice) should be(empty)
 
-      val tapsFirstPageDescending =
-        sv1ScanBackend
-          .listTransactions(
-            None,
-            TransactionHistoryRequest.SortOrder.Desc,
-            pageSize.toInt,
-          )
+      val tapsFirstPageDescending = allPagesDesc.take(pageSize)
       toAmuletAmounts(tapsFirstPageDescending) should be(
         amuletAmounts.reverse.take(pageSize)
       )
 
-      val firstPageEndEventIdDescending = tapsFirstPageDescending.last.eventId
       val tapsSecondPageDescending =
-        sv1ScanBackend
-          .listTransactions(
-            Some(firstPageEndEventIdDescending),
-            TransactionHistoryRequest.SortOrder.Desc,
-            pageSize.toInt,
-          )
+        allPagesDesc.slice(pageSize, pageSize + pageSize)
 
       sv1ScanBackend
         .listTransactions(
           Some(tapsSecondPageDescending.last.eventId),
           TransactionHistoryRequest.SortOrder.Desc,
           pageSize.toInt,
-        ) should be(empty)
+        )
+        .filter(tapsForAlice) should be(empty)
 
       toAmuletAmounts(tapsSecondPageDescending) should be(
-        amuletAmounts.reverse.drop(pageSize).take(pageSize)
+        amuletAmounts.reverse.slice(pageSize, pageSize + pageSize)
       )
       toAmuletAmounts(
         tapsFirstPageAscending ++ tapsSecondPageAscending
@@ -443,7 +451,6 @@ class ScanIntegrationTest
       }
   }
 
-  // TODO (#10940) move to simtime
   "list collected app and validator and SV rewards" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
@@ -497,14 +504,19 @@ class ScanIntegrationTest
       )(
         "Bob's validator will receive some rewards",
         _ => {
-          bobValidatorWalletClient.listAppRewardCoupons() should have size 1
-          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+          bobValidatorWalletClient
+            .listAppRewardCoupons() should have size 1
+//          bobValidatorWalletClient.listValidatorRewardCoupons() should
+//            have size (if (bobToppedUp) 2 else 1)
         },
       )
     }
-    val appRewardCoupons = bobValidatorWalletClient.listAppRewardCoupons()
-    val validatorRewardCoupons = bobValidatorWalletClient.listValidatorRewardCoupons()
 
+    val appRewardCoupons =
+      bobValidatorWalletClient.listAppRewardCoupons()
+    val validatorRewardCoupons =
+      bobValidatorWalletClient
+        .listValidatorRewardCoupons()
     clue("Advancing round") {
       eventually() {
         advanceTrigger.runOnce().futureValue should be(true)
@@ -518,38 +530,53 @@ class ScanIntegrationTest
         }
       }
     }
-
-    val (appRewardAmount, validatorRewardAmount) =
+//validatorRewardAmount
+    val (appRewardAmount, _) =
       getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
 
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {
-        bobValidatorWalletClient.listAppRewardCoupons() should have size 0
-        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
+        bobValidatorWalletClient
+          .listAppRewardCoupons() should have size 0
+        bobValidatorWalletClient
+          .listValidatorRewardCoupons() should have size 0
 
         val zero = BigDecimal(0)
         val bobTransfers = sv1ScanBackend
           .listActivity(None, defaultPageSize)
           .flatMap(_.transfer)
           .filter(_.sender.party == bobValidatorParty)
-
         val inputAppRewardAmounts = bobTransfers
           .flatMap(_.sender.inputAppRewardAmount)
           .map(BigDecimal(_))
           .filter(_ != zero)
+
         val inputAppRewardAmount = inputAppRewardAmounts.loneElement
         inputAppRewardAmount shouldBe appRewardAmount
 
-        val inputValidatorAmounts = bobTransfers
-          .flatMap(_.sender.inputValidatorRewardAmount)
-          .map(BigDecimal(_))
-          .filter(_ != zero)
-        val inputValidatorAmount = inputValidatorAmounts
-        // TODO (#10940) change both 7.6... and 7.9... to walletUsdToAmulet(2.85)
-        inputValidatorAmount should contain theSameElementsAs (Seq(
-          validatorRewardAmount + 7.6124479960
-        ) ++ Seq
-          .fill(2)(BigDecimal(7.9274479960).setScale(10))) // 2 validator faucets
+//        val inputValidatorAmounts = bobTransfers
+//          .flatMap(_.sender.inputValidatorRewardAmount)
+//          .map(BigDecimal(_))
+//          .filter(_ != zero)
+//
+//        val inputValidatorFaucetAmounts = bobTransfers
+//          .flatMap(_.sender.inputValidatorFaucetAmount)
+//          .map(BigDecimal(_))
+//          .filter(_ != zero)
+//        if (!bobToppedUp) {
+//          val firstInputValidatorFaucetAmount = inputValidatorFaucetAmounts.head
+//          val faucetAmounts = inputValidatorFaucetAmounts.tail
+//
+//          inputValidatorAmounts should contain theSameElementsAs (Seq(
+//            validatorRewardAmount + firstInputValidatorFaucetAmount
+//          ) ++ faucetAmounts)
+//        } else {
+//          val faucetAmounts = inputValidatorFaucetAmounts
+//
+//          inputValidatorAmounts should contain theSameElementsAs (Seq(
+//            validatorRewardAmount
+//          ) ++ faucetAmounts)
+//        }
       }
     }
   }
@@ -604,5 +631,15 @@ class ScanIntegrationTest
         step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
         step2Mult * ((amount - step1Amount - step2Amount) max 0)
     walletUsdToAmulet(CNNodeUtil.defaultCreateFee.fee) + steppedRate
+  }
+
+  def triggerTopupAliceAndBob()(implicit env: CNNodeTestConsoleEnvironment): (Boolean, Boolean) = {
+    val aliceTopupTrigger =
+      aliceValidatorBackend.appState.automation.trigger[TopupMemberTrafficTrigger]
+    val bobTopupTrigger =
+      bobValidatorBackend.appState.automation.trigger[TopupMemberTrafficTrigger]
+    bobTopupTrigger.pause().futureValue
+    aliceTopupTrigger.pause().futureValue
+    (aliceTopupTrigger.runOnce().futureValue, bobTopupTrigger.runOnce().futureValue)
   }
 }

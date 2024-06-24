@@ -987,6 +987,7 @@ abstract class ScanStoreTest
                 zero,
                 zero,
                 Some(zero),
+                None,
               )
             ),
             balanceChanges = Seq(),

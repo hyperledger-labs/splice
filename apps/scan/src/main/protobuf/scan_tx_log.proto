@@ -42,6 +42,7 @@ message SenderAmount {
   string holding_fees = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
   // Added after initial release, so needs to be mapped to an Option in scala
   string input_sv_reward_amount = 9 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+  string input_validator_faucet_amount = 10 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
 }
 
 message ReceiverAmount {

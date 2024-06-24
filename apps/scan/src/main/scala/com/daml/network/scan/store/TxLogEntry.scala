@@ -6,6 +6,7 @@ import com.daml.network.util.Codec
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import java.time.Instant
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
@@ -103,6 +104,7 @@ object TxLogEntry extends StoreErrors {
       inputAppRewardAmount = Some(Codec.encode(data.inputAppRewardAmount)),
       inputValidatorRewardAmount = Some(Codec.encode(data.inputValidatorRewardAmount)),
       inputSvRewardAmount = Some(Codec.encode(data.inputSvRewardAmount.getOrElse(BigDecimal(0)))),
+      inputValidatorFaucetAmount = data.inputValidatorFaucetAmount.map(fa => Codec.encode(fa)),
       senderChangeAmount = Codec.encode(data.senderChangeAmount),
       senderChangeFee = Codec.encode(data.senderChangeFee),
       senderFee = Codec.encode(data.senderFee),
@@ -206,6 +208,8 @@ object TxLogEntry extends StoreErrors {
       inputAppRewardAmount = res.summary.inputAppRewardAmount,
       inputValidatorRewardAmount = res.summary.inputValidatorRewardAmount,
       inputSvRewardAmount = Some(res.summary.inputSvRewardAmount),
+      inputValidatorFaucetAmount =
+        res.summary.inputValidatorFaucetAmount.toScala.map(BigDecimal(_)),
       senderChangeAmount = res.summary.senderChangeAmount,
       senderChangeFee = res.summary.senderChangeFee,
       senderFee = senderFee,

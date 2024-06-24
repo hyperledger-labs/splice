@@ -1378,6 +1378,10 @@ components:
           description: |
             Total amount of sv rewards input into this transfer.
           type: string
+        input_validator_faucet_amount:
+          description: |
+            Total amount of validator faucet coupon issuance input into this transfer.
+          type: string
         sender_change_fee:
           description: |
             Fee charged for returning change to the sender,
