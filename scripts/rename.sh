@@ -999,7 +999,7 @@ function subcmd_no_amulet_in_ui() {
 subcommand_whitelist[no_bad_things_repo_wide]='Repo-wide checks for bad patterns'
 function subcmd_no_bad_things_repo_wide() {
     local illegal_patterns=(
-      'http.*ans[.](?!(com|AnsResource))'
+      'http.*(?<!sc)ans[.](?!(com|AnsResource))'
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' in repo"
