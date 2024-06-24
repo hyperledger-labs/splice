@@ -4,6 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.http.AdminRoutes
 import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -47,6 +48,7 @@ class SvAppBootstrap(
       SvAppBackendConfig,
       SharedCNNodeAppParameters,
     ](
+      config,
       name,
       svAppParameters,
       clock,
@@ -56,23 +58,25 @@ class SvAppBootstrap(
       configuredOpenTelemetry,
     ) {
 
-  override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    EitherT.fromEither(
-      Right(
-        new SvApp(
-          name,
-          config,
-          svAppParameters,
-          storage,
-          clock,
-          loggerFactory,
-          tracerProvider,
-          futureSupervisor,
-          metrics,
+  override def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit] =
+    startInstanceUnlessClosing {
+      EitherT.fromEither(
+        Right(
+          new SvApp(
+            name,
+            config,
+            svAppParameters,
+            storage,
+            clock,
+            loggerFactory,
+            tracerProvider,
+            futureSupervisor,
+            metrics,
+            adminRoutes,
+          )
         )
       )
-    )
-  }
+    }
 
   override def isActive: Boolean = storage.isActive
 }

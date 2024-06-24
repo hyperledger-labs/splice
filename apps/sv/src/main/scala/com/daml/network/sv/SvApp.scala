@@ -8,7 +8,7 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
 import com.daml.network.codegen.java.splice
@@ -17,7 +17,6 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.http.CNHttpClient
-import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.migration.AcsExporter
@@ -61,14 +60,8 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  SyncCloseable,
-}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -81,7 +74,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
@@ -100,6 +92,7 @@ class SvApp(
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
     metrics: SvAppMetrics,
+    adminRoutes: AdminRoutes,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -521,14 +514,7 @@ class SvApp(
         loggerFactory,
       )
 
-      commonAdminHandler = new HttpAdminHandler(
-        status
-          .map(CNNodeStatus.fromNodeStatus)
-          .map(NodeStatus.Success(_)),
-        loggerFactory,
-      )
-
-      routes = cors(
+      route = cors(
         CorsSettings(ac)
           .withAllowedMethods(
             List(
@@ -560,25 +546,13 @@ class SvApp(
                     "canton network sv admin realm",
                   )(traceContext),
                 ),
-                pathPrefix("api" / "sv")(
-                  CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
-                ),
               )
             }
           }
         }
 
       }
-      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
-        Http()
-          .newServerAt(
-            config.adminApi.clientConfig.address,
-            config.adminApi.clientConfig.port.unwrap,
-          )
-          .bind(
-            routes
-          )
-      }
+      _ = adminRoutes.updateRoute(route)
     } yield {
       SvApp.State(
         participantAdminConnection,
@@ -590,7 +564,6 @@ class SvApp(
         dsoStore,
         svAutomation,
         dsoAutomation,
-        binding,
         logger,
         timeouts,
         httpClient,
@@ -758,24 +731,17 @@ object SvApp {
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
       dsoAutomation: SvDsoAutomationService,
-      binding: Http.ServerBinding,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       httpClient: CNHttpClient,
       decoder: TemplateJsonDecoder,
-  )(implicit el: ErrorLoggingContext)
-      extends FlagCloseableAsync
+  ) extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
       storage.isActive && svAutomation.isHealthy && dsoAutomation.isHealthy
 
     override def closeAsync(): Seq[AsyncOrSyncCloseable] =
       Seq(
-        AsyncCloseable(
-          "http binding",
-          binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
-          timeouts.shutdownNetwork,
-        ),
         SyncCloseable(
           s"Domain connections",
           localSynchronizerNode.foreach(_.close()),

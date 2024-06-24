@@ -79,7 +79,7 @@ trait CNNodeAppReference extends InstanceReference {
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
       timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded,
-      maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(10.seconds),
+      maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds),
   ): Unit =
     try {
       ConsoleMacros.utils.retry_until_true(timeout, maxBackoff)(

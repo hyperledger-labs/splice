@@ -8,7 +8,7 @@ import cats.instances.future.*
 import cats.syntax.foldable.*
 import cats.{Applicative, Id}
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
+import com.digitalasset.canton.concurrent.{ExecutionContextIdlenessExecutorService}
 import com.digitalasset.canton.config.{DbConfig, LocalNodeConfig, ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.domain.mediator.{
   MediatorNode,
@@ -159,13 +159,15 @@ class ManagedNodes[
         promise: Promise[Either[StartupError, NodeBootstrap]]
     ): EitherT[Future, StartupError, NodeBootstrap] = {
       val params = parametersFor(name)
+
+      val instanceCreated = create(name, config)
+
       val startup = for {
         // start migration
         _ <- EitherT(Future { checkMigration(name, config.storage, params) })
         instance = {
-          val instance = create(name, config)
-          nodes.put(name, StartingUp(promise, instance)).discard
-          instance
+          nodes.put(name, StartingUp(promise, instanceCreated)).discard
+          instanceCreated
         }
         _ <-
           instance.start().leftMap { error =>

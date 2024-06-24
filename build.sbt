@@ -1219,6 +1219,7 @@ lazy val `apps-app` =
   project
     .in(file("apps/app"))
     .dependsOn(
+      `apps-common`,
       `splice-wallet-payments-daml`,
       `splice-wallet-daml`,
       `apps-splitwell`,

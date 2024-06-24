@@ -22,6 +22,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
+import com.daml.network.admin.http.{AdminRoutes, HttpAdminService}
 
 object CNNodeBootstrap {
   type HealthDumpFunction = () => Future[File]
@@ -42,7 +43,7 @@ trait CNNodeBootstrap[+Node <: CantonNode]
     * and connected to at least one domain. This is necessary because the initialization of some CN apps needs to
     * interact with a Ledger API, e.g., to allocate a party or user.
     */
-  def initialize: EitherT[Future, String, Unit]
+  def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit]
 
   def getNode: Option[Node]
 
@@ -68,6 +69,7 @@ abstract class CNNodeBootstrapBase[
     NodeConfig <: LocalNodeConfig,
     ParameterConfig <: CantonNodeParameters,
 ](
+    nodeConfig: NodeConfig,
     override val name: InstanceName,
     parameterConfig: ParameterConfig,
     val clock: Clock,
@@ -98,7 +100,14 @@ abstract class CNNodeBootstrapBase[
         parameterConfig.processingTimeouts,
         loggerFactory,
       )
-
+  protected val httpAdminService: HttpAdminService =
+    HttpAdminService(
+      nodeConfig.nodeTypeName,
+      nodeConfig.adminApi,
+      parameterConfig,
+      loggerFactory,
+      getNode,
+    )
   // reference to the node once it has been started
   private val ref: AtomicReference[Option[T]] = new AtomicReference(None)
   private val starting = new AtomicBoolean(false)
@@ -146,7 +155,7 @@ abstract class CNNodeBootstrapBase[
   /** Attempt to start the node.
     */
   def start(): EitherT[Future, String, Unit] = {
-    initialize.leftMap { err =>
+    initialize(httpAdminService).leftMap { err =>
       logger.info(s"Failed to initialize node, trying to clean up: $err")
       close()
       err
@@ -158,7 +167,7 @@ abstract class CNNodeBootstrapBase[
       if (isRunningVar.getAndSet(false)) {
         val stores = List()
         val instances =
-          grpcAdminServers ++ getNode.toList ++ stores ++ List(clock)
+          grpcAdminServers ++ getNode.toList ++ stores ++ List(clock, httpAdminService)
         Lifecycle.close(instances*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")
       } else {

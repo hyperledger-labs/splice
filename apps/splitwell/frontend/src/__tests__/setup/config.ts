@@ -26,7 +26,7 @@ const config = {
     splitwell: {
       // URL of the splitwell backend.
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://splitwell.TARGET_HOSTNAME',
+      url: 'https://splitwell.TARGET_HOSTNAME/api/splitwell',
     },
     scan: {
       // URL of scan backend.

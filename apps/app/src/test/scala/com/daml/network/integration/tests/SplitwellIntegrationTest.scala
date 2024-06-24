@@ -41,6 +41,11 @@ class SplitwellIntegrationTest
       splitwellBackend.startSync()
     }
 
+    "splitwell should report liveness and readiness" in { implicit env =>
+      splitwellBackend.httpLive shouldBe true
+      splitwellBackend.httpReady shouldBe true
+    }
+
     "allocate unique groups per party, even when multiple requests race for them" in {
       implicit env =>
         import env.*

@@ -45,7 +45,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     participantAdmin: { url: 'http://localhost:6202' },
     validator: { url: 'http://localhost:5503/api/validator' },
     wallet: { uiUrl: 'http://localhost:3000' },
-    splitwell: { url: 'http://localhost:5113' },
+    splitwell: { url: 'http://localhost:5113/api/splitwell' },
     scan: { url: 'http://localhost:5012/api/scan' },
   },
   bob: {
@@ -54,7 +54,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     participantAdmin: { url: 'http://localhost:6302' },
     validator: { url: 'http://localhost:5603/api/validator' },
     wallet: { uiUrl: 'http://localhost:3001' },
-    splitwell: { url: 'http://localhost:5113' },
+    splitwell: { url: 'http://localhost:5113/api/splitwell' },
     scan: { url: 'http://localhost:5012/api/scan' },
   },
   splitwell: {
@@ -63,7 +63,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     // and spinning up a new frontend for this just adds even more resources.
     wallet: { uiUrl: 'http://unused.com' },
     jsonApi: { url: 'http://unused.com/' },
-    splitwell: { url: 'http://localhost:5113' },
+    splitwell: { url: 'http://localhost:5113/api/splitwell' },
     scan: { url: 'http://localhost:5012/api/scan' },
   },
   preflight: {
@@ -72,7 +72,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     participantAdmin: { url: 'http://localhost:8002' },
     validator: { url: 'http://localhost:5003/api/validator' },
     wallet: { uiUrl: 'http://localhost:3000' },
-    splitwell: { url: 'http://localhost:5113' },
+    splitwell: { url: 'http://localhost:5113/api/splitwell' },
     scan: { url: clusterProtocol + '://' + 'scan.sv-2.' + clusterAddress + '/api/scan' },
   },
   scan: {

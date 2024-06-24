@@ -4,6 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.http.AdminRoutes
 import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.validator.config.ValidatorAppBackendConfig
@@ -47,6 +48,7 @@ class ValidatorAppBootstrap(
       ValidatorAppBackendConfig,
       SharedCNNodeAppParameters,
     ](
+      config,
       name,
       validatorAppParameters,
       clock,
@@ -56,23 +58,25 @@ class ValidatorAppBootstrap(
       configuredOpenTelemetry,
     ) {
 
-  override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    EitherT.fromEither(
-      Right(
-        new ValidatorApp(
-          name,
-          config,
-          validatorAppParameters,
-          storage,
-          clock,
-          loggerFactory,
-          tracerProvider,
-          futureSupervisor,
-          metrics,
+  override def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit] =
+    startInstanceUnlessClosing {
+      EitherT.fromEither(
+        Right(
+          new ValidatorApp(
+            name,
+            config,
+            validatorAppParameters,
+            storage,
+            clock,
+            loggerFactory,
+            tracerProvider,
+            futureSupervisor,
+            metrics,
+            adminRoutes,
+          )
         )
       )
-    )
-  }
+    }
 
   override def isActive: Boolean = storage.isActive
 }

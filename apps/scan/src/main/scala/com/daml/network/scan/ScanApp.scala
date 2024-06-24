@@ -1,23 +1,20 @@
 package com.daml.network.scan
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.codegen.java.splice.round as roundCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{
   CNLedgerClient,
   CNNode,
-  CNNodeStatus,
   DarResources,
   ParticipantAdminConnection,
   RetryFor,
   SequencerAdminConnection,
 }
-import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
 import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
 import com.daml.network.migration.DomainMigrationInfo
@@ -33,9 +30,8 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -62,6 +58,7 @@ class ScanApp(
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
     nodeMetrics: ScanAppMetrics,
+    adminRoutes: AdminRoutes,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -190,14 +187,7 @@ class ScanApp(
         loggerFactory,
       )
 
-      adminHandler = new HttpAdminHandler(
-        status
-          .map(CNNodeStatus.fromNodeStatus)
-          .map(NodeStatus.Success(_)),
-        loggerFactory,
-      )
-
-      routes = cors(
+      route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { traceContext =>
@@ -208,26 +198,13 @@ class ScanApp(
                 concat(
                   InternalScanResource.routes(internalHandler, _ => provide(traceContext)),
                   ExternalScanResource.routes(externalHandler, _ => provide(traceContext)),
-                  pathPrefix("api" / "scan")(
-                    CommonAdminResource.routes(adminHandler, _ => provide(traceContext))
-                  ),
                 )
               }
             }
           }
         }
       }
-
-      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
-        Http()
-          .newServerAt(
-            config.adminApi.clientConfig.address,
-            config.adminApi.clientConfig.port.unwrap,
-          )
-          .bind(
-            routes
-          )
-      }
+      _ = adminRoutes.updateRoute(route)
     } yield {
       ScanApp.State(
         participantAdminConnection,
@@ -235,7 +212,6 @@ class ScanApp(
         storage,
         store,
         automation,
-        binding,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
       )
@@ -255,21 +231,14 @@ object ScanApp {
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
-      binding: Http.ServerBinding,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
-  )(implicit el: ErrorLoggingContext)
-      extends AutoCloseable
+  ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
-        AsyncCloseable(
-          "http binding",
-          binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
-          timeouts.shutdownNetwork,
-        ),
         automation,
         store,
         storage,

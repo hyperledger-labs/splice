@@ -4,6 +4,8 @@ info:
   version: 0.0.1
 tags:
   - name: splitwell
+servers:
+  - url: https://example.com/api/splitwell
 paths:
   /readyz:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"

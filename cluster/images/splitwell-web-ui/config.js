@@ -15,7 +15,7 @@ window.canton_network_config = {
     },
     splitwell: {
       // URL of the splitwell backend
-      url: `https://splitwell.${cluster}`,
+      url: `https://splitwell.${cluster}/api/splitwell`,
     },
     jsonApi: {
       // URL of the JSON API for the participant

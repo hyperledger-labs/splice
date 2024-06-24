@@ -25,6 +25,8 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
     sv1Backend.httpLive shouldBe true
     sv1Backend.httpReady shouldBe true
+    sv1ScanBackend.httpLive shouldBe true
+    sv1ScanBackend.httpReady shouldBe true
 
     actAndCheck(
       "disable all SV connections to the ledger API server",

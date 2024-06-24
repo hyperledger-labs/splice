@@ -1,26 +1,23 @@
 package com.daml.network.splitwell
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{
   CNLedgerClient,
   CNLedgerConnection,
   CNNode,
-  CNNodeStatus,
   DarResource,
   DarResources,
   ParticipantAdminConnection,
   RetryFor,
 }
-import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.splitwell.SplitwellResource
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -35,9 +32,8 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{Lifecycle}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -62,6 +58,7 @@ class SplitwellApp(
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
     metrics: SplitwellAppMetrics,
+    adminRoutes: AdminRoutes,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -151,43 +148,26 @@ class SplitwellApp(
       store,
       loggerFactory,
     )
-    adminHandler = new HttpAdminHandler(
-      status
-        .map(CNNodeStatus.fromNodeStatus)
-        .map(NodeStatus.Success(_)),
-      loggerFactory,
-    )
-    routes = cors(
+    route = cors(
       CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
     ) {
       withTraceContext { traceContext =>
         requestLogger(traceContext) {
           HttpErrorHandler(loggerFactory)(traceContext) {
             concat(
-              SplitwellResource.routes(handler, _ => provide(traceContext)),
-              CommonAdminResource.routes(adminHandler, _ => provide(traceContext)),
+              SplitwellResource.routes(handler, _ => provide(traceContext))
             )
           }
         }
       }
     }
-    binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
-      Http()
-        .newServerAt(
-          config.adminApi.clientConfig.address,
-          config.adminApi.clientConfig.port.unwrap,
-        )
-        .bind(
-          routes
-        )
-    }
+    _ = adminRoutes.updateRoute(route)
   } yield {
     SplitwellApp.State(
       automation,
       storage,
       store,
       scanConnection,
-      binding,
       participantAdminConnection,
       loggerFactory.getTracedLogger(SplitwellApp.State.getClass),
       timeouts,
@@ -246,22 +226,15 @@ object SplitwellApp {
       storage: Storage,
       store: SplitwellStore,
       scanConnection: ScanConnection,
-      binding: Http.ServerBinding,
       participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
-  )(implicit el: ErrorLoggingContext)
-      extends AutoCloseable
+  ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
-        AsyncCloseable(
-          "http binding",
-          binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
-          timeouts.shutdownNetwork,
-        ),
         automation,
         storage,
         store,

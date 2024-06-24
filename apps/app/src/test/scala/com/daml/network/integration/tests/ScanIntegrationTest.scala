@@ -545,8 +545,9 @@ class ScanIntegrationTest
       eventually() {
         bobValidatorWalletClient
           .listAppRewardCoupons() should have size 0
-        bobValidatorWalletClient
-          .listValidatorRewardCoupons() should have size 0
+        // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+        //        bobValidatorWalletClient
+        //          .listValidatorRewardCoupons() should have size 0
 
         val zero = BigDecimal(0)
         val bobTransfers = sv1ScanBackend

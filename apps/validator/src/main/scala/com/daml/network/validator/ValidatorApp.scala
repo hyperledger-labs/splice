@@ -4,7 +4,7 @@ import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
 import com.daml.network.auth.*
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
@@ -13,7 +13,6 @@ import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
 import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
 import com.daml.network.http.v0.external.ans.AnsResource
-import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
 import com.daml.network.http.v0.scanproxy.ScanproxyResource
@@ -67,9 +66,8 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -79,7 +77,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
@@ -98,6 +95,7 @@ class ValidatorApp(
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
     metrics: ValidatorAppMetrics,
+    adminRoutes: AdminRoutes,
 )(implicit
     ac: ActorSystem,
     esf: ExecutionSequencerFactory,
@@ -765,13 +763,6 @@ class ValidatorApp(
           loggerFactory,
         )
 
-      commonAdminHandler = new HttpAdminHandler(
-        status
-          .map(CNNodeStatus.fromNodeStatus)
-          .map(NodeStatus.Success(_)),
-        loggerFactory,
-      )
-
       walletInternalHandler = walletManagerOpt.map(walletManager =>
         new HttpWalletHandler(
           walletManager,
@@ -873,7 +864,7 @@ class ValidatorApp(
           }
         }
 
-      routes = cors(
+      route = cors(
         CorsSettings(ac)
           .withAllowedMethods(
             List(
@@ -913,9 +904,6 @@ class ValidatorApp(
                   ValidatorPublicResource.routes(
                     publicHandler,
                     _ => provide(()),
-                  ),
-                  pathPrefix("api" / "validator")(
-                    CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
                   ),
                 ) ++ walletInternalHandler.toList.map { walletHandler =>
                   InternalWalletResource.routes(
@@ -968,18 +956,7 @@ class ValidatorApp(
           }
         }
       }
-
-      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
-        Http()
-          .newServerAt(
-            config.adminApi.clientConfig.address,
-            config.adminApi.clientConfig.port.unwrap,
-          )
-          .bind(
-            routes
-          )
-      }
-
+      _ = adminRoutes.updateRoute(route)
     } yield {
       ValidatorApp.State(
         scanConnection,
@@ -990,7 +967,6 @@ class ValidatorApp(
         store,
         automation,
         walletManagerOpt,
-        binding,
         timeouts,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
       )
@@ -1012,22 +988,15 @@ object ValidatorApp {
       store: ValidatorStore,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
-      binding: Http.ServerBinding,
       timeouts: ProcessingTimeout,
       logger: TracedLogger,
-  )(implicit el: ErrorLoggingContext)
-      extends AutoCloseable
+  ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
         (Seq(
-          AsyncCloseable(
-            "http binding",
-            binding.terminate(hardDeadline = timeouts.shutdownShort.asFiniteApproximation),
-            timeouts.shutdownNetwork,
-          ),
           participantAdminConnection,
           automation,
         ) ++ walletManager.toList ++ Seq(
