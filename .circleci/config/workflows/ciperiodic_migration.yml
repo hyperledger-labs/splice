@@ -209,9 +209,12 @@ workflow:
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
-          # TODO (#12393): uncomment
-#          requires:
-#            - restore_node
+          # TODO (#12393): require only restore_node
+          requires:
+          #  - restore_node
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           <<: *main-branch-only
