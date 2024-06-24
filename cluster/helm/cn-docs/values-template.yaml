@@ -5,3 +5,6 @@ imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
 # k8s nodeSelector for all deployed pods (optional)
 # nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:

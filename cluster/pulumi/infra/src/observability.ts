@@ -17,6 +17,7 @@ import {
   publicPrometheusRemoteWrite,
   REPO_ROOT,
 } from 'cn-pulumi-common';
+import { infraAffinityAndTolerations } from 'cn-pulumi-common';
 
 import {
   clusterIsBeingReset,
@@ -224,6 +225,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                 },
               },
             },
+            ...infraAffinityAndTolerations,
           },
           templateFiles: {
             'template.tmpl': readAlertingManagerFile('slack-notification.tmpl').replaceAll(
@@ -242,6 +244,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           tls: {
             enabled: false, // because `admissionWebhooks` are disabled, see: https://github.com/prometheus-community/helm-charts/issues/418
           },
+          ...infraAffinityAndTolerations,
         },
         prometheus: {
           prometheusSpec: {
@@ -276,6 +279,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               },
             },
             externalUrl: prometheusExternalUrl,
+            ...infraAffinityAndTolerations,
           },
         },
         grafana: {
@@ -384,6 +388,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           },
           adminUser: 'cn-admin',
           adminPassword: adminPassword,
+          ...infraAffinityAndTolerations,
         },
         'kube-state-metrics': {
           fullnameOverride: 'ksm',
@@ -488,6 +493,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               },
             ],
           },
+          ...infraAffinityAndTolerations,
         },
         'prometheus-node-exporter': {
           fullnameOverride: 'node-exporter',

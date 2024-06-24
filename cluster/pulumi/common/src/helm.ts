@@ -47,7 +47,7 @@ function getVersionOverrideFromVersionsFile(
   );
 }
 
-export function installCNHelmChartByNamespaceName(
+function installCNHelmChartByNamespaceName(
   nsLogicalName: string,
   nsMetadataName: pulumi.Output<string>,
   name: string,
@@ -56,6 +56,7 @@ export function installCNHelmChartByNamespaceName(
   version: CnChartVersion = defaultVersion,
   opts?: CNCustomResourceOptions,
   includeNamespaceInName = true,
+  affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
   return new k8s.helm.v3.Release(
@@ -66,7 +67,10 @@ export function installCNHelmChartByNamespaceName(
       chart: chartPath(chartName, version),
       version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
-      values: cnChartValues(nsLogicalName, version, chartName, values),
+      values: {
+        ...cnChartValues(nsLogicalName, version, chartName, values),
+        ...affinityAndTolerations,
+      },
       timeout,
     },
     opts
@@ -81,6 +85,7 @@ export function installCNHelmChart(
   version: CnChartVersion = defaultVersion,
   opts?: CNCustomResourceOptions,
   includeNamespaceInName = true,
+  affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
   return installCNHelmChartByNamespaceName(
@@ -92,6 +97,7 @@ export function installCNHelmChart(
     version,
     opts,
     includeNamespaceInName,
+    affinityAndTolerations,
     timeout
   );
 }
@@ -153,6 +159,7 @@ export function installCNRunbookHelmChartByNamespaceName(
           version.type === 'local' || artifactsRepository === 'google'
             ? repositories.google.dockerImages
             : undefined,
+        ...appsAffinityAndTolerations,
       },
       timeout,
     },
@@ -218,3 +225,55 @@ export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.Reposito
     };
   }
 }
+
+export const appsAffinityAndTolerations = {
+  affinity: {
+    nodeAffinity: {
+      requiredDuringSchedulingIgnoredDuringExecution: {
+        nodeSelectorTerms: [
+          {
+            matchExpressions: [
+              {
+                key: 'cn_apps',
+                operator: 'Exists',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+  tolerations: [
+    {
+      key: 'cn_apps',
+      operator: 'Exists',
+      effect: 'NoSchedule',
+    },
+  ],
+};
+
+export const infraAffinityAndTolerations = {
+  affinity: {
+    nodeAffinity: {
+      requiredDuringSchedulingIgnoredDuringExecution: {
+        nodeSelectorTerms: [
+          {
+            matchExpressions: [
+              {
+                key: 'cn_infra',
+                operator: 'Exists',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+  tolerations: [
+    {
+      key: 'cn_infra',
+      operator: 'Exists',
+      effect: 'NoSchedule',
+    },
+  ],
+};

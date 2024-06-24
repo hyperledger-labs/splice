@@ -39,6 +39,7 @@ import {
   config,
   daContactPoint,
 } from 'cn-pulumi-common';
+import { appsAffinityAndTolerations } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -553,6 +554,7 @@ function installSvApp(
       dependsOn: dependsOn.concat([participant, postgres, decentralizedSynchronizer]),
     },
     undefined,
+    appsAffinityAndTolerations,
     SV_APP_HELM_CHART_TIMEOUT_SEC
   );
   return svApp;

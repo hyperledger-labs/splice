@@ -1,0 +1,75 @@
+import * as gcp from '@pulumi/gcp';
+import { config } from 'cn-pulumi-common';
+
+export function installNodePools(): void {
+  const cluster = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;
+
+  new gcp.container.NodePool('cn-apps-node-pool', {
+    name: 'cn-apps-pool',
+    cluster,
+    nodeConfig: {
+      machineType: config.requireEnv('GCP_CLUSTER_NODE_TYPE'),
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_apps',
+          value: 'true',
+        },
+      ],
+      labels: {
+        cn_apps: 'true',
+      },
+      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
+    },
+    initialNodeCount: 0,
+    autoscaling: {
+      minNodeCount: parseInt(config.requireEnv('GCP_CLUSTER_MIN_NODES')),
+      maxNodeCount: parseInt(config.requireEnv('GCP_CLUSTER_MAX_NODES')),
+    },
+  });
+
+  new gcp.container.NodePool('cn-infra-node-pool', {
+    name: 'cn-infra-pool',
+    cluster,
+    nodeConfig: {
+      machineType: 'e2-standard-8',
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_infra',
+          value: 'true',
+        },
+      ],
+      labels: {
+        cn_infra: 'true',
+      },
+      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
+    },
+    initialNodeCount: 1,
+    autoscaling: {
+      minNodeCount: 1,
+      maxNodeCount: 3,
+    },
+  });
+
+  new gcp.container.NodePool('gke-node-pool', {
+    name: 'gke-pool',
+    cluster,
+    nodeConfig: {
+      machineType: 'e2-standard-4',
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'components.gke.io/gke-managed-components',
+          value: 'true',
+        },
+      ],
+      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
+    },
+    initialNodeCount: 1,
+    autoscaling: {
+      minNodeCount: 1,
+      maxNodeCount: 3,
+    },
+  });
+}

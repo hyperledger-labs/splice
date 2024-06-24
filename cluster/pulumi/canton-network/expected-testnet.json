@@ -670,6 +670,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -677,7 +693,14 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -733,6 +756,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -742,6 +781,13 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "withSvIngress": false
       },
       "version": "0.1.10"
@@ -795,6 +841,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -802,7 +864,14 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -826,6 +895,22 @@
       "timeout": 480,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
@@ -859,7 +944,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -935,6 +1027,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -958,7 +1066,14 @@
           "secretName": "sw-pg-secrets",
           "user": "cnadmin"
         },
-        "scanAddress": "http://scan-app.sv-1:5012"
+        "scanAddress": "http://scan-app.sv-1:5012",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1105,6 +1220,22 @@
             "value": "auth0|63e12e0415ad881ffe914e61"
           }
         ],
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "appDars": [],
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
@@ -1158,6 +1289,13 @@
         "scanAddress": "http://scan-app.sv-1:5012",
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
@@ -1257,6 +1395,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1313,7 +1467,14 @@
         "peers": [],
         "stateSync": {
           "enable": false
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1385,6 +1546,22 @@
       "timeout": 480,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1422,7 +1599,14 @@
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1445,6 +1629,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1462,6 +1662,13 @@
             ]
           }
         },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "withSvIngress": true
       },
       "version": "0.1.10"
@@ -1485,6 +1692,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1492,7 +1715,14 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1569,6 +1799,22 @@
       "timeout": 480,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
@@ -1603,7 +1849,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1680,6 +1933,22 @@
       "timeout": 480,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1706,7 +1975,14 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer"
+        "sequencerAddress": "global-domain-2-sequencer",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1783,6 +2059,22 @@
       "timeout": 1000,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "approvedSvIdentities": [
           {
             "name": "SBI-Holdings",
@@ -1922,7 +2214,14 @@
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
           "publicUrl": "https://scan.sv-2.test.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -1947,6 +2246,22 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "appDars": [],
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
@@ -1993,6 +2308,13 @@
         },
         "scanAddress": "http://scan-app.sv-1:5012",
         "svValidator": true,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
@@ -2172,6 +2494,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2187,6 +2525,13 @@
           },
           "splitwell": true
         },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "withSvIngress": false
       },
       "version": "0.1.10"
@@ -2230,6 +2575,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2237,7 +2598,14 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -2261,6 +2629,22 @@
       "timeout": 480,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
@@ -2294,7 +2678,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -2370,6 +2761,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2377,7 +2784,14 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -2455,6 +2869,22 @@
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "appDars": [
           "cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar"
         ],
@@ -2510,6 +2940,13 @@
         "scanAddress": "http://scan-app.sv-1:5012",
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

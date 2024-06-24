@@ -115,6 +115,10 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -139,5 +143,5 @@ spec:
     protocol: TCP
 ---
 {{- if .Values.enablePostgresMetrics }}
-{{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.mediator.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity ) }}
+{{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.mediator.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
 {{- end}}

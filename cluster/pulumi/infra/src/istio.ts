@@ -5,6 +5,7 @@ import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 import {
   defaultVersion,
   ExactNamespace,
+  infraAffinityAndTolerations,
   installCNHelmChart,
   isMainNet,
   loadIPRanges,
@@ -77,6 +78,7 @@ function configureIstiod(
         },
         pilot: {
           autoscaleMax: 10,
+          ...infraAffinityAndTolerations,
         },
         meshConfig: {
           // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
@@ -296,6 +298,7 @@ function configureGatewayService(
             ingressPort('https', 443),
           ].concat(ingressPorts),
         },
+        ...infraAffinityAndTolerations,
       },
     },
     {
@@ -376,7 +379,8 @@ function configureGateway(
     {
       dependsOn: [gwSvc, publicGwSvc],
     },
-    false
+    false,
+    infraAffinityAndTolerations
   );
 }
 

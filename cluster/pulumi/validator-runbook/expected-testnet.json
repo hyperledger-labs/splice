@@ -125,10 +125,33 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com",
           "svNamespace": "validator"
         },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "withSvIngress": false
       },
       "version": "0.1.10"
@@ -216,9 +239,32 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -251,6 +297,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
@@ -276,7 +338,14 @@
           "postgresName": "postgres",
           "schema": "participant",
           "secretName": "postgres-secrets"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },
@@ -298,7 +367,31 @@
         "username": "artie"
       },
       "timeout": 480,
-      "values": {},
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
       "version": "0.1.10"
     },
     "name": "postgres",
@@ -391,6 +484,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "audience": "https://validator.example.com/api",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
@@ -429,6 +538,13 @@
         },
         "scanAddress": "https://scan.sv-2.test.global.canton.network.digitalasset.com",
         "svSponsorAddress": "https://sv.sv-2.test.global.canton.network.digitalasset.com",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",

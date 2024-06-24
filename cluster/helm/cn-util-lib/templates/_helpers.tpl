@@ -71,6 +71,7 @@
 {{- $persistence := .persistence }}
 {{- $nodeSelector := .nodeSelector }}
 {{- $affinity := .affinity }}
+{{- $tolerations := .tolerations }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -139,6 +140,10 @@ spec:
       {{- end }}
       {{- with $affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $tolerations }}
+      tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 ---

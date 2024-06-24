@@ -227,11 +227,84 @@
     "custom": false,
     "id": "",
     "inputs": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cainjector": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
       "helmOptions": {
         "namespace": "cert-manager",
         "version": "1.14.5"
       },
-      "installCRDs": true
+      "installCRDs": true,
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ],
+      "webhook": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      }
     },
     "name": "cert-manager",
     "provider": "",
@@ -357,6 +430,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "basename": "test-stack",
           "cantonHostname": "network.canton.global",
@@ -367,7 +456,14 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.8"
     },
@@ -1052,6 +1148,22 @@
         "repo": "https://istio-release.storage.googleapis.com/charts"
       },
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "defaults": {
           "autoscaling": {
             "maxReplicas": 10
@@ -1092,7 +1204,14 @@
               "targetPort": 443
             }
           ]
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "1.21.2"
     },
@@ -1112,6 +1231,22 @@
         "repo": "https://istio-release.storage.googleapis.com/charts"
       },
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "defaults": {
           "autoscaling": {
             "maxReplicas": 10
@@ -1582,7 +1717,14 @@
               "targetPort": 26496
             }
           ]
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "1.21.2"
     },
@@ -1730,7 +1872,30 @@
           "enablePrometheusMerge": false
         },
         "pilot": {
-          "autoscaleMax": 10
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "autoscaleMax": 10,
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         }
       },
       "version": "1.21.2"
@@ -1912,6 +2077,22 @@
       "values": {
         "alertmanager": {
           "alertmanagerSpec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_infra",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "externalUrl": "https://alertmanager.global.canton.network.digitalasset.com",
             "storage": {
               "volumeClaimTemplate": {
@@ -1927,7 +2108,14 @@
                   "storageClassName": "standard-rwo"
                 }
               }
-            }
+            },
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_infra",
+                "operator": "Exists"
+              }
+            ]
           },
           "config": {
             "receivers": [
@@ -1988,6 +2176,22 @@
         "grafana": {
           "adminPassword": "grafana-keys-admin-password",
           "adminUser": "cn-admin",
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
           "dashboardProviders": {
             "dashboardproviders.yaml": {
               "apiVersion": 1,
@@ -2094,9 +2298,32 @@
                 "foldersFromFilesStructure": true
               }
             }
-          }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         },
         "kube-state-metrics": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
           "customResourceState": {
             "config": {
               "spec": {
@@ -2258,7 +2485,14 @@
                 ]
               }
             ]
-          }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         },
         "kubeControllerManager": {
           "enabled": false
@@ -2277,6 +2511,22 @@
         },
         "prometheus": {
           "prometheusSpec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_infra",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "enableFeatures": [
               "native-histograms",
               "memory-snapshot-on-shutdown",
@@ -2308,7 +2558,14 @@
                   "storageClassName": "premium-rwo"
                 }
               }
-            }
+            },
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_infra",
+                "operator": "Exists"
+              }
+            ]
           }
         },
         "prometheus-node-exporter": {
@@ -2318,9 +2575,32 @@
           "admissionWebhooks": {
             "enabled": false
           },
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
           "tls": {
             "enabled": false
-          }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         }
       },
       "version": "59.0.0"

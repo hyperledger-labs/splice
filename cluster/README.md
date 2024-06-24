@@ -11,6 +11,7 @@
     - [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
     - [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
   - [Cluster Tooling](#cluster-tooling)
+  - [Node Pools](#node-pools)
   - [Cluster Deployments](#cluster-deployments)
     - [Operator deployments](#operator-deployments)
       - [Deployment stack configuration](#deployment-stack-configuration)
@@ -275,6 +276,22 @@ specific configuration for these clusters is defined in a combination of
 
 All cluster management commands are defined as subcommands of the
 `cncluster` script, and are written in terms of Pulumi charts.
+
+## Node Pools
+
+Each cluster consists of three node pools:
+
+* `gke-pool` for GKE pods
+* `cn-infra-pool` for infrastructure for CN deployments, e.g. observability, istio and cert-manager
+* `cn-apps-pool` for the CN deployment pods
+
+The pools have `node-labels` and `taints` accordingly, and pods have `affinity` and `tolerances` that match them. If a pod fails to be scheduled, inspect its
+affinity and tolerances configuration and make sure they match the node pool
+on which it should run. For now, every cluster also has a `default-pool` which
+should be a fallback default if no other pool can be used for a certain pod,
+but this pool will be deprecated soon [TODO (#13026): update this once we
+delete default-pools], so please refrain from using it.
+
 
 ## Cluster Deployments
 

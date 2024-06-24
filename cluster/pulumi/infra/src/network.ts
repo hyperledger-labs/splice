@@ -11,6 +11,7 @@ import {
   GCP_PROJECT,
   isMainNet,
 } from 'cn-pulumi-common';
+import { infraAffinityAndTolerations } from 'cn-pulumi-common';
 
 import { gcpDnsProject } from './config';
 
@@ -67,6 +68,13 @@ function certManager(certManagerNamespaceName: string): certmanager.CertManager 
     helmOptions: {
       namespace: ns.metadata.name,
       version: '1.14.5',
+    },
+    ...infraAffinityAndTolerations,
+    webhook: {
+      ...infraAffinityAndTolerations,
+    },
+    cainjector: {
+      ...infraAffinityAndTolerations,
     },
   });
 }

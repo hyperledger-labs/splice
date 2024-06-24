@@ -124,9 +124,32 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "dev.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -3971,6 +3994,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {
           "maxConnections": 1000,
           "volumeSize": "400Gi"
@@ -3985,7 +4024,14 @@
           "requests": {
             "memory": "10Gi"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -4008,6 +4054,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {
           "maxConnections": 1000,
           "volumeSize": "400Gi"
@@ -4022,7 +4084,14 @@
           "requests": {
             "memory": "10Gi"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -4045,6 +4114,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {
           "maxConnections": 1000,
           "volumeSize": "400Gi"
@@ -4059,7 +4144,14 @@
           "requests": {
             "memory": "10Gi"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -4082,6 +4174,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {
           "maxConnections": 1000,
           "volumeSize": "400Gi"
@@ -4096,7 +4204,14 @@
           "requests": {
             "memory": "10Gi"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -4119,6 +4234,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {
           "maxConnections": 1000,
           "volumeSize": "400Gi"
@@ -4133,7 +4264,14 @@
           "requests": {
             "memory": "10Gi"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },

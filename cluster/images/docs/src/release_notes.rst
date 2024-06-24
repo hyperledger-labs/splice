@@ -23,6 +23,8 @@ Upcoming
     case there are issues with your node. If you do not want to share
     this, set it to an empty string.
 
+  * Added support for k8s tolerations to all Helm charts.
+
 * SV app
 
   * ``/v0/admin/domain/data-snapshot`` now includes ``created_at`` and ``migration_id`` in

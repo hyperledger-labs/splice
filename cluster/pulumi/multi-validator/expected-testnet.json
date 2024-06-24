@@ -14,9 +14,32 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.10"
     },

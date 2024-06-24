@@ -35,3 +35,6 @@ persistence:
 
 # k8s nodeSelector for all deployed pods (optional)
 # nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:

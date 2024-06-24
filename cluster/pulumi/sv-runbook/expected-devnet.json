@@ -172,6 +172,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "dev.global.canton.network.digitalasset.com",
           "svNamespace": "sv"
@@ -182,7 +198,14 @@
               "2"
             ]
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -347,6 +370,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "db": {},
         "founder": {
           "externalAddress": "dev.global.canton.network.digitalasset.com:26216",
@@ -388,7 +427,14 @@
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -411,6 +457,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",
@@ -440,7 +502,14 @@
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secret"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -483,9 +552,32 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "cluster": {
           "hostname": "dev.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -518,6 +610,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
@@ -538,7 +646,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secret"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -561,6 +676,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "metrics": {
@@ -574,7 +705,14 @@
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-2-sequencer"
+        "sequencerAddress": "global-domain-2-sequencer",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -650,6 +788,22 @@
       },
       "timeout": 1000,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "approvedSvIdentities": [
           {
             "name": "SV-Nodeops-Limited",
@@ -765,7 +919,14 @@
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
           "publicUrl": "https://scan.sv.dev.global.canton.network.digitalasset.com"
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.1.12"
     },
@@ -1102,6 +1263,22 @@
       },
       "timeout": 480,
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "auth": {
           "audience": "https://validator.example.com/api",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
@@ -1125,6 +1302,13 @@
         },
         "scanAddress": "http://scan-app.sv:5012",
         "svValidator": true,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
