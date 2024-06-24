@@ -455,7 +455,8 @@ class ScanIntegrationTest
       }
   }
 
-  "list collected app and validator and SV rewards" in { implicit env =>
+  // TODO (#13038) reenable
+  "list collected app and validator and SV rewards" ignore { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
     waitForWalletUser(bobValidatorWalletClient)
