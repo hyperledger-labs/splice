@@ -13,7 +13,10 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
-import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
+import com.daml.network.sv.automation.leaderbased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
@@ -40,6 +43,7 @@ class ScanIntegrationTest
         ) andThen
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+              .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
           ))(config)
       )
       .addConfigTransforms((_, config) =>
