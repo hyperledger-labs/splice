@@ -506,8 +506,10 @@ class ScanIntegrationTest
         _ => {
           bobValidatorWalletClient
             .listAppRewardCoupons() should have size 1
-//          bobValidatorWalletClient.listValidatorRewardCoupons() should
-//            have size (if (bobToppedUp) 2 else 1)
+          // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+
+          //          bobValidatorWalletClient.listValidatorRewardCoupons() should
+          //            have size (if (bobToppedUp) 2 else 1)
         },
       )
     }
@@ -530,7 +532,8 @@ class ScanIntegrationTest
         }
       }
     }
-//validatorRewardAmount
+    // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+    // replace _ with validatorRewardAmount
     val (appRewardAmount, _) =
       getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
 
@@ -553,30 +556,31 @@ class ScanIntegrationTest
 
         val inputAppRewardAmount = inputAppRewardAmounts.loneElement
         inputAppRewardAmount shouldBe appRewardAmount
+        // TODO(#13038) Add asserts back for listValidatorRewardCoupons
 
-//        val inputValidatorAmounts = bobTransfers
-//          .flatMap(_.sender.inputValidatorRewardAmount)
-//          .map(BigDecimal(_))
-//          .filter(_ != zero)
-//
-//        val inputValidatorFaucetAmounts = bobTransfers
-//          .flatMap(_.sender.inputValidatorFaucetAmount)
-//          .map(BigDecimal(_))
-//          .filter(_ != zero)
-//        if (!bobToppedUp) {
-//          val firstInputValidatorFaucetAmount = inputValidatorFaucetAmounts.head
-//          val faucetAmounts = inputValidatorFaucetAmounts.tail
-//
-//          inputValidatorAmounts should contain theSameElementsAs (Seq(
-//            validatorRewardAmount + firstInputValidatorFaucetAmount
-//          ) ++ faucetAmounts)
-//        } else {
-//          val faucetAmounts = inputValidatorFaucetAmounts
-//
-//          inputValidatorAmounts should contain theSameElementsAs (Seq(
-//            validatorRewardAmount
-//          ) ++ faucetAmounts)
-//        }
+        //        val inputValidatorAmounts = bobTransfers
+        //          .flatMap(_.sender.inputValidatorRewardAmount)
+        //          .map(BigDecimal(_))
+        //          .filter(_ != zero)
+        //
+        //        val inputValidatorFaucetAmounts = bobTransfers
+        //          .flatMap(_.sender.inputValidatorFaucetAmount)
+        //          .map(BigDecimal(_))
+        //          .filter(_ != zero)
+        //        if (!bobToppedUp) {
+        //          val firstInputValidatorFaucetAmount = inputValidatorFaucetAmounts.head
+        //          val faucetAmounts = inputValidatorFaucetAmounts.tail
+        //
+        //          inputValidatorAmounts should contain theSameElementsAs (Seq(
+        //            validatorRewardAmount + firstInputValidatorFaucetAmount
+        //          ) ++ faucetAmounts)
+        //        } else {
+        //          val faucetAmounts = inputValidatorFaucetAmounts
+        //
+        //          inputValidatorAmounts should contain theSameElementsAs (Seq(
+        //            validatorRewardAmount
+        //          ) ++ faucetAmounts)
+        //        }
       }
     }
   }
