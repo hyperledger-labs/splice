@@ -29,9 +29,9 @@ workflow:
           requires:
             - cancel_if_previous_pipeline
 
-  redeploy_sv_runbook_devnet:
+  reset_sv_runbook_devnet:
     when:
-      equal: [ redeploy-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
+      equal: [ reset-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
@@ -42,26 +42,8 @@ workflow:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_devnet redeploy_sv_runbook_devnet devnet_health_check"
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/devnet
-          context:
-            - artifactory
-            - slack-context
-          # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
-          # because the branch is not yet updated.
-          workflow_names: "deploy_devnet"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          skip_if_exists: true
-      - deploy_sv_runbook:
+          workflow_names: "reset_sv_runbook_devnet"
+      - reset_sv_runbook:
           filters:
             branches:
               only:
@@ -70,12 +52,53 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          use_published_artifacts: false
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
+
+  reset_validator_runbook_devnet:
+    when:
+      equal: [ reset-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "reset_validator_runbook_devnet"
+      - reset_validator_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "devnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          requires:
+            - wait_for_previous_pipeline
+
+  healthcheck_sv_runbook_devnet:
+    when:
+      equal: [ healthcheck-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "healthcheck_sv_runbook_devnet reset_sv_runbook_devnet"
       - preflight_sv_check:
           filters:
             branches:
@@ -87,12 +110,13 @@ workflow:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          migration_id: 2
           requires:
-            - deploy_sv_runbook
+            - wait_for_previous_pipeline
 
-  redeploy_validator_runbook_devnet:
+  healthcheck_validator_runbook_devnet:
     when:
-      equal: [ redeploy-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
+      equal: [ healthcheck-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
@@ -103,39 +127,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_devnet redeploy_validator_runbook_devnet"
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/devnet
-          context:
-            - artifactory
-            - slack-context
-          # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
-          # because the branch is not yet updated.
-          workflow_names: "deploy_devnet"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          skip_if_exists: true
-      - deploy_validator_runbook:
-          filters:
-            branches:
-              only:
-                - deployment/devnet
-          context:
-            - artifactory
-            - slack-context
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "devnet"
-          use_published_artifacts: false
-          requires:
-            - wait_for_previous_pipeline
-            - artifacts_push
+          workflow_names: "healthcheck_validator_runbook_devnet reset_validator_runbook_devnet"
       - preflight_validator_check:
           filters:
             branches:
@@ -147,9 +139,9 @@ workflow:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          delay_mins: 30
+          migration_id: 2
           requires:
-            - deploy_validator_runbook
+            - wait_for_previous_pipeline
 
   backup_devnet:
     when:
