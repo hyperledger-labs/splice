@@ -1,10 +1,10 @@
 {
-    "name": "DevNet Validator Runbook Redeployment",
-    "description": "DevNet Validator Runbook Periodic Redeployment every 6 hours",
+    "name": "DevNet Validator Runbook Reset",
+    "description": "DevNet Validator Runbook Periodic Reset every 6 hours",
     "attribution-actor": "system",
     "parameters" : {
       "branch": "deployment/devnet",
-      "run-job": "redeploy-validator-runbook-devnet"
+      "run-job": "reset-validator-runbook-devnet"
     },
     "timetable" : {
       "per-hour" : 1,
