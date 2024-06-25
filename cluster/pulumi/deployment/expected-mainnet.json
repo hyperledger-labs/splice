@@ -441,10 +441,6 @@
             "value": "europe-west4"
           },
           {
-            "name": "CLOUDSDK_COMPUTE_ZONE",
-            "value": "europe-west4-a"
-          },
-          {
             "name": "GOOGLE_APPLICATION_CREDENTIALS",
             "value": "/app/gcp-credentials.json"
           },

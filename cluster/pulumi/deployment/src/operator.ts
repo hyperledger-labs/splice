@@ -59,10 +59,6 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         value: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
       },
       {
-        name: 'CLOUDSDK_COMPUTE_ZONE',
-        value: config.requireEnv('CLOUDSDK_COMPUTE_ZONE'),
-      },
-      {
         name: 'GOOGLE_APPLICATION_CREDENTIALS',
         value: '/app/gcp-credentials.json',
       },

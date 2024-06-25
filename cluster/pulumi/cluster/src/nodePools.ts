@@ -1,8 +1,11 @@
 import * as gcp from '@pulumi/gcp';
-import { config } from 'cn-pulumi-common';
+import { GCP_PROJECT, config } from 'cn-pulumi-common';
 
 export function installNodePools(): void {
-  const cluster = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;
+  const clusterName = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;
+  const cluster = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE')
+    ? `projects/${GCP_PROJECT}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_ZONE')}/clusters/${clusterName}`
+    : clusterName;
 
   new gcp.container.NodePool('cn-apps-node-pool', {
     name: 'cn-apps-pool',

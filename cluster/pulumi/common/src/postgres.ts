@@ -86,7 +86,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           },
           locationPreference: {
             // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
-            zone: config.requireEnv('CLOUDSDK_COMPUTE_ZONE'),
+            zone:
+              config.optionalEnv('CLOUDSDK_COMPUTE_ZONE') ||
+              config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE'),
           },
         },
       },

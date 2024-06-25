@@ -7,7 +7,7 @@
         "maxNodeCount": 20,
         "minNodeCount": 0
       },
-      "cluster": "cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
       "initialNodeCount": 0,
       "name": "cn-apps-pool",
       "nodeConfig": {
@@ -37,7 +37,7 @@
         "maxNodeCount": 3,
         "minNodeCount": 1
       },
-      "cluster": "cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
       "initialNodeCount": 1,
       "name": "cn-infra-pool",
       "nodeConfig": {
@@ -67,7 +67,7 @@
         "maxNodeCount": 3,
         "minNodeCount": 1
       },
-      "cluster": "cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
       "initialNodeCount": 1,
       "name": "gke-pool",
       "nodeConfig": {
