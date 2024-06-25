@@ -175,3 +175,35 @@ test_SvRewardStateMerge = do
   [(sv2RewardStateCid1, _)] <- queryFilter @SvRewardState dso (\state -> state.svName == "sv2")
   submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3, sv2RewardStateCid1])
   pure ()
+
+test_SvRewardUpdatedWeight : Script ()
+test_SvRewardUpdatedWeight = do
+    (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+    unchangedBefore <- getSvInfoByParty app sv1
+    before <- getSvInfoByParty app sv2
+
+    initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+        ARC_DsoRules with
+          dsoAction = SRARC_UpdateSvRewardWeight DsoRules_UpdateSvRewardWeight with
+            svParty = sv2
+            newRewardWeight = before.svRewardWeight + 1
+
+    after <- getSvInfoByParty app sv2
+    after.svRewardWeight === before.svRewardWeight + 1
+
+    unchangedAfter <- getSvInfoByParty app sv1
+    unchangedAfter.svRewardWeight === unchangedBefore.svRewardWeight
+
+    -- check that coupons are claimed with the new weight
+    [(rulesCid, _)] <- query @DsoRules app.dso
+    [(roundCid, round), _, _] <- getActiveOpenRoundsSorted app
+    [(rewardStateCid, _)] <- queryFilter @SvRewardState dso (\s -> s.svName == before.name)
+    -- collect reward coupon
+    void $ submitMulti [sv2] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
+      openRoundCid = roundCid
+      rewardStateCid
+      beneficiaries = [(sv2, before.svRewardWeight + 1)]
+      sv = sv2
+    -- check that the coupon exists and has the right weight
+    [(_, coupon)] <- queryFilter @SvRewardCoupon sv2 (\co -> co.round == round.round)
+    coupon.weight === before.svRewardWeight + 1

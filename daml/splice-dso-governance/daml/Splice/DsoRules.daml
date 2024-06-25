@@ -98,6 +98,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Revoke a specific featured app right.
   | SRARC_SetConfig DsoRules_SetConfig
     -- ^ Voted action to change the `DsoRulesConfig`. Not idempotent.
+  | SRARC_UpdateSvRewardWeight DsoRules_UpdateSvRewardWeight
+    -- ^ Voted action to update the reward weight of an SV.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -178,6 +180,9 @@ data DsoRules_UpdateAmuletPriceVoteResult = DsoRules_UpdateAmuletPriceVoteResult
 data DsoRules_GarbageCollectAmuletPriceVotesResult = DsoRules_GarbageCollectAmuletPriceVotesResult
 
 data DsoRules_SetConfigResult = DsoRules_SetConfigResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_UpdateSvRewardWeightResult = DsoRules_UpdateSvRewardWeightResult with
     newDsoRules : ContractId DsoRules
 
 data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult with
@@ -803,6 +808,22 @@ template DsoRules with
         newDsoRules <- create this with config = newConfig
         return DsoRules_SetConfigResult with ..
 
+    choice DsoRules_UpdateSvRewardWeight : DsoRules_UpdateSvRewardWeightResult
+      with
+        svParty : Party
+        newRewardWeight : Int
+      controller dso
+      do
+        require "New reward weight is positive" (newRewardWeight >= 0)
+        case Map.lookup svParty svs of
+          None -> fail "SV party is not registered"
+          Some sv -> do
+            let newSv = sv with svRewardWeight = newRewardWeight
+            let newSvs = Map.insert svParty newSv svs
+            newDsoRules <- create this with svs = newSvs
+            return DsoRules_UpdateSvRewardWeightResult with ..
+
+
 
     -- App rights management
     ------------------------
@@ -1189,6 +1210,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_UpdateSvRewardWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. ->
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
