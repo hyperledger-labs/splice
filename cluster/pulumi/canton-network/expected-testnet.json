@@ -1000,7 +1000,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1122,7 +1122,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1175,7 +1175,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1368,7 +1368,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1771,7 +1771,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1905,7 +1905,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2031,7 +2031,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2729,7 +2729,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2835,7 +2835,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1"
+          "zone": "us-central1-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
