@@ -15,6 +15,7 @@
   - [Cluster Deployments](#cluster-deployments)
     - [Operator deployments](#operator-deployments)
       - [Deployment stack configuration](#deployment-stack-configuration)
+      - [Upgrading to a new release](#upgrading-to-a-new-release)
       - [The operator](#the-operator)
       - [Alerts](#alerts)
   - [Pulumi and Helm](#pulumi-and-helm)
@@ -320,12 +321,12 @@ To upgrade a cluster controlled by the operator, you need to go
 through the following steps:
 
 1. Run the `publish-public-artifacts` job on CI.
-2. Make a PR to set `CHARTS_VERSION` in the
-   `.envrc.vars` file of the corresponding cluster. For CILR this PR
-   should be made against `main`. You can tag that commit with `[skip ci]`.
-3. Tag the merged commit with the tag specified in
-   `CN_DEPLOYMENT_FLUX_REF` of the corresponding cluster, e.g., `cilr`
-   for cilr.
+2. Make a PR to set `CHARTS_VERSION` in the `.envrc.vars` file of the corresponding cluster.
+   For CILR this PR should be made against `main`.
+   For production clusters (DevNet, TestNet, MainNet) this PR should be made against the respective deployment branch.
+   Note that for production clusters, the current process is to rebase the deployment branch to the release branch of the target version via force pushing (i.e., not a PR).
+3. If the `CN_DEPLOYMENT_FLUX_REF` of the corresponding cluster (configured in the respective `.envrc.vars`) is a Git tag,
+   e.g., `cilr` for CILR, then tag the merged commit with that tag.
 
 #### The operator
 
