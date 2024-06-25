@@ -226,54 +226,62 @@ export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.Reposito
   }
 }
 
-export const appsAffinityAndTolerations = {
-  affinity: {
-    nodeAffinity: {
-      requiredDuringSchedulingIgnoredDuringExecution: {
-        nodeSelectorTerms: [
-          {
-            matchExpressions: [
+// TODO(#13082): remove the AFFINITY_AND_TOLERATIONS flag once base version is 0.1.13
+// (and always set affinity and tolerations)
+export const appsAffinityAndTolerations = config.envFlag('AFFINITY_AND_TOLERATIONS', true)
+  ? {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
               {
-                key: 'cn_apps',
-                operator: 'Exists',
+                matchExpressions: [
+                  {
+                    key: 'cn_apps',
+                    operator: 'Exists',
+                  },
+                ],
               },
             ],
           },
-        ],
+        },
       },
-    },
-  },
-  tolerations: [
-    {
-      key: 'cn_apps',
-      operator: 'Exists',
-      effect: 'NoSchedule',
-    },
-  ],
-};
+      tolerations: [
+        {
+          key: 'cn_apps',
+          operator: 'Exists',
+          effect: 'NoSchedule',
+        },
+      ],
+    }
+  : {};
 
-export const infraAffinityAndTolerations = {
-  affinity: {
-    nodeAffinity: {
-      requiredDuringSchedulingIgnoredDuringExecution: {
-        nodeSelectorTerms: [
-          {
-            matchExpressions: [
+// TODO(#13082): remove the AFFINITY_AND_TOLERATIONS flag once base version is 0.1.13
+// (and always set affinity and tolerations)
+export const infraAffinityAndTolerations = config.envFlag('AFFINITY_AND_TOLERATIONS', true)
+  ? {
+      affinity: {
+        nodeAffinity: {
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [
               {
-                key: 'cn_infra',
-                operator: 'Exists',
+                matchExpressions: [
+                  {
+                    key: 'cn_infra',
+                    operator: 'Exists',
+                  },
+                ],
               },
             ],
           },
-        ],
+        },
       },
-    },
-  },
-  tolerations: [
-    {
-      key: 'cn_infra',
-      operator: 'Exists',
-      effect: 'NoSchedule',
-    },
-  ],
-};
+      tolerations: [
+        {
+          key: 'cn_infra',
+          operator: 'Exists',
+          effect: 'NoSchedule',
+        },
+      ],
+    }
+  : {};
