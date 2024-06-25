@@ -35,6 +35,13 @@ getcontext().rounding = ROUND_HALF_EVEN
 # Matches the prefix defined in ParticipantAdminConnection
 import_acs_workflow_id_prefix = "canton-network-acs-import"
 
+def _default_logger(name, loglevel):
+    logger = colorlog.getLogger(name)
+    logger.addHandler(cli_handler)
+    logger.addHandler(file_handler)
+    logger.setLevel(loglevel)
+
+    return logger
 
 @dataclass
 class TemplateId:
@@ -2660,6 +2667,10 @@ class AppState:
             logger.info(f"Caching disabled, creating new app state")
             return AppState.empty(logger, args)
 
+        if args.rebuild_cache:
+            logger.info(f"Rebuilding cache, creating new app state")
+            return AppState.empty(logger, args)
+
         if not os.path.exists(args.cache_file_path):
             logger.info(
                 f"File {args.cache_file_path} does not exist, creating new app state"
@@ -2703,7 +2714,7 @@ class AppState:
             )
             sys.exit(-1)
 
-async def main():
+def _parse_cli_args():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description="Reads the update history from a given Splice Scan server."
@@ -2743,15 +2754,14 @@ async def main():
         default=100,
         help="Number of transactions to fetch per network request",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--rebuild-cache",
+        action="store_true",
+        help="Force the cache to be rebuilt from scratch.",
+    )
+    return parser.parse_args()
 
-
-    # Set up logging
-    logger = colorlog.getLogger("scan_txlog")
-    logger.addHandler(cli_handler)
-    logger.addHandler(file_handler)
-    logger.setLevel(args.loglevel)
-
+def _log_uncaught_exceptions(logger):
     # Set up exception handling (write unhandled exceptions to log)
     def handle_exception(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
@@ -2764,6 +2774,72 @@ async def main():
 
     sys.excepthook = handle_exception
 
+async def _process_transaction(args, app_state, scan_client, transaction):
+    if transaction.is_acs_import():
+        # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
+        # Note that this also ignores the ACS import of non-founding SVs atm. This would be correct once we do backfilling of history
+        # but until then this script can only run against the founding SV.
+        app_state.logger.debug(
+            f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
+        )
+        return
+
+
+    app_state.logger.debug(
+        f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
+    )
+
+    previous_state = app_state.state.clone(app_state.logger)
+    app_state.check_synchronizer_id(transaction.synchronizer_id)
+    result = app_state.state.handle_transaction(transaction)
+    if args.scan_balance_assertions:
+        for round_number in result.new_open_rounds:
+            app_state.per_round_states[round_number] = (
+                previous_state.clone(_default_logger(f"scan_txlog_{round_number}", "WARNING"))
+            )
+        if result.for_open_round != None:
+            for (
+                round_number,
+                per_round_state,
+            ) in app_state.per_round_states.items():
+                if round_number >= result.for_open_round:
+                    per_round_state.handle_transaction(transaction)
+        if result.new_closed_round:
+            closed_round = result.new_closed_round
+            round_state = app_state.per_round_states[closed_round]
+            del app_state.per_round_states[closed_round]
+            balances = round_state.balance_end_of_round()
+            lines = [
+                f"effective balances for closed round: {closed_round}"
+            ]
+            matches = True
+            scan_party_balances = await scan_client.party_balances(
+                closed_round, balances.keys()
+            )
+            for party, balance in sorted(balances.items()):
+                computed_balance = balance.effective_for_round(
+                    closed_round
+                )
+                scan_balance = scan_party_balances[party]
+                matches_for_party = scan_balance == computed_balance
+                matches &= matches_for_party
+                lines += [
+                    f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+                ]
+            log = "\n".join(lines)
+            if matches:
+                app_state.logger.info(log)
+            else:
+                app_state.logger.error(log)
+
+async def main():
+    args = _parse_cli_args()
+
+    # Set up logging
+    logger = _default_logger("scan_txlog", args.loglevel)
+
+    _log_uncaught_exceptions(logger)
+
     logger.info(f"Starting scan_txlog with arguments: {args}")
     app_state = AppState.create_or_restore_from_cache(logger, args)
 
@@ -2774,68 +2850,11 @@ async def main():
             logger.debug(
                 f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
             )
+
             for transaction_json in batch:
                 transaction = TransactionTree.parse(transaction_json)
-                if transaction.is_acs_import():
-                    # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
-                    # Note that this also ignores the ACS import of non-founding SVs atm. This would be correct once we do backfilling of history
-                    # but until then this script can only run against the founding SV.
-                    logger.debug(
-                        f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
-                    )
-                else:
-                    logger.debug(
-                        f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
-                    )
-                    previous_state = app_state.state.clone(logger)
-                    app_state.check_synchronizer_id(transaction.synchronizer_id)
-                    result = app_state.state.handle_transaction(transaction)
-                    if args.scan_balance_assertions:
-                        for round_number in result.new_open_rounds:
-                            round_logger = colorlog.getLogger(
-                                f"scan_txlog_{round_number}"
-                            )
-                            round_logger.addHandler(cli_handler)
-                            round_logger.addHandler(file_handler)
-                            # warning to avoid repeated log messages for the same transaction
-                            round_logger.setLevel("WARNING")
-                            app_state.per_round_states[round_number] = (
-                                previous_state.clone(round_logger)
-                            )
-                        if result.for_open_round != None:
-                            for (
-                                round_number,
-                                per_round_state,
-                            ) in app_state.per_round_states.items():
-                                if round_number >= result.for_open_round:
-                                    per_round_state.handle_transaction(transaction)
-                        if result.new_closed_round:
-                            closed_round = result.new_closed_round
-                            round_state = app_state.per_round_states[closed_round]
-                            del app_state.per_round_states[closed_round]
-                            balances = round_state.balance_end_of_round()
-                            lines = [
-                                f"effective balances for closed round: {closed_round}"
-                            ]
-                            matches = True
-                            scan_party_balances = await scan_client.party_balances(
-                                closed_round, balances.keys()
-                            )
-                            for party, balance in sorted(balances.items()):
-                                computed_balance = balance.effective_for_round(
-                                    closed_round
-                                )
-                                scan_balance = scan_party_balances[party]
-                                matches_for_party = scan_balance == computed_balance
-                                matches &= matches_for_party
-                                lines += [
-                                    f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-                                ]
-                            log = "\n".join(lines)
-                            if matches:
-                                logger.info(log)
-                            else:
-                                logger.error(log)
+                await _process_transaction(args, app_state, scan_client, transaction)
+
             if len(batch) >= 1:
                 last = batch[-1]
                 app_state.pagination_key = PaginationKey(
