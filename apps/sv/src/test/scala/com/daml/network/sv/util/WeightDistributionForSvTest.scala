@@ -1,12 +1,18 @@
 package com.daml.network.sv.util
 
+import com.daml.network.sv.config.BeneficiaryConfig
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.{SuppressionRule, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
+import scala.language.implicitConversions
 
 class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
+
+  private implicit def castNonNegativeLong(l: Long): NonNegativeLong =
+    NonNegativeLong.tryCreate(l)
 
   "weightDistributionForSv" should {
 
@@ -18,56 +24,69 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
     implicit val loggerImpl: TracedLogger = logger
 
     "give all weight to sv if there are no beneficiaries" in {
-      val result = SvUtil.weightDistributionForSv(memberWeight, Map.empty, svParty)
+      val result = SvUtil.weightDistributionForSv(memberWeight, Seq.empty, svParty)
       result should be(Map(svParty -> memberWeight))
     }
 
-    "give all weight to SV if the weight distribution is too big" in {
-      loggerFactory.assertLogs(SuppressionRule.Level(Level.ERROR))(
+    "weight is capped at remainder" in {
+      loggerFactory.assertLogs(SuppressionRule.Level(Level.WARN))(
         {
           val result =
             SvUtil.weightDistributionForSv(
               memberWeight,
-              Map(validator1 -> BigDecimal("33.33"), validator2 -> BigDecimal("66.68")),
+              Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator2, 6668L)),
               svParty,
             )
           result should be(
-            Map(svParty -> memberWeight)
+            Map(validator1 -> 3333L, validator2 -> 6667L)
           )
         },
-        _.errorMessage should be(
-          s"Total weight of extra beneficiaries exceeds the member's svRewardWeightBps: $memberWeight. " +
-            s"Amount will be attributed solely to the SV."
+        _.warningMessage should be(
+          s"Beneficiary weight 6668 for $validator2 is greater than the remainder 6667, capping weight to remainder"
         ),
       )
     }
 
-    "give leftovers to SV" in {
-      val result = SvUtil.weightDistributionForSv(
-        memberWeight,
-        Map(validator1 -> BigDecimal("33.33"), validator2 -> BigDecimal("66.66")),
-        svParty,
-      )
-      result should be(
-        Map(
-          validator1 -> BigDecimal("3333"),
-          validator2 -> BigDecimal("6666"),
-          svParty -> BigDecimal("1"),
+    "remainder goes to SV" in {
+      val result =
+        SvUtil.weightDistributionForSv(
+          memberWeight,
+          Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator2, 6000L)),
+          svParty,
         )
+      result should be(
+        Map(validator1 -> 3333L, validator2 -> 6000L, svParty -> 667L)
       )
     }
 
-    "give nothing to the SV if there are no leftovers" in {
-      val result = SvUtil.weightDistributionForSv(
-        memberWeight,
-        Map(validator1 -> BigDecimal("33.34"), validator2 -> BigDecimal("66.66")),
-        svParty,
-      )
-      result should be(
-        Map(
-          validator1 -> BigDecimal("3334"),
-          validator2 -> BigDecimal("6666"),
+    "party can be specified multiple times" in {
+      val result =
+        SvUtil.weightDistributionForSv(
+          memberWeight,
+          Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator1, 6667L)),
+          svParty,
         )
+      result should be(
+        Map(validator1 -> 10000L)
+      )
+    }
+
+    "extra SV weights are dropped" in {
+      loggerFactory.assertLogs(SuppressionRule.Level(Level.INFO))(
+        {
+          val result =
+            SvUtil.weightDistributionForSv(
+              memberWeight,
+              Seq(BeneficiaryConfig(validator1, 10000L), BeneficiaryConfig(validator2, 6668L)),
+              svParty,
+            )
+          result should be(
+            Map(validator1 -> 10000L)
+          )
+        },
+        _.infoMessage should be(
+          s"Total SV weight 10000 does not cover the following beneficiaries: List(BeneficiaryConfig($validator2,6668))"
+        ),
       )
     }
 

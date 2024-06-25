@@ -50,13 +50,20 @@ persistence:
   secretName: apps-pg-secret
 
 extraBeneficiaries:
-  # Uncomment as required. The sum of all percentages must be less than or equal to 100.
-  # Any leftover percentage is assigned to the SV operator party. Therefore, if the sum is exactly 100, the SV operator party receives no share.
-  # Up to two decimals points are supported for the percentage.
-  # - partyId: "BENEFICIARY_1_PARTY_ID"
-  #   percentage: 10.0
-  # - partyId: "BENEFICIARY_2_PARTY_ID"
-  #   percentage: 33.33
+  # Uncomment as required. This is an ordered list of beneficiary weights.
+  # The weight is split between the beneficiaries in order of the list until there is no weight remaining.
+  # Any remaining weight goes to the SV operator party.
+  #
+  # The same party id can be specified multiple times and the amounts are added up.
+  #
+  # It can be useful to specify more beneficiaries than your current weight allows to account for an upcoming weight change, e.g., specifying
+  # beneficiary X once with weight X and then once with weight Y at the end will mean that this party will get weight X until your weight
+  # increases to allow for it to receive up to X+Y.
+  #
+  # - beneficiary: "BENEFICIARY_1_PARTY_ID"
+  #   weight: 3333
+  # - beneficiary: "BENEFICIARY_2_PARTY_ID"
+  #   weight: 6667
 
 # Contact point for your SV node that can be used by other node operators
 # to reach you if there are issues with your node.

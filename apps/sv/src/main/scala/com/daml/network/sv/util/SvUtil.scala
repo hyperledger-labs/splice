@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.splice.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.SvScanConfig
+import com.daml.network.sv.config.{BeneficiaryConfig, SvScanConfig}
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
@@ -34,6 +34,7 @@ import java.security.{KeyFactory, SecureRandom, Signature}
 import java.time.Duration as JavaDuration
 import java.util.{Base64, Optional}
 import java.util.concurrent.TimeUnit
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -51,26 +52,38 @@ object SvUtil {
 
   def weightDistributionForSv(
       memberSvRewardWeightBps: Long,
-      extraBeneficiaries: Map[PartyId, BigDecimal],
+      extraBeneficiaries: Seq[BeneficiaryConfig],
       svParty: PartyId,
   )(implicit logger: TracedLogger, tc: TraceContext): Map[PartyId, Long] = {
-    val beneficiariesToWeight = extraBeneficiaries.map { case (partyId, weightPct) =>
-      partyId -> (weightPct.setScale(2, BigDecimal.RoundingMode.DOWN) / BigDecimal(100.0) *
-        BigDecimal(memberSvRewardWeightBps)).toLong
-    }
-    val totalExtraBeneficiariesWeight = beneficiariesToWeight.values.sum
-    val svBeneficiaryWeight = memberSvRewardWeightBps - totalExtraBeneficiariesWeight
-    if (svBeneficiaryWeight < 0) {
-      logger.error(
-        s"Total weight of extra beneficiaries exceeds the member's svRewardWeightBps: $memberSvRewardWeightBps. " +
-          s"Amount will be attributed solely to the SV."
-      )
-      Map(svParty -> memberSvRewardWeightBps)
-    } else {
-      beneficiariesToWeight ++ Option(svBeneficiaryWeight)
-        .filter(_ > 0)
-        .map(weight => (svParty, weight))
-    }
+    @tailrec
+    def go(
+        remainder: Long,
+        remainingBeneficiaries: Seq[BeneficiaryConfig],
+        acc: Map[PartyId, Long],
+    ): Map[PartyId, Long] =
+      if (remainder <= 0) {
+        if (!remainingBeneficiaries.isEmpty) {
+          logger.info(
+            s"Total SV weight $memberSvRewardWeightBps does not cover the following beneficiaries: $remainingBeneficiaries"
+          )
+        }
+        acc
+      } else {
+        remainingBeneficiaries match {
+          case BeneficiaryConfig(party, weight) +: beneficiaries =>
+            val usableWeight = if (weight.value > remainder) {
+              logger.warn(
+                s"Beneficiary weight $weight for $party is greater than the remainder $remainder, capping weight to remainder"
+              )
+              remainder
+            } else weight.value
+            val newAcc = acc.updatedWith(party)(prev => Some(prev.getOrElse(0L) + usableWeight))
+            go(remainder - usableWeight, beneficiaries, newAcc)
+          case _ =>
+            acc.updatedWith(svParty)(prev => Some(prev.getOrElse(0L) + remainder))
+        }
+      }
+    go(memberSvRewardWeightBps, extraBeneficiaries, Map.empty)
   }
 
   private def defaultCometBftNetworkLimits: CometBftConfigLimits = new CometBftConfigLimits(

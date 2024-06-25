@@ -32,6 +32,33 @@ Upcoming
     SV app from backup.  ``migration_id`` is also an optional argument to set the latter,
     defaulting to 1 + the cluster's current migration ID.
 
+  * The extra beneficiary config has been changed to specify weights in an ordered list instead of percentages.
+    The weights are distributed in the order of the list until there is no weight remaining. Any remainder
+    still goes to the SV operator party.
+    This fixes two problems with the percentage-based beneficiary specification:
+
+        1. it does not suffer from rounding errors
+        2. it allows changing the config ahead of time to account for a planned weight changes by adding
+           additional entries at the end.
+
+    This is a breaking config change, which requires you to adapt the SV app config
+    as per this example: assuming a total weight of 10000 basis points, the previous config::
+
+        extraBeneficiaries:
+          - partyId: "BENEFICIARY_1_PARTY_ID"
+            percentage: 10.0
+          - partyId: "BENEFICIARY_2_PARTY_ID"
+            percentage: 33.33
+
+    changes to::
+
+        extraBeneficiaries:
+          - beneficiary: "BENEFICIARY_1_PARTY_ID"
+            weight: 1000
+          - beneficiary: "BENEFICIARY_2_PARTY_ID"
+            weight: 3333
+
+
 * Validator app
 
   * ``/v0/admin/domain/data-snapshot`` now accepts ``migration_id`` as an argument,

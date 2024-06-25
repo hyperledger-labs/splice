@@ -22,6 +22,7 @@ import com.daml.network.splitwell.config.{
 }
 import com.daml.network.sv.config.*
 import com.daml.network.sv.SvAppClientConfig
+import com.daml.network.util.Codec
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   AutoAcceptTransfersConfig,
@@ -47,7 +48,7 @@ import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
-import pureconfig.error.FailureReason
+import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.module.cats.{nonEmptyListReader, nonEmptyListWriter}
 
 import scala.concurrent.duration.*
@@ -473,10 +474,11 @@ object CNNodeConfig {
       deriveReader[BackupDumpConfig]
     implicit val periodicBackupDumpConfigReader: ConfigReader[PeriodicBackupDumpConfig] =
       deriveReader[PeriodicBackupDumpConfig]
-    implicit val extraBeneficiariesConfigReader: ConfigReader[Map[PartyId, BigDecimal]] =
-      implicitly[ConfigReader[Map[String, BigDecimal]]].map(_.map { case (k, v) =>
-        PartyId.tryFromProtoPrimitive(k) -> v
-      })
+    implicit val partyIdConfigReader: ConfigReader[PartyId] = ConfigReader.fromString(str =>
+      Codec.decode(Codec.Party)(str).left.map(err => CannotConvert(str, "PartyId", err))
+    )
+    implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
+      deriveReader[BeneficiaryConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
@@ -729,10 +731,10 @@ object CNNodeConfig {
       deriveWriter[BackupDumpConfig]
     implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
       deriveWriter[PeriodicBackupDumpConfig]
-    implicit val extraBeneficiariesConfigWriter: ConfigWriter[Map[PartyId, BigDecimal]] =
-      implicitly[ConfigWriter[Map[String, BigDecimal]]].contramap(_.map { case (k, v) =>
-        k.toProtoPrimitive -> v
-      })
+    implicit val partyIdConfigWriter: ConfigWriter[PartyId] =
+      implicitly[ConfigWriter[String]].contramap(_.toString)
+    implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
+      deriveWriter[BeneficiaryConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

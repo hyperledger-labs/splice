@@ -8,12 +8,14 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.store.Limit
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
+import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.TransferTxLogEntry
 import com.daml.network.wallet.store.TxLogEntry.TransferTransactionSubtype
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
@@ -45,7 +47,9 @@ class SvTimeBasedRewardCouponIntegrationTest
                   s"${BaseLedgerConnection.sanitizeUserIdToPartyString(aliceLedgerApiUser)}::${aliceParticipant.split("::").last}"
                 )
               svConfig
-                .copy(extraBeneficiaries = Map(alicePartyId -> BigDecimal("33.33")))
+                .copy(extraBeneficiaries =
+                  Seq(BeneficiaryConfig(alicePartyId, NonNegativeLong.tryCreate(3333L)))
+                )
             } else svConfig
 
             name -> newConfig

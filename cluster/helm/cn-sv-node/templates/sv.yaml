@@ -228,13 +228,14 @@ spec:
               value: |
                 canton.sv-apps.sv.enable-onboarding-participant-promotion-delay = false
             {{- end }}
-            - name: ADDITIONAL_CONFIG_EXTRA_BENEFICIARIES
+            {{- range $ii, $sv := .Values.extraBeneficiaries }}
+            - name: ADDITIONAL_CONFIG_BENEFICIARIES_{{ $ii }}
               value: |
-                canton.sv-apps.sv.extra-beneficiaries = {
-                  {{- range $ii, $sv := .Values.extraBeneficiaries }}
-                    {{ $sv.partyId | quote }} = {{ $sv.percentage | quote }}
-                  {{- end }}
+                canton.sv-apps.sv.extra-beneficiaries.{{ $ii }} = {
+                  beneficiary = {{ $sv.beneficiary | quote }}
+                  weight = {{ $sv.weight }}
                 }
+            {{- end }}
             {{- with .Values.onboardingPollingInterval }}
             - name: ADDITIONAL_CONFIG_ONBOARDING_POLLING_INTERVAL
               value: |

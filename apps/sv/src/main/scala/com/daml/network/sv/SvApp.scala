@@ -123,13 +123,6 @@ class SvApp(
       retryProvider,
     )
     (for {
-      _ <- appInitStep("ensure beneficiary weights are <= 100.0") {
-        if (config.extraBeneficiaries.values.sum > BigDecimal(100)) {
-          sys.error(
-            s"Beneficiaries' weight percentage sum exceeds 100. Beneficiaries: ${config.extraBeneficiaries}"
-          )
-        } else Future.unit
-      }
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
           config.onboarding match {

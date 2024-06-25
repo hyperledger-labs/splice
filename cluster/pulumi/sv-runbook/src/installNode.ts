@@ -297,8 +297,8 @@ async function installSvAndValidator(
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
         {
-          partyId: pulumi.Output.create(resolveValidator1PartyId()),
-          percentage: '33.33',
+          beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
+          weight: '3333',
         },
       ]
     : [];
@@ -321,7 +321,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
-    extraBeneficiaries: extraBeneficiaries,
+    extraBeneficiaries,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),

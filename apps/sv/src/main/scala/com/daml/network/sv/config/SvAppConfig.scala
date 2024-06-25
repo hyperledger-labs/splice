@@ -149,6 +149,11 @@ final case class SvSynchronizerConfig(
     global: SvDecentralizedSynchronizerConfig
 )
 
+final case class BeneficiaryConfig(
+    beneficiary: PartyId,
+    weight: NonNegativeLong,
+)
+
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
@@ -182,7 +187,7 @@ case class SvAppBackendConfig(
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
-    extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
+    extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration =
