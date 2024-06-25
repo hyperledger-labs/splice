@@ -1,0 +1,3 @@
+[submodule "cluster/cn-svc-configs"]
+	path = cluster/cn-svc-configs
+	url = git@github.com:DACH-NY/cn-svc-configs.git

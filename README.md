@@ -82,15 +82,18 @@ clusters.)
 
 ## Setting up Your Development Environment
 
-1. Install [direnv](https://direnv.net/#basic-installation).
-2. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
-3. Enable support for nix flakes and the nix command by adding to the
+1. Clone the repository using `git clone --recurse-submodules git@github.com:DACH-NY/canton-network-node.git`.
+   If you cloned the repository before, you might want to set `git config submodule.recurse true` to make sure
+   the `cn-svc-configs` submodule is updated automatically on `git pull` and similar operations.
+2. Install [direnv](https://direnv.net/#basic-installation).
+3. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
+4. Enable support for nix flakes and the nix command by adding to the
    following to your nix config (either `/etc/nix/nix.conf` if you
    have a multi-user install or `~/.config/nix/nix.conf`):
     ```
     extra-experimental-features = nix-command flakes
     ```
-4. Configure artifactory credentials
+6. Configure artifactory credentials
    You can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
@@ -108,12 +111,12 @@ clusters.)
       export ARTIFACTORY_USER="yourartifactoryusername"
       export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
-5. After switching to the CC repo you should see a line like
+7. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
    ```
-6. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
-7. If you get an authorization exception, like the following:
+8. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
+9. If you get an authorization exception, like the following:
    ```
    direnv: using nix
    error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz': HTTP error 401 ('Unauthorized')
@@ -137,7 +140,7 @@ clusters.)
       ```
       nix develop --debug --verbose path:nix
       ```
-8. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
+10. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
    ```
    pre-commit install
    # or:
@@ -154,9 +157,9 @@ clusters.)
 
     If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
-9. On MacOS, please install the following globally:
+11. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
-10. Configure CircleCI.
+12. Configure CircleCI.
    Open `./.circleci/cluster-lock-users.json`, and add a line of the format
    ```
    "<circleci-username>": ["<local-username>"],

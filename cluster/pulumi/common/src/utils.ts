@@ -169,7 +169,7 @@ function extractIpRanges(x: IpRangesDict): string[] {
 
 export function loadIPRanges(): string[] {
   const externalIPRangesJson = loadJsonFromFile(
-    REPO_ROOT + '/cluster/allowed-ip-ranges-external.json'
+    REPO_ROOT + '/cluster/cn-svc-configs/configs/allowed-ip-ranges-external.json'
   );
   const internalIPRangesJson = loadJsonFromFile(
     REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
@@ -191,12 +191,9 @@ export function loadIPRanges(): string[] {
 }
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  return (
-    isDevNet
-      ? loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-dev.yaml`)
-      : isMainNet
-        ? loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-main.yaml`)
-        : loadYamlFromFile(`${REPO_ROOT}/cluster/approved-sv-id-values-test.yaml`)
+  const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
+  return loadYamlFromFile(
+    `${REPO_ROOT}/cluster/cn-svc-configs/configs/${clusterDirectory}/approved-sv-id-values.yaml`
   ).approvedSvIdentities;
 }
 

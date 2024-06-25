@@ -29,6 +29,7 @@ export const gitRepo = new k8s.apiextensions.CustomResource(
         name: config.requireEnv('CN_DEPLOYMENT_FLUX_REF'),
       },
       secretRef: { name: githubSecret.metadata.name },
+      recurseSubmodules: true,
     },
   },
   { dependsOn: [flux] }

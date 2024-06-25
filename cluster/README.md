@@ -1385,8 +1385,13 @@ kubectl delete namespace sv-1 sv-2 sv-3 sv-4 validator1 splitwell docs
 
 ### Allowed IP Ranges
 
-The allowed IP ranges are stored in [`allowed-ip-ranges-external.json`](./allowed-ip-ranges-external.json) for any external IP and
+The allowed IP ranges are stored in [`allowed-ip-ranges-external.json`](./cn-svc-configs/configs/allowed-ip-ranges-external.json) for any external IP and
 [`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
+
+Note that the external allowed IP ranges are managed in the
+[cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo so
+any change should be made there and then after merging it, bump the
+submodule in this repo.
 
 ## TLS Certificate Provisioning
 
@@ -1564,18 +1569,8 @@ The SV runbook prompts them to do so.
 
 #### Approving via SV config
 
-Approval via the configs of our SV apps requires a restart of those SVs,
-but the approval is persisted across cluster redeploys.
-To approve a new SV identity on all SVs, you can:
-
-1. add the new identity to the `approvedSvIdentities` list in `approved-sv-id-values-dev.yaml` or `approved-sv-id-values-test.yaml` (depending on the cluster you are working with),
-   and wait for the next cluster deployment to pick up the change:
-
-```
-approvedSvIdentities:
-  - name: DA-example
-    publicKey: LOPwEwYHKoZIzj0CAQYIasDAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYL3252fseasdfadsfLuNEGqPp/E17DNiaGkLVLf+Q==
-```
+SV identities should be changed in the [cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo.
+After merging a PR there, bump the submodule in this repo.
 
 2. if you cannot wait the next update then, checkout the deployment branch of the cluster you want to update. You can run `make cluster/helm/build` to rebuild the helm charts, and then `cncluster apply` to redeploy the SVs.
 

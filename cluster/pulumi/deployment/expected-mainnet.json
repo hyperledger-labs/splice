@@ -565,6 +565,7 @@
       },
       "spec": {
         "interval": "5m",
+        "recurseSubmodules": true,
         "ref": {
           "name": "refs/heads/deployment/mainnet"
         },
