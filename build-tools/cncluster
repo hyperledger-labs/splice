@@ -850,12 +850,33 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
-    _down_stack canton-network &
-    _down_stack multi-validator &
-    _down_stack sv-runbook &
-    _down_stack validator-runbook &
+    # Array to hold the PIDs of background jobs
+    pids=()
+    # Array to hold the exit statuses of background jobs
+    statuses=()
 
-    wait
+    # Function to down a stack in the background and capture its PID
+    bg_down_stack() {
+      _down_stack "$1" &
+      pids+=($!)
+    }
+
+    bg_down_stack canton-network
+    bg_down_stack multi-validator
+    bg_down_stack sv-runbook
+    bg_down_stack validator-runbook
+
+    # Wait for all background jobs and capture their exit statuses
+    for pid in "${pids[@]}"; do
+      wait "$pid"
+      statuses+=($?)
+    done
+
+    for status in "${statuses[@]}"; do
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+    done
 
     _info "Cluster in reset/idle state."
 }
