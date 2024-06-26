@@ -5352,8 +5352,8 @@ workflows:
           context:
             - canton-network-vpn
           requires:
-            - preflight_sv_check
-            - preflight_validator_check
+            - preflight_sv_check_after_sv_redeploy
+            - preflight_validator_runbook_after_redeploy
 
 
   auth0_user_cleanup:
