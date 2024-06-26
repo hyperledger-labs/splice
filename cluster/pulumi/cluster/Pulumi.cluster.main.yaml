@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-mainnet/locations/europe-west4/keyRings/pulumi/cryptoKeys/main
+encryptedkey: CiQAsoiRgUlyxqPlJhSsH58SqGNr/Uo6EewVq0O85LLewRj8AikSZCpiChQKDEaTvFA8OPETDRplJhD80/OFAxIwCijqrXXElHRr/ZuavCcA8LTbN/Bsc/PN8qty20FA04H0K0pm+7ybPAznELKs+dYJGhgKEBWHEf+CVLBnIbZ5AyrjsMUQxtG7oQw=
