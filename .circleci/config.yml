@@ -4674,6 +4674,13 @@ workflows:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "cimain"
+          context:
+            - canton-network-vpn
+          requires:
+            - restore_node
 
   deploy_ciperiodic_migration:
     when:
@@ -5338,6 +5345,14 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - redeploy_validator_runbook_after_daml_upgrade
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "ciupgrade"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
 
 
   auth0_user_cleanup:

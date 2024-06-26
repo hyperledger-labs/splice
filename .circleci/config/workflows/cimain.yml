@@ -101,3 +101,10 @@ workflow:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "cimain"
+          context:
+            - canton-network-vpn
+          requires:
+            - restore_node

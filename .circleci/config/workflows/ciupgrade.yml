@@ -316,3 +316,11 @@ workflow:
           cluster: "ciupgrade"
           requires:
             - redeploy_validator_runbook_after_daml_upgrade
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "ciupgrade"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
