@@ -371,7 +371,7 @@ buddy for help with getting started on the code base.
 (The current incarnation of what we used to call "Support Rotation", "Flake Rotation", "Flaky Test Duty", ...)
 
 The Canton Network team has a weekly monitoring rotation.
-A pair of engineers is explicitly assigned each week (currently Wednesday to Wednesday) to be responsible for driving the resolution of failures that occur in our test and production environments.
+Two to four (depending on the overall stability situation) engineers are explicitly assigned each week (currently Wednesday to Wednesday) to be responsible for driving the resolution of failures that occur in our test and production environments.
 For the engineers on monitoring duty, this work is their priority over any other issues on which they may be working,
 with failures on partner-facing networks (especially `mainnet`, but also `testnet` and `devnet`) taking priority over other types of failures.
 
@@ -390,38 +390,36 @@ communicated.
 
 In a nutshell, the responsibilities of an engineer on monitoring duty are:
 
-1. Monitor and triage failures reported on (in priority order):
+1. Monitor and triage failures reported on (**in priority order**):
    1. [#team-canton-network-mainnet-deployment](https://daholdings.slack.com/archives/C0731SHS3HB)
    2. [#team-canton-network-dev-testnet-deployment](https://daholdings.slack.com/archives/C06SMCCBYQH)
-   3. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
-   4. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
-   5. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
+   3. [#global-synchronizer-ops](https://daholdings.slack.com/archives/C05E70BCSDA) - engage on issues that could threaten overall stability and/or are possibly due to bugs in our software and/or documentation
+   4. [#validator-ops](https://daholdings.slack.com/archives/C05E70BCSDA) - engage on issues that are possibly due to bugs in our software and/or documentation
+   5. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
+   6. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
+   7. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
 2. Drive resolution of failures - delegate and/or alert others about frequent and disruptive failures.
 3. Escalate to “manager on duty” if too much is going on and we need additional monitoring help.
 4. (lower prio) Resolve issues yourself.
 5. (at end of rotation) Do an explicit handover to the next monitoring team.
 
-This is an excellent opportunity to learn about parts of the Canton
-Network that may be outside your usual area of expertise. This
-includes other parts of the software stack, our build and deployment
-mechanisms, networking design, and debugging techniques. It is also a
-way to be intentional about addressing the current 'least stable'
-parts of our code base, with an idea of improving reliability for our
-customers.
+Note that while the Slack channels to monitor are listed here in priority order, it is also acceptable for engineers on the same rotation to "split up" their monitoring and triaging efforts
+(e.g.: two engineers focusing more on production clusters, the other two engineers more on CI failures and CI-managed clusters).
+However: Each engineer on monitoring rotation is responsible for ensuring that the rotation as a whole operates based on above priorities; specifically that production clusters receive a level of attention that matches their current level of (in)stability.
 
 Monitoring duty is organized based on the [CN Monitoring Rotation](https://docs.google.com/document/d/1VXC1RClOC9CLIjR4-so7sn12Tl9csqD7kGObj6QAZ0Q/edit) Google doc.
 Each monitoring week has a manager assigned to it (typically Martin or Ray).
 The manager on duty's responsibility is:
 
-- Making sure that two engineers are scheduled to be on rotation for the week (and that those engineers are aware of this).
+- Making sure that two or more engineers are scheduled to be on rotation for the week (and that those engineers are aware of this).
 - Being a single point of contact in case of concerns about the current failures situation (both for the engineers on rotation and other team members).
 - Assisting the engineers on monitoring rotation by marshalling additional resources (for both triaging and resolution work) when needed.
 
 Monitoring rotation currently begins and ends on Wednesdays.
 At each boundary, the outgoing and incoming engineers on monitoring duty rotation must have a brief touchpoint meeting to go over any issues still under resolution.
 
-Important: we rely on there always being two engineers available on monitoring duty.
-Thus, engineers on monitoring duty that have a day off should ensure that another engineer will substitute for them.
+Important: we rely on there always being at least two engineers available on monitoring duty.
+Engineers on monitoring duty that have a day off should ensure that another engineer will substitute for them.
 
 For engineers on monitoring duty, the resolution process is as follows.
 
