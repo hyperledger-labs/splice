@@ -61,6 +61,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash")
+-(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:.*" AND jsonPayload.message=~".*Authorization Failed.*")
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
