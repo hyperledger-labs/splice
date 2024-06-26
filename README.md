@@ -394,7 +394,7 @@ In a nutshell, the responsibilities of an engineer on monitoring duty are:
    1. [#team-canton-network-mainnet-deployment](https://daholdings.slack.com/archives/C0731SHS3HB)
    2. [#team-canton-network-dev-testnet-deployment](https://daholdings.slack.com/archives/C06SMCCBYQH)
    3. [#global-synchronizer-ops](https://daholdings.slack.com/archives/C05E70BCSDA) - engage on issues that could threaten overall stability and/or are possibly due to bugs in our software and/or documentation
-   4. [#validator-ops](https://daholdings.slack.com/archives/C05E70BCSDA) - engage on issues that are possibly due to bugs in our software and/or documentation
+   4. [#validator-ops](https://daholdings.slack.com/archives/C06QB1ZEGCE) - engage on issues that are possibly due to bugs in our software and/or documentation
    5. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
    6. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
    7. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
