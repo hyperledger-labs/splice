@@ -922,8 +922,8 @@
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
-            "beneficiary": "dummy::partyId",
-            "weight": "3333"
+            "partyId": "dummy::partyId",
+            "percentage": "33.33"
           }
         ],
         "failOnAppVersionMismatch": true,

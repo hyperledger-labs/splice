@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as semver from 'semver';
 import {
   Auth0Client,
   BackupConfig,
@@ -294,12 +295,22 @@ async function installSvAndValidator(
     }
   );
 
+  const supportsBeneficiariesWeight =
+    defaultVersion.type == 'local' ||
+    (defaultVersion.type == 'remote' && defaultVersion.version.startsWith('0.1.13')) ||
+    semver.gt(defaultVersion.version, '0.1.13');
+
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
-        {
-          beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
-          weight: '3333',
-        },
+        supportsBeneficiariesWeight
+          ? {
+              beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
+              weight: '3333',
+            }
+          : {
+              partyId: pulumi.Output.create(resolveValidator1PartyId()),
+              percentage: '33.33',
+            },
       ]
     : [];
   const svValues: ChartValues = {
