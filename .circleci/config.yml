@@ -5346,6 +5346,7 @@ workflows:
           requires:
             - redeploy_validator_runbook_after_daml_upgrade
       - reset_cluster:
+          name: reset_cluster_after_upgrade
           <<: *main-branch-only
           cluster: "ciupgrade"
           context:
