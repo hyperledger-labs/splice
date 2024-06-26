@@ -9,7 +9,7 @@ if (config.envFlag('CN_DEPLOY_MULTI_VALIDATOR', false)) {
   createStackCR('multi-validator', false);
 }
 if (config.envFlag('CN_DEPLOY_VALIDATOR_RUNBOOK', false)) {
-  createStackCR('validator-runbook', false);
+  createStackCR('validator-runbook', true);
 }
 
 export const infraStack = createStackCR('infra', false);

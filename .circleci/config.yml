@@ -3571,6 +3571,9 @@ jobs:
           project: "infra"
       - preview_pulumi:
           cluster: << parameters.cluster >>
+          project: "deployment"
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
           project: "sv-runbook"
           when_env: "CN_DEPLOY_SV_RUNBOOK"
       - preview_pulumi:
