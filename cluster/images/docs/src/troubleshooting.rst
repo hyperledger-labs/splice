@@ -3,7 +3,7 @@
 Collecting Debug Information
 ============================
 
-This section provides an overview of which information can be collected to debug issues in a Canton Network Node both to debug issues yourself or to provide them to DA support.
+This section provides an overview of which information can be collected to debug issues in a Canton Network Node.
 
 Where to find logs
 ------------------
@@ -43,13 +43,13 @@ When facing an issue related to connectivity problems, if you are using chrome o
 
 Once you are done reiterate 2-6 by clicking the ``Console`` tab instead of the ``Network`` tab.
 
-What to send us
----------------
+Configurations
+--------------
 
-Another thing which is often quite helpful to resolve bugs is configurations:
+Another thing which is often quite helpful to diagnose issue is to collect all configurations.
 
 - The application configuration files when running locally,
 - The helm values when using the helm charts (``helm get values -n <namespace> <chartname>``),
 - The environment variables when using the docker container but not the helm charts.
 
-To help us understand your issue, please send us a zip file containing the according logs alongside your configuration settings, the version you are using and the cluster you are running against.
+In addition to that also check the version you are using and the network (dev/test/mainnet) you are running against.
