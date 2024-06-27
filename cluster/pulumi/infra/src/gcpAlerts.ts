@@ -62,10 +62,9 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash")
 -(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:.*" AND jsonPayload.message=~".*Authorization Failed.*")
--(jsonPayload.level="warn" AND jsonPayload.msg=~"Envoy proxy is NOT ready.*" AND resource.labels.container_name="istio-proxy")
--(jsonPayload.level="warn" AND jsonPayload.msg=~"Aborting proxy.*" AND resource.labels.container_name="istio-proxy")
--(jsonPayload.level="warn" AND jsonPayload.msg=~"Aborted proxy.*" AND resource.labels.container_name="istio-proxy")
 -(jsonPayload.level="error" AND jsonPayload.msg=~".*/readyz")
+-- istio-proxy is spammy with warnings
+-(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
