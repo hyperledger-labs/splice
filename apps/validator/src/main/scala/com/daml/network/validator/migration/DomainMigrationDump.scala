@@ -51,11 +51,25 @@ final case class DomainMigrationDump(
 object DomainMigrationDump {
   implicit val domainMigrationCodec: Codec[DomainMigrationDump] =
     Codec.from(
-      Decoder[http.DomainMigrationDump] emap fromHttp,
+      // We try legacy first so that if both fail the return error comes from the non-legacy decoder.
+      Decoder[http.LegacyDomainMigrationDump]
+        .map(fromLegacy(_))
+        .handleErrorWith(_ => Decoder[http.DomainMigrationDump]) emap fromHttp,
       Encoder[http.DomainMigrationDump] contramap (_.toHttp),
     )
 
   private val base64Decoder = Base64.getDecoder()
+
+  private def fromLegacy(legacy: http.LegacyDomainMigrationDump): http.DomainMigrationDump =
+    http.DomainMigrationDump(
+      legacy.participant,
+      legacy.acsSnapshot,
+      legacy.acsTimestamp,
+      legacy.dars,
+      legacy.migrationId,
+      legacy.domainId,
+      legacy.createdAt,
+    )
 
   def fromHttp(response: http.DomainMigrationDump) = for {
     participant <- NodeIdentitiesDump

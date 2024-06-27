@@ -70,9 +70,7 @@ Upcoming
     ``acs_snapshot``, ``acs_timestamp``, ``migration_id``, ``domain_id``, and
     ``created_at``, respectively. The format of ``/v0/admin/domain/data-snapshot`` has
     been fixed where it mismatched the migration dump import format so that backups do not
-    need to be patched to be restored. Previous backups can be patched to be restored in
-    this format by making the above key changes with a straightforward ``jq`` command, if
-    necessary.
+    need to be patched to be restored. Previous dumps can still be imported using the old format.
 
 * Scan app
 
