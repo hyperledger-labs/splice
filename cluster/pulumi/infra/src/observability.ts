@@ -14,6 +14,7 @@ import {
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
+  LOAD_TESTER_MIN_RATE,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
 } from 'cn-pulumi-common';
@@ -690,7 +691,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
           : {}),
         ...{
           'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
-          'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml'),
+          'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml').replace(
+            '$LOAD_TESTER_MIN_RATE',
+            LOAD_TESTER_MIN_RATE
+          ),
           'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
             .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
             .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())

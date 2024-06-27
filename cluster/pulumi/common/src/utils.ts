@@ -26,6 +26,8 @@ export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
 
+export const LOAD_TESTER_MIN_RATE = config.optionalEnv('LOAD_TESTER_MIN_RATE') || '0.95';
+
 export type LogLevel = 'INFO' | 'DEBUG';
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);

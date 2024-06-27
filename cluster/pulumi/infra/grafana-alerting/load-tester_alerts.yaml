@@ -147,7 +147,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 0.95
+                      - $LOAD_TESTER_MIN_RATE
                     type: lt
                   operator:
                     type: and
