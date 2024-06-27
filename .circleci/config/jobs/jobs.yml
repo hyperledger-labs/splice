@@ -256,29 +256,6 @@ jobs:
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
-  mark_for_testnet:
-    docker:
-    - image: cimg/base:2024.01
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Mark latest snapshot in branch for next TestNet release
-          additional_nix_args: "--keep GITHUB_TOKEN"
-          cmd: |
-            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
-            git tag --force testnet-next $LATEST_SNAPSHOT
-            git push --force origin testnet-next
-      - slack/notify:
-          # #team-canton-network-internal-ci
-          channel: C05DT77QF5M
-          event: pass
-          custom: |
-            { "text": "*✅Job '${CIRCLE_JOB}' marked the commit for testnet*\n<${CIRCLE_BUILD_URL}| Commit $(git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD | sed s/\"//g)>" }
-
   update_pipeline_schedule:
     docker:
     - image: cimg/base:2024.01
@@ -417,29 +394,6 @@ jobs:
              git tag "${RELEASE_TAG}"
              git push origin "${RELEASE_TAG}"
            fi
-           if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
-             # This is a mutating tag pointing to the most recent
-             # valid build for DevNet, and therefore the next build
-             # to go to DevNet.
-             git tag --force devnet-next
-             git push --force origin devnet-next
-           elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
-             ! [ $(git tag -l devnet-next) ]
-           then
-             git tag devnet-next
-             git push origin devnet-next
-           fi
-      - when:
-          condition:
-            equal: [ true, <<pipeline.parameters.mark-for-devnet>> ]
-
-          steps:
-            - slack/notify:
-                # #team-canton-network-internal-ci
-                channel: C05DT77QF5M
-                event: pass
-                custom: |
-                  { "text": "*✅Job '${CIRCLE_JOB}' marked the commit for devnet*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
 
   docker_images_build:
     machine:

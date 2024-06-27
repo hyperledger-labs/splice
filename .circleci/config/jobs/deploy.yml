@@ -444,7 +444,6 @@ jobs:
                 additional_nix_args: "--keep GITHUB_TOKEN"
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
-                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
                   if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
                     scripts/update-deployment-branch-and-tag.sh "<< parameters.cluster >>" HEAD
                   else

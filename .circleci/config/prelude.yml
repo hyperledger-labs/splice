@@ -30,11 +30,6 @@ parameters:
         deploy-ciupgrade,
         deploy-ciperiodic-migration,
         deploy-ciperiodic-sv-reonboard,
-        # Disabled to avoid accidental use. We keep the code for now in case
-        # we do want to do a full reset.
-        # TODO(#11648) Consider deleting this.
-        # deploy-devnet,
-        # deploy-testnet,
         healthcheck-cidaily,
         healthcheck-cidaily-testnet,
         healthcheck-cilr,
@@ -58,20 +53,11 @@ parameters:
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
-        mark-for-testnet,
         apply-infra,
         update-deployment,
         preview-changes
       ]
     default: build
-  # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
-  mark-for-devnet:
-    type: boolean
-    default: false
-  # Tag the current commit for the next DevNet release if no commit is tagged already.
-  mark-for-devnet-if-unmarked:
-    type: boolean
-    default: false
   # Overwrite the bootstrapping config for a cluster. If not set,
   # the cluster will be bootstrapped from the preceeding version of the cluster.
   bootstrapping-config:

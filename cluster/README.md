@@ -496,147 +496,11 @@ variables. As stated above, these are usually populated via `.envrc`.
 
 `cncluster` also has basic autocompletion for bash. To install that, add a line: `source <this script>` to your ~/.bashrc
 
-### DevNet and TestNet
+### DevNet, TestNet and MainNet
 
-The CIDaily cluster is updated every day with the latest code from
-`main`. The Wednesday night release into CIDaily is considered the
-release candidate for the upcoming weekend deployment into DevNet. If
-the Wednesday CIDaily release passes its preflight test, the commit is
-marked with the `devnet-next` tag and deployed to DevNet the
-upcoming week. This allows the DevNet releases to be driven by our
-Wednesday to Wednesday weekly sprint cycle and adequately tested
-before being deployed to customers in DevNet.
-
-A convenient way to move the `devnet-next` tag to the commit of the next `CIDaily` deployment is to run `scripts/unmark-for-devnet.sh`.
-This will remove that tag. The next automatic (daily) `CIDaily` deployment
-(or manually triggered `CIDaily` deployment that sets the `mark-for-devnet-if-unmarked` pipeline parameter to `true`)
-will then recreate the tag.
-Note that if the next `CIDaily` deployment fails, the next `DevNet` deployment will too (for lack of a tag).
-
-On Wednesday night, another trigger marks the version running on `DevNet`
-at that point in time with a `testnet-next` tag. That version will then be
-deployed on TestNet in the following TestNet upgrade (usually the following Monday morning).
-
-#### Strategies for reacting to a failed TestNet or DevNet deployment
-
-Failures of scheduled deployments of `TestNet` and `DevNet` cause disturbances for our external SV partners, and hence also reputation harm for us.
-Recovering from a failed deployment of any of those networks has very high priority, especially for people on [support rotation](../README.md#the-support-rotation).
-Here are a few strategies and techniques that can be useful for speeding up the recovery of a failed `TestNet`/`DevNet` deployment:
-
-- If the deployment problem looks like a flake,
-  i.e., if it looks as if the deployment has a high chance of succeeding without any further changes,
-  the CirlceCI deployment workflow can simply be "Rerun from failed" (see the "Rerun" button on the top right).
-  Note, however, that if the deployment was a partial success,
-  using "Rerun from failed" will reset already deployed pods before redeploying.
-  If you want to keep already deployed pods running
-  (for example because external partners are already using a deployment),
-  you have the option to [manually deploy via CI](#manually-deploying-via-ci) and set the
-  `reset-before-deploy` pipeline parameter to `false`.
-  In any case, please still follow up on the flake and make sure it can't happen at all in future deployments.
-  Example [postmortem](https://docs.google.com/document/d/1WYQgZ6PZC1ZcIIo5CSQtuCg7zNdXPyGYAKx96vVe-Jc).
-- If it looks as if the deployment failed due to a bug in our CircleCI configuration,
-  the CircleCI configuration must be fixed on the current main branch first.
-  Once the fix has been merged, [start a new deployment](#manually-deploying-via-ci) of the target cluster.
-  Note that you can't "Rerun from failed" in this case as this will not pick up you fix.
-  Example [postmortem](https://docs.google.com/document/d/1kfkbmUVCFOARcDLBbIivyRyaLJgjY6ejqE9VePxcDtU)
-  (see the `DevNet` failure there and note that moving the tag for `devnet-next` was *not* necessary in this case).
-- If it looks as if the deployment fails for another reason and you have reason to believe that the last version that was deployed
-  would (still) work, consider redeploying that older version.
-  Especially for `TestNet`, it is more important that *a* stable deployment is running than that it is of the latest version.
-  To quickly move the release tag (either `devnet-next` or `testnet-next`), you can use standard git commands:
-  ```
-  git tag --force devnet-next TARGET_COMMIT
-  git push --force origin devnet-next
-  ```
-  Following that you can trigger a redeploy by whatever means is most convenient.
-  Make sure that `TARGET_COMMIT` is a commit that was actually used previously in a `TestNet` or (for `DevNet`) `DevNet` deployment.
-  If this is not the case, you need to ensure that public artifacts for this version have been published first (see below).
-  It is also important to not redeploy a cluster against the same commit.
-  That will keep the CometBFT chain id the same (and potentially also the domain id on testnet) which can result in nodes that have not yet
-  been reset connecting to the new chain/domain resulting in a fork.
-- If you have reason to believe that you can fix the underlying (not CI-related) deployment problem quickly by merging an appropriate PR,
-  or that a fix already exists on the `main` branch for a commit that is younger than the deployed version,
-  you need to bump the version of the failed deployment so your fix will be included in the redeployment attempt.
-  Note that we generally discourage jumping forward in versioning like this
-  as it sidesteps the regular testing time that our releases go through before being marked for `DevNet` or `TestNet`.
-  If you have reason to believe that the associated risks (of including new failure sources) are justifiable,
-  we recommend that you follow the `scripts/unmark-for-devnet.sh` route described above
-  and trigger a new CIDaily deployment manually to let CI move the tag after some testing.
-  If instead you have decided to move the tag manually using git commands,
-  you need to make sure that public artifacts have been published for the version you will be deploying (see below).
-  Example [postmortem](https://docs.google.com/document/d/1kfkbmUVCFOARcDLBbIivyRyaLJgjY6ejqE9VePxcDtU)
-  (see the `TestNet` failures there).
-- If you know that the deployment issue can be fixed by a small modification of the kubernetes manifest (eg. updating an environment variable,
-  or changing a configuration parameter), you can consider making a direct change to the manifest itself. Usually, this is a situation where
-  all you want to do is change a specific helm chart value. Manually editing the manifest can, in these specific circumstances,
-  be a better option than jumping versions and redeploying the cluster.
-  To do so, launch `k9s`, go to the k8s deployments overview by entering `:deployments`, navigate to the correct k8s deployment and press `e`.
-  This should fire up your default editor where you can make changes. Upon saving your edits, the affected pods should get restarted and
-  the changes should take effect automatically.
-  Note, however, that any changes made in this manner will be lost on the next cluster deployment, so make sure that you also create
-  a PR to persist the corresponding change(s) in the repo.
-- Versions you deploy to `DevNet` and `TestNet` must have been published as public releases to Artifactory first,
-  otherwise their deployment will fail.
-  A quick way to check if the commit you are planning to deploy is safe in this respect is to check whether it has a git tag
-  such as `0.1.1-snapshot.20231016.3949.0.vf820dd0f`.
-  This is normally true for all CN versions that have been successfully deployed to `DevNet`, `TestNet`, or `CIDaily` at least once.
-  If you suspect that no public artifacts have been published for the version you plan to deploy, you need to trigger this manually.
-  Follow the steps on [manually deploying via CI](#manually-deploying-via-ci), with the following modifications:
-  1. Instead of `main`, select a branch that corresponds to the commit you need published artifacts for.
-  Please make sure that the branch refers to an actual commit on `main`, for example by creating a new branch at the target commit.
-  2. As an argument for `run-job`, use `publish-public-artifacts`.
-- If you believe that the problem can be fixed (or at least better understood)
-  by interacting with a Canton or Canton Network API on some node deployed on the problematic cluster,
-  see the section on [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
-  below for pointers on accessing such APIs.
-
-Once you have successfully recovered from a `TestNet` or `DevNet` deployment failure,
-please make sure that our SV partners are informed about your resolution as well,
-via a message on the [#dso-ops](https://daholdings.slack.com/archives/C05E70BCSDA) Slack channel.
-Also consider initiating the writing of a [postmortem](https://drive.google.com/drive/folders/10xogcO7_y_gYdEfbUkQLamD8-PTwPmqW) about what happened.
-
-#### Testing deploy-devnet and deploy-testnet changes
-
-Changes to the `deploy-devnet` and `deploy-testnet` CircleCI workflows are dangerous, as they affect our coming production deployments.
-On the other hand, they are somewhat non-trivial to test directly. To test changes to these workflows, one can temporarily:
-
-1. Lock a scratchnet cluster.
-2. In `.circleci/config/workflows.yaml`, locate the workflow to be tested, and:
-   a. Modify all "cluster" arguments to the different jobs to the required scratchnet. This is an important step!
-      Make sure you do not miss any job, in order not to accidentally make any changes to the running production clusters.
-   b. Comment out the `main-branch-only` guards on all jobs in the workflow.
-3. In `.circleci/config/prelude.yaml`, change the default value of `run-job` to the required value, e.g. `deploy-devnet` or `deploy-testnet`.
-4. Commit, push and create a draft PR to trigger CI against your changes.
-
-### Manually Deploying via CI
-
-If necessary, it is possible to manually trigger CI/CD deployments to
-our production-like clusters. This can be useful if either `DevNet` or
-`TestNet` winds up in a bad state or needs a patch.  Before reading
-further, there are two caveats to be aware of:
-
-* Our current CI deployment process forces a complete cluster reset,
-  including loss of all data.
-* These are environments in increasing use by our customers, with
-  expectations for uptime and data integrity. Do not reset these
-  environments before consulting with the team on Slack.
-
-Given approval, a manual deployment of `main` can be done as follows:
-
-1. Navigate to the CircleCI dashboard for [`main`](https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node?branch=main).
-2. Click on "Trigger Pipeline"
-3. Add a parameter named `run-job`, with one of the following values:
-   * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.
-   * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
-   * `deploy-cidaily` - Reset the state of `CIDaily` AND `CIDaily TestNet` and deploy a new code set.
-4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `CIDaily TestNet`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
-5. If you want to keep the existing deployment intact and only deploy missing resources,
-   add an additional boolean parameter named `reset-before-deploy` and set it to `false.
-   Note that this might lead to unexpected results if you are triggering the pipeline based on a Git commit
-   that is different from the one of the original deployment,
-   and also for deployments that bootstrap from ACS and participant identities dumps
-   (see above; pulumi might decide to redeploy your node because the dump file changed, even if the dump contents are identical).
-6. Observe progress of the job via the CI console.
+DevNet releases are cut manually as described in [RELEASE.MD](../RELEASE.MD) when needed and then deployed.
+TestNet should always upgrade to a release already on DevNet with the exception of urgent bugfixes.
+MainNet should always upgrade to a release already on TestNet with the exception of urgent bugfixes.
 
 #### Confirming the Deployment
 
@@ -693,14 +557,6 @@ which will force an immediate recreation of the pod and attempt to
 repull the image.
 
 ```kubectl delete pod ${POD_NAME}```
-
-The entire state of the cluster can be reset as follows. This includes
-every `Pod` and all of the volumes used to store persistent state. ***If
-you do this, all data will be lost.***
-
-```
-cncluster reset
-```
 
 ### CloudSQL and ScratchNet Clusters
 

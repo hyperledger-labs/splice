@@ -3,18 +3,6 @@ workflow:
     when:
       equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/devnet
-          context:
-            - artifactory
-            - slack-context
-          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
-          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
-          workflow_names: "deploy_devnet"
       - preflight_check:
           filters:
             branches:
@@ -147,16 +135,6 @@ workflow:
     when:
       equal: [ backup-devnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/devnet
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_devnet"
       - backup_cluster:
           filters:
             branches:

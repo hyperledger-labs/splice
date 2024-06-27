@@ -3,18 +3,6 @@ workflow:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/testnet
-          context:
-            - artifactory
-            - slack-context
-          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
-          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
-          workflow_names: "deploy_testnet"
       - preflight_check:
           <<: *non_devnet_preflight_params
           filters:
@@ -30,30 +18,10 @@ workflow:
           requires:
             - cancel_if_previous_pipeline
 
-  mark_for_testnet:
-    when:
-      equal: [ mark-for-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - mark_for_testnet:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-
   backup_testnet:
     when:
       equal: [ backup-testnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/testnet
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_testnet"
       - backup_cluster:
           filters:
             branches:
