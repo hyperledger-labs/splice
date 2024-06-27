@@ -123,7 +123,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
@@ -250,7 +250,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
@@ -391,7 +391,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
