@@ -345,6 +345,7 @@ jobs:
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Reset cluster
+                cmd_retry_count: 3
                 cluster: << parameters.cluster >>
                 additional_nix_args: >
                   --keep GITHUB_TOKEN

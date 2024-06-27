@@ -891,7 +891,7 @@ commands:
                 done
 
                 if [ $AUTH_TRY_COUNT -gt $MAX_AUTH_RETRIES ]; then
-                    echo "Exceeded maximum retries, no more attempts: gcloud auth activate-service-account" >&2
+                    echo "Exceeded maximum retries ($AUTH_TRY_COUNT / $MAX_AUTH_RETRIES), no more attempts: gcloud auth activate-service-account" >&2
                     exit 1
                 fi
 
@@ -927,7 +927,7 @@ commands:
               done
 
               if [ $n -gt $MAX_RETRY ]; then
-                echo "Exceeded maximum retries, no more attempts << parameters.cmd_name >>" >&2
+                echo "Exceeded maximum retries ($n / $MAX_RETRY), no more attempts << parameters.cmd_name >>" >&2
                 exit 1
               fi
             EOF
@@ -1035,7 +1035,7 @@ commands:
             done
 
             if [ $n -gt $MAX_RETRY ]; then
-              echo "Exceeded maximum retries, no more attempts" >&2
+              echo "Exceeded maximum retries ($n / $MAX_RETRY), no more attempts" >&2
               exit 1
             fi
 
@@ -1851,6 +1851,7 @@ jobs:
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Reset cluster
+                cmd_retry_count: 3
                 cluster: << parameters.cluster >>
                 additional_nix_args: >
                   --keep GITHUB_TOKEN
@@ -3354,7 +3355,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
@@ -3481,7 +3482,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
@@ -3622,7 +3623,7 @@ jobs:
                       cluster: << parameters.cluster >>
                       gce_authenticate: true
                       cmd: |
-                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-${GCP_CLUSTER_BASENAME}net --format json | jq .autoscaling.enabled) != "true" ]; do
                           echo "waiting for auto-scaler to be disabled..."
                           sleep 1
                         done
@@ -4806,6 +4807,7 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:
@@ -5506,6 +5508,7 @@ workflows:
             - redeploy_validator_runbook_after_daml_upgrade
       - reset_cluster:
           name: reset_cluster_after_upgrade
+          is_shared_cluster: false
           <<: *main-branch-only
           cluster: "ciupgrade"
           context:

@@ -714,7 +714,7 @@ commands:
                 done
 
                 if [ $AUTH_TRY_COUNT -gt $MAX_AUTH_RETRIES ]; then
-                    echo "Exceeded maximum retries, no more attempts: gcloud auth activate-service-account" >&2
+                    echo "Exceeded maximum retries ($AUTH_TRY_COUNT / $MAX_AUTH_RETRIES), no more attempts: gcloud auth activate-service-account" >&2
                     exit 1
                 fi
 
@@ -750,7 +750,7 @@ commands:
               done
 
               if [ $n -gt $MAX_RETRY ]; then
-                echo "Exceeded maximum retries, no more attempts << parameters.cmd_name >>" >&2
+                echo "Exceeded maximum retries ($n / $MAX_RETRY), no more attempts << parameters.cmd_name >>" >&2
                 exit 1
               fi
             EOF
@@ -858,7 +858,7 @@ commands:
             done
 
             if [ $n -gt $MAX_RETRY ]; then
-              echo "Exceeded maximum retries, no more attempts" >&2
+              echo "Exceeded maximum retries ($n / $MAX_RETRY), no more attempts" >&2
               exit 1
             fi
 
