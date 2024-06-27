@@ -4806,6 +4806,7 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"
+          is_shared_cluster: false
           context:
             - canton-network-vpn
           requires:
@@ -5506,6 +5507,7 @@ workflows:
             - redeploy_validator_runbook_after_daml_upgrade
       - reset_cluster:
           name: reset_cluster_after_upgrade
+          is_shared_cluster: false
           <<: *main-branch-only
           cluster: "ciupgrade"
           context:
