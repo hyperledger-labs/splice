@@ -185,7 +185,7 @@ class SplitwellApp(
       automation: SplitwellAutomationService,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
-      RetryFor.ClientCalls,
+      RetryFor.WaitingOnInitDependency,
       "splitwell_rules_created",
       s"Wait for splitwell rules to be created for domain $domain",
       automation.store.lookupSplitwellRules(domain).flatMap {
