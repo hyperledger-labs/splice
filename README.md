@@ -23,12 +23,14 @@
     - [DB migrations](#db-migrations)
     - [Daml Numerics](#daml-numerics)
     - [Editing Daml](#editing-daml)
-    - [Preparing for upgrades that add variant constructors](#preparing-for-upgrades-that-add-variant-constructors)
+      - [Backwards-compatible Daml changes](#backwards-compatible-daml-changes)
     - [Bumping External Dependencies](#bumping-external-dependencies)
       - [Bumping CometBFT](#bumping-cometbft)
       - [Bumping Canton](#bumping-canton)
+      - [Bumping Daml Compiler version](#bumping-daml-compiler-version)
       - [Bumping Our Canton fork](#bumping-our-canton-fork)
         - [Updating Canton build dependencies](#updating-canton-build-dependencies)
+        - [Triggering a daml snapshot release](#triggering-a-daml-snapshot-release)
     - [Message Definitions](#message-definitions)
     - [Config parameters](#config-parameters)
     - [Code Layout](#code-layout)
@@ -536,65 +538,19 @@ in daml/dars.lock. CI verifies that those package IDs are correct. If you intent
 changes in daml code, please run `sbt damlDarsLockFileUpdate` and commit the updated `dars.lock`
 file along with your dar changes.
 
-### Preparing for upgrades that add variant constructors
+#### Backwards-compatible Daml changes
 
-Daml 3.0 does not yet support adding new constructors to variants.
-We therefore add an extension constructor to every variant that is stored on-ledger, i.e., occurs
-directly or indirectly in a template argument, choice argument, or choice result.
-For example, the original `TransferInput` variant is defined as follows:
-```
-data TransferInput
-  = InputAppRewardCoupon (ContractId AppRewardCoupon)
-  | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
-  | InputSvRewardCoupon (ContractId SvRewardCoupon)
-  | InputAmulet (ContractId Amulet)
-  | ExtTransferInput with
-      dummyUnitField : ()
-        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
-  deriving (Eq, Ord, Show)
-```
-such that we can enable the following upgrade to add a new constructor:
-```
-data TransferInput
-  = InputAppRewardCoupon (ContractId AppRewardCoupon)
-...
-  | ExtTransferInput with
-      dummyUnitField : ()
-        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
-      optInputValidatorFaucetCoupon : Optional (ContractId ValidatorFaucetCoupon)
-        -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
-  deriving (Eq, Ord, Show)
-```
+We require all Daml changes to be backwards-compatible. The best docs for that can currently be found
+in this draft of the [Daml app upgrading guidelines](https://docs.google.com/document/d/10ttHyhufCI7hGEsd0CA2VCjsXPhAg7Hg-fVeMQOKS4U/edit#heading=h.m26v9yc5o96).
 
-Please add extension constructors to all variants that are stored on ledger using the naming scheme:
-```
-data Foo
-  = ...
-  | ExtFoo with
-      dummyUnitField : ()
-        --  ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
-```
-whenever you encounter this constructor in a case distinction you should error out as follows:
-```
-  case fooValue of
-     ExtFoo _dummyUnitField -> error "ExtFoo: bare extension constructors are not allowed at runtime"
-     ...
-```
-This matches the expectation that down-casting a constructor added in a later version of the variant would
-fail at runtime. Note that we add the `_dummyUnitField` so that the compiler errors out on this case
-once a new field is added.
+In the early days of Daml 3.0 upgrading of variants and enums was not supported, which is why there
+are variant constructors with names like `ExtFoo` in our codebase. They used to be a workaround for
+this lack of upgradeability. You can ignore them, and just add new enum and variant constructors directly.
 
-**Note:** enums are represented as variants whose constructors have no arguments.
-Such variants receive special treatment by the Java codegen. We recommend to drop the `_dummyUnitField`
-for these enums; i.e., use the following pattern:
-```
-data Bar
-  = ...
-  | ExtBar
-      -- ^  Extension constructor to work around the current lack of upgrading for variants in Daml 3.0
-      -- Will serve as the default value in a containing record in case of an upgrade.
-```
-This matches the guidance given for protobuf enums: https://protobuf.dev/programming-guides/dos-donts/#unspecified-enum
+Care still must be taken to not accidentally change an enum into a variant: enums are `data` type declarations
+that only consist of nullary constructors. They are compiled to Daml-LF enums, which is nice as that
+ensures that the codegens like the Java codegen define these as Jave enums as well. **Make sure to only add
+further nullary constructors to types that only have nullary constructors.**
 
 
 ### Bumping External Dependencies
