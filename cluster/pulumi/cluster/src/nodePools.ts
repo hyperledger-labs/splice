@@ -35,7 +35,7 @@ export function installNodePools(): void {
     name: 'cn-infra-pool',
     cluster,
     nodeConfig: {
-      machineType: 'e2-standard-8',
+      machineType: config.optionalEnv('INFRA_NODE_POOL_MACHINE_TYPE') || 'e2-standard-8',
       taints: [
         {
           effect: 'NO_SCHEDULE',
