@@ -18,6 +18,12 @@ workflow:
             - slack-context
           requires:
             - wait_for_previous_pipeline
+      - enable_autoscaler:
+          name: "ensure_autoscaler_enabled"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:

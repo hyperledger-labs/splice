@@ -193,6 +193,7 @@
           requires:
             - trigger_global_domain_migration
             - prepare_cluster_for_migration
+            - prepare_sv_runbook_for_migration
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-never
@@ -203,6 +204,7 @@
           cluster: "user-selected-scratchnet"
           migration_id: 1
           parallelism: 1
+          wait_for_disabled_autoscaler: true
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
@@ -214,8 +216,7 @@
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
-            - trigger_global_domain_migration
-            - prepare_sv_runbook_for_migration
+            - migrate_cluster
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
@@ -223,6 +224,7 @@
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
+          wait_for_disabled_autoscaler: true
           <<: *main-branch-never
           context:
             - artifactory
@@ -230,7 +232,7 @@
             - slack-context
           cluster: "user-selected-scratchnet"
           requires:
-            - trigger_global_domain_migration
+            - migrate_cluster
       - deploy_validator_runbook:
           name: "migrate_validator_runbook"
           <<: *main-branch-never
@@ -242,10 +244,11 @@
           global_domain_migrate_from_id: 0
           reset_cluster: false
           requires:
-            - trigger_global_domain_migration
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
+          wait_for_disabled_autoscaler: true
           <<: *main-branch-never
           context:
             - artifactory
@@ -253,7 +256,15 @@
             - slack-context
           cluster: "user-selected-scratchnet"
           requires:
-            - trigger_global_domain_migration
+            - migrate_cluster
+      - disable_autoscaler:
+          context:
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          requires:
+            - migrate_cluster
       # TODO (#12393): reenable, this restore nukes the database of migration ID 1, which breaks.
 #      - restore_node:
 #          name: "restore_node_after_migration"
@@ -281,6 +292,13 @@
             - preflight_check_migrated
             - migrate_sv_runbook
             - migrate_validator_runbook
+      - enable_autoscaler:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
 
   # Simple deployment with no migration
   deploy_scratchnet_basic:

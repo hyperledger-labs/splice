@@ -18,6 +18,9 @@ jobs:
       wait_for_splitwell:
         type: boolean
         default: true
+      wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
       cluster_version:
         type: string
         default: ""
@@ -111,6 +114,20 @@ jobs:
                 cmd_before_retry: |-
                   echo "VPN connection seems to have died, restarting VPN and retrying..."
                   /tmp/vpn-scripts/restart-vpn.sh
+            - when:
+                condition:
+                  equal: [ true, << parameters.wait_for_disabled_autoscaler >> ]
+                steps:
+                  - run_bash_command_in_nix:
+                      cmd_name: Disable autoscaler
+                      cluster: << parameters.cluster >>
+                      gce_authenticate: true
+                      cmd: |
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                          echo "waiting for auto-scaler to be disabled..."
+                          sleep 1
+                        done
+                        echo "Done, auto-scaler is disabled"
             - get_cluster:
                 cluster: << parameters.cluster >>
             - execute_sbt_command:
@@ -160,6 +177,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -221,6 +241,20 @@ jobs:
                 cmd_before_retry: |-
                   echo "VPN connection seems to have died, restarting VPN and retrying..."
                   /tmp/vpn-scripts/restart-vpn.sh
+            - when:
+                condition:
+                  equal: [ true, << parameters.wait_for_disabled_autoscaler >> ]
+                steps:
+                  - run_bash_command_in_nix:
+                      cmd_name: Disable autoscaler
+                      cluster: << parameters.cluster >>
+                      gce_authenticate: true
+                      cmd: |
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                          echo "waiting for auto-scaler to be disabled..."
+                          sleep 1
+                        done
+                        echo "Done, auto-scaler is disabled"
             - when:
                 condition: << parameters.delay_mins >>
                 steps:
@@ -284,6 +318,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -345,6 +382,20 @@ jobs:
                 cmd_before_retry: |-
                   echo "VPN connection seems to have died, restarting VPN and retrying..."
                   /tmp/vpn-scripts/restart-vpn.sh
+            - when:
+                condition:
+                  equal: [ true, << parameters.wait_for_disabled_autoscaler >> ]
+                steps:
+                  - run_bash_command_in_nix:
+                      cmd_name: Disable autoscaler
+                      cluster: << parameters.cluster >>
+                      gce_authenticate: true
+                      cmd: |
+                        until [ $(gcloud container node-pools describe cn-apps-pool --cluster cn-scratchdnet --format json | jq .autoscaling.enabled) != "true" ]; do
+                          echo "waiting for auto-scaler to be disabled..."
+                          sleep 1
+                        done
+                        echo "Done, auto-scaler is disabled"
             - when:
                 condition: << parameters.delay_mins >>
                 steps:
