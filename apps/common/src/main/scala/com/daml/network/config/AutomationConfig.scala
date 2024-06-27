@@ -36,6 +36,12 @@ case class AutomationConfig(
       * done quickly enough during init preventing tests from failing due to lack of traffic.
       */
     topupTriggerPollingInterval: Option[NonNegativeFiniteDuration] = None,
+    /** Polling interval to check for domain connection changes.
+      * There are a large number of domain stores, e.g. one per user on the
+      * validator app; with few domain changes, more checks aren't needed.
+      */
+    domainIngestionPollingInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration ofSeconds 30,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,

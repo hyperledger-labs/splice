@@ -14,6 +14,7 @@ class DomainIngestionService(
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends PeriodicTaskTrigger(
+      context.config.domainIngestionPollingInterval,
       context.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop),
       quiet = true,
     ) {
