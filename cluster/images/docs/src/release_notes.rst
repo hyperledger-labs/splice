@@ -3,8 +3,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.13
+------
 
 * Docker
 
