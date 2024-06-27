@@ -60,7 +60,7 @@ groups:
         dashboardUid: QP_wDqDnz
         panelId: 11
         noDataState: OK
-        execErrState: Error
+        execErrState: OK
         for: 2m
         annotations:
           __dashboardUid__: QP_wDqDnz
