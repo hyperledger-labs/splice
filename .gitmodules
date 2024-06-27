@@ -1,3 +1,4 @@
 [submodule "cluster/cn-svc-configs"]
 	path = cluster/cn-svc-configs
 	url = ../cn-svc-configs.git
+	branch = main

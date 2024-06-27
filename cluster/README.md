@@ -1394,6 +1394,12 @@ Note that the external allowed IP ranges are managed in the
 any change should be made there and then after merging it, bump the
 submodule in this repo.
 
+To update the submodule to a new commit
+
+```
+git submodule update --remote
+```
+
 ## TLS Certificate Provisioning
 
 Certificates are issued and renewed in the cluster automatically by
