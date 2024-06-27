@@ -10,7 +10,7 @@ our development directly against that, while engaging also non-DA contributors.
 
 Currently:
 - Only our Daml models have been approved for open sourcing
-- Our Daml models have been open sourced at https://github.com/DACH-NY/decentralized-canton-sync, copyrighted to Digital Asset
+- Our Daml models have been open sourced at https://github.com/digital-asset/decentralized-canton-sync, copyrighted to Digital Asset
 - Our Daml models have also been handed over to Splice
 - We still develop the Daml models in our private repo first, and then copy
 them to the open source repos. This implies that for the time being, we need
