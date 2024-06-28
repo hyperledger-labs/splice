@@ -17,6 +17,13 @@ workflow:
             - slack-context
           workflow_names: "deploy_cimain"
           wait_type: "wait_workflow"
+      - autoscaler_set_min_nodes:
+          name: "set min nodes to 6"
+          <<: *main-branch-only
+          cluster: "cimain"
+          num_nodes: 6
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -101,6 +108,13 @@ workflow:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+      - autoscaler_set_min_nodes:
+          name: "set min nodes to 0"
+          <<: *main-branch-only
+          cluster: "cimain"
+          num_nodes: 0
+          requires:
+            - restore_node
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"
