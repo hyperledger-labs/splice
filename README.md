@@ -432,6 +432,10 @@ For engineers on monitoring duty, the resolution process is as follows.
 * For failures that are especially disruptive, the
   issue in Github can be labeled "now" to signal its importance.
 
+We have a script `./scripts/monitor-flaky-tests.sh` that can be helpful for keeping track of new activity (e.g. team members reporting new occurrences of flakes on individual PRs) on flaky issues you may not be subscribed to on GitHub. A good way to use this is with the watch command for live updates, like `watch -n 120 ./scripts/monitor-flaky-tests.sh`. The `gh` command requires you to authenticate to GitHub. You can run `gh auth login` once, or add a repo-scoped personal access token in a var (`export GITHUB_TOKEN=...`) in `.envrc.private`.
+
+By default, the script returns the top 5 most recent issues. Use the `-l <int>` argument to fetch more issues.
+
 Further reading:
 - [alerts checklist](support/ALERTS_CHECKLIST.md)
 - [flake checklist](support/FLAKE_CHECKLIST.md)

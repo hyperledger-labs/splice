@@ -24,6 +24,7 @@ in pkgs.mkShell {
     docker
     evans
     geckodriver
+    gh
     git
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
