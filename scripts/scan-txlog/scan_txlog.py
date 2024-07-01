@@ -43,6 +43,9 @@ def _default_logger(name, loglevel):
 
     return logger
 
+# Global logger, always accessible
+GLOG=_default_logger("global", "INFO")
+
 @dataclass
 class TemplateId:
     template_id: str
@@ -96,28 +99,24 @@ class TemplateQualifiedNames:
 @dataclass
 class HandleTransactionResult:
     for_open_round: str
-    for_closed_round: str
     new_open_rounds: set
     new_closed_round: str
 
     @staticmethod
     def empty():
-        return HandleTransactionResult(None, None, set(), None)
+        return HandleTransactionResult(None, set(), None)
 
     def for_open_round(round_number):
-        return HandleTransactionResult(round_number, None, set(), None)
-
-    def for_closed_round(round_number):
-        return HandleTransactionResult(None, round_number, set(), None)
+        return HandleTransactionResult(round_number, set(), None)
 
     def new_open_rounds(rounds):
-        return HandleTransactionResult(None, None, rounds, None)
+        return HandleTransactionResult(None, rounds, None)
 
     def new_open_round(round_number):
-        return HandleTransactionResult(None, None, set([round_number]), None)
+        return HandleTransactionResult(None, set([round_number]), None)
 
     def new_closed_round(new_closed_round):
-        return HandleTransactionResult(None, None, set(), new_closed_round)
+        return HandleTransactionResult(None, set(), new_closed_round)
 
     def merge(self, other):
         # This is technically an unnecessary limitation but unlikely to be violated in practice.
@@ -130,17 +129,9 @@ class HandleTransactionResult:
             raise Exception(
                 f"Round mismatch: {other.for_open_round} != {self.for_open_round}"
             )
-        if (
-            other.for_closed_round
-            and self.for_closed_round
-            and other.for_closed_round != self.for_closed_round
-        ):
-            raise Exception(
-                f"Round mismatch: {other.for_closed_round} != {self.for_closed_round}"
-            )
+
         return HandleTransactionResult(
             self.for_open_round or other.for_open_round,
-            self.for_closed_round or other.for_closed_round,
             self.new_open_rounds.union(other.new_open_rounds),
             self.new_closed_round or other.new_closed_round,
         )
@@ -1309,45 +1300,45 @@ class PerPartyState:
 # The state at a given record time
 class State:
     logger: logging.Logger
+    args: dict
     active_contracts: dict[str, CreatedEvent]
     record_time: datetime
-    ignored_root_creates: list[str]
-    ignored_root_exercises: list[str]
+    synchronizer_id: Optional[str]
 
     def __init__(
         self,
         logger,
+        args,
         active_contracts,
         record_time,
-        ignored_root_creates,
-        ignored_root_exercises,
+        synchronizer_id
     ):
         self.logger = logger
+        self.args = args
         self.active_contracts = active_contracts
         self.record_time = record_time
-        self.ignored_root_creates = ignored_root_creates
-        self.ignored_root_exercises = ignored_root_exercises
+        self.synchronizer_id = synchronizer_id
 
     def clone(self, new_logger):
         return State(
             new_logger,
+            self.args,
             self.active_contracts.copy(),
             self.record_time,
-            self.ignored_root_creates,
-            self.ignored_root_exercises,
+            self.synchronizer_id
         )
 
     @classmethod
-    def from_json(cls, logger, json):
+    def from_json(cls, logger, args, json):
         return cls(
             logger,
+            args,
             {
                 cid: CreatedEvent.from_json(contract)
                 for cid, contract in json["active_contracts"].items()
             },
             datetime.fromisoformat(json["record_time"]),
-            json["ignored_root_creates"],
-            json["ignored_root_exercises"],
+            json["synchronizer_id"]
         )
 
     def to_json(self):
@@ -1357,8 +1348,7 @@ class State:
                 for cid, contract in self.active_contracts.items()
             },
             "record_time": self.record_time.isoformat(),
-            "ignored_root_creates": self.ignored_root_creates,
-            "ignored_root_exercises": self.ignored_root_exercises,
+            "synchronizer_id": self.synchronizer_id
         }
 
     def summary(self):
@@ -1510,7 +1500,37 @@ class State:
             if open_round.payload.get_open_mining_round_round() == round_number
         )
 
+    def _fail(self, transaction, message, cause=None, recoverable=True):
+        if not self.args.stop_on_error and recoverable:
+            message = f'{message} (will attempt to recover from acs_diff and restart)'
+
+        self.get_transaction_logger(transaction).error(message)
+
+        if not recoverable:
+            raise Exception(f'Unrecoveable error, stopping export (error: {message})') from cause
+
+        if self.args.stop_on_error:
+            raise Exception(f'--stop-on-error set, stopping export (error: {message})') from cause
+
+    def _check_synchronizer_id(self, transaction):
+        sid = transaction.synchronizer_id
+
+        if self.synchronizer_id is None:
+            self.synchronizer_id = sid
+            return
+
+        if self.synchronizer_id != sid:
+            self._fail(
+                transaction,
+                f"Synchronizer ID mismatch between cache file and environment: "
+                f"({self.synchronizer_id}!={sid}). Please reset the local cache "
+                f"and retry.",
+                recoverable=False
+            )
+
     def handle_transaction(self, transaction):
+        self._check_synchronizer_id(transaction)
+
         previous_state = self.clone(self.logger)
         record_time = datetime.fromisoformat(transaction.record_time)
         result = HandleTransactionResult.empty()
@@ -1520,9 +1540,7 @@ class State:
                 event_result = self.handle_root_event(transaction, event)
                 result = result.merge(event_result)
         except Exception as e:
-            self.get_transaction_logger(transaction).error(
-                f"Encountered exception while processing transaction, attempting to continue relying on acs_diff to fix up the state for this transaction: {e}"
-            )
+            self._fail(transaction, f"Encountered exception while processing transaction: {e}", cause=e)
 
         # This is a sanity check to make sure the code does not forget tracking an ACS change.
         acs_diff = transaction.acs_diff()
@@ -1530,9 +1548,7 @@ class State:
         created = self.active_contracts.keys() - previous_state.active_contracts.keys()
         archived = previous_state.active_contracts.keys() - self.active_contracts.keys()
         if created != acs_diff.created_events.keys():
-            self.get_transaction_logger(transaction).error(
-                f"Transaction created contracts {acs_diff.created_events}\nbut our state created {created}, correcting"
-            )
+            self._fail(transaction, f"Transaction created contracts {acs_diff.created_events}\nbut our state created {created}")
             self.active_contracts = {
                 k: v
                 for k, v in (
@@ -1541,9 +1557,7 @@ class State:
                 if k not in acs_diff.archived_events.keys()
             }
         if archived != acs_diff.archived_events.keys():
-            self.get_transaction_logger(transaction).error(
-                f"Transaction archived contracts {acs_diff.archived_events}\nbut our state archived {archived}, correcting"
-            )
+            self._fail(transaction, f"Transaction archived contracts {acs_diff.archived_events}\nbut our state archived {archived}")
             self.active_contracts = {
                 k: v
                 for k, v in (
@@ -1563,10 +1577,10 @@ class State:
         elif isinstance(event, CreatedEvent):
             return self.handle_root_created_event(transaction, event)
         else:
-            self.get_transaction_logger(transaction).error(f"Unknown event: {event}")
+            self._fail(transaction, f"Unknown event: {event}")
 
     def handle_root_created_event(self, transaction, event):
-        if event.template_id.qualified_name in self.ignored_root_creates:
+        if event.template_id.qualified_name in self.args.ignore_root_create:
             if event.template_id.qualified_name in TemplateQualifiedNames.all_tracked:
                 self.active_contracts[event.contract_id] = event
                 return HandleTransactionResult.empty()
@@ -1577,9 +1591,7 @@ class State:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
             case _:
-                self.get_transaction_logger(transaction).error(
-                    f"Unexpected root CreatedEvent: {event}"
-                )
+                self._fail(transaction, f"Unexpected root CreatedEvent: {event}")
         return HandleTransactionResult.empty()
 
     def handle_receive_sv_reward_coupon(self, transaction, event):
@@ -1663,9 +1675,7 @@ class State:
                             validator_faucet
                         )
                 case _:
-                    self.get_transaction_logger(transaction).error(
-                        f"Unexpected transfer input: {tag}"
-                    )
+                    self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
             app_rewards,
             validator_rewards,
@@ -1731,9 +1741,7 @@ class State:
                     # set to an empty list to simplify computations below
                     lock_holders = []
                 case tag:
-                    self.get_transaction_logger(transaction).error(
-                        f"unexpected output tag: {tag}"
-                    )
+                    self._fail(transaction, f"Unexpected transfer output: {tag}")
             fee_amounts += [output_fee]
             receiver_fee = receiver_fee_ratio * output_fee
             sender_fee = output_fee - receiver_fee
@@ -1747,9 +1755,7 @@ class State:
             locking_fee = len(lock_holders) * transfer_config_cc.lock_holder_fee
             create_fee = transfer_config_cc.create_fee
             if output_fee != create_fee + transfer_fee + locking_fee:
-                self.get_transaction_logger(transaction).error(
-                    f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}"
-                )
+                self._fail(transaction, f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}")
             output_descriptions += ["  fees:"]
             output_descriptions += [f"    total: {output_fee}"]
             output_descriptions += [f"      base_transfer_fee: {create_fee}"]
@@ -1832,7 +1838,7 @@ class State:
             fee_amounts,
         )
         if transfer_error := summary.get_error("transfer"):
-            self.get_transaction_logger(transaction).error(transfer_error)
+            self._fail(transaction, f'Transfer error: {transfer_error}')
         activity_record_descriptions = []
         for validator_reward in validator_reward_coupons:
             amount = validator_reward.payload.get_validator_reward_amount()
@@ -1938,7 +1944,7 @@ class State:
             [sender_change_fee, amulet_paid],
         )
         if transfer_error := summary.get_error("buy_traffic"):
-            self.get_transaction_logger(transaction).error(transfer_error)
+            self._fail(transaction, f'Buy Traffic Error: {transfer_error}')
         self.get_transaction_logger(transaction).info(
             textwrap.dedent(
                 f"""\
@@ -2098,9 +2104,7 @@ class State:
                         case _:
                             pass
             else:
-                self.get_transaction_logger(transaction).error(
-                    f"Unexpected event type: {event}"
-                )
+                self._fail(transaction, f"Unexpected event type: {event}")
         new_round = latest_round_number + 1
         self.get_transaction_logger(transaction).info(
             f"AdvanceOpenMiningRounds: Advanced OpenMiningRound, latest open mining round is now {new_round}"
@@ -2250,9 +2254,7 @@ class State:
                     case tag:
                         self.logger.error(f"Unexpected ARC_AnsEntryContext tag: {tag}")
             case _:
-                self.get_transaction_logger(transaction).error(
-                    f"Unexpected action: {action}"
-                )
+                self._fail(transaction, f"Unexpected action: {action}")
 
     def handle_claim_expired_rewards(self, transaction, event):
         assert len(event.child_event_ids) == 1
@@ -2323,9 +2325,7 @@ class State:
                         ]
                         del self.active_contracts[cid]
                     case choice:
-                        self.get_transaction_logger(transaction).error(
-                            f"Unexpected exercise as part of activity record expiry: {event}"
-                        )
+                        self._fail(transaction, f"Unexpected exercise as part of activity record expiry: {event}")
         expired_activity_rewards = "\n".join(rewards_lines)
         self.get_transaction_logger(transaction).info(
             f"ExpireActivityRecords: Expired activity records for round {round}:\n{expired_activity_rewards}"
@@ -2561,7 +2561,8 @@ class State:
                 return HandleTransactionResult.empty()
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
-                if choice_str in self.ignored_root_exercises:
+
+                if choice_str in self.args.ignore_root_exercise:
                     if (
                         event.is_consuming
                         and event.template_id.qualified_name
@@ -2569,9 +2570,7 @@ class State:
                     ):
                         del self.active_contracts[event.contract_id]
                 else:
-                    self.get_transaction_logger(transaction).error(
-                        f"Unexpected choice: {event.template_id}:{choice}"
-                    )
+                    self._fail(transaction, f"Unexpected choice: {event.template_id}:{choice}")
                 return HandleTransactionResult.empty()
 
     def balance_end_of_round(self):
@@ -2626,26 +2625,22 @@ class AppState:
     state: State
     per_round_states: dict[int, State]
     pagination_key: Optional[PaginationKey]
-    synchronizer_id: Optional[str]
 
     @classmethod
     def empty(cls, logger, args):
-        state = State(
-            logger, {}, None, args.ignore_root_create, args.ignore_root_exercise
-        )
-        return cls(logger, state, {}, None, None)
+        state = State(logger, args, {}, None, None)
+        return cls(logger, state, {}, None)
 
     @classmethod
-    def from_json(cls, logger, data):
+    def from_json(cls, logger, args, data):
         return cls(
             logger,
-            State.from_json(logger, data["state"]),
+            State.from_json(logger, args, data["state"]),
             {
-                int(round_number): State.from_json(logger, round_data)
+                int(round_number): State.from_json(logger, args, round_data)
                 for round_number, round_data in data["per_round_states"].items()
             },
-            PaginationKey.from_json(data["pagination_key"]),
-            data.get('synchronizer_id')
+            PaginationKey.from_json(data["pagination_key"])
         )
 
     def to_json(self):
@@ -2658,7 +2653,6 @@ class AppState:
             "pagination_key": (
                 None if self.pagination_key is None else self.pagination_key.to_json()
             ),
-            "synchronizer_id": self.synchronizer_id
         }
 
     @classmethod
@@ -2681,7 +2675,7 @@ class AppState:
             with open(args.cache_file_path, "r") as file:
                 data = json.load(file)
                 logger.info(f"Restoring app state from {args.cache_file_path}")
-                return AppState.from_json(logger, data)
+                return AppState.from_json(logger, args, data)
 
         except Exception as e:
             logger.error(
@@ -2700,19 +2694,6 @@ class AppState:
                 self.logger.error(
                     f"Could not save app state to {args.cache_file_path}: {e}"
                 )
-
-    def check_synchronizer_id(self, sid):
-        if self.synchronizer_id is None:
-            self.synchronizer_id = sid
-            return
-
-        if self.synchronizer_id != sid:
-            self.logger.error(
-                f"Synchronizer ID mismatch between cache file and environment: "
-                f"({self.synchronizer_id}!={sid}). Please reset the local cache "
-                f"and retry."
-            )
-            sys.exit(-1)
 
 def _parse_cli_args():
     # Parse command line arguments
@@ -2759,6 +2740,11 @@ def _parse_cli_args():
         action="store_true",
         help="Force the cache to be rebuilt from scratch.",
     )
+    parser.add_argument(
+        "--stop-on-error",
+        action="store_true",
+        help="Stop processing when an error is encountered, and make no attempt to recover and continue.",
+    )
     return parser.parse_args()
 
 def _log_uncaught_exceptions(logger):
@@ -2773,6 +2759,49 @@ def _log_uncaught_exceptions(logger):
         )
 
     sys.excepthook = handle_exception
+
+async def _check_scan_balance_assertions(scan_client, app_state, result):
+    previous_state = app_state.state.clone(app_state.logger)
+
+    for round_number in result.new_open_rounds:
+        app_state.per_round_states[round_number] = (
+            previous_state.clone(_default_logger(f"scan_txlog_{round_number}", "WARNING"))
+        )
+    if result.for_open_round != None:
+        for (
+            round_number,
+            per_round_state,
+        ) in app_state.per_round_states.items():
+            if round_number >= result.for_open_round:
+                per_round_state.handle_transaction(transaction)
+    if result.new_closed_round:
+        closed_round = result.new_closed_round
+        app_state.logger.info(f'Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}')
+        round_state = app_state.per_round_states[closed_round]
+        del app_state.per_round_states[closed_round]
+        balances = round_state.balance_end_of_round()
+        lines = [
+            f"effective balances for closed round: {closed_round}"
+        ]
+        matches = True
+        scan_party_balances = await scan_client.party_balances(
+            closed_round, balances.keys()
+        )
+        for party, balance in sorted(balances.items()):
+            computed_balance = balance.effective_for_round(
+                closed_round
+            )
+            scan_balance = scan_party_balances[party]
+            matches_for_party = scan_balance == computed_balance
+            matches &= matches_for_party
+            lines += [
+                f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
+            ]
+        log = "\n".join(lines)
+        if matches:
+            app_state.logger.info(log)
+        else:
+            app_state.logger.error(log)
 
 async def _process_transaction(args, app_state, scan_client, transaction):
     if transaction.is_acs_import():
@@ -2789,48 +2818,10 @@ async def _process_transaction(args, app_state, scan_client, transaction):
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
     )
 
-    previous_state = app_state.state.clone(app_state.logger)
-    app_state.check_synchronizer_id(transaction.synchronizer_id)
     result = app_state.state.handle_transaction(transaction)
+
     if args.scan_balance_assertions:
-        for round_number in result.new_open_rounds:
-            app_state.per_round_states[round_number] = (
-                previous_state.clone(_default_logger(f"scan_txlog_{round_number}", "WARNING"))
-            )
-        if result.for_open_round != None:
-            for (
-                round_number,
-                per_round_state,
-            ) in app_state.per_round_states.items():
-                if round_number >= result.for_open_round:
-                    per_round_state.handle_transaction(transaction)
-        if result.new_closed_round:
-            closed_round = result.new_closed_round
-            round_state = app_state.per_round_states[closed_round]
-            del app_state.per_round_states[closed_round]
-            balances = round_state.balance_end_of_round()
-            lines = [
-                f"effective balances for closed round: {closed_round}"
-            ]
-            matches = True
-            scan_party_balances = await scan_client.party_balances(
-                closed_round, balances.keys()
-            )
-            for party, balance in sorted(balances.items()):
-                computed_balance = balance.effective_for_round(
-                    closed_round
-                )
-                scan_balance = scan_party_balances[party]
-                matches_for_party = scan_balance == computed_balance
-                matches &= matches_for_party
-                lines += [
-                    f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-                ]
-            log = "\n".join(lines)
-            if matches:
-                app_state.logger.info(log)
-            else:
-                app_state.logger.error(log)
+        _check_scan_balance_assertions(scan_client, app_state, result)
 
 async def main():
     args = _parse_cli_args()
