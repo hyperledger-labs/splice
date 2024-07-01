@@ -90,6 +90,16 @@ Updating the reward weight of an SV
 
 - Receive from the SV owners an agreed-upon update to the SV weights.
 
+- If the SV whose weight is being adjusted defined `extraBeneficiaries` (as described in :ref:`sv-helm`),
+  they will have to update them accordingly. Namely:
+
+  - On weight increases they should add a new entry with the extra weight, as otherwise any leftovers will go to the SV party.
+
+  - On weight decreases, the last extra beneficiary will have their weight capped.
+
+  Note that you can and usually should update the extra-beneficiaries config before the weight change takes effect.
+  The extra entries at the end will just be ignored.
+
 - Start a governance vote. To do so, create a new vote request in the SV web UI under the `Governance` tab.
   Select the "Update SV Reward Weight" name, then select the SV member and specify the new reward weight.
 
