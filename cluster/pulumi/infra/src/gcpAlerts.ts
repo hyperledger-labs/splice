@@ -35,6 +35,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name="cometbft" AND jsonPayload.err="error adding vote")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopping peer for error")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Failed to write PacketMsg")
+-(resource.labels.container_name="cometbft" AND jsonPayload._msg="Connection failed @ sendRoutine")
 -- execution context overload
 -jsonPayload.message=~"Task runner canton-env-ec is .* overloaded.*"
 -- on startup
