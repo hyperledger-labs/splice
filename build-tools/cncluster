@@ -2701,30 +2701,11 @@ function subcmd_list_sv_cometbft_addresses() {
     _error "Usage: $SCRIPTNAME list_sv_cometbft_addresses <sv-name> [domain_migration_id]"
   fi
 
-  cleanup() {
-    kill $port_forward_pid
-  }
-  trap cleanup EXIT
-  kubectl port-forward -n "$sv" deployment/global-domain-"$domain"-cometbft 26657:26657 > /dev/null &
-  port_forward_pid=$!
-
-  if ! kill -0 $port_forward_pid; then
-    _error "Failed to start port forwarding"
-    exit 1
-  fi
-
-  while ! nc -z -w 1 localhost 26657 > /dev/null 2>&1; do
-    sleep 0.1
-    if [ $SECONDS -ge 10 ]; then
-      echo "Failed to port-forward to $sv cometbft pod"
-      cleanup
-      exit 1
-    fi
-  done
   pubkey_sv=$(mktemp)
   pubkey_address=$(mktemp)
   curl -sSLf "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" | jq '[.sv_node_states[] | .payload as $payload | .payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey}]' > "$pubkey_sv"
-  curl -sSLf --header "Content-Type: application/json" 'localhost:26657/validators' | jq '[.result.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
+  curl -sSLf --header "Content-Type: application/json" -X POST -d '{"id": 0, "method": "validators"}' "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/json-rpc" | \
+    jq '[.result.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
 
   jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
 }

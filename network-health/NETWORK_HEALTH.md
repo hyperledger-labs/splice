@@ -80,20 +80,10 @@ point of investigation is to figure out which SV’s CometBFT nodes are
 not working.
 
 Looking for warnings and errors in the logs can often be a good first start. If this does not
-bring up anything useful, the best option is to check the CometBFT state directly (the following currently
-requires port-forwarding permissions, which only the CN engineering team has):
+bring up anything useful, the best option is to check the CometBFT state directly:
 
 ```
-kubectl get pods -n sv-1 -l cn-component=cometbft
-
-# Copy the name of the cometbft pod. Note that there may be more than one due to domain migrations.
-# Typically the one with the largest index is the active one.
-
-kubectl port-forward -n sv-1 <pod-name> 26657:26657
-
-# In another terminal:
-
-curl localhost:26657/consensus_state | jq
+curl -fsSL -X POST -H 'Content-Type: application/json' --data '{"id": 0, "method": "consensus_state"}' "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/json-rpc" | jq
 {
   "jsonrpc": "2.0",
   "id": -1,

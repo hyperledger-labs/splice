@@ -2049,18 +2049,10 @@ For instance, if you find that blocks take a long time to advance in cometbft lo
 To debug what is happening while a slowdown is occurring, poll the `consensus_state` endpoint
 while blocks are advancing slowly (the `consensus_state` does not provide historical data).
 
-You can access this endpoint by port forwarding the rpc port (26657) on the cometbft container in the respective cluster.
-The cometbft container is found in the `global-domain-x-cometbft` pod, where x is the migration ID.
-Use the following command to port forward to `sv-1`s global domain cometbft pod:
+You can access this endpoint as follows:
 
 ```
-kubectl port-forward -n sv-1 $(kubectl get pod -n sv-1 -l app=global-domain-0-cometbft -o name) 26657:26657
-```
-
-Access the `consensus_state` endpoint, port forwarded through localhost:
-
-```
-curl http://localhost:26657/consensus_state | jq
+curl -fsSL -X POST -H 'Content-Type: application/json' --data '{"id": 0, "method": "consensus_state"}' "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/json-rpc" | jq
 ```
 
 The cometbft `consensus_state` endpoint provides the result state that the state machine has currently reached in the consensus protocol.
@@ -2091,7 +2083,7 @@ The output should look something like the example below:
 ]
 ```
 
-This output can be used to find the proposer address from the consensus_state endpoint and find the associated SV.
+This output can be used to find the proposer address from the `consensus_state` endpoint and find the associated SV.
 
 ###
 

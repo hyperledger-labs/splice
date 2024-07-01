@@ -689,12 +689,14 @@ components:
           type: string
           # status, block - used in configure-state-sync.sh
           # commit, validators, consensus_params - used by the CometBFT Light client for state sync
+          # consensus_state - used for debugging CometBFT issues
           enum:
             - status
             - block
             - commit
             - validators
             - consensus_params
+            - consensus_state
         params:
           type: object
           additionalProperties: true

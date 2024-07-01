@@ -170,6 +170,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
         Map("height" -> Json.fromString("1")),
         Seq("block_height", "consensus_params"),
       )
+      // not required for state sync but to aid in debugging CometBFT issues
+      testJsonRpcCall(6, "consensus_state", Map.empty, Seq("round_state"))
     }
   }
 
