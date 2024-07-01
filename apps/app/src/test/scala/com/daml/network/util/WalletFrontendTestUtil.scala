@@ -53,19 +53,21 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       .text should matchText(s"$balanceUSD USD")
   }
 
-  protected def readTransactionFromRow(transactionRow: Element): FrontendTransaction = {
-    def parseAmountText(str: String, currency: String) = {
-      try {
-        BigDecimal(
-          str
-            .replace(currency, "")
-            .trim
-        )
-      } catch {
-        case e: Throwable =>
-          throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
-      }
+  def parseAmountText(str: String, currency: String) = {
+    try {
+      BigDecimal(
+        str
+          .replace(currency, "")
+          .trim
+          .replace(",", "")
+      )
+    } catch {
+      case e: Throwable =>
+        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
     }
+  }
+
+  protected def readTransactionFromRow(transactionRow: Element): FrontendTransaction = {
 
     FrontendTransaction(
       action = transactionRow.childElement(className("tx-action")).text,
@@ -209,19 +211,6 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         )
       )
     } else None
-  }
-
-  private def parseAmountText(str: String, currency: String) = {
-    try {
-      BigDecimal(
-        str
-          .replace(currency, "")
-          .trim
-      )
-    } catch {
-      case e: Throwable =>
-        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
-    }
   }
 }
 

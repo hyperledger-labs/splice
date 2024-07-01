@@ -227,7 +227,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
           val totalAmuletBalanceSv = find(id("total-amulet-balance-cc")).value.text
           val totalAmuletBalanceSv1 = sv1ScanClient.getTotalAmuletBalance(round)
-          BigDecimal(totalAmuletBalanceSv.stripSuffix("CC").trim) shouldBe totalAmuletBalanceSv1
+          parseAmountText(totalAmuletBalanceSv, "CC") shouldBe totalAmuletBalanceSv1
         }
       }
     } else {

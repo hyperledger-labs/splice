@@ -45,7 +45,7 @@ const AmountDisplay: React.FC<AmountDisplayProps> = props => {
 
   return (
     <>
-      {_amount.toString()} {_currency}
+      {_amount.toFormat()} {_currency}
     </>
   );
 };
