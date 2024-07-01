@@ -10,6 +10,7 @@ Upcoming
 
   * Added a governance option to update the SV reward weight of a member SV.
     This is available in the Governance tab by selecting the action "Update SV Reward Weight".
+  * Added `consensus_state` to the list of CometBFT RPC endpoints exposed via the SV app at `/v0/admin/domain/cometbft/json-rpc`.
 
 
 0.1.13

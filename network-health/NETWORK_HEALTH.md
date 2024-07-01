@@ -86,7 +86,7 @@ bring up anything useful, the best option is to check the CometBFT state directl
 curl -fsSL -X POST -H 'Content-Type: application/json' --data '{"id": 0, "method": "consensus_state"}' "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/json-rpc" | jq
 {
   "jsonrpc": "2.0",
-  "id": -1,
+  "id": 0,
   "result": {
     "round_state": {
       "height/round/step": "2440268/0/6",
