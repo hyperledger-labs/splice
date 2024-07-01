@@ -207,7 +207,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -436,7 +436,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "global-domain-2-cometbft",
     "provider": "",
@@ -511,7 +511,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "global-domain-2",
     "provider": "",
@@ -579,7 +579,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "loopback",
     "provider": "",
@@ -655,7 +655,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "participant-2",
     "provider": "",
@@ -714,7 +714,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "scan",
     "provider": "",
@@ -901,8 +901,8 @@
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
-            "partyId": "dummy::partyId",
-            "percentage": "33.33"
+            "beneficiary": "dummy::partyId",
+            "weight": "3333"
           }
         ],
         "failOnAppVersionMismatch": true,
@@ -933,7 +933,7 @@
           }
         ]
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "sv-app",
     "provider": "",
@@ -1322,7 +1322,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.1.12"
+      "version": "0.1.13"
     },
     "name": "validator",
     "provider": "",

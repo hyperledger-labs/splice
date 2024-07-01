@@ -10,6 +10,7 @@ workflow:
                 - deployment/devnet
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -142,6 +143,7 @@ workflow:
                 - deployment/devnet
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
