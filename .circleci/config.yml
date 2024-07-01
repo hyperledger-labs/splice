@@ -205,6 +205,7 @@ commands:
         name: Checkout submodule
         command: |
           git submodule update --init --recursive
+          git config submodule.recurse true
   setup_nix:
     description: Set up Nix
     steps:
