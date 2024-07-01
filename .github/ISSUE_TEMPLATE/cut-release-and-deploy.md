@@ -25,13 +25,18 @@ assignees: ''
 
 - [ ] (optional) pause health checks
 - [ ] warn our partners on [#global-synchronizer-ops](https://daholdings.slack.com/archives/C05E70BCSDA): We'll be upgrading our nodes on DevNet to test a new version. Some turbulence might be expected.
-- [ ] create a temp branch off of the release branch
-- [ ] on this branch
-   - [ ] reapply all changes made to the current `deployment/devnet` that look as if we might still need them (e.g., the changes after the last hard migration)
-   - [ ] adjust the versions in `cluster/deployment/devnet/.envrc.vars` to match our new version
-- [ ] Push your temp branch.
-- [ ] Trigger a CircleCI pipeline on this branch with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER`. Review the output to see that there are no unexpected changes.
+- [ ] Ensure all changes backported to the previous release branch are also included in main, e.g., by checking (adjusting branches as needed)
+      `git diff (git merge-base origin/release-line-0.1.13 origin/main) origin/release-line-0.1.13`
+      and ensuring that all changes are already included in the new release branch you're upgrading to. This should be the case but sometimes
+      a change gets missed. Note: At the moment, for testnet and mainnet the previous branch is still `deployment/testnet`, `deployment/mainnet` so view the diff against that.
+- [ ] Make a PR against the `.envrc.vars` file for the cluster you're upgrading in the release branch that bumps the versions.
+- [ ] Forward port that PR to `main`.
+- [ ] Trigger a CircleCI pipeline on the release branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER`. Review the output
+      together with someone else to see that there are no unexpected changes.
       Pay particular attention to deleted or newly created resources.
+- [ ] Make a PR against main that changes the `CN_DEPLOYMENT_FLUX_REF` variable in the respective `.envrc.vars` to the new release branch.
+- [ ] Trigger a CircleCI pipeline on this PR branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER` and review the changes to the `deployment` stack.
+- [ ] After merging to main, trigger a CircleCI pipeline on main with `run-job: update-deployment`. This makes the operator track the release branch.
 - [ ] force push the temp branch we're on to `deployment/devnet` (**while pairing with someone!** note that you might need someone to change the branch config so you can do this; try asking Martin, Itai, Moritz, or Nicu)
 - [ ] wait for [the operator](cluster/README.md#the-operator) to apply your changes
       A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful
