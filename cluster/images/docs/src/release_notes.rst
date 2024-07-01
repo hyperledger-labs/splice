@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* SV app
+
+  * Added a governance option to update the SV reward weight of a member SV.
+    This is available in the Governance tab by selecting the action "Update SV Reward Weight".
+
+
 0.1.13
 ------
 

@@ -84,3 +84,18 @@ CometBFT node identities
   For recovering, it is sufficient for an SV operator to set up a new CometBFT node (with a fresh identity)
   and make sure that it is correctly registered by their SV app backend
   (e.g., by amending the configuration of their SV app backend and restarting it).
+
+Updating the reward weight of an SV
+-----------------------------------
+
+- Receive from the SV owners an agreed-upon update to the SV weights.
+
+- Start a governance vote. To do so, create a new vote request in the SV web UI under the `Governance` tab.
+  Select the "Update SV Reward Weight" name, then select the SV member and specify the new reward weight.
+
+- Wait for the vote request to get approved and executed.
+  Once that happens, the DSO info tab will show the updated reward weight,
+  and the SV will earn rewards according to the new weight moving forward.
+
+- Make sure that the changed reward is also reflected on `the cn-svc-configs repository <https://github.com/DACH-NY/cn-svc-configs/>`_.
+  Otherwise, the old value would become effective again in the event of an onboarding and reonboarding.
