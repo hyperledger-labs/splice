@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.automation.leaderbased.TerminatedSubscriptionTrigger
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.Assertion
@@ -36,7 +37,10 @@ class Ans4SvsIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       setTriggersWithin[Assertion](
-        triggersToPauseAtStart = Seq(),
+        // TODO(#13199): Consider adding a retry to the submission below instead
+        triggersToPauseAtStart = Seq(
+          aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
+        ),
         triggersToResumeAtStart = Seq(),
       ) {
 
