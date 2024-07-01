@@ -1537,6 +1537,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -1581,6 +1584,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
+                  
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
+                  
                   cncluster ci_pdown_sv
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
@@ -1647,6 +1656,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -1688,6 +1700,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
+                  
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
+            
                   cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
@@ -1989,6 +2007,9 @@ jobs:
       run:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - setup_nix
@@ -2031,6 +2052,12 @@ jobs:
               export ENABLE_CLOUD_SQL=false
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
+            
+              if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                # silence specific alerts that may fire due to SV downtime
+                cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              fi
+              
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
       - print_gcloud_logs_commands:
@@ -3685,6 +3712,9 @@ jobs:
       is_shared_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3705,6 +3735,12 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
+            
             if [[ << parameters.is_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
             else
@@ -5184,6 +5220,7 @@ workflows:
           <<: *main-branch-only
           cluster: "ciupgrade"
           is_shared_cluster: false
+          silence_deployment_alerts: true
           context:
             - canton-network-vpn
           requires:
@@ -5195,7 +5232,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: "ciupgrade"
-          silence_deployment_alerts: true
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
@@ -5277,6 +5313,7 @@ workflows:
             - slack-context
           <<: *main-branch-only
           run: << pipeline.parameters.run-partial-upgrade >>
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - preflight_check_initial
@@ -5438,6 +5475,7 @@ workflows:
           # by resetting the SV runbook, it's as if a new SV was onboarded,
           # thus testing that SVs joining after an upgrade also work
           reset_cluster: true
+          silence_deployment_alerts: true
           <<: *main-branch-only
           context:
             - artifactory
@@ -5453,6 +5491,7 @@ workflows:
           # by resetting the Validator runbook, it's as if a new Validator was onboarded,
           # thus testing that Validators joining after an upgrade also work
           reset_cluster: true
+          silence_deployment_alerts: true
           <<: *main-branch-only
           context:
             - artifactory

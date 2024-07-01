@@ -7,6 +7,9 @@ jobs:
       is_shared_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -27,6 +30,12 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
+            
             if [[ << parameters.is_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
             else

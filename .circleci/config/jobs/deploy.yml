@@ -22,6 +22,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -66,6 +69,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
+                  
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
+                  
                   cncluster ci_pdown_sv
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
@@ -132,6 +141,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -173,6 +185,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
+                  
+                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                    # silence specific alerts that may fire due to reset downtime
+                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                  fi
+            
                   cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
@@ -474,6 +492,9 @@ jobs:
       run:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - setup_nix
@@ -516,6 +537,12 @@ jobs:
               export ENABLE_CLOUD_SQL=false
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
+            
+              if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+                # silence specific alerts that may fire due to SV downtime
+                cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              fi
+              
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
       - print_gcloud_logs_commands:

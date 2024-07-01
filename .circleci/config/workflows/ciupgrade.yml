@@ -18,6 +18,7 @@ workflow:
           <<: *main-branch-only
           cluster: "ciupgrade"
           is_shared_cluster: false
+          silence_deployment_alerts: true
           context:
             - canton-network-vpn
           requires:
@@ -29,7 +30,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: "ciupgrade"
-          silence_deployment_alerts: true
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
@@ -111,6 +111,7 @@ workflow:
             - slack-context
           <<: *main-branch-only
           run: << pipeline.parameters.run-partial-upgrade >>
+          silence_deployment_alerts: true
           requires:
             - artifacts_push
             - preflight_check_initial
@@ -272,6 +273,7 @@ workflow:
           # by resetting the SV runbook, it's as if a new SV was onboarded,
           # thus testing that SVs joining after an upgrade also work
           reset_cluster: true
+          silence_deployment_alerts: true
           <<: *main-branch-only
           context:
             - artifactory
@@ -287,6 +289,7 @@ workflow:
           # by resetting the Validator runbook, it's as if a new Validator was onboarded,
           # thus testing that Validators joining after an upgrade also work
           reset_cluster: true
+          silence_deployment_alerts: true
           <<: *main-branch-only
           context:
             - artifactory
