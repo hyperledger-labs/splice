@@ -35,7 +35,10 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.Submiss
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.NotConnectedToAnyDomain
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.UnknownInformees
+import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.{
+  UnknownInformees,
+  UnknownSubmitters,
+}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
   InactiveContracts,
   LockedContracts,
@@ -781,21 +784,16 @@ object HttpWalletHandler {
     }
   }
 
-  private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean = {
-    (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION &&
-      ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-        case ErrorInfoDetail(InvalidDomainId.id, _) => true
-        case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
-        case ErrorInfoDetail(UnknownContractDomain.id, _) => true
-        case _ => false
-      }) ||
-    (ex.getStatus.getCode == Status.Code.NOT_FOUND &&
-      ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-        case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
-        case ErrorInfoDetail(UnknownInformees.id, _) => true
-        case _ => false
-      })
-  }
+  private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean =
+    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+      case ErrorInfoDetail(InvalidDomainId.id, _) => true
+      case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
+      case ErrorInfoDetail(UnknownContractDomain.id, _) => true
+      case ErrorInfoDetail(UnknownSubmitters.id, _) => true
+      case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
+      case ErrorInfoDetail(UnknownInformees.id, _) => true
+      case _ => false
+    }
 
   private def isMediatorTimeout(ex: io.grpc.StatusRuntimeException): Boolean = {
     (ex.getStatus.getCode == Status.Code.ABORTED) &&
