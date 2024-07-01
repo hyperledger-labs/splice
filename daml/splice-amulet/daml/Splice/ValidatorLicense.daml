@@ -4,6 +4,9 @@
 module Splice.ValidatorLicense where
 
 import DA.Action (void)
+import DA.Text as Text
+import DA.Time
+import qualified DA.Foldable as Foldable
 
 import Splice.Round
 import Splice.Types
@@ -23,7 +26,21 @@ data ValidatorLicense_WithdrawResult = ValidatorLicense_WithdrawResult
 
 data ValidatorLicense_CancelResult = ValidatorLicense_CancelResult
 
+data ValidatorLicense_UpdateMetadataResult = ValidatorLicense_UpdateMetadataResult with
+  licenseCid : ContractId ValidatorLicense
+
+data ValidatorLicense_ReportActiveResult = ValidatorLicense_ReportActiveResult with
+  licenseCid : ContractId ValidatorLicense
+
 data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResult
+
+data ValidatorLicenseMetadata = ValidatorLicenseMetadata
+  with
+    lastUpdatedAt : Time -- ^ The last time the validator metadata was updated
+    version : Text  -- ^ The version the validator is currently on
+    contactPoint : Text -- ^ A contact point that can be used to reach the operator of the validator in case there are issues with the validator.
+      -- This can be an email address or a slack user name.
+  deriving (Show, Eq)
 
 -- | The existence of a validator license is what makes a validator an (onboarded) validator.
 template ValidatorLicense with
@@ -31,10 +48,14 @@ template ValidatorLicense with
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
     dso : Party                 -- ^ The party representing the operations of the decentralized synchronizer.
     faucetState : Optional FaucetState
+    metadata : Optional ValidatorLicenseMetadata
+    lastActiveAt : Optional Time -- ^ Last time this validator was active. Tracked to get a view on the set of validator nodes that are up and running.
+
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding
 
+    ensure validValidatorLicense this
 
     -- We expect the wallet of the validator to call this choice automatically.
     choice ValidatorLicense_ReceiveFaucetCoupon : ValidatorLicense_ReceiveFaucetCouponResult
@@ -59,7 +80,7 @@ template ValidatorLicense with
               lastReceivedFor = openRound.round
               numCouponsMissed = state.numCouponsMissed + (openRound.round.number - state.lastReceivedFor.number - 1)
 
-        licenseCid <- create this with faucetState = newFaucetState
+        licenseCid <- create this with faucetState = newFaucetState; lastActiveAt = Some now
 
         couponCid <- create ValidatorFaucetCoupon with
           dso
@@ -81,6 +102,65 @@ template ValidatorLicense with
       do return ValidatorLicense_CancelResult
 
 
+    choice ValidatorLicense_UpdateMetadata : ValidatorLicense_UpdateMetadataResult
+      with
+        version : Text
+        contactPoint : Text
+      controller validator
+        do now <- getTime
+           Foldable.forA_ metadata $ \metadata -> do
+             require "Metadata has changed" (version /= metadata.version || contactPoint /= metadata.contactPoint)
+             require
+               ("At least " <> show metadataUpdateMinInterval <> " has passed since the last metadata update")
+               (metadataUpdateAllowed metadata.lastUpdatedAt now)
+           licenseCid <- create this with
+             metadata = Some ValidatorLicenseMetadata with
+               version
+               lastUpdatedAt = now
+               contactPoint
+             lastActiveAt = Some now
+           pure (ValidatorLicense_UpdateMetadataResult licenseCid)
+
+    choice ValidatorLicense_ReportActive : ValidatorLicense_ReportActiveResult
+      -- ^ Choice for validators with disabled wallets to report themselves as active.
+      -- Validators that receive amulets will report through ReceiveFaucetCoupon.
+      controller validator
+      do now <- getTime
+         Foldable.forA_ lastActiveAt $ \activeAt -> do
+           require
+             ("At least <> show activityReportMinInterval " <> " has passed since the last activity report")
+             (activityReportAllowed activeAt now)
+         licenseCid <- create this with
+           lastActiveAt = Some now
+         pure (ValidatorLicense_ReportActiveResult licenseCid)
+
+
+metadataUpdateMinInterval : RelTime
+metadataUpdateMinInterval = hours 1
+
+activityReportMinInterval : RelTime
+activityReportMinInterval = metadataUpdateMinInterval
+
+metadataUpdateAllowed : Time -> Time -> Bool
+metadataUpdateAllowed previous now =
+  now `subTime` previous >= metadataUpdateMinInterval
+
+activityReportAllowed : Time -> Time -> Bool
+activityReportAllowed previous now =
+  now `subTime` previous >= activityReportMinInterval
+
+validValidatorLicense : ValidatorLicense -> Bool
+validValidatorLicense license =
+  optional True validValidatorLicenseMetadata license.metadata
+
+maxIdentifierLength : Int
+maxIdentifierLength = 255
+
+validValidatorLicenseMetadata : ValidatorLicenseMetadata -> Bool
+validValidatorLicenseMetadata metadata =
+  Text.length metadata.contactPoint <= maxIdentifierLength &&
+  Text.length metadata.version <= maxIdentifierLength
+
 template ValidatorFaucetCoupon with
     dso : Party
     validator : Party
@@ -96,7 +176,6 @@ template ValidatorFaucetCoupon with
          -- Expiry requires proof of the coupon's round being closed, as all rounds advance on their own time.
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return ValidatorFaucetCoupon_DsoExpireResult
-
 
 -- instances
 ------------

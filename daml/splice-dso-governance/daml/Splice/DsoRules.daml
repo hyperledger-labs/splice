@@ -101,6 +101,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Revoke a specific featured app right.
   | SRARC_SetConfig DsoRules_SetConfig
     -- ^ Voted action to change the `DsoRulesConfig`. Not idempotent.
+  | SRARC_UpdateSvRewardWeight DsoRules_UpdateSvRewardWeight
+    -- ^ Voted action to update the reward weight of an SV.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -181,6 +183,9 @@ data DsoRules_UpdateAmuletPriceVoteResult = DsoRules_UpdateAmuletPriceVoteResult
 data DsoRules_GarbageCollectAmuletPriceVotesResult = DsoRules_GarbageCollectAmuletPriceVotesResult
 
 data DsoRules_SetConfigResult = DsoRules_SetConfigResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_UpdateSvRewardWeightResult = DsoRules_UpdateSvRewardWeightResult with
     newDsoRules : ContractId DsoRules
 
 data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult with
@@ -721,12 +726,8 @@ template DsoRules with
               else pure VRO_Expired
         -- check if the request is ready to be closed
         when (now < request.voteBefore) $ do
-          let svBeingOffboarded = case request.action of
-                ARC_DsoRules (SRARC_OffboardSv (DsoRules_OffboardSv with sv)) ->
-                  fmap (.name) (Map.lookup sv svs)
-                _ -> None
-          require "All svs (except one being offboarded) must have voted to allow early closing" $
-            all (\m -> Some m == svBeingOffboarded || m `Map.member` request.votes) activeSvs
+          require "All svs must have voted to allow early closing" $
+            all (\m -> m `Map.member` request.votes) activeSvs
           require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
         -- report the result
         pure DsoRules_CloseVoteRequestResult with
@@ -810,6 +811,22 @@ template DsoRules with
         newDsoRules <- create this with config = newConfig
         return DsoRules_SetConfigResult with ..
 
+    choice DsoRules_UpdateSvRewardWeight : DsoRules_UpdateSvRewardWeightResult
+      with
+        svParty : Party
+        newRewardWeight : Int
+      controller dso
+      do
+        require "New reward weight is positive" (newRewardWeight >= 0)
+        case Map.lookup svParty svs of
+          None -> fail "SV party is not registered"
+          Some sv -> do
+            let newSv = sv with svRewardWeight = newRewardWeight
+            let newSvs = Map.insert svParty newSv svs
+            newDsoRules <- create this with svs = newSvs
+            return DsoRules_UpdateSvRewardWeightResult with ..
+
+
 
     -- App rights management
     ------------------------
@@ -840,15 +857,20 @@ template DsoRules with
       with
         sponsor : Party
         validator : Party
+        version : Optional Text
+        contactPoint : Optional Text
       controller sponsor
       do
         require "Sponsor is an SV" (sponsor `Map.member` svs)
         -- create license that records in particular which SV sponsored the onboarding of the validator
+        now <- getTime
         validatorLicense <- create ValidatorLicense with
           dso
           sponsor
           validator
           faucetState = None
+          metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
+          lastActiveAt = Some now
         return DsoRules_OnboardValidatorResult with ..
 
 
@@ -1191,6 +1213,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_UpdateSvRewardWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. ->
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
