@@ -94,10 +94,8 @@ class TopupMemberTrafficTrigger(
         )
     } yield {
       if (
-        // we do not even submit the topup tx if the validator does not have sufficient funds because we know
-        // the tx would fail but it would still drain synchronizer traffic which we would like to avoid (see #11915).
-        hasSufficientFunds &&
         shouldTopup(
+          hasSufficientFunds,
           currentTrafficState,
           topupState,
           topupParameters,
@@ -166,26 +164,38 @@ class TopupMemberTrafficTrigger(
   }
 
   private def shouldTopup(
+      hasSufficientFunds: Boolean,
       currentTrafficState: MemberTrafficStatus,
       topupState: Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState],
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Boolean = {
-    val currentExtraTrafficRemainder = currentTrafficState.trafficState.extraTrafficRemainder.value
-    val currentTime = clock.now
-    val tooSoon =
-      topupState.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis > currentTime.toEpochMilli
-    if (tooSoon) {
-      logger.trace(
-        s"Trying to top-up too soon after previous top-up (last purchased at = ${topupState.payload.lastPurchasedAt}, current time = $currentTime)"
-      )
-      false
-    } else if (currentExtraTrafficRemainder >= topupParameters.topupAmount) {
-      logger.trace(
-        s"Sufficient traffic balance remains (current traffic balance = $currentExtraTrafficRemainder, topup amount = ${topupParameters.topupAmount})"
+    // we do not even submit the topup tx if the validator does not have sufficient funds because we know
+    // the tx would fail but it would still drain synchronizer traffic which we would like to avoid (see #11915).
+    if (!hasSufficientFunds) {
+      logger.warn(
+        s"Insufficient funds to buy configured traffic amount. Please ensure that the validator's wallet has enough amulets to purchase " +
+          s"${BigDecimal(topupParameters.topupAmount) / 1e6} MB of traffic to continue healthy operation."
       )
       false
     } else {
-      true
+      val currentExtraTrafficRemainder =
+        currentTrafficState.trafficState.extraTrafficRemainder.value
+      val currentTime = clock.now
+      val tooSoon =
+        topupState.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis > currentTime.toEpochMilli
+      if (tooSoon) {
+        logger.trace(
+          s"Trying to top-up too soon after previous top-up (last purchased at = ${topupState.payload.lastPurchasedAt}, current time = $currentTime)"
+        )
+        false
+      } else if (currentExtraTrafficRemainder >= topupParameters.topupAmount) {
+        logger.trace(
+          s"Sufficient traffic balance remains (current traffic balance = $currentExtraTrafficRemainder, topup amount = ${topupParameters.topupAmount})"
+        )
+        false
+      } else {
+        true
+      }
     }
   }
 

@@ -133,7 +133,7 @@ abstract class TaskbasedTrigger[T: Pretty](
               MetricsContext.withExtraMetricLabels(("outcome", "expected_failure")) { m =>
                 metrics.completed.mark()(m)
               }
-              logger.info(
+              logger.warn(
                 show"Skipping processing of \n$task\ndue to expected non-retryable failure",
                 ex,
               )
