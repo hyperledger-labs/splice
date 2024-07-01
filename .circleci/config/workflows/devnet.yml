@@ -7,7 +7,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: 2
@@ -27,7 +27,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -36,7 +36,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -55,7 +55,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -64,7 +64,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -83,7 +83,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -92,7 +92,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - canton-network-vpn
@@ -112,7 +112,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - slack-context
@@ -121,7 +121,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           context:
             - artifactory
             - canton-network-vpn
@@ -140,7 +140,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/devnet
+                - release-line-0.1.13
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: 2

@@ -158,7 +158,7 @@ In this example, this would be LCV, GSF,SBI and Orb-1  (the following also curre
 permissions, which only the CN engineering team has).
 
 ```
-moritz@moritz-p5570 ~/c/c/c/d/devnet (deployment/devnet)> cncluster list_sv_cometbft_addresses sv-1
+moritz@moritz-p5570 ~/c/c/c/d/devnet > cncluster list_sv_cometbft_addresses sv-1
 warning: Found legacy stack files in state store:
   - sv-runbook.test
 Please run 'pulumi state upgrade' to migrate them to the new format.

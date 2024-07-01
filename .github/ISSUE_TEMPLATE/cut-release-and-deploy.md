@@ -34,10 +34,10 @@ assignees: ''
 - [ ] Trigger a CircleCI pipeline on the release branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER`. Review the output
       together with someone else to see that there are no unexpected changes.
       Pay particular attention to deleted or newly created resources.
-- [ ] Make a PR against main that changes the `CN_DEPLOYMENT_FLUX_REF` variable in the respective `.envrc.vars` to the new release branch.
+- [ ] Make a PR against main that changes the `CN_DEPLOYMENT_FLUX_REF` variable in the respective `.envrc.vars` to the new release branch, changes
+      the branch references in `.circleci/configs/*.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
 - [ ] Trigger a CircleCI pipeline on this PR branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER` and review the changes to the `deployment` stack.
 - [ ] After merging to main, trigger a CircleCI pipeline on main with `run-job: update-deployment`. This makes the operator track the release branch.
-- [ ] force push the temp branch we're on to `deployment/devnet` (**while pairing with someone!** note that you might need someone to change the branch config so you can do this; try asking Martin, Itai, Moritz, or Nicu)
 - [ ] wait for [the operator](cluster/README.md#the-operator) to apply your changes
       A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful
       and on the right commit.
