@@ -45,7 +45,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
             actionType={actionType}
             actionName={dsoAction.tag}
             valuesMap={{
-              Member: <PartyId partyId={dsoAction.value.sv} />,
+              Member: <PartyId id="srarc_offboardsv-member" partyId={dsoAction.value.sv} />,
             }}
           />
         );
@@ -79,6 +79,24 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
             actionName={dsoAction.tag}
             valuesMap={{
               NewConfig: <PrettyJsonPrint data={dsoAction.value.newConfig} />,
+            }}
+          />
+        );
+      }
+      case 'SRARC_UpdateSvRewardWeight': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={dsoAction.tag}
+            valuesMap={{
+              Member: (
+                <PartyId id="srarc_updatesvrewardweight-member" partyId={dsoAction.value.svParty} />
+              ),
+              NewWeight: (
+                <Typography id="srarc_updatesvrewardweight-weight">
+                  {dsoAction.value.newRewardWeight}
+                </Typography>
+              ),
             }}
           />
         );
@@ -174,7 +192,7 @@ const ActionValueTable: React.FC<{
                   <TableCell>
                     <Typography variant="h6">{key}</Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell id={`${key}-value`}>
                     {typeof valuesMap[key] == 'boolean'
                       ? valuesMap[key].toString()
                       : valuesMap[key]}

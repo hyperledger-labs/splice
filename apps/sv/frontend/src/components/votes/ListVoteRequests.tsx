@@ -160,6 +160,9 @@ const ListVoteRequests: React.FC = () => {
         case 'SRARC_SetConfig': {
           return `${dsoRulesAction.tag}`;
         }
+        case 'SRARC_UpdateSvRewardWeight': {
+          return `${dsoRulesAction.tag}`;
+        }
       }
     } else if (action.tag === 'ARC_AmuletRules') {
       const amuletRulesAction = action.value.amuletRulesAction;

@@ -19,7 +19,7 @@ import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
-import com.daml.network.codegen.java.splice.wallet.payment.Unit
+import com.daml.network.codegen.java.splice.wallet.payment.Unit as DamlUnit
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 
 import java.util.Optional
@@ -245,7 +245,12 @@ class SvFrontendIntegrationTest
           val rows = findAll(className("amulet-price-table-row")).toSeq
           rows should have size 3
           forEvery(
-            Table(("backend", "other value row"), (sv2Backend, 0), (sv3Backend, 1), (sv4Backend, 2))
+            Table(
+              ("backend", "other value row"),
+              (sv2Backend, 0),
+              (sv3Backend, 1),
+              (sv4Backend, 2),
+            )
           ) { (backend, otherValueRow) =>
             svAmuletPriceShouldMatch(
               rows,
@@ -343,7 +348,11 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
+    def testCreateAndVoteDsoRulesAction(action: String)(
+        fillUpForm: WebDriverType => Unit
+    )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
+        env: CNNodeTestConsoleEnvironment
+    ) = {
       val requestReasonUrl = "This is a request reason url."
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
@@ -364,10 +373,9 @@ class SvFrontendIntegrationTest
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_OffboardSv")
+              dropDownAction.selectByValue(action)
 
-              val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-              dropDownMember.selectByIndex(3)
+              fillUpForm(webDriver)
 
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
@@ -390,7 +398,7 @@ class SvFrontendIntegrationTest
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 (
                   rows.head.text,
@@ -403,8 +411,6 @@ class SvFrontendIntegrationTest
       }
 
       withFrontEnd("sv2") { implicit webDriver =>
-        val previousVoteRequestsActionNeeded = getVoteRequestsActionNeededSize()
-
         val (_, reviewButton) = actAndCheck(
           "sv2 operator can login and browse to the governance tab", {
             go to s"http://localhost:$sv2UIPort/votes"
@@ -417,8 +423,7 @@ class SvFrontendIntegrationTest
 
             val tbody = find(id("sv-voting-action-needed-table-body"))
             inside(tbody) { case Some(tb) =>
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe previousVoteRequestsActionNeeded + 1
+              val rows = getAllVoteRows("sv-voting-action-needed-table-body")
 
               rows.head.text should matchText(
                 createdVoteRequestAction
@@ -445,8 +450,9 @@ class SvFrontendIntegrationTest
               element.text should matchText("ARC_DsoRules")
             }
             inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-              element.text should matchText("SRARC_OffboardSv")
+              element.text should matchText(action)
             }
+            validateRequestedActionInModal(webDriver)
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
               seleniumText(element) should matchText(
                 getSvName(1)
@@ -503,12 +509,9 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can see the vote request detail by clicking review button", {
-            val tbody = find(id("sv-voting-in-progress-table-body"))
-            inside(tbody) { case Some(tb) =>
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              val reviewButton = rows.head
-              reviewButton.underlying.click()
-            }
+            val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+            val reviewButton = rows.head
+            reviewButton.underlying.click()
           },
         )(
           "sv1 can see the new vote request detail",
@@ -573,6 +576,38 @@ class SvFrontendIntegrationTest
       }
     }
 
+    "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      testCreateAndVoteDsoRulesAction("SRARC_OffboardSv") { webDriver =>
+        val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+        dropDownMember.selectByValue(sv3PartyId)
+      } { implicit webDriver =>
+        find(id("srarc_offboardsv-member"))
+          .flatMap(_.findChildElement(tagName("input")))
+          .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
+      }
+    }
+
+    "can create a valid SRARC_UpdateSvRewardWeight vote request and cast vote on it" in {
+      implicit env =>
+        val newWeight = "1234"
+        val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+        testCreateAndVoteDsoRulesAction("SRARC_UpdateSvRewardWeight") { webDriver =>
+          val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+          dropDownMember.selectByValue(sv3PartyId)
+
+          val weightInput = webDriver.findElement(By.id("reward-weight"))
+
+          weightInput.clear()
+          weightInput.sendKeys(newWeight)
+        } { implicit webDriver =>
+          find(id("srarc_updatesvrewardweight-member"))
+            .flatMap(_.findChildElement(tagName("input")))
+            .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
+          find(id("srarc_updatesvrewardweight-weight")).map(_.text) should be(Some(newWeight))
+        }
+    }
+
     "can create valid SRARC_GrantFeaturedAppRight and SRARC_RevokeFeaturedAppRight vote requests" in {
       implicit env =>
         val requestProviderParty = "TestProviderParty"
@@ -622,7 +657,7 @@ class SvFrontendIntegrationTest
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 (
                   rows.head.text,
@@ -634,12 +669,9 @@ class SvFrontendIntegrationTest
 
           val (_, rightCid) = actAndCheck(
             "sv1 operator can see the vote request detail by clicking review button", {
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                val reviewButton = rows.head
-                reviewButton.underlying.click()
-              }
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
             },
           )(
             "sv1 can see the new vote request detail",
@@ -680,11 +712,8 @@ class SvFrontendIntegrationTest
             _ => {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe previousVoteRequestsInProgress + 2
-              }
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+              rows.size shouldBe previousVoteRequestsInProgress + 2
             },
           )
         }
@@ -738,13 +767,9 @@ class SvFrontendIntegrationTest
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
             click on "tab-panel-in-progress"
-            val tbody = find(id("sv-voting-in-progress-table-body"))
-            val reviewButton = inside(tbody) { case Some(tb) =>
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-            }
-            reviewButton
+            val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+            rows.size shouldBe previousVoteRequestsInProgress + 1
+            rows.head
           }
 
           actAndCheck(
@@ -803,16 +828,12 @@ class SvFrontendIntegrationTest
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
             eventually(120.seconds) {
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
             click on "tab-panel-rejected"
             eventually() {
-              val tbody = find(id("sv-vote-results-rejected-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
               rows.size shouldBe 2
             }
           }
@@ -872,9 +893,7 @@ class SvFrontendIntegrationTest
             _ => {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 1
               rows.head.text shouldBe "CRARC_AddFutureAmuletConfigSchedule"
 
@@ -978,9 +997,7 @@ class SvFrontendIntegrationTest
                 scala.util.Try(click on "vote-request-modal-close-button")
                 click on "tab-panel-in-progress"
 
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 rows.head.text shouldBe "CRARC_AddFutureAmuletConfigSchedule"
 
@@ -995,7 +1012,7 @@ class SvFrontendIntegrationTest
                 inside(find(id("pretty-json"))) { case Some(json) =>
                   val amuletConfig =
                     AmuletConfig
-                      .jsonDecoder(Unit.jsonDecoder())
+                      .jsonDecoder(DamlUnit.jsonDecoder())
                       .decode(new JsonLfReader(json.text))
                   BigDecimal(amuletConfig.transferConfig.createFee.fee) should be(
                     BigDecimal(requestNewTransferConfigFeeValue)
@@ -1055,9 +1072,7 @@ class SvFrontendIntegrationTest
             clue("the vote request is marked as planned") {
               eventually() {
                 click on "tab-panel-planned"
-                val tbody = find(id("sv-vote-results-planned-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-vote-results-planned-table-body")
                 rows.size shouldBe 1
               }
             }
@@ -1096,9 +1111,7 @@ class SvFrontendIntegrationTest
             eventually() {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
               sv1ScanBackend
                 .getAmuletRules()
@@ -1140,9 +1153,7 @@ class SvFrontendIntegrationTest
               _ => {
                 click on "tab-panel-in-progress"
 
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 rows.head.text shouldBe "CRARC_UpdateFutureAmuletConfigSchedule"
 
@@ -1197,9 +1208,7 @@ class SvFrontendIntegrationTest
             eventually() {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
               sv1ScanBackend
                 .getAmuletRules()
@@ -1237,9 +1246,7 @@ class SvFrontendIntegrationTest
               _ => {
                 click on "tab-panel-in-progress"
 
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 rows.head.text shouldBe "CRARC_RemoveFutureAmuletConfigSchedule"
 
@@ -1298,13 +1305,9 @@ class SvFrontendIntegrationTest
               _ => {
                 click on "tab-panel-action-needed"
 
-                val tbodyActionNeeded = find(id("sv-voting-action-needed-table-body"))
-                inside(tbodyActionNeeded) { case Some(tb) =>
-                  val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-
-                  val reviewButton = rows.head
-                  reviewButton.underlying.click()
-                }
+                val rows = getAllVoteRows("sv-voting-action-needed-table-body")
+                val reviewButton = rows.head
+                reviewButton.underlying.click()
               },
             )
 
@@ -1452,9 +1455,7 @@ class SvFrontendIntegrationTest
             "sv1 can see the new vote request",
             _ => {
               click on "tab-panel-in-progress"
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 1
               rows.head.text shouldBe "CRARC_AddFutureAmuletConfigSchedule"
 
@@ -1484,9 +1485,7 @@ class SvFrontendIntegrationTest
             _ => {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 1
               rows.head.text shouldBe "CRARC_AddFutureAmuletConfigSchedule"
 
@@ -1547,6 +1546,24 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
+  }
+
+  def getAllVoteRows(tableBodyId: String)(implicit webDriver: WebDriverType) = {
+    def tableBody = find(id(tableBodyId))
+    inside(tableBody) { case Some(tb) =>
+      val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+      if (rows.size < 5) {
+        rows
+      } else {
+        tb
+          .findChildElement(className("MuiSelect-select"))
+          .valueOrFail("Could not find 'Rows per page' input")
+          .underlying
+          .click()
+        webDriver.findElement(By.xpath("//li[@data-value='25']")).click()
+        tb.findAllChildElements(className("vote-row-action")).toSeq
+      }
+    }
   }
 
   private def svAmuletPriceShouldMatch(

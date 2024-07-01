@@ -41,12 +41,15 @@ import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfig
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
+import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
 
 dayjs.extend(utc);
 
 export type ActionFromForm = ActionRequiringConfirmation | { formError: DecoderError };
 
-function actionFromFormIsError(action: ActionFromForm): action is { formError: DecoderError } {
+export function actionFromFormIsError(
+  action: ActionFromForm
+): action is { formError: DecoderError } {
   return !!(action as { formError: DecoderError }).formError;
 }
 
@@ -110,6 +113,7 @@ const VoteRequest: React.FC = () => {
       name: 'Update DSO App Configuration Schedule',
       value: 'CRARC_UpdateFutureAmuletConfigSchedule',
     },
+    { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
   ];
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
@@ -262,6 +266,9 @@ const VoteRequest: React.FC = () => {
           )}
           {actionName === 'CRARC_UpdateFutureAmuletConfigSchedule' && (
             <UpdateFutureAmuletConfigSchedule chooseAction={chooseAction} />
+          )}
+          {actionName === 'SRARC_UpdateSvRewardWeight' && (
+            <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
           <Typography variant="h5">Proposal</Typography>
 
