@@ -1,8 +1,14 @@
 workflow:
-  deploy_ciperiodic_sv_reonboard:
+  deploy_ciperiodic_non_devnet:
     when:
-      equal: [ deploy-ciperiodic-sv-reonboard, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-ciperiodic-non-devnet, << pipeline.parameters.run-job >> ]
     jobs:
+      - artifacts_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -11,13 +17,6 @@ workflow:
             - slack-context
           workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
-      - artifacts_push:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
       - enable_autoscaler:
           name: "ensure_autoscaler_enabled"
           <<: *main-branch-only
@@ -31,8 +30,23 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           update_deployment_branch: false
+          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
+          force_non_devnet: true
           requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_check:
+          <<: *main-branch-only
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - wait_for_previous_pipeline
             - artifacts_push
       - deploy_sv_runbook:
           <<: *main-branch-only
@@ -41,57 +55,9 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
+          force_non_devnet: true
           requires:
             - deploy_cluster
-      - preflight_check:
-          name: "offboard_sv_runbook"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-offboard-sv-runbook-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - deploy_sv_runbook
-            - preflight_sv_check
-      - deploy_validator_to_recover_sv_amulets:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          validator_party_hint: "DA-Helm-Test-Node"
-          validator_new_participant_id: "new-participant"
-          restore_identity_from_sv_runbook: true
-          cluster: "ciperiodic"
-          requires:
-            - offboard_sv_runbook
-      - deploy_sv_runbook:
-          name: "redeploy_sv_runbook"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciperiodic"
-          requires:
-            - deploy_validator_to_recover_sv_amulets
-      - preflight_check:
-          name: "preflight_sv_reonboard_check"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-re-onboard-sv-runbook-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - redeploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-only
           context:
@@ -99,6 +65,26 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+             - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - deploy_cluster
+      - preflight_validator_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
           requires:
             - deploy_cluster
       - reset_cluster:
@@ -108,4 +94,6 @@ workflow:
           context:
             - canton-network-vpn
           requires:
-            - preflight_sv_reonboard_check
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check

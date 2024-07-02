@@ -30,6 +30,7 @@ parameters:
         deploy-ciupgrade,
         deploy-ciperiodic-migration,
         deploy-ciperiodic-sv-reonboard,
+        deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
         healthcheck-cidaily-testnet,
         healthcheck-cilr,

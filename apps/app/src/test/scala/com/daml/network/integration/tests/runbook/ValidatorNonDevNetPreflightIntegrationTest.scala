@@ -23,10 +23,6 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
   private lazy val validatorWalletUiUrl =
     s"https://wallet.$validatorName.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
-  protected val sv1UserName = s"admin@sv1.com"
-  protected val sv1UserPassword: String = sys.env(s"SV_WEB_UI_PASSWORD")
-  protected val sv1WalletUiUrl = s"https://wallet.sv-2.${sys.env("NETWORK_APPS_ADDRESS")}/"
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition.preflightTopology(

@@ -35,6 +35,7 @@ parameters:
         deploy-ciupgrade,
         deploy-ciperiodic-migration,
         deploy-ciperiodic-sv-reonboard,
+        deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
         healthcheck-cidaily-testnet,
         healthcheck-cilr,
@@ -1552,6 +1553,9 @@ jobs:
       global_domain_migrate_from_id:
         type: integer
         default: -1
+      force_non_devnet:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -1584,12 +1588,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
-                  
+
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
                     cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
                   fi
-                  
+
                   cncluster ci_pdown_sv
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
@@ -1625,6 +1629,11 @@ jobs:
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
+            fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             cncluster activate
             cncluster ci_apply_sv $VERSION
@@ -1671,6 +1680,9 @@ jobs:
       global_domain_migrate_from_id:
         type: integer
         default: -1
+      force_non_devnet:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -1700,12 +1712,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
-                  
+
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
                     cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
                   fi
-            
+
                   cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
@@ -1741,6 +1753,11 @@ jobs:
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
+            fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             cncluster activate
             cncluster ci_apply_validator $VERSION
@@ -1847,6 +1864,9 @@ jobs:
         type: integer
         default: -1
       cancel_workflow_on_failure:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
 
@@ -1960,6 +1980,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
+            fi
 
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
@@ -2052,12 +2077,12 @@ jobs:
               export ENABLE_CLOUD_SQL=false
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
-            
+
               if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                 # silence specific alerts that may fire due to SV downtime
                 cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
               fi
-              
+
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
       - print_gcloud_logs_commands:
@@ -3253,6 +3278,9 @@ jobs:
       extra_env_vars:
         type: string
         default: ""
+      force_non_devnet:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3319,7 +3347,7 @@ jobs:
                   fi
                   cncluster wait sv-1 $validator_app << parameters.migration_id >>
                   cncluster wait validator1 $validator_app << parameters.migration_id >>
-                  if (env-bool IS_DEVNET); then
+                  if (env-bool IS_DEVNET) && [ << parameters.force_non_devnet >> == false ]; then
                     cncluster wait sv-2 $validator_app << parameters.migration_id >>
                     cncluster wait sv-3 $validator_app << parameters.migration_id >>
                     cncluster wait sv-4 $validator_app << parameters.migration_id >>
@@ -3398,6 +3426,9 @@ jobs:
         type: integer
         default: 0
       wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
     machine:
@@ -3500,6 +3531,11 @@ jobs:
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
+                  if [[ << parameters.force_non_devnet >> == true ]]; then
+                    export IS_DEVNET=0
+                    export APPROVE_SV_RUNBOOK=true
+                    export PREAPPROVE_VALIDATOR_RUNBOOK=true
+                  fi
                   cncluster preflight_sv
                 cmd_retry_count: 3
                 # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
@@ -3539,6 +3575,9 @@ jobs:
         type: integer
         default: 0
       wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
     machine:
@@ -3640,6 +3679,11 @@ jobs:
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
+                  if [[ << parameters.force_non_devnet >> == true ]]; then
+                    export IS_DEVNET=0
+                    export APPROVE_SV_RUNBOOK=true
+                    export PREAPPROVE_VALIDATOR_RUNBOOK=true
+                  fi
                   cncluster preflight_validator
                 cmd_retry_count: 3
                 # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
@@ -4841,7 +4885,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - enable_autoscaler:
           name: "ensure_autoscaler_enabled"
@@ -5088,6 +5132,105 @@ workflows:
             - preflight_validator_check_migrated
             - preflight_check_migrated
 
+  deploy_ciperiodic_non_devnet:
+    when:
+      equal: [ deploy-ciperiodic-non-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - artifacts_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          wait_type: "wait_workflow"
+      - enable_autoscaler:
+          name: "ensure_autoscaler_enabled"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_cluster:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          update_deployment_branch: false
+          silence_deployment_alerts: true
+          cancel_workflow_on_failure: true
+          force_non_devnet: true
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_check:
+          <<: *main-branch-only
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - deploy_cluster
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+             - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - deploy_cluster
+      - preflight_validator_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          force_non_devnet: true
+          requires:
+            - deploy_cluster
+      - reset_cluster:
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          is_shared_cluster: false
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check
+
   deploy_ciperiodic_sv_reonboard:
     when:
       equal: [ deploy-ciperiodic-sv-reonboard, << pipeline.parameters.run-job >> ]
@@ -5098,7 +5241,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - artifacts_push:
           <<: *main-branch-only
@@ -5119,8 +5262,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: "ciperiodic"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:

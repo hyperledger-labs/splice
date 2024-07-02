@@ -37,6 +37,9 @@ jobs:
       global_domain_migrate_from_id:
         type: integer
         default: -1
+      force_non_devnet:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -69,12 +72,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
-                  
+
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
                     cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
                   fi
-                  
+
                   cncluster ci_pdown_sv
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
@@ -110,6 +113,11 @@ jobs:
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
+            fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             cncluster activate
             cncluster ci_apply_sv $VERSION
@@ -156,6 +164,9 @@ jobs:
       global_domain_migrate_from_id:
         type: integer
         default: -1
+      force_non_devnet:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -185,12 +196,12 @@ jobs:
                 gce_authenticate: true
                 cmd: |
                   cncluster activate
-                  
+
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
                     cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
                   fi
-            
+
                   cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
@@ -226,6 +237,11 @@ jobs:
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
+            fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             cncluster activate
             cncluster ci_apply_validator $VERSION
@@ -332,6 +348,9 @@ jobs:
         type: integer
         default: -1
       cancel_workflow_on_failure:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
 
@@ -445,6 +464,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
+            if [[ << parameters.force_non_devnet >> == true ]]; then
+              export IS_DEVNET=0
+              export APPROVE_SV_RUNBOOK=true
+              export PREAPPROVE_VALIDATOR_RUNBOOK=true
+            fi
 
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
@@ -537,12 +561,12 @@ jobs:
               export ENABLE_CLOUD_SQL=false
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
-            
+
               if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                 # silence specific alerts that may fire due to SV downtime
                 cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
               fi
-              
+
               cncluster partial_upgrade $(get-snapshot-version) "$images"
             fi
       - print_gcloud_logs_commands:

@@ -33,6 +33,9 @@ jobs:
       extra_env_vars:
         type: string
         default: ""
+      force_non_devnet:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -99,7 +102,7 @@ jobs:
                   fi
                   cncluster wait sv-1 $validator_app << parameters.migration_id >>
                   cncluster wait validator1 $validator_app << parameters.migration_id >>
-                  if (env-bool IS_DEVNET); then
+                  if (env-bool IS_DEVNET) && [ << parameters.force_non_devnet >> == false ]; then
                     cncluster wait sv-2 $validator_app << parameters.migration_id >>
                     cncluster wait sv-3 $validator_app << parameters.migration_id >>
                     cncluster wait sv-4 $validator_app << parameters.migration_id >>
@@ -178,6 +181,9 @@ jobs:
         type: integer
         default: 0
       wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
     machine:
@@ -280,6 +286,11 @@ jobs:
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
+                  if [[ << parameters.force_non_devnet >> == true ]]; then
+                    export IS_DEVNET=0
+                    export APPROVE_SV_RUNBOOK=true
+                    export PREAPPROVE_VALIDATOR_RUNBOOK=true
+                  fi
                   cncluster preflight_sv
                 cmd_retry_count: 3
                 # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
@@ -319,6 +330,9 @@ jobs:
         type: integer
         default: 0
       wait_for_disabled_autoscaler:
+        type: boolean
+        default: false
+      force_non_devnet:
         type: boolean
         default: false
     machine:
@@ -420,6 +434,11 @@ jobs:
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
+                  if [[ << parameters.force_non_devnet >> == true ]]; then
+                    export IS_DEVNET=0
+                    export APPROVE_SV_RUNBOOK=true
+                    export PREAPPROVE_VALIDATOR_RUNBOOK=true
+                  fi
                   cncluster preflight_validator
                 cmd_retry_count: 3
                 # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
