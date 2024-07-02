@@ -60,7 +60,7 @@ class SvReOnboardPreflightIntegrationTest
           userIsLoggedIn()
           val usdText = find(id("wallet-balance-usd")).value.text.trim
           usdText should not be "..."
-          val usd = BigDecimal(usdText.split(" ").head)
+          val usd = parseAmountText(usdText, "USD")
           usd should be >= BigDecimal("100000")
 
           val loggedInUser = seleniumText(find(id("logged-in-user")))
