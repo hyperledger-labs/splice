@@ -10,6 +10,7 @@ import {
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
   COMETBFT_RETAIN_BLOCKS,
+  config,
   ENABLE_COMETBFT_PRUNING,
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
@@ -28,6 +29,9 @@ import {
 } from './alertings';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
+
+export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '500GB';
+export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '800Gi';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -259,7 +263,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             ],
             enableRemoteWriteReceiver: true,
             retention: '1y',
-            retentionSize: '500GB',
+            retentionSize: prometheusRetentionSize,
             resources: {
               requests: {
                 memory: '12Gi',
@@ -273,7 +277,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
-                      storage: '600Gi',
+                      storage: prometheusStorageSize,
                     },
                   },
                 },
