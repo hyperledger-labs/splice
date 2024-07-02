@@ -66,6 +66,7 @@ workflow:
             - deploy_cluster_cidaily_testnet
       - publish_public_release:
           <<: *main-branch-only
+          <<: *notify-fail
           context:
             - artifactory
             - slack-context

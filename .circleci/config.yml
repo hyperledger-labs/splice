@@ -2716,7 +2716,6 @@ jobs:
 
            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
            RELEASE_TAG=$(get-snapshot-version)
-           git fetch origin
            if [ $(git tag -l "${RELEASE_TAG}") ]; then
              echo "tag ${RELEASE_TAG} already exists. not tagging"
            else
@@ -4179,6 +4178,7 @@ workflows:
             - deploy_cluster_cidaily_testnet
       - publish_public_release:
           <<: *main-branch-only
+          <<: *notify-fail
           context:
             - artifactory
             - slack-context
