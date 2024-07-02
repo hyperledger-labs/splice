@@ -53,7 +53,7 @@ if [ "${CI-}" ==  true ]; then
   git remote set-url origin "https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git"
 fi
 
-git fetch origin
+git fetch origin --recurse-submodules=no
 git_commit=$(git rev-parse --verify "${git_revision}")
 echo "updating deployment branch for cluster ${cluster_name} to ${git_commit}"
 remote_branch_name="deployment/${cluster_name}"
