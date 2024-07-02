@@ -84,4 +84,7 @@ INVALID_ARGUMENT.*SequencerTimeoutError
 # TODO (#12813): find a way to remove this
 Encountered 4 consecutive transient failures \(polling interval .*
 
+# TODO (#13236): check if we can avoid such errors (they seem to happen when some HTTP API calls race with shutdowns)
+unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetrics
+
 # Make sure to have a trailing newline
