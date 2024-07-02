@@ -1384,29 +1384,33 @@ class WalletTxLogIntegrationTest
             _ => aliceWalletClient.listSubscriptions() shouldBe empty,
           )
 
-          val entries = aliceWalletClient.listTransactions(None, 100)
-          val notifications = entries.dropRight(3)
-          forExactly(notifications.size - 1, notifications) {
-            case logEntry: NotificationTxLogEntry =>
-              logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed.toProto
-              logEntry.details should startWith("ITR_InsufficientFunds")
-            case e => fail(s"Unexpected log entry $e")
-          }
-          forExactly(1, notifications) {
-            case logEntry: NotificationTxLogEntry =>
-              logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionExpired.toProto
-              logEntry.details should startWith("Expired")
-            case e => fail(s"Unexpected log entry $e")
-          }
+          eventually() {
+            inside(aliceWalletClient.listTransactions(None, 100)) {
+              case notifications :+ subscriptionPaymentCollected :+ subscriptionPaymentAccepted :+ balanceChange =>
+                forExactly(1, notifications) {
+                  case logEntry: NotificationTxLogEntry =>
+                    logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionExpired.toProto
+                    logEntry.details should startWith("Expired")
+                  case e => fail(s"Unexpected log entry $e")
+                }
+                // guaranteed to have at least 1
+                forExactly(notifications.size - 1, notifications) {
+                  case logEntry: NotificationTxLogEntry =>
+                    logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed.toProto
+                    logEntry.details should startWith("ITR_InsufficientFunds")
+                  case e => fail(s"Unexpected log entry $e")
+                }
 
-          inside(entries.takeRight(3)(0)) { case logEntry: TransferTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected.toProto
-          }
-          inside(entries.takeRight(3)(1)) { case logEntry: TransferTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentAccepted.toProto
-          }
-          inside(entries.takeRight(3)(2)) { case logEntry: BalanceChangeTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+                inside(subscriptionPaymentCollected) { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected.toProto
+                }
+                inside(subscriptionPaymentAccepted) { case logEntry: TransferTxLogEntry =>
+                  logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentAccepted.toProto
+                }
+                inside(balanceChange) { case logEntry: BalanceChangeTxLogEntry =>
+                  logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+                }
+            }
           }
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
