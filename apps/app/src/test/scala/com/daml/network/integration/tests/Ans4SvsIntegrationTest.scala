@@ -34,15 +34,16 @@ class Ans4SvsIntegrationTest
       val leaderTerminatedSubscriptionTrigger =
         sv1Backend.leaderBasedAutomation.trigger[TerminatedSubscriptionTrigger]
 
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-
       setTriggersWithin[Assertion](
         // TODO(#13199): Consider adding a retry to the submission below instead
+        // ...and figuring out how to make the `onboardUser` part of `onboardWalletUser` not time out
+        // in the even of an untimely domain disconnect
         triggersToPauseAtStart = Seq(
           aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
         ),
         triggersToResumeAtStart = Seq(),
       ) {
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
         val ansRules = sv1ScanBackend.getAnsRules()
 
