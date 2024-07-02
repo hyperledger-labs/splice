@@ -6,8 +6,8 @@ fi
 
 sha=$(git rev-parse HEAD)
 
-# Always use the release version on release branches. This mainly matters for the ciupgrade tests.
-branch=${CIRCLE_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
+# Always use the release version on release branches. This only matters for the ciupgrade tests.
+branch=$(git rev-parse --abbrev-ref HEAD)
 if [[ $branch == release-line-* && -z ${OVERRIDE_VERSION-} ]]; then
     OVERRIDE_VERSION="${branch#release-line-}"
 fi
