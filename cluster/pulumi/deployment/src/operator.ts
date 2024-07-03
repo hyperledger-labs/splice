@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { config } from 'cn-pulumi-common';
+import { config, infraAffinityAndTolerations } from 'cn-pulumi-common';
 
 import { namespace } from './namespace';
 import { Version } from './version';
@@ -91,5 +91,6 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         },
       },
     ],
+    ...infraAffinityAndTolerations,
   },
 });

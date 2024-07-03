@@ -546,6 +546,22 @@
       "name": "pulumi-kubernetes-operator",
       "namespace": "operator",
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
         "controller": {
           "args": [
             "--zap-level=debug",
@@ -619,7 +635,14 @@
             "annotations": {},
             "type": "ClusterIP"
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "0.7.3"
     },
