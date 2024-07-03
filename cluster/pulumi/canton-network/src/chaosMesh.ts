@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
-import { GCP_PROJECT } from 'cn-pulumi-common';
+import { GCP_PROJECT, infraAffinityAndTolerations } from 'cn-pulumi-common';
 
 export type ChaosMeshArguments = {
   dependsOn: Resource[];
@@ -162,6 +162,21 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
           leaderElection: {
             enabled: false,
           },
+          ...infraAffinityAndTolerations,
+        },
+        chaosDaemon: {
+          ...infraAffinityAndTolerations,
+        },
+        dashboard: {
+          ...infraAffinityAndTolerations,
+        },
+        dnsServer: {
+          // Unfortunatly, in the latest release (2.6.3) of chaos-mesh helm charts, affinity for dns-server is not supported
+          // (support was added in https://github.com/chaos-mesh/chaos-mesh/commit/ee642585de38e1fa9b4e99787437498f16029eea, but not included in v2.6.3)
+          // This means that the dns server pod may get scheduled to the default pool if it exists, but its
+          // tolerance would also allow it to be scheduled to the infra pool, and k8s will prefer to do that
+          // rather than scale up the default pool from 0, so we just accept that for now.
+          ...infraAffinityAndTolerations,
         },
       },
     },
