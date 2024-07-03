@@ -87,4 +87,7 @@ Encountered 4 consecutive transient failures \(polling interval .*
 # TODO (#13236): check if we can avoid such errors (they seem to happen when some HTTP API calls race with shutdowns)
 unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetrics
 
+# TODO (#13145): investigate what task is it still running and see if we can somehow fix it
+Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
+
 # Make sure to have a trailing newline
