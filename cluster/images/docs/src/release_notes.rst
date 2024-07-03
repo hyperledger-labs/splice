@@ -16,6 +16,23 @@ Upcoming
 
   * Fix an issue in the validator and SV helm charts where setting ``contactPoint`` to an empty string produced an error.
 
+* Daml
+
+  * Add a choice that allows pruning configs from the AmuletRules ``futureValues`` after the time has been reached to reduce the size of the config
+    and reduce differences between the config schedule on different networks.
+
+  * The Daml changes in this release require a governance vote to upgrade the package configs to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.3
+    amuletNameService  0.1.3
+    dsoGovernance      0.1.5
+    validatorLifecycle 0.1.0
+    wallet             0.1.3
+    walletPayments     0.1.3
+    ================== =======
 
 0.1.13
 ------
