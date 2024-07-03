@@ -521,11 +521,12 @@ object DamlPlugin extends AutoPlugin {
         s"Codegen asked to generate code from nonexistent file: $darFile"
       )
 
+    // TODO(#13274) Switch back to upstream java codegen once it supports upgrading.
     val codegenJarPath =
       ensureArtifactAvailable(
         url =
-          s"https://repo.maven.apache.org/maven2/com/daml/codegen-jvm-main/${damlJavaCodegenVersion}/",
-        artifactFilename = s"codegen-jvm-main-${damlJavaCodegenVersion}.jar",
+          s"https://github.com/digital-asset/decentralized-canton-sync/releases/download/java-codegen/",
+        artifactFilename = s"java_codegen_binary_723cb16dc0450edb4cb52f833948d43f8124f3c6.jar",
         damlVersion = damlJavaCodegenVersion,
         log = log,
       ).getAbsolutePath

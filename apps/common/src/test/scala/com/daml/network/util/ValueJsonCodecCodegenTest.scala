@@ -1,13 +1,17 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data as JavaApi
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   round as roundCodegen,
   types as typesCodegen,
+  validatorlicense as validatorlicenseCodegen,
 }
 import com.daml.network.store.{StoreErrors, StoreTest}
+
+import java.util.Optional
 
 class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
 
@@ -29,6 +33,43 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         .value
 
       decoded shouldEqual original
+    }
+
+    "handles optional fields in contract payloads" in {
+      // without optional field set
+      val decodedOptionalNotSet: JavaApi.DamlRecord = ValueJsonCodecCodegen
+        .deserializableContractPayload(
+          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID,
+          """{"validator": "validator", "sponsor": "sponsor", "dso": "dso"}""",
+        )
+        .value
+      validatorlicenseCodegen.ValidatorLicense
+        .valueDecoder()
+        .decode(decodedOptionalNotSet) shouldBe new validatorlicenseCodegen.ValidatorLicense(
+        "validator",
+        "sponsor",
+        "dso",
+        Optional.empty(),
+        Optional.empty(),
+        Optional.empty(),
+      )
+      // with (one) optional field set
+      val decodedOptionalSet: JavaApi.DamlRecord = ValueJsonCodecCodegen
+        .deserializableContractPayload(
+          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID,
+          s"""{"validator": "validator", "sponsor": "sponsor", "dso": "dso", "lastActiveAt": "${Timestamp.Epoch.toString}"}""",
+        )
+        .value
+      validatorlicenseCodegen.ValidatorLicense
+        .valueDecoder()
+        .decode(decodedOptionalSet) shouldBe new validatorlicenseCodegen.ValidatorLicense(
+        "validator",
+        "sponsor",
+        "dso",
+        Optional.empty(),
+        Optional.empty(),
+        Optional.of(java.time.Instant.EPOCH),
+      )
     }
 
     "convert between choice arguments/results and JSON values" in {
