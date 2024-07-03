@@ -367,8 +367,7 @@ lazy val `apps-common` =
         ),
         BuildInfoKey(
           "compatibleVersion",
-          BuildUtil
-            .runCommandOptionalLog(Seq("./build-tools/get-snapshot-version", "latest_release")),
+          better.files.File("LATEST_RELEASE").contentAsString.strip,
         ),
       ),
       buildInfoPackage := "com.daml.network.environment",
