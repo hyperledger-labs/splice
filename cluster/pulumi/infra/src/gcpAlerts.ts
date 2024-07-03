@@ -30,7 +30,7 @@ export function installGcpLoggingAlerts(): void {
 resource.type="k8s_container"
 resource.labels.cluster_name="${CLUSTER_NAME}"
 resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
--(resource.labels.container_name="participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
 -- https://github.com/DACH-NY/canton-network-node/issues/10475
 -(resource.labels.container_name="cometbft" AND jsonPayload.err="error adding vote")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopping peer for error")
