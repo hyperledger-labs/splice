@@ -9,7 +9,3 @@
 --home /cometbft \
 --log_level="{{- if $values.extraLogLevelFlags }}{{- $values.extraLogLevelFlags }},{{- end }}pex:debug,CantonNetworkApplication:{{- $values.logLevel }},*:info" \
 {{- end }}
-
-{{- define "isTestNet" -}}
-{{- mustRegexMatch "^(test|cidaily-testnet)$" .Values.genesis.chainId -}}
-{{- end }}

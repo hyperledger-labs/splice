@@ -59,16 +59,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
-              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              fi
-            fi
-
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)

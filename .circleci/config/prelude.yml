@@ -32,7 +32,6 @@ parameters:
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
-        healthcheck-cidaily-testnet,
         healthcheck-cilr,
         healthcheck-devnet,
         healthcheck-testnet,
@@ -45,9 +44,7 @@ parameters:
         healthcheck-validator-runbook-devnet,
         backup-cidaily,
         restore-sv-cidaily,
-        backup-cidaily-testnet,
         restore-validator-cidaily,
-        restore-validator-cidaily-testnet,
         backup-devnet,
         backup-testnet,
         backup-mainnet,
@@ -59,11 +56,6 @@ parameters:
         preview-changes
       ]
     default: build
-  # Overwrite the bootstrapping config for a cluster. If not set,
-  # the cluster will be bootstrapped from the preceeding version of the cluster.
-  bootstrapping-config:
-    type: string
-    default: ""
   # Whether the cluster should be reset before deploying.
   # It only makes sense to unset this if you are planning to use CI to fix a broken deployment.
   reset-before-deploy:
@@ -125,7 +117,6 @@ cluster-parameter: &cluster-parameter
       [
         "cimain",
         "cidaily",
-        "cidaily-testnet",
         "cilr",
         "ciperiodic",
         "ciupgrade",

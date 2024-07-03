@@ -37,7 +37,6 @@ parameters:
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
-        healthcheck-cidaily-testnet,
         healthcheck-cilr,
         healthcheck-devnet,
         healthcheck-testnet,
@@ -50,9 +49,7 @@ parameters:
         healthcheck-validator-runbook-devnet,
         backup-cidaily,
         restore-sv-cidaily,
-        backup-cidaily-testnet,
         restore-validator-cidaily,
-        restore-validator-cidaily-testnet,
         backup-devnet,
         backup-testnet,
         backup-mainnet,
@@ -64,11 +61,6 @@ parameters:
         preview-changes
       ]
     default: build
-  # Overwrite the bootstrapping config for a cluster. If not set,
-  # the cluster will be bootstrapped from the preceeding version of the cluster.
-  bootstrapping-config:
-    type: string
-    default: ""
   # Whether the cluster should be reset before deploying.
   # It only makes sense to unset this if you are planning to use CI to fix a broken deployment.
   reset-before-deploy:
@@ -130,7 +122,6 @@ cluster-parameter: &cluster-parameter
       [
         "cimain",
         "cidaily",
-        "cidaily-testnet",
         "cilr",
         "ciperiodic",
         "ciupgrade",
@@ -1532,9 +1523,6 @@ jobs:
       deploy_version:
         type: string
         default: ""
-      restore_cluster:
-        type: boolean
-        default: false
       reset_cluster:
         type: boolean
         default: true
@@ -1601,15 +1589,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
-              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              fi
-            fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
@@ -1725,15 +1704,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
-              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              fi
-            fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
@@ -1950,15 +1920,6 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
-              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              fi
-            fi
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
             # TODO (#11584): remove this once there's a new base version.
@@ -3924,16 +3885,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
-              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              fi
-            fi
-
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -4155,7 +4106,7 @@ workflows:
             - slack-context
           channel_notify: C03J6NCPSE4
 
-  deploy_cidaily_and_cidaily_testnet:
+  deploy_cidaily:
     when:
       equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
     jobs:
@@ -4171,7 +4122,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check cidaily_testnet_health_check redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily backup_cidaily_testnet restore_validator_cidaily_testnet"
+          workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily"
       - deploy_cluster:
           name: deploy_cluster_cidaily
           <<: *main-branch-only
@@ -4183,19 +4134,7 @@ workflows:
           requires:
             - artifacts_push
             - wait_for_previous_pipeline
-      - deploy_cluster:
-          name: deploy_cluster_cidaily_testnet
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cidaily-testnet"
-          silence_deployment_alerts: true
-          requires:
-            - artifacts_push
-            - wait_for_previous_pipeline
       - preflight_check:
-          name: preflight_check_devnet
           cluster: "cidaily"
           <<: *main-branch-only
           context:
@@ -4207,19 +4146,6 @@ workflows:
           requires:
             - artifacts_push
             - deploy_cluster_cidaily
-      - preflight_check:
-          name: preflight_check_testnet
-          cluster: "cidaily-testnet"
-          <<: *non_devnet_preflight_params
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          # require deploy_cluster and deploy_sv_runbook for stability and reliability
-          requires:
-            - artifacts_push
-            - deploy_cluster_cidaily_testnet
       - publish_public_release:
           <<: *main-branch-only
           <<: *notify-fail
@@ -4227,10 +4153,8 @@ workflows:
             - artifactory
             - slack-context
           requires:
-            - preflight_check_devnet
-            - preflight_check_testnet
+            - preflight_check
       - deploy_sv_runbook:
-          name: deploy_sv_runbook_devnet
           <<: *main-branch-only
           context:
             - artifactory
@@ -4241,18 +4165,7 @@ workflows:
           requires:
             - deploy_cluster_cidaily
             - publish_public_release
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_testnet
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cidaily-testnet"
-          requires:
-            - deploy_cluster_cidaily_testnet
       - deploy_validator_runbook:
-          name: deploy_validator_runbook_devnet
           <<: *main-branch-only
           context:
             - artifactory
@@ -4262,19 +4175,7 @@ workflows:
           requires:
             - deploy_cluster_cidaily
             - publish_public_release
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_testnet
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cidaily-testnet"
-          use_published_artifacts: true
-          requires:
-            - deploy_cluster_cidaily_testnet
-            - publish_public_release
       - preflight_sv_check:
-          name: preflight_sv_check_devnet
           <<: *main-branch-only
           context:
             - artifactory
@@ -4282,19 +4183,8 @@ workflows:
             - slack-context
           cluster: "cidaily"
           requires:
-            - deploy_sv_runbook_devnet
-      - preflight_sv_check:
-          name: preflight_sv_check_testnet
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cidaily-testnet"
-          requires:
-            - deploy_sv_runbook_testnet
+            - deploy_sv_runbook
       - preflight_validator_check:
-          name: preflight_validator_check_devnet
           <<: *main-branch-only
           context:
             - artifactory
@@ -4302,7 +4192,7 @@ workflows:
             - slack-context
           cluster: "cidaily"
           requires:
-            - deploy_validator_runbook_devnet
+            - deploy_validator_runbook
       - backup_cluster:
           name: backup_cidaily
           <<: *main-branch-only
@@ -4313,16 +4203,6 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_cidaily
-      - backup_cluster:
-          name: backup_cidaily_testnet
-          <<: *main-branch-only
-          cluster: "cidaily-testnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_cidaily_testnet
 
   cidaily_health_check:
     when:
@@ -4350,7 +4230,7 @@ workflows:
             - slack-context
           # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
           # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+          workflow_names: "deploy_cidaily"
       - cancel_if_previous_pipeline:
           name: skip_during_catchup
           <<: *notify-fail
@@ -4381,48 +4261,6 @@ workflows:
             - cancel_if_previous_pipeline
             - skip_during_catchup
 
-  cidaily_testnet_health_check:
-    when:
-      equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          context:
-            - artifactory
-            - slack-context
-          # Only wait for backup-recovery, concurrent preflight checks are fine.
-          workflow_names: "restore_validator_cidaily_testnet"
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          context:
-            - artifactory
-            - slack-context
-          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
-          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
-      - preflight_check:
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          cluster: "cidaily-testnet"
-          <<: *non_devnet_preflight_params
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-            - cancel_if_previous_pipeline
-
   redeploy_sv_runbook_cidaily:
     when:
       equal: [ redeploy-sv-runbook-cidaily, << pipeline.parameters.run-job >> ]
@@ -4436,7 +4274,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily cidaily_health_check restore_sv_cidaily restore_validator_cidaily"
+          workflow_names: "deploy_cidaily redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily cidaily_health_check restore_sv_cidaily restore_validator_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -4448,7 +4286,7 @@ workflows:
             - slack-context
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+          workflow_names: "deploy_cidaily"
       - artifacts_push:
           <<: *notify-fail
           context:
@@ -4495,7 +4333,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_validator_runbook_cidaily cidaily_health_check restore_sv_cidaily restore_validator_cidaily"
+          workflow_names: "redeploy_validator_runbook_cidaily cidaily_health_check restore_sv_cidaily restore_validator_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -4507,7 +4345,7 @@ workflows:
             - slack-context
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+          workflow_names: "deploy_cidaily"
       - artifacts_push:
           <<: *notify-fail
           context:
@@ -4553,7 +4391,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+          workflow_names: "deploy_cidaily"
       - backup_cluster:
           filters:
             branches:
@@ -4580,7 +4418,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check redeploy_sv_runbook_cidaily "
+          workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily "
       - restore_node:
           filters:
             branches:
@@ -4609,69 +4447,13 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check redeploy_validator_runbook_cidaily"
+          workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily"
       - restore_node:
           filters:
             branches:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
-          namespace_name: "validator1"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-
-  backup_cidaily_testnet:
-    when:
-      equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet"
-      - backup_cluster:
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          cluster: "cidaily-testnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-
-  # on cidaily-testnet we have only one SV, so restoring validator1 instead
-  restore_validator_cidaily_testnet:
-    when:
-      equal: [ restore-validator-cidaily-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_testnet_health_check"
-      - restore_node:
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
-          cluster: "cidaily-testnet"
           namespace_name: "validator1"
           context:
             - artifactory

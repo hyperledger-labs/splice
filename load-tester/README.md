@@ -45,7 +45,6 @@ The load test is used to generate continuous load against a Canton Network clust
 Eventually we plan to run the load generator on the following clusters:
 
 - `cidaily`
-- `cidaily-testnet`
 - `cilr`
 - `devnet`
 - `testnet`
