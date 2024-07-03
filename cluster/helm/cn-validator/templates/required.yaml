@@ -17,5 +17,3 @@
 {{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}
 
 {{ $_ := required ".Values.enableWallet is required" .Values.enableWallet }}
-
-{{ $_ := required ".Values.contactPoint is required." .Values.contactPoint }}
