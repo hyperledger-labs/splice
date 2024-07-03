@@ -156,6 +156,14 @@ final class HttpErrorHandler(
           )
           completeErrorResponse(e.getStatus, e.getStatus.getDescription)
         }
+      case e: IllegalArgumentException =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri was malformed: ${e.getMessage}", e)
+          completeErrorResponse(
+            StatusCodes.BadRequest,
+            e.getMessage,
+          )
+        }
       case e: Throwable =>
         extractUri { uri =>
           logger.error(s"Request to $uri resulted in an unexpected exception: ${e.getMessage}", e)

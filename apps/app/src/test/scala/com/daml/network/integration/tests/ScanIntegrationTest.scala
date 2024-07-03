@@ -27,6 +27,12 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.http.v0.definitions.BalanceChange
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import scala.util.Success
+
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
     with ConfigScheduleUtil
@@ -624,6 +630,26 @@ class ScanIntegrationTest
         .flatMap(_.mint)
         .filter(_.amuletOwner == sv1UserParty.toProtoPrimitive)
       BigDecimal(sv1MintsFromHistory.loneElement.amuletAmount) shouldBe BigDecimal(mintAmount)
+    }
+  }
+
+  "getWalletBalance should return 400 for invalid party ID" in { implicit env =>
+    implicit val sys = env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
+    val response = Http()
+      .singleRequest(
+        Get(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/wallet-balance?party_id=None&asOfEndOfRound=0"
+        )
+      )
+      .futureValue
+
+    inside(response) {
+      case _ if response.status == StatusCodes.BadRequest =>
+        inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
+          response.contains("Invalid unique identifier `None` with missing namespace") shouldBe true
+        }
     }
   }
 
