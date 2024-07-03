@@ -224,6 +224,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -438,6 +454,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -627,6 +650,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -841,6 +880,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -1030,6 +1076,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -1244,6 +1306,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -1433,6 +1502,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -1647,6 +1732,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -1836,6 +1928,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -2050,6 +2158,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -2239,6 +2354,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -2434,6 +2565,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -2583,6 +2721,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -2778,6 +2932,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -2927,6 +3088,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -3122,6 +3299,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -3271,6 +3455,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -3466,6 +3666,13 @@
                 "image": "postgres:14",
                 "name": "pg-init"
               }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
             ]
           }
         }
@@ -3615,6 +3822,22 @@
             }
           },
           "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
             "containers": [
               {
                 "env": [
@@ -3809,6 +4032,13 @@
                 ],
                 "image": "postgres:14",
                 "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
               }
             ]
           }
