@@ -9,21 +9,23 @@ CLUSTER=cn-${GCP_CLUSTER_BASENAME}net
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 
-data=$(get_metrics "fetch k8s_node
-              | filter resource.cluster_name =~ \"$CLUSTER\"
-              | metric kubernetes.io/node/cpu/allocatable_utilization
-              | every 6h
-              | group_by 6h,
-                   [value_allocatable_utilization_mean:
-                        max(value.allocatable_utilization)]
-              | group_by [resource.cluster_name],
-                   [value_allocatable_utilization_mean_aggregate:
-                        aggregate(value_allocatable_utilization_mean)]
-              | group_by 1w, min(val())
+data=$(get_metrics "{
+                fetch k8s_node
+                  | metric kubernetes.io/node/cpu/total_cores;
+                fetch k8s_container
+                  | metric kubernetes.io/container/cpu/request_cores
+              }
+              | filter (resource.cluster_name =~ \"$CLUSTER\")
+              | align next_older(1m)
+              | group_by [resource.cluster_name]
+              | join
+              | sub
+              | group_by 1h, min(val())
+              | group_by 1w, max(val())
             ")
 
-perc=$(echo "$data" | jq -r '.timeSeriesData[] | ((.pointData[0].values[0].doubleValue * 100) | tostring) + "%"')
-_info "In the past week, there was a period of 6h where utilization was not over: ${perc}"
+cores=$(echo "$data" | jq -r '.timeSeriesData[] | ((.pointData[0].values[0].doubleValue))')
 
-_info "If this number is relatively low, the auto-scaler seems to not scale things down properly"
+_info "In the past week, there was a period of an hour where the total CPU requests was lower than the available cores by ${cores}."
+_info "If this number is relatively high (~25 cores seems to be a reasonable threshold), the auto-scaler seems to not scale things down properly"
 _info "Hint: search for \"noScaleDown\" in Google logs"

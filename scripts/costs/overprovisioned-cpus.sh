@@ -20,10 +20,10 @@ data=$(get_metrics "fetch k8s_container
               | group_by [resource.container_name], .min()
               | join
               | sub
-              | group_by 4w, min(val())
+              | group_by 1w, min(val())
               | top 20
              ")
 
-echo "Top 20 strictly over-provisioned (CPU requests not ever used) containers by CPU usage over the last 4 weeks:"
+echo "Top 20 strictly over-provisioned (CPU requests not ever used) containers by CPU usage over the last week:"
 
-echo "$data" | jq '.timeSeriesData | map({"label": .labelValues[0].stringValue, "value": .pointData[0].values[0].doubleValue}) | sort_by(.value) | reverse'
+echo "$data" | jq -r '.timeSeriesData | map({"label": .labelValues[0].stringValue, "value": .pointData[0].values[0].doubleValue}) | sort_by(.value) | reverse | map(.["label"] + ": " + (.value | tostring) + " cores") | .[]'
