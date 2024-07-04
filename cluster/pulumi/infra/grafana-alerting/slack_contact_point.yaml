@@ -14,7 +14,5 @@ contactPoints:
             {{ template "slack_title" . }}
           text: |
             {{ template "slack_message" . }}
-          color:
-            {{ template "slack_color" . }}
 deleteContactPoints:
   - uid: grafana-default-email
