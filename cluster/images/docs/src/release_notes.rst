@@ -6,8 +6,10 @@ Release Notes
 Upcoming
 --------
 
-0.1.14
+0.1.15
 ------
+
+Note: 0.1.14 was skipped as it contained an issue related to logging. Upgrade directly from 0.1.13 to 0.1.15.
 
 * SV app
 
