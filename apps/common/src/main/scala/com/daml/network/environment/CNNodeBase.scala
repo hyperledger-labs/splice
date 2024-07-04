@@ -353,17 +353,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           appInitStep("Initialize node") { initializeNode(client) }
         )
       }
-    }.andThen { _ =>
-      logger.info(
-        s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
-      )
-      isInitializedVar.set(true)
     }
       // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
       // For example, if we fail to get the service party we won't close the ledger client.
       // Note that we have a similar issue in app-initialization, so this should be handled
       // in a generic way
       .andThen {
+        case Success(_) =>
+          logger.info(
+            s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
+          )
+          isInitializedVar.set(true)
         case Failure(err) if this.isClosing =>
           logger.info(
             s"$appInitMessage: Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
