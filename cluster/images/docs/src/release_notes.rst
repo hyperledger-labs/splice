@@ -6,6 +6,9 @@ Release Notes
 Upcoming
 --------
 
+0.1.14
+------
+
 * SV app
 
   * Added a governance option to update the SV reward weight of a member SV.
