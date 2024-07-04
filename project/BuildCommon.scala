@@ -199,7 +199,7 @@ object BuildCommon {
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-amulet-test-daml/clean; splice-dso-governance-daml/clean; splice-dso-governance-test-daml/clean; splice-wallet-daml/clean; splice-wallet-test-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splice-amulet-name-service-test-daml/clean; splitwell-daml/clean; splitwell-test-daml/clean; splice-validator-lifecycle-daml/clean; splice-validator-lifecycle-test-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-dso-governance-daml/clean; splice-wallet-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splitwell-daml/clean; splice-validator-lifecycle-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(
