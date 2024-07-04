@@ -5,7 +5,6 @@ export * from './backup';
 export * from './domainFees';
 export * from './domainMigration';
 export * from './helm';
-export * from './infra';
 export * from './ingress';
 export * from './jmx';
 export * from './loopback';

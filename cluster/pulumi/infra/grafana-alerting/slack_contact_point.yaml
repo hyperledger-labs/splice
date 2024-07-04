@@ -10,10 +10,11 @@ contactPoints:
           recipient: $SLACK_NOTIFICATION_CHANNEL
           token: $SLACK_ACCESS_TOKEN
           username: grafana
-          # <string>
           title: |
             {{ template "slack_title" . }}
           text: |
             {{ template "slack_message" . }}
+          color:
+            {{ template "slack_color" . }}
 deleteContactPoints:
   - uid: grafana-default-email
