@@ -91,9 +91,16 @@ ${conditionalString(
   });
 
   const alertCount = enableChaosMesh ? 50 : 1;
+  const displayName = `Log warnings and errors > ${alertCount} ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('logsAlert', {
     alertStrategy: {
       autoClose: '3600s',
+      notificationChannelStrategies: [
+        {
+          notificationChannelNames: [notificationChannel.name],
+          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+        },
+      ],
     },
     combiner: 'OR',
     conditions: [
@@ -120,10 +127,10 @@ ${conditionalString(
             count: alertCount,
           },
         },
-        displayName: `Log warnings and errors > ${alertCount} ${CLUSTER_BASENAME}`,
+        displayName: displayName,
       },
     ],
-    displayName: 'Log warnings and errors',
+    displayName: displayName,
     notificationChannels: [notificationChannel.name],
   });
 }

@@ -1974,7 +1974,15 @@
     "id": "",
     "inputs": {
       "alertStrategy": {
-        "autoClose": "3600s"
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
       },
       "combiner": "OR",
       "conditions": [
@@ -2000,7 +2008,7 @@
           "displayName": "Log warnings and errors > 1 dev"
         }
       ],
-      "displayName": "Log warnings and errors",
+      "displayName": "Log warnings and errors > 1 dev",
       "notificationChannels": [
         null
       ]
