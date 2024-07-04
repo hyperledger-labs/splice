@@ -13,11 +13,11 @@ import {
 import { clusterBasename } from './config';
 
 export const istioVersion = {
-  istio: '1.21.2',
+  istio: '1.22.2',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 211,
-    wasm: 168,
+    general: 220,
+    wasm: 177,
   },
 };
 
