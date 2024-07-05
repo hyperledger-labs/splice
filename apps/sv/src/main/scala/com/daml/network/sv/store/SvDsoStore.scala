@@ -210,8 +210,15 @@ trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
   def getAmuletRules()(implicit
       tc: TraceContext
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
+    getAssignedAmuletRules().map(_.contract)
+
+  def getAssignedAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[
+    AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+  ] =
     lookupAmuletRules().map(
-      _.map(_.contract).getOrElse(
+      _.getOrElse(
         throw Status.NOT_FOUND
           .withDescription("No active AmuletRules contract")
           .asRuntimeException()

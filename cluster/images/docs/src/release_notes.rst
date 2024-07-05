@@ -6,6 +6,10 @@ Release Notes
 Upcoming
 --------
 
+* SV app
+
+  * Add automation to automatically call the Daml choice that prunes ``futureValue`` added in 0.1.15
+
 0.1.15
 ------
 

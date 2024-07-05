@@ -35,6 +35,7 @@ getcontext().rounding = ROUND_HALF_EVEN
 # Matches the prefix defined in ParticipantAdminConnection
 import_acs_workflow_id_prefix = "canton-network-acs-import"
 
+
 def _default_logger(name, loglevel):
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
@@ -43,8 +44,10 @@ def _default_logger(name, loglevel):
 
     return logger
 
+
 # Global logger, always accessible
-GLOG=_default_logger("global", "INFO")
+GLOG = _default_logger("global", "INFO")
+
 
 @dataclass
 class TemplateId:
@@ -1027,7 +1030,7 @@ class TransactionTree:
             json["record_time"],
             json["update_id"],
             json["workflow_id"],
-            json["synchronizer_id"]
+            json["synchronizer_id"],
         )
 
     def is_acs_import(self):
@@ -1305,14 +1308,7 @@ class State:
     record_time: datetime
     synchronizer_id: Optional[str]
 
-    def __init__(
-        self,
-        logger,
-        args,
-        active_contracts,
-        record_time,
-        synchronizer_id
-    ):
+    def __init__(self, logger, args, active_contracts, record_time, synchronizer_id):
         self.logger = logger
         self.args = args
         self.active_contracts = active_contracts
@@ -1325,7 +1321,7 @@ class State:
             self.args,
             self.active_contracts.copy(),
             self.record_time,
-            self.synchronizer_id
+            self.synchronizer_id,
         )
 
     @classmethod
@@ -1338,7 +1334,7 @@ class State:
                 for cid, contract in json["active_contracts"].items()
             },
             datetime.fromisoformat(json["record_time"]),
-            json["synchronizer_id"]
+            json["synchronizer_id"],
         )
 
     def to_json(self):
@@ -1348,7 +1344,7 @@ class State:
                 for cid, contract in self.active_contracts.items()
             },
             "record_time": self.record_time.isoformat(),
-            "synchronizer_id": self.synchronizer_id
+            "synchronizer_id": self.synchronizer_id,
         }
 
     def summary(self):
@@ -1502,15 +1498,19 @@ class State:
 
     def _fail(self, transaction, message, cause=None, recoverable=True):
         if not self.args.stop_on_error and recoverable:
-            message = f'{message} (will attempt to recover from acs_diff and restart)'
+            message = f"{message} (will attempt to recover from acs_diff and restart)"
 
         self.get_transaction_logger(transaction).error(message)
 
         if not recoverable:
-            raise Exception(f'Unrecoveable error, stopping export (error: {message})') from cause
+            raise Exception(
+                f"Unrecoveable error, stopping export (error: {message})"
+            ) from cause
 
         if self.args.stop_on_error:
-            raise Exception(f'--stop-on-error set, stopping export (error: {message})') from cause
+            raise Exception(
+                f"--stop-on-error set, stopping export (error: {message})"
+            ) from cause
 
     def _check_synchronizer_id(self, transaction):
         sid = transaction.synchronizer_id
@@ -1525,7 +1525,7 @@ class State:
                 f"Synchronizer ID mismatch between cache file and environment: "
                 f"({self.synchronizer_id}!={sid}). Please reset the local cache "
                 f"and retry.",
-                recoverable=False
+                recoverable=False,
             )
 
     def handle_transaction(self, transaction):
@@ -1540,7 +1540,11 @@ class State:
                 event_result = self.handle_root_event(transaction, event)
                 result = result.merge(event_result)
         except Exception as e:
-            self._fail(transaction, f"Encountered exception while processing transaction: {e}", cause=e)
+            self._fail(
+                transaction,
+                f"Encountered exception while processing transaction: {e}",
+                cause=e,
+            )
 
         # This is a sanity check to make sure the code does not forget tracking an ACS change.
         acs_diff = transaction.acs_diff()
@@ -1548,7 +1552,10 @@ class State:
         created = self.active_contracts.keys() - previous_state.active_contracts.keys()
         archived = previous_state.active_contracts.keys() - self.active_contracts.keys()
         if created != acs_diff.created_events.keys():
-            self._fail(transaction, f"Transaction created contracts {acs_diff.created_events}\nbut our state created {created}")
+            self._fail(
+                transaction,
+                f"Transaction created contracts {acs_diff.created_events}\nbut our state created {created}",
+            )
             self.active_contracts = {
                 k: v
                 for k, v in (
@@ -1557,7 +1564,10 @@ class State:
                 if k not in acs_diff.archived_events.keys()
             }
         if archived != acs_diff.archived_events.keys():
-            self._fail(transaction, f"Transaction archived contracts {acs_diff.archived_events}\nbut our state archived {archived}")
+            self._fail(
+                transaction,
+                f"Transaction archived contracts {acs_diff.archived_events}\nbut our state archived {archived}",
+            )
             self.active_contracts = {
                 k: v
                 for k, v in (
@@ -1755,7 +1765,10 @@ class State:
             locking_fee = len(lock_holders) * transfer_config_cc.lock_holder_fee
             create_fee = transfer_config_cc.create_fee
             if output_fee != create_fee + transfer_fee + locking_fee:
-                self._fail(transaction, f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}")
+                self._fail(
+                    transaction,
+                    f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}",
+                )
             output_descriptions += ["  fees:"]
             output_descriptions += [f"    total: {output_fee}"]
             output_descriptions += [f"      base_transfer_fee: {create_fee}"]
@@ -1838,7 +1851,7 @@ class State:
             fee_amounts,
         )
         if transfer_error := summary.get_error("transfer"):
-            self._fail(transaction, f'Transfer error: {transfer_error}')
+            self._fail(transaction, f"Transfer error: {transfer_error}")
         activity_record_descriptions = []
         for validator_reward in validator_reward_coupons:
             amount = validator_reward.payload.get_validator_reward_amount()
@@ -1944,7 +1957,7 @@ class State:
             [sender_change_fee, amulet_paid],
         )
         if transfer_error := summary.get_error("buy_traffic"):
-            self._fail(transaction, f'Buy Traffic Error: {transfer_error}')
+            self._fail(transaction, f"Buy Traffic Error: {transfer_error}")
         self.get_transaction_logger(transaction).info(
             textwrap.dedent(
                 f"""\
@@ -2325,7 +2338,10 @@ class State:
                         ]
                         del self.active_contracts[cid]
                     case choice:
-                        self._fail(transaction, f"Unexpected exercise as part of activity record expiry: {event}")
+                        self._fail(
+                            transaction,
+                            f"Unexpected exercise as part of activity record expiry: {event}",
+                        )
         expired_activity_rewards = "\n".join(rewards_lines)
         self.get_transaction_logger(transaction).info(
             f"ExpireActivityRecords: Expired activity records for round {round}:\n{expired_activity_rewards}"
@@ -2559,6 +2575,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "AmuletRules_AddFutureAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
+            case "DsoRules_PruneAmuletConfigSchedule":
+                return HandleTransactionResult.empty()
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 
@@ -2570,7 +2588,9 @@ class State:
                     ):
                         del self.active_contracts[event.contract_id]
                 else:
-                    self._fail(transaction, f"Unexpected choice: {event.template_id}:{choice}")
+                    self._fail(
+                        transaction, f"Unexpected choice: {event.template_id}:{choice}"
+                    )
                 return HandleTransactionResult.empty()
 
     def balance_end_of_round(self):
@@ -2640,7 +2660,7 @@ class AppState:
                 int(round_number): State.from_json(logger, args, round_data)
                 for round_number, round_data in data["per_round_states"].items()
             },
-            PaginationKey.from_json(data["pagination_key"])
+            PaginationKey.from_json(data["pagination_key"]),
         )
 
     def to_json(self):
@@ -2678,9 +2698,7 @@ class AppState:
                 return AppState.from_json(logger, args, data)
 
         except Exception as e:
-            logger.error(
-                f"Could not read app state from {args.cache_file_path}: {e}"
-            )
+            logger.error(f"Could not read app state from {args.cache_file_path}: {e}")
             sys.exit(-1)
 
     def save_to_cache(self, args):
@@ -2694,6 +2712,7 @@ class AppState:
                 self.logger.error(
                     f"Could not save app state to {args.cache_file_path}: {e}"
                 )
+
 
 def _parse_cli_args():
     # Parse command line arguments
@@ -2747,6 +2766,7 @@ def _parse_cli_args():
     )
     return parser.parse_args()
 
+
 def _log_uncaught_exceptions(logger):
     # Set up exception handling (write unhandled exceptions to log)
     def handle_exception(exc_type, exc_value, exc_traceback):
@@ -2760,12 +2780,13 @@ def _log_uncaught_exceptions(logger):
 
     sys.excepthook = handle_exception
 
+
 async def _check_scan_balance_assertions(scan_client, app_state, result):
     previous_state = app_state.state.clone(app_state.logger)
 
     for round_number in result.new_open_rounds:
-        app_state.per_round_states[round_number] = (
-            previous_state.clone(_default_logger(f"scan_txlog_{round_number}", "WARNING"))
+        app_state.per_round_states[round_number] = previous_state.clone(
+            _default_logger(f"scan_txlog_{round_number}", "WARNING")
         )
     if result.for_open_round != None:
         for (
@@ -2776,21 +2797,19 @@ async def _check_scan_balance_assertions(scan_client, app_state, result):
                 per_round_state.handle_transaction(transaction)
     if result.new_closed_round:
         closed_round = result.new_closed_round
-        app_state.logger.info(f'Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}')
+        app_state.logger.info(
+            f"Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}"
+        )
         round_state = app_state.per_round_states[closed_round]
         del app_state.per_round_states[closed_round]
         balances = round_state.balance_end_of_round()
-        lines = [
-            f"effective balances for closed round: {closed_round}"
-        ]
+        lines = [f"effective balances for closed round: {closed_round}"]
         matches = True
         scan_party_balances = await scan_client.party_balances(
             closed_round, balances.keys()
         )
         for party, balance in sorted(balances.items()):
-            computed_balance = balance.effective_for_round(
-                closed_round
-            )
+            computed_balance = balance.effective_for_round(closed_round)
             scan_balance = scan_party_balances[party]
             matches_for_party = scan_balance == computed_balance
             matches &= matches_for_party
@@ -2803,6 +2822,7 @@ async def _check_scan_balance_assertions(scan_client, app_state, result):
         else:
             app_state.logger.error(log)
 
+
 async def _process_transaction(args, app_state, scan_client, transaction):
     if transaction.is_acs_import():
         # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
@@ -2813,7 +2833,6 @@ async def _process_transaction(args, app_state, scan_client, transaction):
         )
         return
 
-
     app_state.logger.debug(
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
     )
@@ -2822,6 +2841,7 @@ async def _process_transaction(args, app_state, scan_client, transaction):
 
     if args.scan_balance_assertions:
         _check_scan_balance_assertions(scan_client, app_state, result)
+
 
 async def main():
     args = _parse_cli_args()
