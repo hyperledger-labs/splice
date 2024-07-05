@@ -45,6 +45,9 @@ class AppUpgradeIntegrationTest
     // We don't currently register the upgrade of splitwell in app manager, just want to test
     // that we can actually upgrade splitwell and use the new payment APIs in it.
     .withoutInitialManagerApps
+    // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
+    // to the tests after SVs 2 and 3 have been upgraded
+    .withSequencerConnectionsFromScanDisabled()
     .addConfigTransform((_, config) => {
       // Makes the test a bit faster and easier to debug. See #11488
       CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
