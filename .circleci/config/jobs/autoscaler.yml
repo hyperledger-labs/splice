@@ -81,8 +81,13 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
+      num_nodes_from_env_var:
+        type: string
+        default: ""
       num_nodes:
+        # Will be ignored if num_nodes_from_env_var is set
         type: integer
+        default: 0
     docker:
       - image: cimg/base:2024.01
     environment:
@@ -95,6 +100,10 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
-            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=<< parameters.num_nodes >>
+            if [ -n "<< parameters.num_nodes_from_env_var >>" ]; then
+              gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${<< parameters.num_nodes_from_env_var >>}
+            else
+              gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=<< parameters.num_nodes >>
+            fi
           cmd_retry_count: 5
 
