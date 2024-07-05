@@ -10,13 +10,15 @@ import scala.concurrent.duration.*
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
   protected def tapAmulets(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
-    val tapsBefore =
+    val txDatesBefore =
       clue("Getting state before tap") {
         // The long eventually makes this robust against `StaleElementReferenceException` errors
         eventually(timeUntilSuccess = 2.minute)(
-          findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
+          findAll(className("tx-row")).toSeq.map(readDateFromRow)
         )
       }
+
+    logger.debug(s"Transaction dates before tap: $txDatesBefore")
 
     clue("Tapping...") {
       click on "tap-amount-field"
@@ -32,10 +34,14 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         find(className(errorDisplayElementClass)).map { errElem =>
           (errElem.text.trim, find(className(errorDetailsElementClass)).map(_.text.trim))
         } shouldBe empty
-        val tapsAfter = findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
-        val newTaps = tapsAfter.diff(tapsBefore)
+        val txs = findAll(className("tx-row")).toSeq
+        val txDatesAfter = txs.map(readDateFromRow)
+        logger.debug(s"Transaction dates after tap: $txDatesAfter")
+        val tapsAfter = txs.flatMap(readTapFromRow)
+        val newTaps = tapsAfter.filter(tap => !txDatesBefore.exists(_ == tap.date))
+        logger.debug(s"New taps: $newTaps")
         forExactly(1, newTaps) { tap =>
-          tap shouldBe walletUsdToAmulet(tapQuantity)
+          tap.tapAmount shouldBe walletUsdToAmulet(tapQuantity)
         }
       }
     }
@@ -192,26 +198,34 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     click on "create-offer-submit-button"
   }
 
-  private def readTapCCAmountFromRow(transactionRow: Element): Option[BigDecimal] = {
-    if (
-      transactionRow
-        .childElement(className("tx-action"))
-        .text
-        .contains("Balance Change") && transactionRow
-        .childElement(className("tx-subtype"))
-        .text
-        .contains("Tap")
-    ) {
-      Some(
-        parseAmountText(
-          transactionRow
-            .childElement(className("tx-amount-cc"))
-            .text,
-          currency = "CC",
+  private def readTapFromRow(transactionRow: Element): Option[Tap] = {
+    val date = readDateFromRow(transactionRow)
+    val amountO =
+      if (
+        transactionRow
+          .childElement(className("tx-action"))
+          .text
+          .contains("Balance Change") && transactionRow
+          .childElement(className("tx-subtype"))
+          .text
+          .contains("Tap")
+      ) {
+        Some(
+          parseAmountText(
+            transactionRow
+              .childElement(className("tx-amount-cc"))
+              .text,
+            currency = "CC",
+          )
         )
-      )
-    } else None
+      } else None
+    amountO.map(Tap(date, _))
   }
+
+  private def readDateFromRow(transactionRow: Element): String =
+    transactionRow
+      .childElement(className("tx-row-cell-date"))
+      .text
 }
 
 object WalletFrontendTestUtil {
@@ -230,4 +244,9 @@ object WalletFrontendTestUtil {
 
   val errorDisplayElementClass = "error-display-message"
   val errorDetailsElementClass = "error-display-details"
+
+  final case class Tap(
+      date: String,
+      tapAmount: BigDecimal,
+  )
 }
