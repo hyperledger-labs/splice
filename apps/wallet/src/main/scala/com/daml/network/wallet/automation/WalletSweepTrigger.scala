@@ -112,7 +112,7 @@ class WalletSweepTrigger(
                 )
                 val cmd = install.exercise(
                   _.exerciseWalletAppInstall_CreateTransferOffer(
-                    config.receiver,
+                    config.receiver.toProtoPrimitive,
                     new PaymentAmount(amountToSendAfterFeesCC, Unit.AMULETUNIT),
                     s"Sweeping wallet funds to receiver ${config.receiver}.",
                     Instant.now().plus(10, ChronoUnit.MINUTES),

@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.AssignedContract
+import com.daml.network.util.{AssignedContract, Codec}
 import com.daml.network.wallet.config.AutoAcceptTransfersConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
@@ -45,7 +45,7 @@ class AutoAcceptTransferOffersTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     if (
       transferOffer.contract.payload.receiver == store.key.validatorParty.toProtoPrimitive && autoAcceptTransfers.fromParties
-        .contains(transferOffer.contract.payload.sender)
+        .contains(Codec.tryDecode(Codec.Party)(transferOffer.contract.payload.sender))
     ) {
       for {
         install <- store.getInstall()

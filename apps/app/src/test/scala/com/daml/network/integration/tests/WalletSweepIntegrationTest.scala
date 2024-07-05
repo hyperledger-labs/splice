@@ -62,7 +62,7 @@ class WalletSweepIntegrationTest
                 sv1PartyId.toProtoPrimitive -> WalletSweepConfig(
                   NonNegativeNumeric.tryCreate(maxBalanceUsd),
                   NonNegativeNumeric.tryCreate(minBalanceUsd),
-                  alicePartyId.toProtoPrimitive,
+                  alicePartyId,
                 )
               )
             )
@@ -70,7 +70,7 @@ class WalletSweepIntegrationTest
             c.copy(
               autoAcceptTransfers = Map(
                 alicePartyId.toProtoPrimitive ->
-                  AutoAcceptTransfersConfig(fromParties = Seq(sv1PartyId.toProtoPrimitive))
+                  AutoAcceptTransfersConfig(fromParties = Seq(sv1PartyId))
               )
             )
           } else {

@@ -3,6 +3,7 @@ package com.daml.network.wallet.config
 import com.daml.network.config.{HttpCNNodeClientConfig, NetworkAppClientConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.topology.PartyId
 
 case class WalletSynchronizerConfig(
     global: DomainAlias
@@ -29,11 +30,9 @@ final case class WalletSweepConfig(
     maxBalanceUsd: NonNegativeNumeric[BigDecimal],
     // The minimum balance in USD to keep in the wallet.
     minBalanceUsd: NonNegativeNumeric[BigDecimal],
-    // TODO(#12126): use PartyId instead of String
-    receiver: String,
+    receiver: PartyId,
 )
 
 final case class AutoAcceptTransfersConfig(
-    // TODO(#12126): use PartyId instead of String
-    fromParties: Seq[String] = Seq()
+    fromParties: Seq[PartyId] = Seq()
 )

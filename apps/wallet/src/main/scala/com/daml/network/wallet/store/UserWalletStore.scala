@@ -353,8 +353,8 @@ trait UserWalletStore extends CNNodeAppStore with NamedLogging {
   }
 
   final def getOutstandingTransferOffers(
-      fromParty: Option[String],
-      toParty: Option[String],
+      fromParty: Option[PartyId],
+      toParty: Option[PartyId],
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,

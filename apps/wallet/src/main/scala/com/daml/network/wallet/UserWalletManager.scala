@@ -220,7 +220,6 @@ class UserWalletManager(
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
       Option.when(endUserParty == store.walletKey.validatorParty)(validatorTopupConfig),
-      // TODO(#12126): Use PartyId instead of String, so that config mistakes show on startup
       // TODO(#12554): make it easier to configure the sweep functionality and guard better against operator errors (typos, etc.)
       walletSweep.get(endUserParty.toProtoPrimitive),
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
