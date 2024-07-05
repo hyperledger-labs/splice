@@ -47,17 +47,17 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -resource.labels.container_name="splitwell-web-ui"
 -(resource.labels.container_name="cometbft" AND textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'")
 -- sequencer down
--(resource.labels.namespace_name=~"validator.*|splitwell" AND resource.labels.container_name="participant" AND jsonPayload.message=~".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
+-(resource.labels.namespace_name=~"validator.*|splitwell" AND resource.labels.container_name=~".*participant" AND jsonPayload.message=~".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -resource.labels.container_name=~".*pg-.*-e"
 -UnknownHostException
 -"Late processing (or clock skew) of batch"
 -UnresolvedAddressException
 -(resource.labels.container_name="sequencer-pg" AND ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
--(resource.labels.container_name="participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*")
--(resource.labels.container_name="participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*")
--(resource.labels.container_name="participant" AND jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients")
--(resource.labels.container_name="participant" AND jsonPayload.message=~"channel.*shutdown did not complete gracefully in allotted")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"channel.*shutdown did not complete gracefully in allotted")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
