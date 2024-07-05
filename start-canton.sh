@@ -27,49 +27,59 @@ bootstrapScriptPath=bootstrap-canton.sc
 global_cometbft=0
 collect_metrics=0
 
-while getopts "hdap:c:wsbtfgm" arg; do
-  case ${arg} in
-    h)
-      usage
-      exit 0
-      ;;
-    b)
-      daemon=2
-      ;;
-    d)
-      daemon=1
-      ;;
-    p)
-      POSTGRES_MODE="${OPTARG}"
-      ;;
-    w)
-      simtime=0
-      echo "starting canton with wall clock time only"
-      ;;
-    s)
-      wallclocktime=0
-      echo "starting canton with simulated time only"
-      ;;
-    c)
-      CANTON="${OPTARG}"
-      echo "using custom canton binary: $CANTON"
-      ;;
-    f)
-      global_cometbft=1
-      echo "start canton with the cometbft driver"
-      ;;
-    g)
-      globalUpgradeDomain=1
-      echo "start extra global upgrade domain"
-      ;;
-    m)
-      collect_metrics=1
-      ;;
-    ?)
-      usage
-      exit 1
-      ;;
-  esac
+args=$(getopt -o "hdap:c:wsbtfgm" -l "help" -- "$@")
+
+eval set -- "$args"
+
+while true
+do
+    case "$1" in
+        -h)
+            usage
+            exit 0
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        -b)
+            daemon=2
+            ;;
+        -d)
+            daemon=1
+            ;;
+        -p)
+            POSTGRES_MODE="${OPTARG}"
+            ;;
+        -w)
+            simtime=0
+            echo "starting canton with wall clock time only"
+            ;;
+        -s)
+            wallclocktime=0
+            echo "starting canton with simulated time only"
+            ;;
+        -c)
+            CANTON="${OPTARG}"
+            echo "using custom canton binary: $CANTON"
+            ;;
+        -f)
+            global_cometbft=1
+            echo "start canton with the cometbft driver"
+            ;;
+        -g)
+            globalUpgradeDomain=1
+            echo "start extra global upgrade domain"
+            ;;
+        -m)
+            collect_metrics=1
+            ;;
+        --)
+            shift
+            break
+            ;;
+    esac
+    shift
 done
 
 if [ $globalUpgradeDomain -ne 0 ] && [ $simtime -ne 0 ]; then
