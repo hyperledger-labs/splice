@@ -6126,8 +6126,6 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - cancel_if_previous_pipeline
 
   reset_sv_runbook_devnet:
     when:
