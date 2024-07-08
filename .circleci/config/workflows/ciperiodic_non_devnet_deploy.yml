@@ -109,7 +109,6 @@ workflow:
           name: "set_min_nodes"
           <<: *main-branch-only
           cluster: "ciperiodic"
-          # Set min nodes to MAX_NODES to prevent scale downs
           num_nodes_from_env_var: "GCP_CLUSTER_MIN_NODES"
           requires:
             - preflight_sv_check

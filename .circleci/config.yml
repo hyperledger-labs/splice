@@ -5035,7 +5035,6 @@ workflows:
           name: "set_min_nodes"
           <<: *main-branch-only
           cluster: "ciperiodic"
-          # Set min nodes to MAX_NODES to prevent scale downs
           num_nodes_from_env_var: "GCP_CLUSTER_MIN_NODES"
           requires:
             - preflight_sv_check
@@ -5067,6 +5066,14 @@ workflows:
           cluster: "ciperiodic"
           requires:
             - wait_for_previous_pipeline
+      - autoscaler_set_min_nodes:
+          name: "Prevent scaledowns (by setting a high min_nodes)"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          # Set min nodes to MAX_NODES to prevent scale downs
+          num_nodes_from_env_var: "GCP_CLUSTER_MAX_NODES"
+          requires:
+            - ensure_autoscaler_enabled
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -5152,6 +5159,15 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_sv_reonboard_check
+      - autoscaler_set_min_nodes:
+          name: "set_min_nodes"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          num_nodes_from_env_var: "GCP_CLUSTER_MIN_NODES"
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check
 
   deploy_ciupgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
