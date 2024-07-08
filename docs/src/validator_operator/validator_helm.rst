@@ -348,7 +348,7 @@ Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/s
 
 If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
@@ -372,7 +372,7 @@ Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/s
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
@@ -587,7 +587,7 @@ to other parties on the network whenever the balance of certain parties that it 
 exceeds a certain threshold. To do so, uncomment and fill in the following section
 in the ``validator-values.yaml`` file:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: SWEEP_START
     :end-before: SWEEP_END
@@ -603,7 +603,7 @@ Similarly, you can configure the validator to automatically accept transfer offe
 from certain parties on the network. To do so, uncomment and fill in the following section
 in the ``validator-values.yaml`` file:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: AUTO_ACCEPT_START
     :end-before: AUTO_ACCEPT_END
@@ -663,7 +663,7 @@ You can configure to restore the validator and participant with the dump file yo
 
 * Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
     :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
@@ -671,7 +671,7 @@ You can configure to restore the validator and participant with the dump file yo
 * Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
   This will specify a new participant ID for the validator. Replace ``put-some-new-string-never-used-before`` with a string that was never used before.
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
     :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END

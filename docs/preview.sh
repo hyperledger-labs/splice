@@ -3,8 +3,7 @@ set -eou pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-./gen-daml-docs.sh
+(cd "$REPO_ROOT"; sbt docs/bundle)
 
-make -C "${REPO_ROOT}" cluster/images/docs/html
-cd target/html
+cd html/html
 python -m http.server 8000 --bind 127.0.0.1

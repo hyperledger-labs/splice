@@ -1,7 +1,6 @@
 # Docs
 
 Documentation for all CC functionality.
-Intended to be published to https://network.canton.global.
 
 ## Development Builds
 
@@ -19,5 +18,4 @@ or other changes that are not picked up by `sphinx-autobuild`.
 
 ### Changes
 
-When making a change, push a new docker image into the Docker
-container, use `make clean && make docker-push`.
+When making a change, rebuild the documentation using `sbt docs/bundle`.

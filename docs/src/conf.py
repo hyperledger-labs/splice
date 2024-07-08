@@ -96,7 +96,8 @@ html_theme_options = {
 
 html_js_files = ['script.js']
 
-with open("../../../../nix/canton-sources.json") as f:
+repo_root = os.getenv("REPO_ROOT")
+with open(repo_root + "/nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_version = obj['version']
     daml_sdk_version = obj['sdk_version']

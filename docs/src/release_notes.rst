@@ -10,6 +10,10 @@ Upcoming
 
   * Add automation to automatically call the Daml choice that prunes ``futureValue`` added in 0.1.15
 
+* Release
+
+  * HTML docs are now included in the release bundle, under `docs/html`.
+
 0.1.15
 ------
 

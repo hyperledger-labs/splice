@@ -102,6 +102,7 @@ lazy val root: Project = (project in file("."))
     `load-tester`,
     tools,
     `cn-wartremover-extension`,
+    docs,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -148,6 +149,75 @@ lazy val `tools` = project
   .dependsOn(`apps-app` % "compile->test")
   .settings(
     libraryDependencies += auth0
+  )
+
+lazy val docs = project
+  .in(file("docs"))
+  .dependsOn(`apps-common`)
+  .settings(
+    Compile / resourceGenerators += Def.task {
+      val baseDir = baseDirectory.value
+      val srcDir = sourceDirectory.value
+      val log = streams.value.log
+      val cacheDir = streams.value.cacheDirectory
+      val cache = FileFunction.cached(cacheDir) { _ =>
+        runCommand(
+          Seq("./gen-daml-docs.sh"),
+          log,
+          None,
+          Some(baseDir),
+        )
+        Set(srcDir / "app_dev" / "api")
+      }
+      val damlSources =
+        (`splice-app-manager-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
+          (`splitwell-daml` / Compile / damlBuild).value ++
+          (`splice-dso-governance-daml` / Compile / damlBuild).value ++
+          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-payments-daml` / Compile / damlBuild).value
+      cache(
+        damlSources.toSet
+      ).toSeq
+    }.taskValue,
+    bundle := {
+      (Compile / resources).value
+      val baseDir = baseDirectory.value
+      val srcDir = sourceDirectory.value
+      val outDir = baseDirectory.value / "html"
+      val log = streams.value.log
+      val version = BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version"))
+      val cacheDir = streams.value.cacheDirectory
+      val cache = FileFunction.cached(cacheDir) { _ =>
+        runCommand(
+          Seq(
+            "sphinx-build",
+            "-M",
+            "html",
+            srcDir.getPath,
+            outDir.getPath,
+            "-D",
+            s"version=$version",
+            "-W",
+          ),
+          log,
+          None,
+          Some(baseDir),
+        )
+        org.apache.commons.io.FileUtils.deleteDirectory(outDir / "doctrees")
+        Set(outDir)
+      }
+      (
+        outDir,
+        cache(
+          (srcDir ** "*").get.toSet
+        ),
+      )
+    },
+    cleanFiles += baseDirectory.value / "html",
+    cleanFiles += sourceDirectory.value / "app_dev" / "api",
   )
 
 // Shared non-template/non-interface code
@@ -1082,6 +1152,7 @@ lazy val bundleTask = {
         (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
         (`splice-util-daml` / Compile / damlBuild).value,
       )
+    val docsArgs = Seq("-r", (`docs` / bundle).value._1.getPath, "docs")
 
     val committedDarFiles = getCommittedDarFiles
     val args: Seq[String] =
@@ -1092,7 +1163,8 @@ lazy val bundleTask = {
           Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
         }) ++ committedDarFiles.flatMap({ dar =>
           Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
-        })
+        }) ++ docsArgs
+
     val cacheDir = streams.value.cacheDirectory
     val main = (assembly / mainClass).value.get
     val cache = FileFunction.cached(cacheDir) { _ =>

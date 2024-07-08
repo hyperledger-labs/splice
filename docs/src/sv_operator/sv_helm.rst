@@ -538,7 +538,7 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 
 If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
@@ -550,7 +550,7 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-v
 
 If you are deploying new instances of your global domain components as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``global-domain-values.yaml``:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/global-domain-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/global-domain-values.yaml
     :language: yaml
     :start-after: DOMAIN_BOOTSTRAP_START
     :end-before: DOMAIN_BOOTSTRAP_END
@@ -616,7 +616,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 
 If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``sv-values.yaml``:
 
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
     :language: yaml
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
