@@ -1872,6 +1872,9 @@
             },
             "holdApplicationUntilProxyStarts": true
           },
+          "defaultHttpRetryPolicy": {
+            "attempts": 0
+          },
           "enablePrometheusMerge": false
         },
         "pilot": {

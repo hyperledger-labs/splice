@@ -100,6 +100,10 @@ function configureIstiod(
             // wait for the istio container to start before starting apps to avoid network errors
             holdApplicationUntilProxyStarts: true,
           },
+          // We have clients retry so we disable istio’s automatic retries.
+          defaultHttpRetryPolicy: {
+            attempts: 0,
+          },
         },
       },
     },
