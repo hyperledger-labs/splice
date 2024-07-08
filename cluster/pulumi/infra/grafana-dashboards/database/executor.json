@@ -17,11 +17,26 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 85,
+  "graphTooltip": 1,
+  "id": 401,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "panels": [],
+      "repeat": "libs",
+      "repeatDirection": "h",
+      "title": "Db $libs",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -78,16 +93,15 @@
               }
             ]
           },
-          "unit": "s",
-          "unitScale": true
+          "unit": "s"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 15,
-        "w": 24,
+        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 1,
       "options": {
@@ -105,6 +119,8 @@
           "sort": "desc"
         }
       },
+      "repeat": "db_pool",
+      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
@@ -113,11 +129,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by(le, namespace, node_name, node_type, component, name, node) (rate(cn_db_storage_general_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
-          "legendFormat": "0.99 {{namespace}} {{node_name}}",
+          "legendFormat": "0.99 {{namespace}} {{node_name}} {{node}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -129,12 +145,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le, namespace, node_name, node_type, component, name, node) (rate(cn_db_storage_general_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
           "instant": false,
-          "legendFormat": "0.95 {{namespace}} {{node_name}}",
+          "legendFormat": "0.95 {{namespace}} {{node_name}}{{node}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -144,38 +160,16 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by(le, namespace, node_name, node_type, component, name, node) (rate(daml_db_storage_general_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
-          "fullMetaSearch": false,
+          "expr": "sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_sum{namespace=~\"$namespace\"}[$__rate_interval])) / sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_count{namespace=~\"$namespace\"}[$__rate_interval]))",
           "hide": false,
-          "includeNullMetadata": false,
           "instant": false,
-          "legendFormat": "0.99 {{namespace}} {{component}}",
+          "legendFormat": "avg {{namespace}} {{node_name}}{{node}}",
           "range": true,
-          "refId": "C",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le, namespace, node_name, node_type, component, name, node) (rate(daml_db_storage_general_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
-          "fullMetaSearch": false,
-          "hide": false,
-          "includeNullMetadata": false,
-          "instant": false,
-          "legendFormat": "0.95 {{namespace}} {{component}}",
-          "range": true,
-          "refId": "D",
-          "useBackend": false
+          "refId": "C"
         }
       ],
-      "title": "Waittime",
-      "transformations": [],
+      "title": "Waittime ${db_pool}",
       "type": "timeseries"
     },
     {
@@ -233,8 +227,7 @@
                 "value": 80
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -242,7 +235,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 16
       },
       "id": 2,
       "options": {
@@ -257,6 +250,8 @@
           "sort": "desc"
         }
       },
+      "repeat": "db_pool",
+      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
@@ -264,27 +259,14 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "cn_db_storage_general_executor_running{namespace=~\"$namespace\"}",
+          "expr": "${libs}_db_storage_${db_pool}_executor_running{namespace=~\"$namespace\"}",
           "instant": false,
-          "legendFormat": "{{namespace}} {{node_name}}",
+          "legendFormat": "{{namespace}} {{node_name}}{{node}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "daml_db_storage_general_executor_running{namespace=~\"$namespace\"}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{namespace}} {{component}}",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "Running executor",
+      "title": "Running executor ${db_pool}",
       "type": "timeseries"
     },
     {
@@ -342,16 +324,15 @@
                 "value": 80
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
       "gridPos": {
         "h": 10,
         "w": 12,
-        "x": 12,
-        "y": 15
+        "x": 0,
+        "y": 26
       },
       "id": 3,
       "options": {
@@ -366,6 +347,8 @@
           "sort": "desc"
         }
       },
+      "repeat": "db_pool",
+      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
@@ -373,27 +356,14 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "cn_db_storage_general_executor_queued{namespace=~\"$namespace\"}",
+          "expr": "${libs}_db_storage_${db_pool}_executor_queued{namespace=~\"$namespace\"}",
           "instant": false,
-          "legendFormat": "{{namespace}} {{node_name}}",
+          "legendFormat": "{{namespace}} {{node_name}} {{node}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "daml_db_storage_general_executor_queued{namespace=~\"$namespace\"}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{namespace}} {{component}}",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "Queued executor",
+      "title": "Queued executor ${db_pool}",
       "type": "timeseries"
     }
   ],
@@ -405,12 +375,12 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "validator1"
+            "sv-2"
           ],
           "value": [
-            "validator1"
+            "sv-2"
           ]
         },
         "datasource": {
@@ -433,17 +403,88 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "cn",
+            "daml"
+          ],
+          "value": [
+            "cn",
+            "daml"
+          ]
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "name": "libs",
+        "options": [
+          {
+            "selected": true,
+            "text": "cn",
+            "value": "cn"
+          },
+          {
+            "selected": true,
+            "text": "daml",
+            "value": "daml"
+          }
+        ],
+        "query": "cn,daml",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "general",
+            "write"
+          ],
+          "value": [
+            "general",
+            "write"
+          ]
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "name": "db_pool",
+        "options": [
+          {
+            "selected": true,
+            "text": "general",
+            "value": "general"
+          },
+          {
+            "selected": true,
+            "text": "write",
+            "value": "write"
+          },
+          {
+            "selected": false,
+            "text": "locks",
+            "value": "locks"
+          }
+        ],
+        "query": "general,write,locks",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
       }
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Executor",
   "uid": "d7498b3f-c5e4-41ba-9fe2-2874aa683f51",
-  "version": 2,
+  "version": 11,
   "weekStart": ""
 }
