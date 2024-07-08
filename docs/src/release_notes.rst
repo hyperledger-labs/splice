@@ -18,6 +18,23 @@ Upcoming
 
   * Added notes about configuring traffic top-ups for validators to `validator-values.yaml`
 
+* Daml
+
+  * All Dars have been rebuilt from source files that include the same copyright prefix
+    as in the Splice repository. This bumps dar versions in all packages.
+    Incorporating that will require a governance vote to upgrade the package configs to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.4
+    amuletNameService  0.1.4
+    dsoGovernance      0.1.6
+    validatorLifecycle 0.1.1
+    wallet             0.1.4
+    walletPayments     0.1.4
+    ================== =======
+
 0.1.15
 ------
 
