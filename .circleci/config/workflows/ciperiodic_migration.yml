@@ -73,16 +73,6 @@ workflow:
           requires:
             - prepare_cluster_for_migration
             - prepare_sv_runbook_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-only
-          cluster: "ciperiodic"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
       - hard_migration:
           name: "prepare_cluster_for_migration"
           <<: *main-branch-only
@@ -127,7 +117,7 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - prepare_cluster_for_migration
-            - backup_cluster_before_migration
+            - trigger_global_domain_migration
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-only
@@ -140,7 +130,7 @@ workflow:
           migration_id: 1
           wait_for_disabled_autoscaler: true
           requires:
-            - backup_cluster_before_migration
+            - trigger_global_domain_migration
       - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
           name: "migrate_sv_runbook"
           context:
@@ -201,20 +191,30 @@ workflow:
           migration_id: 1
           requires:
             - migrate_cluster
-# TODO (#12393): reenable, this restore nukes the database of migration ID 1,
-#      - restore_node:
-#          <<: *main-branch-only
-#          cluster: "ciperiodic"
-#          namespace_name: "sv-3"
-#          expected_migration_id: 1
-#          context:
-#            - artifactory
-#            - canton-network-vpn
-#            - slack-context
-#          requires:
-#            - preflight_sv_check_migrated
-#            - preflight_validator_check_migrated
-#            - preflight_check_migrated
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           <<: *main-branch-only
@@ -226,12 +226,8 @@ workflow:
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
-          # TODO (#12393): require only restore_node
           requires:
-          #  - restore_node
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - restore_node
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           <<: *main-branch-only

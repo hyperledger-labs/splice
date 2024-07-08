@@ -90,6 +90,7 @@ workflow:
           name: backup_cidaily
           <<: *main-branch-only
           cluster: "cidaily"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -291,6 +292,7 @@ workflow:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -320,6 +322,7 @@ workflow:
           cluster: "cidaily"
           # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -348,6 +351,7 @@ workflow:
                 - deployment/cidaily
           cluster: "cidaily"
           namespace_name: "validator1"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn

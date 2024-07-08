@@ -6,17 +6,30 @@ set -euo pipefail
 source "${TOOLS_LIB}/libcli.source"
 source "${REPO_ROOT}/cluster/scripts/utils.source"
 
-declare -A component_to_deployments
-component_to_deployments["sequencer"]="global-domain-0-sequencer"
-component_to_deployments["mediator"]="global-domain-0-mediator"
-component_to_deployments["participant"]="participant-0"
-component_to_deployments["cometbft-0"]="global-domain-0-cometbft"
-component_to_deployments["cn-apps"]="validator-app scan-app sv-app"
-component_to_deployments["validator"]="validator-app"
+function component_to_deployments() {
+  local -r component=$1
+  local -r migration_id=$2
+  if [[ "$component" == "sequencer" ]]; then
+    echo "global-domain-$migration_id-sequencer"
+  elif [[ "$component" == "mediator" ]]; then
+    echo "global-domain-$migration_id-mediator"
+  elif [[ "$component" == "participant" ]]; then
+    echo "participant-$migration_id"
+  elif [[ "$component" == "cometbft" ]]; then
+    echo "global-domain-$migration_id-cometbft"
+  elif [[ "$component" == "cn-apps" ]]; then
+    echo "validator-app scan-app sv-app"
+  elif [[ "$component" == "validator" ]]; then
+    echo "validator-app"
+  else
+    _error "Unknown component: $component"
+  fi
+}
 
 function create_pvc_from_snapshot() {
-  local -r snapshot_name=$1
-  local -r pvc_name=$2
+  local -r namespace=$1
+  local -r snapshot_name=$2
+  local -r pvc_name=$3
 
   vs=$(kubectl get volumesnapshot -n "$namespace" -o json "$snapshot_name")
   status=$(echo "$vs" | jq -r .status.readyToUse)
@@ -47,8 +60,9 @@ EOF
 }
 
 function restore_pvc_from_snapshot() {
-  local -r snapshot_name=$1
-  local -r pvc_name=$2
+  local -r namespace=$1
+  local -r snapshot_name=$2
+  local -r pvc_name=$3
 
   _warning "This operation will delete pvc $pvc_name, and restore it from backup."
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
@@ -62,12 +76,14 @@ function restore_pvc_from_snapshot() {
   kubectl delete -n "$namespace" pvc "$pvc_name"
 
   _info "Recreating PVC from snapshot"
-  create_pvc_from_snapshot "$snapshot_name" "$pvc_name"
+  create_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name"
 }
 
 function down() {
-  local -r component=$1
-  local -r deployment_names="${component_to_deployments[$component]}"
+  local -r namespace=$1
+  local -r component=$2
+  local -r migration_id=$3
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
     _info "Scaling down $component deployment $deployment_name"
@@ -76,8 +92,10 @@ function down() {
 }
 
 function wait_down() {
-  local -r component=$1
-  local -r deployment_names="${component_to_deployments[$component]}"
+  local -r namespace=$1
+  local -r component=$2
+  local -r migration_id=$3
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
     _info "Waiting for all pods of $deployment_name to get deleted"
@@ -86,8 +104,10 @@ function wait_down() {
 }
 
 function up() {
-  local -r component=$1
-  local -r deployment_names="${component_to_deployments[$component]}"
+  local -r namespace=$1
+  local -r component=$2
+  local -r migration_id=$3
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
     _info "Scaling up $component deployment $deployment_name"
@@ -96,7 +116,9 @@ function up() {
 }
 
 function restore_pvc_postgres() {
-  local -r component=$1
+  local -r namespace=$1
+  local -r component=$2
+  local -r run_id=$3
 
   local -r template_name="pg-data"
   local -r ss_name="$component-pg"
@@ -107,7 +129,7 @@ function restore_pvc_postgres() {
   _info "Scaling down postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=0
 
-  restore_pvc_from_snapshot "$snapshot_name" "$pvc_name"
+  restore_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name"
 
   _info "Scaling up postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=1
@@ -127,7 +149,9 @@ function await_confirmation() {
 }
 
 function restore_cloudsql_postgres() {
-  local -r component=$1
+  local -r namespace=$1
+  local -r component=$2
+  local -r run_id=$3
   MAX_RETRIES=20
   retry_count=0
 
@@ -176,22 +200,26 @@ function restore_cloudsql_postgres() {
 }
 
 function restore_component() {
-  local -r component=$1
+  local -r namespace=$1
+  local -r component=$2
+  local -r migration_id=$3
+  local -r run_id=$4
+  local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
-  if [ "$component" == "cometbft-0" ]; then
+  if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
-    kubectl scale deployment -n "$namespace" "${component_to_deployments[$component]}" --replicas=0
-    restore_pvc_from_snapshot "global-domain-0-cometbft-cometbft-data-$run_id" "global-domain-0-cometbft-cometbft-data"
-    kubectl scale deployment -n "$namespace" "${component_to_deployments[$component]}" --replicas=1
+    kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=0
+    restore_pvc_from_snapshot "$namespace" "global-domain-$migration_id-cometbft-cometbft-data-$run_id" "global-domain-$migration_id-cometbft-cometbft-data"
+    kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
     type=$(get_postgres_type "$namespace-$component-pg")
     case "$type" in
       "canton:network:postgres")
-        restore_pvc_postgres "$component"
+        restore_pvc_postgres "$namespace" "$component" "$run_id"
         ;;
       "canton:cloud:postgres")
-        restore_cloudsql_postgres "$component"
+        restore_cloudsql_postgres "$namespace" "$component" "$run_id"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -201,7 +229,8 @@ function restore_component() {
 }
 
 function wait_cloudsql_restore() {
-  local -r component=$1
+  local -r namespace=$1
+  local -r component=$2
 
   cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
 
@@ -222,9 +251,10 @@ function wait_cloudsql_restore() {
 }
 
 function wait_restore_component() {
-  local -r component=$1
+  local -r namespace=$1
+  local -r component=$2
 
-  if [ "$component" == "cometbft-0" ]; then
+  if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
     type=$(get_postgres_type "$namespace-$component-pg")
@@ -233,7 +263,7 @@ function wait_restore_component() {
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"
         ;;
       "canton:cloud:postgres")
-        wait_cloudsql_restore "$component"
+        wait_cloudsql_restore "$namespace" "$component"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -247,7 +277,7 @@ function usage() {
 }
 
 function main() {
-  if [ "$#" -lt 3 ]; then
+  if [ "$#" -lt 4 ]; then
     usage
     exit 1
   fi
@@ -271,38 +301,38 @@ function main() {
   done
   set -- "${POSITIONAL_ARGS[@]}"
 
-  readonly namespace=$1
-  readonly run_id=$2
+  local -r namespace=$1
+  local -r migration_id=$2
+  local -r run_id=$3
 
-  for component in "${@:3}"; do
-    if [[ ! -v component_to_deployments["$component"] ]]; then
-      _error "Unknown component: $component"
-    fi
+  for component in "${@:4}"; do
+    # verify all components exist and have a mapping
+    component_to_deployments "$component" "$migration_id"
   done
 
   _info " ** Scaling down ** "
-  for component in "${@:3}"; do
-    down "$component"
+  for component in "${@:4}"; do
+    down "$namespace" "$component" "$migration_id"
   done
 
-  for component in "${@:3}"; do
-    wait_down "$component"
+  for component in "${@:4}"; do
+    wait_down "$namespace" "$component" "$migration_id"
   done
 
   _info " ** Restoring ** "
-  for component in "${@:3}"; do
-    restore_component "$component"
+  for component in "${@:4}"; do
+    restore_component "$namespace" "$component" "$migration_id" "$run_id"
   done
 
   _info " ** Waiting for all restore operations to finish ** "
-  for component in "${@:3}"; do
-    wait_restore_component "$component"
+  for component in "${@:4}"; do
+    wait_restore_component "$namespace" "$component"
   done
 
 
   _info " ** Scaling up ** "
-  for component in "${@:3}"; do
-    up "$component"
+  for component in "${@:4}"; do
+    up "$namespace" "$component" "$migration_id"
   done
 
 

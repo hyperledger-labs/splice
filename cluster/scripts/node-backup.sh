@@ -14,6 +14,7 @@ function backup_pvc() {
   local description=$1
   local namespace=$2
   local pvc_name=$3
+  local migration_id=$4
 
   local backupName="${pvc_name}-$RUN_ID"
 
@@ -24,6 +25,8 @@ apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   name: "$backupName"
+  annotations:
+    migrationId: "$migration_id"
 spec:
   volumeSnapshotClassName: dev-vsc
   source:
@@ -62,8 +65,10 @@ function backup_pvc_postgres() {
 
   _info "** Backup up pvc-based postgres $description **"
 
-  local pvc_name="pg-data-$instance-$migration_id"
-  backup_pvc "$description" "$namespace" "$pvc_name"
+  # Since we only have one replica, it's always 0.
+  replica_index="0"
+  local pvc_name="pg-data-$instance-$replica_index"
+  backup_pvc "$description" "$namespace" "$pvc_name" "$migration_id"
 }
 
 #### CloudSQL Backup & Restore
@@ -178,7 +183,9 @@ function wait_for_postgres_backup() {
   type=$(get_postgres_type "$full_instance")
 
   if [ "$type" == "canton:network:postgres" ]; then
-    local pvc_name="pg-data-$instance-$migration_id"
+    # Since we only have one replica, it's always 0.
+    replica_index="0"
+    local pvc_name="pg-data-$instance-$replica_index"
     wait_for_pvc_backup "$description" "$namespace" "$pvc_name"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     wait_for_cloudsql_backup "$description" "$full_instance"
@@ -196,7 +203,7 @@ function backup_component() {
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
     if [ "$component" == "cometbft-$migration_id" ]; then
-      backup_pvc "cometBFT" "$namespace" "global-domain-$migration_id-cometbft-cometbft-data"
+      backup_pvc "cometBFT" "$namespace" "global-domain-$migration_id-cometbft-cometbft-data" "$migration_id"
     else
       backup_postgres "$component" "$namespace" "$component-pg" "$migration_id"
     fi

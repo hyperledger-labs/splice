@@ -626,7 +626,6 @@ jobs:
         default: 3
       migration_id:
         type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -692,9 +691,8 @@ jobs:
       <<: *channel-notify-parameter
       namespace_name:
         type: string
-      expected_migration_id:
+      migration_id:
         type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -714,16 +712,16 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >>
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.expected_migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.expected_migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
                 ;;
             esac
       - print_gcloud_logs_commands:

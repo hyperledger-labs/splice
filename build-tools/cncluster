@@ -2250,15 +2250,16 @@ function subcmd_restore_node() {
     set -- "${POSITIONAL_ARGS[@]}"
 
     node="${1-}"
-    backup_run_id="${2-}"
+    migration_id="${2-}"
+    backup_run_id="${3-}"
 
-    if [ -z "$node" ]; then
-        _error "Usage: $SCRIPTNAME restore_node <namespace_name> [<backup_run_id>]"
+    if [ -z "$node" ] || [ -z "$migration_id" ]; then
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> [<backup_run_id>]"
     fi
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest backup"
-        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node")
+        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
@@ -2275,11 +2276,11 @@ function subcmd_restore_node() {
             _info "Silencing SV report creation alerts for $sv_name for 1 hour"
             subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer participant mediator cn-apps
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" cometbft sequencer participant mediator cn-apps
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant validator
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" participant validator
             ;;
         *)
             _error "Unknown node $node"

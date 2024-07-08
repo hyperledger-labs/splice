@@ -119,18 +119,6 @@
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
       - deploy_cluster:
           name: "prepare_cluster_for_migration"
           <<: *main-branch-never
@@ -175,7 +163,9 @@
             - preflight_check_core
             - preflight_sv_check_before_migration
             - preflight_validator_check_before_migration
-            - backup_cluster_before_migration
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
       - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-never
@@ -265,31 +255,38 @@
           migration_id: 1
           requires:
             - migrate_cluster
-      # TODO (#12393): reenable, this restore nukes the database of migration ID 1, which breaks.
-#      - restore_node:
-#          name: "restore_node_after_migration"
-#          <<: *main-branch-never
-#          cluster: "user-selected-scratchnet"
-#          namespace_name: "sv-3"
-#          expected_migration_id: 1
-#          context:
-#            - artifactory
-#            - canton-network-vpn
-#            - slack-context
-#          requires:
-#            - preflight_sv_check_migrated
-#            - preflight_validator_check_migrated
-#            - preflight_check_migrated
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
-            # TODO (#12393): readd: - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - restore_node_after_migration
             - migrate_sv_runbook
             - migrate_validator_runbook
       - enable_autoscaler:
@@ -382,6 +379,7 @@
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -393,6 +391,7 @@
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -407,6 +406,7 @@
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "validator1"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn

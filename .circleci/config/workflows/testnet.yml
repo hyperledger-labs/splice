@@ -27,6 +27,7 @@ workflow:
                 - deployment/testnet
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
+          migration_id: << pipeline.parameters.migration-id >>
           context:
             - artifactory
             - canton-network-vpn

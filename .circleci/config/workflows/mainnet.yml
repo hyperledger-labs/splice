@@ -13,6 +13,7 @@ workflow:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
+          migration_id: << pipeline.parameters.migration-id >>
           context:
             - artifactory
             - canton-network-vpn

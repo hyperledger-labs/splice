@@ -83,6 +83,10 @@ parameters:
   upgrade-version:
     type: string
     default: ""
+  # for jobs that require a migration-id to be specified
+  migration-id:
+    type: integer
+    default: 0
 
 notify-fail: &notify-fail
   context: slack-context

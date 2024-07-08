@@ -9,16 +9,17 @@ source "${REPO_ROOT}/cluster/scripts/utils.source"
 # TODO(#9361): For now, we assume the latest backup was a full one (all components).
 
 function usage() {
-  echo "Usage: $0 <namespace>"
+  _info "Usage: $0 <namespace> <migration_id>"
 }
 
 function main() {
-  if [ "$#" -lt 1 ]; then
+  if [ "$#" -lt 2 ]; then
       usage
       exit 1
   fi
 
   local namespace=$1
+  local migration_id=$2
   local component="validator"
   case "$namespace" in
       sv-1|sv-2|sv-3|sv-4)
@@ -31,7 +32,7 @@ function main() {
 
   if [ "$type" == "canton:network:postgres" ]; then
     # Since we assume that the latest backup was a full one, it suffices to find any volumesnapshot in this namespace
-    backup_run_id=$(kubectl get volumesnapshot -n "$namespace" --sort-by=.metadata.creationTimestamp -o json | jq -r '.items[-1].metadata.name // empty' | grep -o '[^-]*$')
+    backup_run_id=$(kubectl get volumesnapshot -n "$namespace" --sort-by=.metadata.creationTimestamp -o json | jq "[.items[] | select(.metadata.annotations[\"migrationId\"] == \"$migration_id\")]" | jq -r '.[-1].metadata.name // empty' | grep -o '[^-]*$')
     echo "$backup_run_id"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     # Since we assume that the latest backup was a full one, we just find the latest backup on the validator's db.

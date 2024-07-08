@@ -88,6 +88,10 @@ parameters:
   upgrade-version:
     type: string
     default: ""
+  # for jobs that require a migration-id to be specified
+  migration-id:
+    type: integer
+    default: 0
 
 notify-fail: &notify-fail
   context: slack-context
@@ -2950,7 +2954,6 @@ jobs:
         default: 3
       migration_id:
         type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3016,9 +3019,8 @@ jobs:
       <<: *channel-notify-parameter
       namespace_name:
         type: string
-      expected_migration_id:
+      migration_id:
         type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3038,16 +3040,16 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >>
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.expected_migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.expected_migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
                 ;;
             esac
       - print_gcloud_logs_commands:
@@ -4206,6 +4208,7 @@ workflows:
           name: backup_cidaily
           <<: *main-branch-only
           cluster: "cidaily"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4407,6 +4410,7 @@ workflows:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4436,6 +4440,7 @@ workflows:
           cluster: "cidaily"
           # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4464,6 +4469,7 @@ workflows:
                 - deployment/cidaily
           cluster: "cidaily"
           namespace_name: "validator1"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4622,6 +4628,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4634,7 +4641,7 @@ workflows:
           <<: *main-branch-only
           cluster: "cimain"
           namespace_name: "sv-3"
-          expected_migration_id: 0
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -4734,16 +4741,6 @@ workflows:
           requires:
             - prepare_cluster_for_migration
             - prepare_sv_runbook_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-only
-          cluster: "ciperiodic"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
       - hard_migration:
           name: "prepare_cluster_for_migration"
           <<: *main-branch-only
@@ -4788,7 +4785,7 @@ workflows:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - prepare_cluster_for_migration
-            - backup_cluster_before_migration
+            - trigger_global_domain_migration
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-only
@@ -4801,7 +4798,7 @@ workflows:
           migration_id: 1
           wait_for_disabled_autoscaler: true
           requires:
-            - backup_cluster_before_migration
+            - trigger_global_domain_migration
       - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
           name: "migrate_sv_runbook"
           context:
@@ -4862,20 +4859,30 @@ workflows:
           migration_id: 1
           requires:
             - migrate_cluster
-# TODO (#12393): reenable, this restore nukes the database of migration ID 1,
-#      - restore_node:
-#          <<: *main-branch-only
-#          cluster: "ciperiodic"
-#          namespace_name: "sv-3"
-#          expected_migration_id: 1
-#          context:
-#            - artifactory
-#            - canton-network-vpn
-#            - slack-context
-#          requires:
-#            - preflight_sv_check_migrated
-#            - preflight_validator_check_migrated
-#            - preflight_check_migrated
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          <<: *main-branch-only
+          cluster: "ciperiodic"
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           <<: *main-branch-only
@@ -4887,12 +4894,8 @@ workflows:
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
-          # TODO (#12393): require only restore_node
           requires:
-          #  - restore_node
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - restore_node
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           <<: *main-branch-only
@@ -5622,18 +5625,6 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
       - deploy_cluster:
           name: "prepare_cluster_for_migration"
           <<: *main-branch-never
@@ -5678,7 +5669,9 @@ workflows:
             - preflight_check_core
             - preflight_sv_check_before_migration
             - preflight_validator_check_before_migration
-            - backup_cluster_before_migration
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
       - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-never
@@ -5768,31 +5761,38 @@ workflows:
           migration_id: 1
           requires:
             - migrate_cluster
-      # TODO (#12393): reenable, this restore nukes the database of migration ID 1, which breaks.
-#      - restore_node:
-#          name: "restore_node_after_migration"
-#          <<: *main-branch-never
-#          cluster: "user-selected-scratchnet"
-#          namespace_name: "sv-3"
-#          expected_migration_id: 1
-#          context:
-#            - artifactory
-#            - canton-network-vpn
-#            - slack-context
-#          requires:
-#            - preflight_sv_check_migrated
-#            - preflight_validator_check_migrated
-#            - preflight_check_migrated
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
-            # TODO (#12393): readd: - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - restore_node_after_migration
             - migrate_sv_runbook
             - migrate_validator_runbook
       - enable_autoscaler:
@@ -5885,6 +5885,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -5896,6 +5897,7 @@ workflows:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -5910,6 +5912,7 @@ workflows:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "validator1"
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -6249,7 +6252,7 @@ workflows:
                 - release-line-0.1.15
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 2
+          migration_id: << pipeline.parameters.migration-id >>
           context:
             - artifactory
             - canton-network-vpn
@@ -6279,6 +6282,7 @@ workflows:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
+          migration_id: << pipeline.parameters.migration-id >>
           context:
             - artifactory
             - canton-network-vpn
@@ -6332,6 +6336,7 @@ workflows:
                 - deployment/testnet
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
+          migration_id: << pipeline.parameters.migration-id >>
           context:
             - artifactory
             - canton-network-vpn
