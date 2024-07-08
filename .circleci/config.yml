@@ -4903,7 +4903,6 @@ workflows:
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
-          delay_mins: 10 # delay the preflight tests to give autoscaler some time to be happy
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
@@ -4919,9 +4918,7 @@ workflows:
           <<: *main-branch-only
           cluster: "ciperiodic"
           requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - preflight_sv_check_redeployed
 
   deploy_ciperiodic_non_devnet:
     when:
