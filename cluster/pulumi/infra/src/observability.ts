@@ -233,9 +233,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             ...infraAffinityAndTolerations,
           },
           templateFiles: {
-            'template.tmpl': readAlertingManagerFile('slack-notification.tmpl').replaceAll(
-              '$CLUSTER_BASENAME',
-              CLUSTER_BASENAME
+            'template.tmpl': substituteSlackNotificationTemplate(
+              readAlertingManagerFile('slack-notification.tmpl')
             ),
           },
         },
@@ -679,6 +678,14 @@ function createGrafanaContactPoints(namespace: Input<string>) {
   );
 }
 
+function substituteSlackNotificationTemplate(file: string) {
+  return file
+    .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
+    .replaceAll('$CLUSTER_NAME', CLUSTER_NAME)
+    .replaceAll('$GCP_PROJECT', GCP_PROJECT)
+    .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl);
+}
+
 function createGrafanaAlerting(namespace: Input<string>) {
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
@@ -707,11 +714,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
           'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
           'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
           'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
-          'templates.yaml': readGrafanaAlertingFile('templates.yaml')
-            .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
-            .replaceAll('$CLUSTER_NAME', CLUSTER_NAME)
-            .replaceAll('$GCP_PROJECT', GCP_PROJECT)
-            .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl),
+          'templates.yaml': substituteSlackNotificationTemplate(
+            readGrafanaAlertingFile('templates.yaml')
+          ),
         },
       },
     },
