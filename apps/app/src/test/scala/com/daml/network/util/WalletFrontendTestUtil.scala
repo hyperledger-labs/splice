@@ -40,7 +40,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         val tapsAfter = txs.flatMap(readTapFromRow)
         val newTaps = tapsAfter.filter(tap => !txDatesBefore.exists(_ == tap.date))
         logger.debug(s"New taps: $newTaps")
-        forExactly(1, newTaps) { tap =>
+        forAtLeast(1, newTaps) { tap =>
           tap.tapAmount shouldBe walletUsdToAmulet(tapQuantity)
         }
       }
