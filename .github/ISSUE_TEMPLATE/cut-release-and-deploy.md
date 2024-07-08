@@ -9,44 +9,57 @@ assignees: ''
 
 ## Cut release
 
+Note: Some commands assume you are using the [fish](https://fishshell.com/) shell. If you are using other shells, you may need to adjust the commands accordingly. For example, `foo (bar)` in `fish` is equivalent to `foo $(bar)` in `bash`.
+
 - [ ] Wait for everything to be merged that we want in it
   - [ ] ...
-- [ ] Do the steps from https://github.com/DACH-NY/canton-network-node/blob/main/RELEASE.md; make sure to:
-  - [ ] fix the release notes (if needed) and change `Upcoming` to the target version.
-  - [ ] Make sure the commit you want to release from has a `[release]` tag so it gets published as a non-snapshot version.
-        If you tweak the release notes, this can be the same commit.
-  - [ ] Create release branch from the commit with the `[release]` tag
-  - [ ] Trigger a release on the release branch
-  - [ ] Trigger CI job `publish-public-artifacts` on release branch
-  - [ ] bump `VERSION` and `LATEST_RELEASE` on main
+- [ ] Merge a PR into `origin/main` with the following changes:
+  - [ ] Verify that the `dar` files in `daml/dars` are up-to-date. These should have been updated by whoever updated our daml model, but it's not enforced.
+    - Run `sbt cleanCnDars` to ensure a clean environment.
+    - Run `sbt damlBuild`, this will generate the dar files in `daml/dars`.
+    - Run `find daml -name "*.dar" -not -path "*daml/dars/*" -not -path "*current.dar" -not -path "*test*.dar" -exec cp -t daml/dars {} +` in the project root to move all the created `dar`s to `daml/dars` (excluding `*-current.dar` and `*-test.dar`), and commit the copied files.
+  - [ ] Update the release notes (`cluster/images/docs/src/release_notes.rst`):
+    - Replace `Upcoming` by the target version
+    - Fix any spelling mistakes and make sure the RST rendering is not broken
+    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the preg version)
+  - [ ] Update `cluster/deployment/*/.envrc.vars`, bumping the release version.
+    - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
+    - Do NOT change `CN_DEPLOYMENT_FLUX_REF`. This value is used by the operator to determine what to deploy, and we do not want to change any deployment yet.
+  - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
+- [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
+  - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
+- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
+- [ ] Merge a PR into `origin/main` with the following changes:
+  - Update `VERSION` and `LATEST_RELEASE` on main. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
 - [ ] Open source any Daml changes, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
+  - [ ] Merge PR in https://github.com/digital-asset/decentralized-canton-sync
+  - [ ] Merge PR in https://github.com/hyperledger-labs/splice
 
 ## Upgrade our own nodes on DevNet
 
-- [ ] (optional) pause health checks
-- [ ] warn our partners on [#global-synchronizer-ops](https://daholdings.slack.com/archives/C05E70BCSDA): We'll be upgrading our nodes on DevNet to test a new version. Some turbulence might be expected.
-- [ ] Ensure all changes backported to the previous release branch are also included in main, e.g., by checking (adjusting branches as needed)
-      `git diff (git merge-base origin/release-line-0.1.13 origin/main) origin/release-line-0.1.13`
-      and ensuring that all changes are already included in the new release branch you're upgrading to. This should be the case but sometimes
-      a change gets missed. Note: At the moment, for testnet and mainnet the previous branch is still `deployment/testnet`, `deployment/mainnet` so view the diff against that.
-- [ ] Make a PR against the `.envrc.vars` file for the cluster you're upgrading in the release branch that bumps the versions.
-- [ ] Forward port that PR to `main`.
-- [ ] Trigger a CircleCI pipeline on the release branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER`. Review the output
-      together with someone else to see that there are no unexpected changes.
-      Pay particular attention to deleted or newly created resources.
-- [ ] Make a PR against main that changes the `CN_DEPLOYMENT_FLUX_REF` variable in the respective `.envrc.vars` to the new release branch, changes
-      the branch references in `.circleci/configs/*.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
-- [ ] Trigger a CircleCI pipeline on this PR branch (after merging the PR) with `run-job: preview-changes` and `cluster: YOUR_TARGET_CLUSTER` and review the changes to the `deployment` stack.
-- [ ] After merging to main, trigger a CircleCI pipeline on main with `run-job: update-deployment`. This makes the operator track the release branch.
-- [ ] wait for [the operator](cluster/README.md#the-operator) to apply your changes
-      A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful
-      and on the right commit.
-- [ ] confirm that we didn't break anything (e.g., via the grafana dashboards and a manually triggered preflight check)
-- [ ] resume health checks (if paused)
+- [ ] Warn our partners on [#supervalidator-ops](https://daholdings.slack.com/archives/C05E70BCSDA): "We'll be upgrading the DA-2 and DA-Eng nodes on DevNet to test a new version. Some turbulence might be expected."
+- [ ] Ensure all changes to the previous release branch are also included in main. This should be the case but sometimes a change gets missed.
+  - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off from main.
+    - Run `git diff (git merge-base origin/release-line-0.x.z origin/main) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
+    - Run `git log (git merge-base origin/release-line-0.x.z origin/main)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
+  - Note: At the moment, for testnet and mainnet the previous branch is still `deployment/testnet`, `deployment/mainnet` so view the diff against that when upgrading testnet or mainnet.
+- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: preview-changes` and `cluster: devnet`.
+    - Review the output together with someone else to see that there are no unexpected changes.
+    - Pay particular attention to deleted or newly created resources.
+- [ ] Merge a PR into `main` with the following changes:
+  - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
+  - [ ] Update the branch references in `.circleci/configs/*.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
+  - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes` and `cluster: devnet`
+    - Review the changes to the `deployment` stack.
+- [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
+  - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
+- [ ] Wait for [the operator](cluster/README.md#the-operator) to apply your changes
+  - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
+- [ ] Confirm that we didn't break anything (e.g., via the sv status grafana dashboard)
 
 ## Tell our partners
 
-- [ ] communicate to partners that a new version is available
+- [ ] Communicate to partners that a new version is available
 
 ## Persist lessons learned
 

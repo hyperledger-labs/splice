@@ -11,7 +11,7 @@ our development directly against that, while engaging also non-DA contributors.
 Currently:
 - Only our Daml models have been approved for open sourcing
 - Our Daml models have been open sourced at https://github.com/digital-asset/decentralized-canton-sync, copyrighted to Digital Asset
-- Our Daml models have also been handed over to Splice
+- Our Daml models have also been handed over to Splice at https://github.com/hyperledger-labs/splice
 - We still develop the Daml models in our private repo first, and then copy
 them to the open source repos. This implies that for the time being, we need
 to maintain both DA's open source repo as well as Splice, until active
@@ -21,11 +21,14 @@ DA's public repo *before* being pushed to Splice.
 ## Process
 
 As part of creating a new CN release, please:
-1. Run in the public `decentralized-canton-sync` repo:
-`scripts/update.sh <CN_REPO_ROOT> <SPLICE_REPO_ROOT>`
-2. Review and commit any Daml changes in `decentralized-canton-sync`
-3. Once the PR in `decentralized-canton-sync` is merged, review and commit
+1. Make sure you have checked out latest main in the [decentralized-canton-sync](https://github.com/digital-asset/decentralized-canton-sync) repo
+   and the [splice](https://github.com/hyperledger-labs/splice) repo.
+2. Run in the public `decentralized-canton-sync` repo:
+   `scripts/update.sh <CN_REPO_ROOT> <SPLICE_REPO_ROOT>`
+3. Review and commit any Daml changes in `decentralized-canton-sync`
+4. Once the PR in `decentralized-canton-sync` is merged, review and commit
    the same changes in the `splice` repo. Note that you will need to commit
    with `git commit -s` for your commit to be signed off in order to be able
    to merge it to Splice (unfortunately, there does not seem to be a git
    config to make that the default).
+   You may also need to create the PR from a fork of the Splice repo.
