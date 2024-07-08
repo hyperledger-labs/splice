@@ -14,6 +14,10 @@ Upcoming
 
   * HTML docs are now included in the release bundle, under `docs/html`.
 
+* Documentation
+
+  * Added notes about configuring traffic top-ups for validators to `validator-values.yaml`
+
 0.1.15
 ------
 
