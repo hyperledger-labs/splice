@@ -227,14 +227,6 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingUnlimitedTrafficTrigger(
-        onboardingTriggerContext,
-        dsoStore,
-        localSynchronizerNode.map(_.sequencerAdminConnection),
-        config.trafficBalanceReconciliationDelay,
-      )
-    )
-    registerTrigger(
       new SvOffboardingSequencerTrigger(
         wallClockTriggerContext,
         dsoStore,
@@ -333,6 +325,14 @@ class SvDsoAutomationService(
     registerTrigger(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
+        dsoStore,
+        localSynchronizerNode.map(_.sequencerAdminConnection),
+        config.trafficBalanceReconciliationDelay,
+      )
+    )
+    registerTrigger(
+      new SvOnboardingUnlimitedTrafficTrigger(
+        onboardingTriggerContext,
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
