@@ -29,6 +29,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.Schedule
 import Splice.Util
 
 
@@ -247,6 +248,9 @@ data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficCon
 
 data DsoRules_MergeSvRewardStateResult = DsoRules_MergeSvRewardStateResult with
     svRewardState : ContractId SvRewardState
+
+data DsoRules_PruneAmuletConfigScheduleResult = DsoRules_PruneAmuletConfigScheduleResult with
+    amuletRulesCid : ContractId AmuletRules
 
 
 -- Workflow templates
@@ -1170,6 +1174,26 @@ template DsoRules with
          -- taking the max is the correct merge.
          cid <- create $ maximumOn (\state -> state.state.lastRoundCollected) rewardStates
          pure $ DsoRules_MergeSvRewardStateResult cid
+
+    nonconsuming choice DsoRules_PruneAmuletConfigSchedule : DsoRules_PruneAmuletConfigScheduleResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+      controller dsoDelegate
+      do now <- getTime
+         amuletRules <- fetchAndArchive (ForDso dso) amuletRulesCid
+         case pruneAtLeastOne now amuletRules.configSchedule of
+           None -> abort ("Must have at least one scheduled config in futureValues with a timestamp <= " <> show now)
+           Some newSchedule -> do
+             newAmuletRules <- create amuletRules with configSchedule = newSchedule
+             pure $ DsoRules_PruneAmuletConfigScheduleResult newAmuletRules
+
+pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
+pruneAtLeastOne now schedule =
+   case reverse past of
+     [] -> None
+     (_, newInitial) :: _ -> Some (Schedule newInitial future)
+   where
+     (past, future) = span (\(t, _) -> t <= now) schedule.futureValues
 
 summarizeDso : DsoRules -> DsoSummary
 summarizeDso dsoRules = DsoSummary with
