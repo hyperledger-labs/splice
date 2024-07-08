@@ -13,14 +13,16 @@
   {{- end -}}
 
   $CLUSTER_BASENAME
-  {{- if $hasCritical }}
+  {{ if gt (len .Alerts.Firing) 0 }}
+    {{- if $hasCritical }}
     🔥 {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-  {{- else if $hasWarning }}
+    {{- else if $hasWarning }}
     ⚠️ {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-  {{- else }}
+    {{- else }}
     :information_source: {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-  {{- end }}
-  {{ if gt (len .Alerts.Resolved) 0 }} ✅ $CLUSTER_BASENAME {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}
+    {{- end }}
+  {{ end }}
+  {{ if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}
 {{ end }}
 
 {{ define "slack_message" }}
@@ -36,11 +38,11 @@
       {{- $hasOthers = true -}}
     {{- end -}}
   {{- end -}}
-  {{ if $hasCritical }} 🔥*Critical alerts*\n {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "critical" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasWarning }} ⚠️*Warning alerts*\n {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "warning" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasInfo }} :information_source:*Info alerts*\n {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "info" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasOthers }} *Other alerts*\n {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity "info")  (ne .Annotations.severity "warning")) (ne .Annotations.severity "critical") -}} {{ template "slack_alert_firing" . }} {{ end }} {{ end }} {{ end }}
-  {{ if gt (len .Alerts.Resolved) 0 }} ✅*Resolved Alerts*\n {{ range .Alerts.Resolved }} {{ template "slack_alert_resolved" .}} {{ end }} {{ end }}
+  {{ if $hasCritical }} 🔥Critical alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "critical" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+  {{ if $hasWarning }} ⚠️Warning alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "warning" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+  {{ if $hasInfo }} :information_source:Info alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "info" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+  {{ if $hasOthers }} Other alerts {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity "info")  (ne .Annotations.severity "warning")) (ne .Annotations.severity "critical") -}} {{ template "slack_alert_firing" . }} {{ end }} {{ end }} {{ end }}
+  {{ if gt (len .Alerts.Resolved) 0 }} ✅Resolved Alerts {{ range .Alerts.Resolved }} {{ template "slack_alert_resolved" .}} {{ end }} {{ end }}
 {{ end }}
 
 {{ define "slack_alert_firing" }}
