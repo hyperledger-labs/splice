@@ -55,6 +55,7 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "cimain"
+          silence_deployment_alerts: true
           requires:
             - deploy_cluster
       - preflight_sv_check:
@@ -72,6 +73,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cimain"
+          silence_deployment_alerts: true
           requires:
             - deploy_cluster
       - preflight_validator_check:
