@@ -321,7 +321,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -433,7 +433,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
