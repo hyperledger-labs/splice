@@ -146,5 +146,3 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - wait_for_previous_pipeline

@@ -6254,8 +6254,6 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - wait_for_previous_pipeline
 
   apply_infra:
     when:
@@ -6322,8 +6320,6 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - cancel_if_previous_pipeline
 
   backup_testnet:
     when:
@@ -6340,6 +6336,4 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - wait_for_previous_pipeline
 
