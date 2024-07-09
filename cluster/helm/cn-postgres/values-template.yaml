@@ -12,6 +12,7 @@ db:
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
   maxConnections: 300
+  maxWalSize: 2GB
 
 persistence:
   secretName: "postgres-secrets"
