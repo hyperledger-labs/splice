@@ -37,7 +37,7 @@ function docker_start() {
     -p 5432:5432 \
     $DOCKER_POSTGRES_IMAGE_NAME \
     postgres \
-    -c max_connections=8000 \
+    -c max_connections=16000 \
     -c log_statement=all \
     -c logging_collector=on \
     -c log_destination=csvlog \

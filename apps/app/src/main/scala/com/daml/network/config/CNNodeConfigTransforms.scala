@@ -482,23 +482,28 @@ object CNNodeConfigTransforms {
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
           .focus(_.localSynchronizerNode)
-          .modify(_.map(c => {
-            c
-              .focus(_.sequencer.internalApi.port)
-              .modify(setPortPrefix(range))
-              .focus(_.sequencer.adminApi.port)
-              .modify(setPortPrefix(range))
-              .focus(_.sequencer.externalPublicApiUrl)
-              .modify(setPortPrefixInUrl(range))
-              .focus(_.mediator.adminApi.port)
-              .modify(setPortPrefix(range))
-          }))
+          .modify(_.map(c => setSvSynchronizerConfigPortsPrefix(range, c)))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
       } else {
         config
       }
     })
+  }
+
+  def setSvSynchronizerConfigPortsPrefix(
+      range: Int,
+      config: SvSynchronizerNodeConfig,
+  ): SvSynchronizerNodeConfig = {
+    config
+      .focus(_.sequencer.internalApi.port)
+      .modify(setPortPrefix(range))
+      .focus(_.sequencer.adminApi.port)
+      .modify(setPortPrefix(range))
+      .focus(_.sequencer.externalPublicApiUrl)
+      .modify(setPortPrefixInUrl(range))
+      .focus(_.mediator.adminApi.port)
+      .modify(setPortPrefix(range))
   }
 
   def bumpSomeScanAppPortsBy(bump: Int, scanApps: Seq[String]): CNNodeConfigTransform = {

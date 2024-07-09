@@ -9,7 +9,10 @@ import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.admin.api.client.commands.{
+  HttpScanAppClient,
+  HttpScanSoftDomainMigrationPocAppClient,
+}
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
@@ -360,6 +363,26 @@ class SingleScanConnection private[client] (
         config.adminApi.url,
         HttpScanAppClient.GetMigrationSchedule(),
       )
+    )
+
+  def getSynchronizerIdentities(domainIdPrefix: String)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerIdentities(domainIdPrefix),
+    )
+
+  def getSynchronizerBootstrappingTransactions(domainIdPrefix: String)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerBootstrappingTransactions] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerBootstrappingTransactions(
+        domainIdPrefix
+      ),
     )
 }
 

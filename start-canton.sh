@@ -25,9 +25,10 @@ CANTON=canton
 globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
 global_cometbft=0
+softDomainMigration=0
 collect_metrics=0
 
-args=$(getopt -o "hdap:c:wsbtfgm" -l "help" -- "$@")
+args=$(getopt -o "hdap:c:wsbtfgm" -l "help,soft-domain-migration" -- "$@")
 
 eval set -- "$args"
 
@@ -73,6 +74,10 @@ do
             ;;
         -m)
             collect_metrics=1
+            ;;
+        --soft-domain-migration)
+            softDomainMigration=1
+            echo "starting extra domain to test soft domain migrations"
             ;;
         --)
             shift
@@ -155,6 +160,20 @@ else
   fi
 fi
 
+if [ $softDomainMigration -eq 1 ]; then
+  db_names+=(
+    "sequencer_driver_new"
+    "sequencer_new_sv1"
+    "sequencer_new_sv2"
+    "sequencer_new_sv3"
+    "sequencer_new_sv4"
+    "mediator_new_sv1"
+    "mediator_new_sv2"
+    "mediator_new_sv3"
+    "mediator_new_sv4"
+  )
+fi
+
 # Create the DB's in parallel
 printf '%s\n' "${db_names[@]}" | xargs -P 64 -I {} ./scripts/postgres.sh "$POSTGRES_MODE" createdb {}
 
@@ -196,6 +215,10 @@ if [ $globalUpgradeDomain -eq 1 ] && [ $simtime -eq 0 ]; then
       "$bootstrapScriptPath" > "$combinedBootstrapScriptPath"
   bootstrapScriptPath="$combinedBootstrapScriptPath"
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/global-upgrade-domain-overrides.conf"
+fi
+
+if [ $softDomainMigration -eq 1 ]; then
+config_overrides="$config_overrides -c ./apps/app/src/test/resources/simple-topology-soft-domain-upgrade-canton.conf"
 fi
 
 tmux_cmd_canton() {

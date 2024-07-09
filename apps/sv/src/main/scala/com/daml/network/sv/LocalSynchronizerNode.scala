@@ -54,13 +54,7 @@ final class LocalSynchronizerNode(
     with FlagCloseable
     with NamedLogging {
 
-  val sequencerConnection =
-    new GrpcSequencerConnection(
-      LocalSynchronizerNode.toEndpoints(sequencerInternalConfig),
-      transportSecurity = sequencerInternalConfig.tls.isDefined,
-      customTrustCertificates = None,
-      SequencerAlias.Default,
-    )
+  val sequencerConnection = LocalSynchronizerNode.toSequencerConnection(sequencerInternalConfig)
 
   private def containsIdentityTransactions(
       uid: UniqueIdentifier,
@@ -394,4 +388,12 @@ object LocalSynchronizerNode {
   // to simplify conversion to GrpcSequencerConnection.
   private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
     NonEmpty.mk(Seq, toEndpoint(config))
+
+  def toSequencerConnection(config: ClientConfig) =
+    new GrpcSequencerConnection(
+      LocalSynchronizerNode.toEndpoints(config),
+      transportSecurity = config.tls.isDefined,
+      customTrustCertificates = None,
+      SequencerAlias.Default,
+    )
 }

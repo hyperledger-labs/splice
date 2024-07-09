@@ -573,6 +573,39 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetDsoInfoResponse"
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/sign_bootstrapping_state:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "signSynchronizerBootstrappingState"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/initialize:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "initializeSynchronizer"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
 components:
   schemas:
     ListOngoingValidatorOnboardingsResponse:

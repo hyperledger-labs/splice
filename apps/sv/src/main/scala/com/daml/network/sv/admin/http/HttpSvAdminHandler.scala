@@ -38,7 +38,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 
 class HttpSvAdminHandler(
@@ -54,7 +54,7 @@ class HttpSvAdminHandler(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContext,
+    ec: ExecutionContextExecutor,
     tracer: Tracer,
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvAdminHandler[TracedUser]
@@ -634,5 +634,4 @@ class HttpSvAdminHandler(
       }
     }(extracted.traceContext, tracer)
   }
-
 }

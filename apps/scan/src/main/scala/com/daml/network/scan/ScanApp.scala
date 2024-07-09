@@ -17,8 +17,13 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
 import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
+import com.daml.network.http.v0.scan_soft_domain_migration_poc.ScanSoftDomainMigrationPocResource
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.admin.http.{HttpExternalScanHandler, HttpScanHandler}
+import com.daml.network.scan.admin.http.{
+  HttpExternalScanHandler,
+  HttpScanHandler,
+  HttpScanSoftDomainMigrationPocHandler,
+}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -187,6 +192,21 @@ class ScanApp(
         loggerFactory,
       )
 
+      softDomainMigrationPocHandler =
+        if (config.supportsSoftDomainMigrationPoc)
+          Seq(
+            new HttpScanSoftDomainMigrationPocHandler(
+              participantAdminConnection,
+              store,
+              loggerFactory,
+              amuletAppParameters,
+              nodeMetrics,
+              config.synchronizers,
+              retryProvider,
+            )
+          )
+        else Seq.empty
+
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
@@ -196,8 +216,11 @@ class ScanApp(
             requestLogger(traceContext) {
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
-                  InternalScanResource.routes(internalHandler, _ => provide(traceContext)),
-                  ExternalScanResource.routes(externalHandler, _ => provide(traceContext)),
+                  (InternalScanResource.routes(internalHandler, _ => provide(traceContext)) +:
+                    ExternalScanResource.routes(externalHandler, _ => provide(traceContext)) +:
+                    softDomainMigrationPocHandler.map(handler =>
+                      ScanSoftDomainMigrationPocResource.routes(handler, _ => provide(traceContext))
+                    ))*
                 )
               }
             }

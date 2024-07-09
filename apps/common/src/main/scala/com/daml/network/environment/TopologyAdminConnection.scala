@@ -171,17 +171,32 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[SequencerDomainStateX]]] =
+    listSequencerDomainState(
+      TopologyStoreId.DomainStore(domainId),
+      domainId,
+      timeQuery,
+      proposals,
+    )
+
+  def listSequencerDomainState(
+      store: TopologyStoreId,
+      domainId: DomainId,
+      timeQuery: TimeQuery,
+      proposals: Boolean,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TopologyResult[SequencerDomainStateX]]] =
     runCmd(
       TopologyAdminCommandsX.Read.SequencerDomainState(
         BaseQueryX(
-          filterStore = domainId.filterString,
+          filterStore = store.filterName,
           proposals = proposals,
           timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
         ),
-        filterDomain = "",
+        filterDomain = domainId.filterString,
       )
     ).map { txs =>
       txs.map(res => TopologyResult(res.context, res.item))
@@ -202,35 +217,36 @@ abstract class TopologyAdminConnection(
   def getMediatorDomainStateProposals(domainId: DomainId)(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[MediatorDomainStateX]]] = {
-    listMediatorDomainState(domainId, proposals = true)
+    listMediatorDomainState(TopologyStoreId.DomainStore(domainId), domainId, proposals = true)
   }
 
   def getMediatorDomainState(domainId: DomainId)(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[MediatorDomainStateX]] =
-    listMediatorDomainState(domainId, proposals = false).map { txs =>
-      txs.headOption
-        .getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription(s"No mediator state for domain $domainId")
-            .asRuntimeException()
-        )
-    }
+    listMediatorDomainState(TopologyStoreId.DomainStore(domainId), domainId, proposals = false)
+      .map { txs =>
+        txs.headOption
+          .getOrElse(
+            throw Status.NOT_FOUND
+              .withDescription(s"No mediator state for domain $domainId")
+              .asRuntimeException()
+          )
+      }
 
-  private def listMediatorDomainState(domainId: DomainId, proposals: Boolean)(implicit
-      traceContext: TraceContext
+  def listMediatorDomainState(store: TopologyStoreId, domainId: DomainId, proposals: Boolean)(
+      implicit traceContext: TraceContext
   ) = {
     runCmd(
       TopologyAdminCommandsX.Read.MediatorDomainState(
         BaseQueryX(
-          filterStore = domainId.filterString,
+          filterStore = store.filterName,
           proposals = proposals,
           timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
         ),
-        filterDomain = "",
+        filterDomain = domainId.filterString,
       )
     )
   }.map { txs =>
@@ -254,17 +270,18 @@ abstract class TopologyAdminConnection(
         )
     }
 
-  private def listDecentralizedNamespaceDefinition(
+  def listDecentralizedNamespaceDefinition(
       domainId: DomainId,
       decentralizedNamespace: Namespace,
       proposals: TopologyTransactionType = AuthorizedState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
   )(implicit tc: TraceContext) = {
     runCmd(
       TopologyAdminCommandsX.Read.ListDecentralizedNamespaceDefinition(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals.proposals,
-          timeQuery = TimeQuery.HeadState,
+          timeQuery = timeQuery,
           ops = None,
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
@@ -290,6 +307,8 @@ abstract class TopologyAdminConnection(
       store: Option[TopologyStoreId],
       timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: Boolean = false,
+      includeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
+      filterNamespace: Option[Namespace] = None,
   )(implicit
       tc: TraceContext
   ): Future[Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]] = {
@@ -303,8 +322,10 @@ abstract class TopologyAdminConnection(
           filterSigningKey = "",
           protocolVersion = None,
         ),
-        filterNamespace = "",
-        excludeMappings = Seq.empty,
+        filterNamespace = filterNamespace.fold("")(_.filterString),
+        excludeMappings =
+          if (includeMappings.isEmpty) Seq.empty
+          else TopologyMappingX.Code.all.diff(includeMappings).map(_.code),
       )
     ).map(_.result)
   }
@@ -472,7 +493,7 @@ abstract class TopologyAdminConnection(
       filterNamespace = participantId.namespace.filterString,
     )
 
-  private def proposeMapping[M <: TopologyMappingX: ClassTag](
+  def proposeMapping[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
       mapping: M,
       signedBy: Fingerprint,
@@ -1292,7 +1313,12 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
-    listDomainParametersState(domainId, proposals, TimeQuery.HeadState)
+    listDomainParametersState(
+      TopologyStoreId.DomainStore(domainId),
+      domainId,
+      proposals,
+      TimeQuery.HeadState,
+    )
       .map(_.headOption.getOrElse {
         throw Status.NOT_FOUND
           .withDescription(s"No DomainParametersState state domain $domainId")
@@ -1304,18 +1330,24 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersStateX]]] = {
-    listDomainParametersState(domainId, proposals, TimeQuery.Range(None, None))
+    listDomainParametersState(
+      TopologyStoreId.DomainStore(domainId),
+      domainId,
+      proposals,
+      TimeQuery.Range(None, None),
+    )
   }
 
-  private def listDomainParametersState(
+  def listDomainParametersState(
+      storeId: TopologyStoreId,
       domainId: DomainId,
       proposals: TopologyTransactionType,
       timeQuery: TimeQuery,
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersStateX]]] = {
     runCmd(
       TopologyAdminCommandsX.Read.DomainParametersState(
         BaseQueryX(
-          domainId.filterString,
+          storeId.filterName,
           proposals = proposals.proposals,
           timeQuery,
           None,

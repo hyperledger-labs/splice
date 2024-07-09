@@ -19,11 +19,16 @@ import com.daml.network.environment.*
 import com.daml.network.http.CNHttpClient
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
+import com.daml.network.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
 import com.daml.network.migration.AcsExporter
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
+import com.daml.network.sv.admin.http.{
+  HttpSvAdminHandler,
+  HttpSvHandler,
+  HttpSvSoftDomainMigrationPocHandler,
+}
 import com.daml.network.sv.automation.{
   LeaderBasedAutomationService,
   SvDsoAutomationService,
@@ -507,6 +512,23 @@ class SvApp(
         loggerFactory,
       )
 
+      softDomainMigrationPocHandler =
+        if (config.supportsSoftDomainMigrationPoc)
+          Seq(
+            new HttpSvSoftDomainMigrationPocHandler(
+              dsoAutomation,
+              localSynchronizerNode,
+              config.synchronizerNodes,
+              participantAdminConnection,
+              clock,
+              retryProvider,
+              loggerFactory,
+              amuletAppParameters,
+              metrics,
+            )
+          )
+        else Seq.empty
+
       route = cors(
         CorsSettings(ac)
           .withAllowedMethods(
@@ -525,20 +547,32 @@ class SvApp(
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                SvResource.routes(
+                (SvResource.routes(
                   handler,
                   _ => provide(traceContext),
-                ),
-                SvAdminResource.routes(
-                  adminHandler,
-                  AdminAuthExtractor(
-                    verifier,
-                    svStore.key.svParty,
-                    svAutomation.connection,
-                    loggerFactory,
-                    "canton network sv admin realm",
-                  )(traceContext),
-                ),
+                ) +:
+                  SvAdminResource.routes(
+                    adminHandler,
+                    AdminAuthExtractor(
+                      verifier,
+                      svStore.key.svParty,
+                      svAutomation.connection,
+                      loggerFactory,
+                      "canton network sv admin realm",
+                    )(traceContext),
+                  ) +:
+                  softDomainMigrationPocHandler.map(handler =>
+                    SvSoftDomainMigrationPocResource.routes(
+                      handler,
+                      AdminAuthExtractor(
+                        verifier,
+                        svStore.key.svParty,
+                        svAutomation.connection,
+                        loggerFactory,
+                        "canton network sv admin realm",
+                      )(traceContext),
+                    )
+                  ))*
               )
             }
           }

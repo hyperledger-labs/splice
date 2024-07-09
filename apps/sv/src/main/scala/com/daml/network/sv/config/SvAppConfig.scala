@@ -175,6 +175,8 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[CometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
+    // This is for the Poc from #13301
+    synchronizerNodes: Map[String, SvSynchronizerNodeConfig] = Map.empty,
     scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -196,6 +198,8 @@ case class SvAppBackendConfig(
     // We don't make this optional to encourage users to think about it at least. They
     // can always set it to an empty string.
     contactPoint: String,
+    // TODO(#13301) Remove this flag
+    supportsSoftDomainMigrationPoc: Boolean = false,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

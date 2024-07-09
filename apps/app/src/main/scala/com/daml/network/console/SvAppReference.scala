@@ -14,7 +14,11 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{BuildInfo, CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
-import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
+import com.daml.network.sv.admin.api.client.commands.{
+  HttpSvAdminAppClient,
+  HttpSvSoftDomainMigrationPocAppClient,
+  HttpSvAppClient,
+}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
@@ -383,6 +387,18 @@ class SvAppBackendReference(
   def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
+    }
+
+  def signSynchronizerBootstrappingState(domainIdPrefix: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvSoftDomainMigrationPocAppClient.SignSynchronizerBootstrappingState(domainIdPrefix)
+      )
+    }
+
+  def initializeSynchronizer(domainIdPrefix: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
     }
 
   /** Remote participant this sv app is configured to interact with. */

@@ -596,6 +596,51 @@ paths:
         "404":
           description: "No migration scheduled"
 
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-identities/{domain_id_prefix}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerIdentities"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerIdentities"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerBootstrappingTransactions"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerBootstrappingTransactions"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
 components:
   schemas:
     GetDsoPartyIdResponse:
@@ -1615,3 +1660,38 @@ components:
         migration_id:
           type: integer
           format: int64
+
+    SynchronizerIdentities:
+      type: object
+      required:
+        - sequencer_id
+        - sequencer_identity_transactions
+        - mediator_id
+        - mediator_identity_transactions
+      properties:
+        sequencer_id:
+          type: string
+        sequencer_identity_transactions:
+          type: array
+          items:
+            type: string
+        mediator_id:
+          type: string
+        mediator_identity_transactions:
+          type: array
+          items:
+            type: string
+
+    SynchronizerBootstrappingTransactions:
+      type: object
+      required:
+        - domain_parameters
+        - sequencer_domain_state
+        - mediator_domain_state
+      properties:
+        domain_parameters:
+          type: string
+        sequencer_domain_state:
+          type: string
+        mediator_domain_state:
+          type: string

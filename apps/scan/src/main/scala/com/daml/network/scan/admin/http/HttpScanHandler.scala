@@ -30,7 +30,7 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Using
@@ -54,7 +54,7 @@ class HttpScanHandler(
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContext,
+    ec: ExecutionContextExecutor,
     tracer: Tracer,
 ) extends v0.ScanHandler[TraceContext]
     with Spanning

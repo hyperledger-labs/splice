@@ -56,6 +56,7 @@ all network indices must be odd numbers.
   - See `simple-topology.conf` with ports bumped by 20k (currently for the ledger API, but may be extended for other connections in the future)
 - `26`: Reserved for CometBFT
 - `27`: Standalone Canton instances launched in integration tests
+- `28`: Canton instances used for soft domain migration tests
 
 ### Allocated Nodes (Node Index)
 

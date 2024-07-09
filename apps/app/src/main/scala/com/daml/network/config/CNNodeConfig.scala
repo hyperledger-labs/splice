@@ -13,7 +13,11 @@ import com.daml.network.http.v0.definitions.{
 }
 import com.daml.network.http.UrlValidator
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import com.daml.network.scan.config.{
+  ScanAppBackendConfig,
+  ScanAppClientConfig,
+  ScanSynchronizerConfig,
+}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
@@ -386,6 +390,8 @@ object CNNodeConfig {
       deriveReader[ScanAppClientConfig]
     implicit val domainConfigReader: ConfigReader[SynchronizerConfig] =
       deriveReader[SynchronizerConfig]
+    implicit val scanSynchronizerConfig: ConfigReader[ScanSynchronizerConfig] =
+      deriveReader[ScanSynchronizerConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -648,6 +654,8 @@ object CNNodeConfig {
       deriveWriter[BftScanClientConfig]
     implicit val scanClientConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
+    implicit val scanSynchronizerConfig: ConfigWriter[ScanSynchronizerConfig] =
+      deriveWriter[ScanSynchronizerConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
 

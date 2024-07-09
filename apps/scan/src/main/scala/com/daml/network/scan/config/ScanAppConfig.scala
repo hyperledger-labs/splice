@@ -13,6 +13,11 @@ import com.digitalasset.canton.config.*
 
 trait BaseScanAppConfig {}
 
+final case class ScanSynchronizerConfig(
+    sequencer: ClientConfig,
+    mediator: ClientConfig,
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -22,6 +27,9 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: CNParticipantClientConfig,
     sequencerAdminClient: ClientConfig,
+    // Map from domain id prefix to sequencer/mediator config
+    // This is for the Poc from #13301
+    synchronizers: Map[String, ScanSynchronizerConfig] = Map.empty,
     override val automation: AutomationConfig = AutomationConfig(),
     isFounder: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
@@ -30,6 +38,8 @@ case class ScanAppBackendConfig(
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
+    // TODO(#13301) Remove this flag
+    supportsSoftDomainMigrationPoc: Boolean = false,
 ) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {
