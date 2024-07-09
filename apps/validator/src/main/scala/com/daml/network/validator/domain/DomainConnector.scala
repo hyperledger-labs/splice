@@ -8,6 +8,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DsoSequ
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.config.DomainTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -96,6 +97,9 @@ class DomainConnector(
     val domainConfig = DomainConnectionConfig(
       alias,
       sequencerConnections,
+      timeTracker = DomainTimeTrackerConfig(
+        minObservationDuration = config.timeTrackerMinObservationDuration
+      ),
     )
     logger.info(s"Ensuring domain $alias registered with config $domainConfig")
     participantAdminConnection.ensureDomainRegisteredAndConnected(

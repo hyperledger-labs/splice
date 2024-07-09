@@ -4,4 +4,6 @@ The provided balance may not be up to date if a balance update is being processe
 # TODO (#11294): suspicious warning, but doesn't fail tests
 Using approximate topology snapshot.*.*StandaloneSequencer
 
+Response message for request.*timed out
+
 # Make sure to have a trailing newline

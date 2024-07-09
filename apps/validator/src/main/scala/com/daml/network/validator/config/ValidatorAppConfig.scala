@@ -198,6 +198,9 @@ case class ValidatorAppBackendConfig(
     // We don't make this optional to encourage users to think about it at least. They
     // can always set it to an empty string.
     contactPoint: String,
+    // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
+    timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(1),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
