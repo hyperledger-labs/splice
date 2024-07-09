@@ -141,14 +141,16 @@ val damlDarsLockCheckerFileArg =
 lazy val `build-tools-dar-lock-checker` = project
   .in(file("build-tools/dar-lock-checker"))
   .settings(
-    libraryDependencies ++= Seq(Dependencies.better_files, Dependencies.daml_lf_archive_reader)
+    libraryDependencies ++= Seq(Dependencies.better_files, Dependencies.daml_lf_archive_reader),
+    Headers.ApacheDAHeaderSettings,
   )
 
 lazy val `tools` = project
   .in(file("apps/tools"))
   .dependsOn(`apps-app` % "compile->test")
   .settings(
-    libraryDependencies += auth0
+    libraryDependencies += auth0,
+    Headers.ApacheDAHeaderSettings,
   )
 
 lazy val docs = project
@@ -218,6 +220,7 @@ lazy val docs = project
     },
     cleanFiles += baseDirectory.value / "html",
     cleanFiles += sourceDirectory.value / "app_dev" / "api",
+    Headers.ApacheDAHeaderSettings,
   )
 
 // Shared non-template/non-interface code
@@ -767,6 +770,7 @@ lazy val `apps-common-frontend` = {
       cleanFiles += damlTsCodegenDir.value,
       cleanFiles += baseDirectory.value / "lib",
       cleanFiles += baseDirectory.value / "../../node_modules",
+      Headers.ApacheDAHeaderSettings,
     )
 }
 
@@ -776,7 +780,8 @@ lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
   bundle := BuildCommon.bundleFrontend.value,
   cleanFiles += baseDirectory.value / "build",
   cleanFiles += baseDirectory.value / "node_modules",
-)
+) ++ Headers.ApacheDAHeaderSettings
+
 lazy val `apps-wallet-frontend` = {
   project
     .in(file("apps/wallet/frontend"))
@@ -833,14 +838,18 @@ lazy val `apps-sv-frontend` = {
 }
 
 lazy val `apps-frontends` = {
-  project.aggregate(
-    `apps-common-frontend`,
-    `apps-wallet-frontend`,
-    `apps-ans-frontend`,
-    `apps-sv-frontend`,
-    `apps-scan-frontend`,
-    `apps-splitwell-frontend`,
-  )
+  project
+    .aggregate(
+      `apps-common-frontend`,
+      `apps-wallet-frontend`,
+      `apps-ans-frontend`,
+      `apps-sv-frontend`,
+      `apps-scan-frontend`,
+      `apps-splitwell-frontend`,
+    )
+    .settings(
+      Headers.ApacheDAHeaderSettings
+    )
 }
 
 lazy val `apps-wallet` =

@@ -15,6 +15,7 @@ import Wartremover.cnWarts
 import protocbridge.ProtocRunner
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
+import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
 
 object BuildCommon {
 
@@ -64,12 +65,12 @@ object BuildCommon {
       sys.env("ARTIFACTORY_USER"),
       sys.env("ARTIFACTORY_PASSWORD"),
     ),
-  ) ++ sharedProtocSettings
+  ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
 
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
-    sharedSettings ++ cantonWarts ++ cnWarts ++ unusedImportsSetting ++
+    sharedSettings ++ cantonWarts ++ cnWarts ++ unusedImportsSetting ++ Headers.ApacheDAHeaderSettings ++
       Seq(
         Compile / PB.deleteTargetDirectory := false,
         // ^^ do not let protocGenerate delete the entire target directory, otherwise the different apps
@@ -189,11 +190,11 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "formatFix",
-          s"; format ; scalafixAll ; apps-frontends/npmFix ; pulumi/npmFix ; load-tester/npmFix",
+          s"; format ; scalafixAll ; apps-frontends/npmFix ; pulumi/npmFix ; load-tester/npmFix ; headerCreate",
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck",
+          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
@@ -266,7 +267,9 @@ object BuildCommon {
     //      """
     //    ),
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
-  ) ++ sharedProtocSettings
+    headerSources / excludeFilter := "*",
+    headerResources / excludeFilter := "*",
+  ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
 
   // Project for utilities that are also used outside of the Canton repo
   lazy val `canton-util-external` = {
@@ -434,6 +437,7 @@ object BuildCommon {
         Compile / damlProjectVersionOverride := Some("0.0.1"),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
+        Headers.NoHeaderSettings,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
         //      addFilesToHeaderCheck("*.sh", "../pack", Compile),
