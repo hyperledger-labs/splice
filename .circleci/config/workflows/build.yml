@@ -58,7 +58,8 @@ workflow:
           name: "scala_test wall clock time"
           test_names_file: "test-full-class-names.log"
           start_canton_options: "-w -f -m"
-          resource_class: "xlarge"
+          # TODO(#13385) revert back to xlarge once the really demanging test is in a dedicated job
+          resource_class: "2xlarge"
           # TODO(#10912) Investigate why things got slower
           parallelism: 11
       - scala_test:
@@ -131,7 +132,7 @@ workflow:
           name: "scala_test disaster recovery"
           test_names_file: "test-full-class-names-disaster-recovery.log"
           start_canton_options: "-w"
-          resource_class: "xlarge"
+          resource_class: "2xlarge"
           parallelism: 1
       - scala_test:
           <<: *notify-fail
