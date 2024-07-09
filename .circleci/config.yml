@@ -5165,9 +5165,7 @@ workflows:
           cluster: "ciperiodic"
           num_nodes_from_env_var: "GCP_CLUSTER_MIN_NODES"
           requires:
-            - preflight_sv_check
-            - preflight_validator_check
-            - preflight_check
+            - preflight_sv_reonboard_check
 
   deploy_ciupgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
