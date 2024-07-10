@@ -142,9 +142,30 @@ class FoundingNodeInitializer(
           config,
           participantAdminConnection,
         ),
-        participantAdminConnection.uploadDarFiles(
-          requiredDars,
+        retryProvider.ensureThatB(
           RetryFor.WaitingOnInitDependency,
+          "founder_initial_package_upload",
+          "Founder has uploaded the initial set of packages",
+          initConnection
+            .lookupUserMetadata(
+              config.ledgerApiUser,
+              BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+            )
+            .map(_.nonEmpty),
+          participantAdminConnection
+            .uploadDarFiles(
+              requiredDars,
+              RetryFor.WaitingOnInitDependency,
+            )
+            .flatMap { _ =>
+              initConnection.ensureUserMetadataAnnotation(
+                config.ledgerApiUser,
+                BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+                "true",
+                RetryFor.WaitingOnInitDependency,
+              )
+            },
+          logger,
         ),
       ).tupled
       storeKey = SvStore.Key(svParty, dsoParty)

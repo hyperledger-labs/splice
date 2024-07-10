@@ -1003,6 +1003,9 @@ object BaseLedgerConnection {
 
   val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
 
+  val FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY: String =
+    "network.canton.global/founder_initial_package_upload"
+
   val DOMAIN_MIGRATION_CURRENT_MIGRATION_ID_METADATA_KEY: String =
     "network.canton.global/domain_migration_current_migration_id"
   val DOMAIN_MIGRATION_ACS_RECORD_TIME_METADATA_KEY: String =

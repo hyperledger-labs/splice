@@ -7,6 +7,7 @@ import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
+  BaseLedgerConnection,
   CNLedgerClient,
   ParticipantAdminConnection,
   RetryFor,
@@ -125,6 +126,14 @@ class DomainMigrationInitializer(
       _ <- readOnlyConnection.ensureUserHasPrimaryParty(
         config.ledgerApiUser,
         storeKey.svParty,
+      )
+      // User metadata gets reset on domain migrations so to guard against the onboarding config being set back to the founding one
+      // and avoiding premature package uploads we set the metadata field here as well.
+      _ <- readOnlyConnection.ensureUserMetadataAnnotation(
+        config.ledgerApiUser,
+        BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+        "true",
+        RetryFor.WaitingOnInitDependency,
       )
       migrationInfo =
         DomainMigrationInfo(

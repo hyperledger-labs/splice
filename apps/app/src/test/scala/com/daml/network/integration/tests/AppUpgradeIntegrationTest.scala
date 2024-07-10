@@ -174,6 +174,13 @@ class AppUpgradeIntegrationTest
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
+          // Founder does not upload DAR before the vote goes through
+          // TODO(#13413) Enable this
+          // val founderPackages = sv1Backend.participantClientWithAdminToken.packages.list()
+          // forAll(founderPackages) { pkg =>
+          //   pkg.packageId should not be DarResources.amulet.bootstrap.packageId
+          // }
+
           val amuletRules = sv2ScanBackend.getAmuletRules()
           val amuletConfig = amuletRules.payload.configSchedule.initialValue
           // Ideally we'd like the config to take effect immediately. However, we
@@ -304,6 +311,12 @@ class AppUpgradeIntegrationTest
               newAmuletRules.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
             },
           )
+
+          val founderPackagesAfterUpgrade =
+            sv1Backend.participantClientWithAdminToken.packages.list()
+          forExactly(1, founderPackagesAfterUpgrade) { pkg =>
+            pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
+          }
 
           actAndCheck(
             "Bob taps after upgrade",
