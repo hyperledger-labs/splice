@@ -450,7 +450,7 @@ class DbScanStore(
           // There exists no row for a (round, party) in round_party_totals where the party is not active in round,
           // so it is necessary to find the most recent round where the party was active
           // and sum the most recent total_amulet_balances for all parties.
-          // using greatest(0, ...) to handle negative balances caused by coins never expiring.
+          // using greatest(0, ...) to handle negative balances caused by amulets never expiring.
           storage.query(
             // TODO(#11312) change to query from round_totals when amulet expiry works again
             sql"""

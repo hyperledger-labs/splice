@@ -379,6 +379,10 @@ function subcmd_internal_coin_amulet_rename() {
     "'(?<!([Cc]anton ))(\b|(?<=[_-]))coin(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulet'" \
     "" \
     "$IGNORE_DOCS_RST"
+  rename "coins to amulets" \
+    "'(?<!([Cc]anton ))(\b|(?<=[_-]))coins(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulets'" \
+    "" \
+    "$IGNORE_DOCS_RST"
   rename "createdcoin to createdamulet" \
     "'\bcreatedcoin\b///createdamulet'" \
     "" \

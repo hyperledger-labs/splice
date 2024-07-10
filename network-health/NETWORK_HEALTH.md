@@ -13,7 +13,7 @@ There are 6 layers that all need to function for a network of 3f+1 SVs to be hea
 4. Mediators (f+1 need to work for all transactions)
 3. Participants (2f+1 need to work for any transaction with the DSO as a confirmer)
 5. SV apps (2f+1 need to work for rounds to advance, however transactions even with DSO confirmer can go through without SV apps functioning)
-6. Scan (f+1 need to work for each validator to be able to read data through explicit disclosure and perform coin operations)
+6. Scan (f+1 need to work for each validator to be able to read data through explicit disclosure and perform amulet operations)
 
 
 ## Alerting

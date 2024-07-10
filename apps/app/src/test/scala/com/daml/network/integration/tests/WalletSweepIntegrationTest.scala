@@ -88,7 +88,7 @@ class WalletSweepIntegrationTest
       sv1WalletClient.tap(maxBalanceUsd - 5)
       val sv1BalanceAtStart = sv1WalletClient.balance().unlockedQty.longValue
       val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
-      clue("sv1 should keep its coins") {
+      clue("sv1 should keep its amulets") {
         eventually() {
           sv1WalletClient.balance().unlockedQty.longValue shouldBe sv1BalanceAtStart
           aliceValidatorWalletClient.balance().unlockedQty.longValue shouldBe aliceBalanceAtStart
@@ -101,7 +101,7 @@ class WalletSweepIntegrationTest
       sv1WalletClient.tap(maxBalanceUsd + 2)
       val aliceBalanceAtStart = aliceValidatorWalletClient.balance().unlockedQty.longValue
       clue(
-        s"sv1 should transfer its coins to alice and still have a minimal balance of $minBalanceUsd"
+        s"sv1 should transfer its amulets to alice and still have a minimal balance of $minBalanceUsd"
       ) {
         eventually(40.seconds) {
           assertSweepCompleted()
@@ -233,7 +233,7 @@ class WalletSweepIntegrationTest
   }
 
   private def assertSweepCompleted()(implicit env: CNNodeTestConsoleEnvironment) = {
-    // The merging of the two tapped coins loses 1 x base transfer fee,
+    // The merging of the two tapped amulets loses 1 x base transfer fee,
     // but may occur after the amount of the transfer offer is computed.
     // When that happens, we end up having slightly less than the minimum balance.
     sv1Balance() should beWithin(minBalanceUsd - smallAmount, minBalanceUsd + smallAmount)

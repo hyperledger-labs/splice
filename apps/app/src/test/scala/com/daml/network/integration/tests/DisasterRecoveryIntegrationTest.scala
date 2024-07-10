@@ -330,7 +330,7 @@ class DisasterRecoveryIntegrationTest
 
         val validatorParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         actAndCheck(
-          "Tap coins for alice validator", {
+          "Tap amulets for alice validator", {
             aliceWalletClient.tap(1500.0)
           },
         )(

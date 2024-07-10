@@ -2445,7 +2445,7 @@ function subcmd_disaster_recovery_test() {
   taps[validator1]=105105105.0
   tapsTokens[validator1]=validator1
 
-  _info "Tapping coin before disaster"
+  _info "Tapping amulet before disaster"
   local ingressName
   for ingressName in "${!taps[@]}"; do
     _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
@@ -2465,11 +2465,11 @@ function subcmd_disaster_recovery_test() {
   for ingressName in "${!taps[@]}"; do
     _info "Checking tap of ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
     token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
-    local coinPrice=0.005
+    local amuletPrice=0.005
     local fuzzFactorForFees=0.95
     totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
                    -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
-    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $coinPrice * $fuzzFactorForFees")" ]; then
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $amuletPrice * $fuzzFactorForFees")" ]; then
         _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
     else
         _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
@@ -2580,11 +2580,11 @@ function subcmd_disaster_recovery_test() {
   for ingressName in "${!taps[@]}"; do
     _info "Checking restore of tap ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
     token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
-    local coinPrice=0.005
+    local amuletPrice=0.005
     local fuzzFactorForFees=0.95
     totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
                    -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
-    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $coinPrice * $fuzzFactorForFees")" ]; then
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $amuletPrice * $fuzzFactorForFees")" ]; then
         _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
     else
         _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
