@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # shellcheck shell=bash
 # Bash 3 compatible for Darwin
 # Based on https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/admin/pulumi-bin/update.sh
+
+
 set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )

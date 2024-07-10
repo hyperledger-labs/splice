@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 // This is a copy of https://github.com/TanStack/query/blob/118801df342881021c2bb6c8add5bb11b6dd944a/packages/query-core/src/utils.ts#L314 but extended to handle
 // 1. OpenAPI generated classes which behave like plain objects for most intents and purposes but don't satisfy the default check
 // 2. BigNumber which isn't a plain object but has clean equality check

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 set -eou pipefail
 
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.

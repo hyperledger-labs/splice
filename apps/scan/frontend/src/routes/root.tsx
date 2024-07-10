@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { PollingStrategy } from 'common-frontend-utils';
 import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
 import React, { useMemo } from 'react';

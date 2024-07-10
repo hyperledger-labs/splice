@@ -131,6 +131,7 @@ lazy val root: Project = (project in file("."))
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
+    Headers.OtherHeaderSettings,
   )
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
@@ -770,7 +771,7 @@ lazy val `apps-common-frontend` = {
       cleanFiles += damlTsCodegenDir.value,
       cleanFiles += baseDirectory.value / "lib",
       cleanFiles += baseDirectory.value / "../../node_modules",
-      Headers.ApacheDAHeaderSettings,
+      Headers.TsHeaderSettings,
     )
 }
 
@@ -780,7 +781,7 @@ lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
   bundle := BuildCommon.bundleFrontend.value,
   cleanFiles += baseDirectory.value / "build",
   cleanFiles += baseDirectory.value / "node_modules",
-) ++ Headers.ApacheDAHeaderSettings
+) ++ Headers.TsHeaderSettings
 
 lazy val `apps-wallet-frontend` = {
   project

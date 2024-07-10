@@ -1,4 +1,8 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // TODO(#7579) -- remove duplication from default config
+
 const config = {
   // URL of SV API.
   // Edit this to match the SV you're trying to connect to.

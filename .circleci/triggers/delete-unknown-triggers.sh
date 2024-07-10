@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This script calls the CircleCI API to delete scheduled triggers that are not defined in the repo as a JSON file.
+
+
 
 # Add your personal API token to the CIRCLECI_TOKEN environment variable before running the script.
 # https://circleci.com/docs/managing-api-tokens

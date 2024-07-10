@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 set -euo pipefail
 
 # This script returns recent activity (comments only) on issues in the Flaky Tests milestone that are not labeled as "now", "infrequent/no repro", or "blocked-on-upstream", and that are assigned to no one.

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Usage: .circleci/download-ci-artifacts.sh and enter the ~5-digit CircleCI job number when prompted
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.
+
+
 
 set -eou pipefail
 

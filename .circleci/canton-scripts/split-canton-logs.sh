@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 ###############################################################################
 # Split Canton logs into logs before and after shutdown
 ###############################################################################
+
+
 
 set -eou pipefail
 

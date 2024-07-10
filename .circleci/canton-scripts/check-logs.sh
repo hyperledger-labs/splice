@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 ###############################################################################
 # This script was copied from the Canton repo and then heavily adapted to use
 # ripgrep instead of lnav for filtering the logs. To say that it's faster this
 # way is an understatement.
 ###############################################################################
+
+
 
 set -eou pipefail
 

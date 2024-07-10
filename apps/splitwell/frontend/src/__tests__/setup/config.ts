@@ -1,4 +1,8 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // TODO(#7579) -- remove duplication from default config
+
 const config = {
   auth: {
     algorithm: 'hs-256-unsafe',

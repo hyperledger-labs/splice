@@ -1,6 +1,11 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # shellcheck shell=bash
 ## A basic Bash autocomplete for cncluster. Currently only autocompletes on cncluster's subcommands.
 ## To install, add a line: `source <this script>` to your ~/.bashrc
+
+
 
 __cncluster() {
     local cur

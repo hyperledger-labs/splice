@@ -9,7 +9,7 @@ repos:
         language: system
         require_serial: true
         entry: "bash -c 'sbt --client \"headerCreate\"' bash"
-        types: [scala] # TODO(#13367): Extend as we add more file types
+        files: '(.*\.daml|.*\.scala|.*\.sh|.*\.py|.*\.tsx|.*\.rst)'
       - id: scalafmt
         name: scalafmt
         language: system

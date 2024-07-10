@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { DisableConditionally, ErrorDisplay, Loading } from 'common-frontend';
 import { AssignedContract, Contract } from 'common-frontend-utils';
 import { useCallback, useState } from 'react';

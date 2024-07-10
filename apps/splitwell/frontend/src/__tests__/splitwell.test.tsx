@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';

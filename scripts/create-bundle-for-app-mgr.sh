@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This script is used mostly for the app manager. If you are not sure you need this one,
 # then most chances are you are looking for the `create-bundle.sh` script in the repo root.
+
+
 
 # This is a shell script to allow for easily building custom bundles
 # outside of tests, e.g, for manual testing.

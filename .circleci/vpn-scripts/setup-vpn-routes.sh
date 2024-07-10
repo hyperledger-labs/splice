@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 set -eoux pipefail
 # Virtual IP setup by charon-cmd, we assume this is only ip4 interface without a broadcast address.
 echo "Dumping full ip config for debugging"

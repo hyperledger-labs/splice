@@ -1,4 +1,8 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Static constants for mock values
+
 export const splitwellProviderPartyId =
   'splitwell__provider::122087c9aa69ea8ab1b674bbb7c39e47d03c15b6ffaf7343b58b4a6b71c9d9fc6ce1';
 

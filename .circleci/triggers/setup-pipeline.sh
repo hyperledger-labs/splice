@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # This script calls the CircleCI API to create / update the scheduled pipeline.
 # The pipeline runs once a day and triggers certain workflows (i.e., continuous cluster deployment)
+
+
 
 # Add your personal API token to the CIRCLECI_TOKEN environment variable before running the script.
 # https://circleci.com/docs/managing-api-tokens

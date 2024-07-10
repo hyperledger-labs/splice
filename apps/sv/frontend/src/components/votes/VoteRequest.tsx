@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
 import { DisableConditionally, SvClientProvider } from 'common-frontend';

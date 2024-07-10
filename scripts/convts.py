@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+
+
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Process browser log files in a given directory converting the timestamps
 to human readable / lnav compatible ISO 8601 date time format.
 """

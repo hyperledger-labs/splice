@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Support both "./lock-first-scratch.sh" and "source lock-first-scratch.sh / .lock-first-scratch.sh"
 # The latter puts you in the scratch directory, so it's slightly more convenient.
+
+
 
 script_is_not_sourced=0
 if [ "${BASH_SOURCE[0]}" == "${0}" ]; then

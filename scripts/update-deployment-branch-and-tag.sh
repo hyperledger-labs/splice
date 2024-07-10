@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # For each cluster, we maintain a tag called deployment-<cluster_name>
 # that tracks the latest commit deployed to that cluster and a deployment branch
 # called deployment/<cluster_name> on which periodic CI workflows for that cluster
 # like preflights, runbook deployments etc. are run.
+
+
 
 # This script updates both the deployment branch and the deployment tag for the
 # given cluster to the provided git revision (commit hash/branch/tag).

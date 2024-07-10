@@ -17,6 +17,8 @@ them to the open source repos. This implies that for the time being, we need
 to maintain both DA's open source repo as well as Splice, until active
 development moves over to Splice. Moreover, our contributions need to be on
 DA's public repo *before* being pushed to Splice.
+- All source files include a copyright header. The git pre-commit hook should
+add them automatically if missing. To trigger that manually, run `sbt headerCreate`.
 
 ## Process
 
@@ -32,3 +34,5 @@ As part of creating a new CN release, please:
    to merge it to Splice (unfortunately, there does not seem to be a git
    config to make that the default).
    You may also need to create the PR from a fork of the Splice repo.
+   At the moment, only Itai has write permissions to Splice, so please ping him
+   to merge.
