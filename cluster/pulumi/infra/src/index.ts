@@ -4,7 +4,7 @@ import { config } from 'cn-pulumi-common';
 import { clusterIsBeingReset, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { clusterBasename } from './config';
-import { installGcpLoggingAlerts } from './gcpAlerts';
+import { installGcpLoggingAlerts, installMaintenanceUpdateAlerts } from './gcpAlerts';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
@@ -23,6 +23,7 @@ const observabilityDependsOn = [network, istio];
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsBeingReset) {
   installGcpLoggingAlerts();
+  installMaintenanceUpdateAlerts();
 }
 
 configureStorage();

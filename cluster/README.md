@@ -100,6 +100,7 @@
     - [Restore](#restore)
   - [Security](#security)
   - [Chaos Mesh](#chaos-mesh)
+  - [Maintenance Windows](#maintenance-windows)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1941,6 +1942,25 @@ This is currently disabled by default. To enable it, set
 ```
 export ENABLE_CHAOS_MESH=1
 ```
+
+## Maintenance Windows
+
+GKE clusters are automatically updated by Google. This can cause downtime and trigger false positive alerts.
+To avoid this we set maintenance windows during working hours as followed:
+- Tuesdays from 7:00 AM to 11:00 AM UTC
+- Wednesdays from 7:00 AM to 11:00 AM UTC
+- Thursdays from 7:00 AM to 11:00 AM UTC
+
+These are set when the cluster is created and can be changed using:
+
+```
+gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+       --maintenance-window-start 2024-01-01T07:00:00 \
+       --maintenance-window-end 2024-01-01T11:00:00 \
+       --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=TU,WE,TH'
+```
+
+A gcp alert triggers whenever an update starts.
 
 ## Onboarding
 

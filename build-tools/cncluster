@@ -780,8 +780,13 @@ function subcmd_create() {
                --enable-autoscaling \
                --min-nodes 0 \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
-               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}"
+               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
 
+        #### Set maintenance window
+        gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+               --maintenance-window-start 2024-01-01T08:00:00 \
+               --maintenance-window-end 2024-01-01T12:00:00 \
+               --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=TU,WE,TH'
 
         #### Enable Firewall Access
         gcloud container clusters update "${GCP_CLUSTER_NAME}" \

@@ -6,23 +6,21 @@ import { slackToken } from './alertings';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
+const slackAlertNotificationChannel =
+  config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
+  'team-canton-network-internal-alerts';
+const notificationChannel = new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
+  displayName: `${CLUSTER_BASENAME} Slack Alert Notification Channel`,
+  type: 'slack',
+  labels: {
+    channel_name: `#${slackAlertNotificationChannel}`,
+  },
+  sensitiveLabels: {
+    authToken: slackToken(),
+  },
+});
+
 export function installGcpLoggingAlerts(): void {
-  const slackAlertNotificationChannel =
-    config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
-    'team-canton-network-internal-alerts';
-  const notificationChannel = new gcp.monitoring.NotificationChannel(
-    slackAlertNotificationChannel,
-    {
-      displayName: `${CLUSTER_BASENAME} Slack Alert Notification Channel`,
-      type: 'slack',
-      labels: {
-        channel_name: `#${slackAlertNotificationChannel}`,
-      },
-      sensitiveLabels: {
-        authToken: slackToken(),
-      },
-    }
-  );
   const logWarningsMetric = new gcp.logging.Metric('log_warnings', {
     name: `log_warnings_${CLUSTER_BASENAME}`,
     description: 'Logs with a severity level of warning or above',
@@ -125,6 +123,70 @@ ${conditionalString(
           )} AND metric.type = "logging.googleapis.com/user/${logWarningsMetric.name}"`,
           trigger: {
             count: alertCount,
+          },
+        },
+        displayName: displayName,
+      },
+    ],
+    displayName: displayName,
+    notificationChannels: [notificationChannel.name],
+  });
+}
+
+// https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#control_plane_upgrade_logs
+export function installMaintenanceUpdateAlerts(): void {
+  const logGkeClusterUpdate = new gcp.logging.Metric('log_gke_cluster_update', {
+    name: `log_gke_cluster_update_${CLUSTER_BASENAME}`,
+    description: 'Logs with ClusterUpdate events',
+    filter: `
+resource.labels.cluster_name="${CLUSTER_NAME}"
+resource.type="gke_cluster"
+protoPayload.metadata.operationType=~"(UPDATE_CLUSTER|UPGRADE_MASTER)"`,
+    labelExtractors: {
+      cluster: 'EXTRACT(resource.labels.cluster_name)',
+    },
+    metricDescriptor: {
+      labels: [
+        {
+          description: 'Cluster name',
+          key: 'cluster',
+        },
+      ],
+      metricKind: 'DELTA',
+      valueType: 'INT64',
+    },
+  });
+
+  const displayName = `Cluster ${CLUSTER_BASENAME} is being updated`;
+  new gcp.monitoring.AlertPolicy('updateAlert', {
+    alertStrategy: {
+      autoClose: '3600s',
+      notificationChannelStrategies: [
+        {
+          notificationChannelNames: [notificationChannel.name],
+          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+        },
+      ],
+    },
+    combiner: 'OR',
+    conditions: [
+      {
+        conditionThreshold: {
+          aggregations: [
+            {
+              //query period
+              alignmentPeriod: '600s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              groupByFields: ['metric.label.cluster'],
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          //retest period
+          duration: '300s',
+          filter: pulumi.interpolate`resource.type="global" AND metric.type = "logging.googleapis.com/user/${logGkeClusterUpdate.name}"`,
+          trigger: {
+            count: 1,
           },
         },
         displayName: displayName,
