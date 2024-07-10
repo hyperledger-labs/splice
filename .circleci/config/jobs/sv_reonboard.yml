@@ -28,6 +28,9 @@ jobs:
       restore_identity_from_sv_runbook:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - setup_nix
@@ -56,8 +59,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+
           cmd: |
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then

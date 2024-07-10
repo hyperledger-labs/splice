@@ -40,6 +40,9 @@ jobs:
       cancel_workflow_on_failure:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -74,7 +77,10 @@ jobs:
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             set -eou pipefail
             if [ -z "<< parameters.upgrade_version >>" ]; then
@@ -143,6 +149,9 @@ jobs:
       cancel_workflow_on_failure:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -180,7 +189,10 @@ jobs:
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             set -eou pipefail
             if [ -z "<< parameters.upgrade_version >>" ]; then

@@ -545,16 +545,6 @@ commands:
             cncluster activate
             cncluster show
 
-            post_slack_message () {
-              echo "posting slack message"
-              local text="$1"
-
-              curl -X POST --url "https://slack.com/api/chat.postMessage" \
-                 -H "Content-type: application/json" \
-                 -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
-                 --data '{ "text": "'"$text"'", "channel": "C05DT77QF5M" }'
-            }
-
             lockholder=$(cncluster lockholder)
             slack_mention_text="'${lockholder}'"
 
@@ -566,12 +556,12 @@ commands:
             fi
 
             if ! cncluster ci_assert_fresh_lock; then
-              post_slack_message "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )"
+              .circleci/post-slack-message.sh "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )" "C05DT77QF5M"
 
               cncluster prefresh
               cncluster ci_reset_unlock
             elif ! cncluster ci_warn_lock_expiry; then
-              post_slack_message "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*"
+              .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
 
   # Largely copied from Canton's CI definition
@@ -1557,6 +1547,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -1599,8 +1592,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
@@ -1675,6 +1670,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -1714,8 +1712,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
@@ -1763,6 +1763,9 @@ jobs:
       reset_cluster:
         type: boolean
         default: true
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - setup_nix
@@ -1788,8 +1791,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply multi-validator pulumi stack
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of multi-validator pulumi stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             cncluster activate
             cncluster ci_apply_multi
@@ -1852,6 +1857,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
 
     steps:
       - checkout_with_retry
@@ -1930,7 +1938,10 @@ jobs:
             --keep K6_VALIDATOR_ADMIN_USERNAME
             --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
@@ -2009,6 +2020,9 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - setup_nix
@@ -2041,7 +2055,10 @@ jobs:
             --keep K6_VALIDATOR_ADMIN_USERNAME
             --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
@@ -2078,6 +2095,9 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
 
     steps:
       - checkout_with_retry
@@ -2109,7 +2129,10 @@ jobs:
             --keep K6_VALIDATOR_ADMIN_USERNAME
             --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of infra stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             cncluster activate
             cncluster infra_up
@@ -2157,6 +2180,9 @@ jobs:
       cancel_workflow_on_failure:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -2191,7 +2217,10 @@ jobs:
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             set -eou pipefail
             if [ -z "<< parameters.upgrade_version >>" ]; then
@@ -2260,6 +2289,9 @@ jobs:
       cancel_workflow_on_failure:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - when:
@@ -2297,7 +2329,10 @@ jobs:
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
             --keep SLACK_ACCESS_TOKEN
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             set -eou pipefail
             if [ -z "<< parameters.upgrade_version >>" ]; then
@@ -3177,6 +3212,9 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
 
     steps:
       - checkout_with_retry
@@ -3210,7 +3248,10 @@ jobs:
             --keep K6_USERS_PASSWORD
             --keep K6_VALIDATOR_ADMIN_USERNAME
             --keep K6_VALIDATOR_ADMIN_PASSWORD
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
@@ -3865,6 +3906,9 @@ jobs:
       restore_identity_from_sv_runbook:
         type: boolean
         default: false
+      deploy_retry_count:
+        type: integer
+        default: 2
     steps:
       - checkout_with_retry
       - setup_nix
@@ -3893,8 +3937,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+
           cmd: |
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -4587,6 +4633,7 @@ workflows:
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           silence_deployment_alerts: true
           cancel_workflow_on_failure: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -4610,6 +4657,7 @@ workflows:
             - canton-network-vpn
           cluster: "cimain"
           silence_deployment_alerts: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - deploy_cluster
       - preflight_sv_check:
@@ -4628,6 +4676,7 @@ workflows:
             - slack-context
           cluster: "cimain"
           silence_deployment_alerts: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - deploy_cluster
       - preflight_validator_check:

@@ -9,6 +9,9 @@ jobs:
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
       <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
 
     steps:
       - checkout_with_retry
@@ -42,7 +45,10 @@ jobs:
             --keep K6_USERS_PASSWORD
             --keep K6_VALIDATOR_ADMIN_USERNAME
             --keep K6_VALIDATOR_ADMIN_PASSWORD
+            --keep CIRCLE_BUILD_URL
           gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate

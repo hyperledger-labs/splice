@@ -33,6 +33,7 @@ workflow:
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           silence_deployment_alerts: true
           cancel_workflow_on_failure: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -56,6 +57,7 @@ workflow:
             - canton-network-vpn
           cluster: "cimain"
           silence_deployment_alerts: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - deploy_cluster
       - preflight_sv_check:
@@ -74,6 +76,7 @@ workflow:
             - slack-context
           cluster: "cimain"
           silence_deployment_alerts: true
+          deploy_retry_count: 0  # Alert us more quickly on hard deployment failures
           requires:
             - deploy_cluster
       - preflight_validator_check:

@@ -386,16 +386,6 @@ commands:
             cncluster activate
             cncluster show
 
-            post_slack_message () {
-              echo "posting slack message"
-              local text="$1"
-
-              curl -X POST --url "https://slack.com/api/chat.postMessage" \
-                 -H "Content-type: application/json" \
-                 -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
-                 --data '{ "text": "'"$text"'", "channel": "C05DT77QF5M" }'
-            }
-
             lockholder=$(cncluster lockholder)
             slack_mention_text="'${lockholder}'"
 
@@ -407,12 +397,12 @@ commands:
             fi
 
             if ! cncluster ci_assert_fresh_lock; then
-              post_slack_message "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )"
+              .circleci/post-slack-message.sh "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )" "C05DT77QF5M"
 
               cncluster prefresh
               cncluster ci_reset_unlock
             elif ! cncluster ci_warn_lock_expiry; then
-              post_slack_message "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*"
+              .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
 
   # Largely copied from Canton's CI definition
