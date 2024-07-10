@@ -35,6 +35,13 @@ Upcoming
     walletPayments     0.1.4
     ================== =======
 
+* Sequencer
+
+  * Improve performance of sequencer startup and querying the
+    sequencer onboarding snapshot when onboarding new SVs. This adds a
+    new index to the sequencer database so can take a while depending
+    on the size of the DB.
+
 0.1.15
 ------
 
