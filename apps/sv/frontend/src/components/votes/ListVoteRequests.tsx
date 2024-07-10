@@ -244,6 +244,7 @@ const ListVoteRequests: React.FC = () => {
         onClose={handleClose}
         aria-labelledby="vote-request-modal-title"
         aria-describedby="vote-request-modal-description"
+        slotProps={{ root: { id: 'vote-request-modal-root' } }}
       >
         <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
           <ClickAwayListener onClickAway={handleClose}>
@@ -271,6 +272,7 @@ const ListVoteRequests: React.FC = () => {
         onClose={handleClose}
         aria-labelledby="vote-result-modal-title"
         aria-describedby="vote-result-modal-description"
+        slotProps={{ root: { id: 'vote-result-modal-root' } }}
       >
         <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
           <ClickAwayListener onClickAway={handleClose}>

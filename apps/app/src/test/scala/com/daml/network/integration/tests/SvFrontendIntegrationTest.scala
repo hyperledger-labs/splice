@@ -831,6 +831,9 @@ class SvFrontendIntegrationTest
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
+            eventually() {
+              find(id("vote-request-modal-root")) shouldBe empty
+            }
             click on "tab-panel-rejected"
             eventually() {
               val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
