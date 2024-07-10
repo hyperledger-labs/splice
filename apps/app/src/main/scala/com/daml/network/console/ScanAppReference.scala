@@ -7,7 +7,7 @@ import org.apache.pekko.actor.ActorSystem
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -17,13 +17,14 @@ import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.definitions.GetDsoInfoResponse
 import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.util.{CNNodeUtil, AmuletConfigSchedule, Contract, ContractWithState}
+import com.daml.network.util.{AmuletConfigSchedule, CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -45,6 +46,12 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetDsoPartyId(List()))
     }
+
+  def getDsoInfo(): GetDsoInfoResponse = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetDsoInfo(List()))
+    }
+  }
 
   @Help.Summary(
     "Returns contracts required as inputs for a transfer."

@@ -16,7 +16,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeState
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.tracing.TraceContext

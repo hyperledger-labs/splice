@@ -20,7 +20,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
+import com.daml.network.store.DsoRulesStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -133,7 +133,7 @@ class PublishScanConfigTrigger(
 
 object PublishScanConfigTrigger {
   case class PublishLocalConfigTask(
-      dsoRulesAndState: DsoRulesWithSvNodeState,
+      dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeState,
       synchronizerNodeConfig: Option[SynchronizerNodeConfig],
       scanConfig: daml.dso.decentralizedsynchronizer.ScanConfig,
       domainId: DomainId,

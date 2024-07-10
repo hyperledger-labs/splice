@@ -8,7 +8,7 @@ import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.environment.{RetryFor, RetryProvider}
 import com.daml.network.sv.config.CometBftConfig
-import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
 import com.digitalasset.canton.drivers.cometbft.{

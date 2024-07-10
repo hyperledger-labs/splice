@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { useSvClient } from 'common-frontend';
+import { useSvClient, SvUiState } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
@@ -7,33 +7,6 @@ import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvSta
 import { ElectionRequest, DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
-
-type SvUiState =
-  | {
-      svUser: string;
-      svPartyId: string;
-      dsoPartyId: string;
-      votingThreshold: bigint;
-      amuletRules: Contract<AmuletRules>;
-      dsoRules: Contract<DsoRules>;
-      nodeStates: Contract<SvNodeState>[];
-    }
-  | undefined;
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const SvUiState = {
-  encode: (uiState: SvUiState): unknown => {
-    if (!uiState) {
-      return undefined;
-    }
-    return {
-      ...uiState,
-      amuletRules: Contract.encode(AmuletRules, uiState.amuletRules),
-      dsoRules: Contract.encode(DsoRules, uiState.dsoRules),
-      nodeStates: uiState.nodeStates.map(c => Contract.encode(SvNodeState, c)),
-    };
-  },
-};
 
 export const useDsoInfos = (): UseQueryResult<SvUiState> => {
   const { getDsoInfo } = useSvClient();

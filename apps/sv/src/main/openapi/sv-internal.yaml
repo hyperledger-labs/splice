@@ -572,7 +572,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetDsoInfoResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
 
   # TODO(#13301) Replace by automation
   /v0/synchronizer/{domain_id_prefix}/sign_bootstrapping_state:
@@ -605,7 +605,6 @@ paths:
       responses:
         "200":
           description: ok
-
 components:
   schemas:
     ListOngoingValidatorOnboardingsResponse:
@@ -1063,45 +1062,6 @@ components:
           type: string
         sequencer_snapshot:
           type: string
-
-    GetDsoInfoResponse:
-      type: object
-      required:
-        - sv_user
-        - sv_party_id
-        - dso_party_id
-        - voting_threshold
-        - latest_mining_round
-        - amulet_rules
-        - dso_rules
-        - sv_node_states
-      properties:
-        # User representing the SV
-        sv_user:
-          type: string
-        # Party representing the SV
-        sv_party_id:
-          type: string
-        # Party representing the whole DSO
-        dso_party_id:
-          type: string
-        # Threshold required to pass vote requests
-        voting_threshold:
-          type: integer
-        # Contract ID of the OpenMiningRound contract of the latest Mining Round
-        latest_mining_round:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract ID of the AmuletRules contract associated with the DSO
-        amulet_rules:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract IDs of the DsoRules contract associated with the DSO
-        dso_rules:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # States the SVs' nodes
-        sv_node_states:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     TriggerAcsDumpResponse:
       type: object

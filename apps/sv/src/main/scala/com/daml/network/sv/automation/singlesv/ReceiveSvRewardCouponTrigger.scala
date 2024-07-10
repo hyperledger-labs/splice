@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.store.SvDsoStore.OpenMiningRoundContract
+import com.daml.network.store.MiningRoundsStore.OpenMiningRoundContract
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}

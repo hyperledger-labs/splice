@@ -17,6 +17,7 @@ import { ThemeProvider } from '@mui/material';
 import Activity from './routes/activity';
 import AppLeaderboard from './routes/appLeaderboard';
 import SynchronizerFeesLeaderboard from './routes/domainFeesLeaderboard';
+import DsoWithContexts from './routes/dso';
 import Root from './routes/root';
 import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
         <Route path="synchronizer-fees-leaderboard" element={<SynchronizerFeesLeaderboard />} />
         <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
+      <Route path="/dso" element={<DsoWithContexts />} />
     </Route>
   )
 );

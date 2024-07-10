@@ -12,7 +12,6 @@ import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
-import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -204,29 +203,6 @@ class DbScanStore(
           .value
         contractWithState = row.map(
           contractWithStateFromRow(AnsRules.COMPANION)(_)
-        )
-      } yield contractWithState
-    }
-
-  override def lookupDsoRules()(implicit
-      tc: TraceContext
-  ): Future[Option[ContractWithState[DsoRules.ContractId, DsoRules]]] =
-    waitUntilAcsIngested {
-      for {
-        row <- storage
-          .querySingle(
-            selectFromAcsTableWithState(
-              ScanTables.acsTableName,
-              storeId,
-              domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(DsoRules.TEMPLATE_ID)}""",
-              orderLimit = sql"""order by event_number desc limit 1""",
-            ).headOption,
-            "lookupDsoRules",
-          )
-          .value
-        contractWithState = row.map(
-          contractWithStateFromRow(DsoRules.COMPANION)(_)
         )
       } yield contractWithState
     }

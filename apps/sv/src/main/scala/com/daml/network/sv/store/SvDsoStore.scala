@@ -38,8 +38,7 @@ import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomai
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.store.SvDsoStore.noActiveDsoRules
-import com.daml.network.sv.store.db.{DbSvDsoStore}
+import com.daml.network.sv.store.db.DbSvDsoStore
 import com.daml.network.sv.store.db.DsoTables.DsoAcsStoreRowData
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
@@ -48,18 +47,20 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
-import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the DSO party. */
-trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
+trait SvDsoStore
+    extends CNNodeAppStore
+    with PackageIdResolver.HasAmuletRules
+    with DsoRulesStore
+    with MiningRoundsStore {
   import SvDsoStore.{amuletRulesFollowers, dsoRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
@@ -75,14 +76,6 @@ trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
 
   def domainMigrationId: Long
 
-  def lookupDsoRulesWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[
-      AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
-    ]]
-  ] = multiDomainAcsStore
-    .findAnyContractWithOffset(splice.dsorules.DsoRules.COMPANION)
-    .map(_.map(_.flatMap(_.toAssignedContract)))
-
   def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
@@ -93,72 +86,6 @@ trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
   )(implicit
       tc: TraceContext
   ): Future[Seq[DsoRules_CloseVoteRequestResult]]
-
-  def lookupDsoRules()(implicit
-      tc: TraceContext
-  ): Future[
-    Option[AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]]
-  ] =
-    lookupDsoRulesWithOffset().map(_.value)
-
-  def getDsoRulesWithOffset()(implicit tc: TraceContext): Future[QueryResult[
-    AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
-  ]] = lookupDsoRulesWithOffset().map(_.sequence getOrElse (throw noActiveDsoRules))
-
-  def getDsoRules()(implicit
-      tc: TraceContext
-  ): Future[AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]] =
-    lookupDsoRules().map(_.getOrElse(throw noActiveDsoRules))
-
-  def getDsoRulesWithMemberNodeStates()(implicit
-      tc: TraceContext
-  ): Future[SvDsoStore.DsoRulesWithMemberNodeStates] = {
-    for {
-      // Note: at a certain size of the DSO, we'll be better off doing this join in the DB. We'll find out from our logs and performance tests.
-      dsoRules <- getDsoRules()
-      memberSvParties = dsoRules.payload.svs.keySet().asScala.toSeq
-      svNodeStates <- Future
-        .traverse(memberSvParties) { svPartyStr =>
-          val svParty = PartyId.tryFromProtoPrimitive(svPartyStr)
-          getSvNodeState(svParty).map(co => svParty -> co.contract)
-        }
-        .map(_.toMap)
-    } yield SvDsoStore.DsoRulesWithMemberNodeStates(dsoRules, svNodeStates)
-  }
-
-  def getDsoRulesWithSvNodeState(svParty: PartyId)(implicit
-      tc: TraceContext
-  ): Future[SvDsoStore.DsoRulesWithSvNodeState] = {
-    for {
-      dsoRules <- getDsoRules()
-      svNodeState <- getSvNodeState(svParty)
-    } yield SvDsoStore.DsoRulesWithSvNodeState(dsoRules, svParty, svNodeState.contract)
-  }
-
-  def lookupSvNodeState(svPartyId: PartyId)(implicit
-      tc: TraceContext
-  ): Future[Option[
-    AssignedContract[
-      splice.dso.svstate.SvNodeState.ContractId,
-      splice.dso.svstate.SvNodeState,
-    ]
-  ]]
-
-  def getSvNodeState(svPartyId: PartyId)(implicit
-      tc: TraceContext
-  ): Future[
-    AssignedContract[
-      splice.dso.svstate.SvNodeState.ContractId,
-      splice.dso.svstate.SvNodeState,
-    ]
-  ] =
-    lookupSvNodeState(svPartyId).map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(show"No SvNodeState found for $svPartyId")
-          .asRuntimeException()
-      )
-    )
 
   def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
@@ -260,68 +187,6 @@ trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
         throw Status.NOT_FOUND.withDescription("No active AnsRules contract").asRuntimeException()
       )
     )
-
-  /** Lookup the triple of open mining rounds that should always be present
-    * after bootstrapping.
-    */
-  final def lookupOpenMiningRoundTriple()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[SvDsoStore.OpenMiningRoundTriple]] =
-    for {
-      openMiningRounds <- multiDomainAcsStore.listAssignedContracts(
-        splice.round.OpenMiningRound.COMPANION
-      )
-    } yield for {
-      newestOverallRound <- openMiningRounds.maxByOption(_.payload.round.number)
-      // all rounds are signed by dso; pick the domain with the highest round#
-      domain = newestOverallRound.domain
-      Seq(oldest, middle, newest) <- Some(
-        openMiningRounds
-          .filter(_.domain == domain)
-          .sortBy(_.payload.round.number)
-      )
-      if oldest.payload.round.number + 1 == middle.payload.round.number &&
-        newest.payload.round.number - 1 == middle.payload.round.number
-    } yield SvDsoStore.OpenMiningRoundTriple(
-      oldest = oldest.contract,
-      middle = middle.contract,
-      newest = newest.contract,
-      domain = domain,
-    )
-
-  /** Get the triple of open mining rounds that should always be present after boostrapping. */
-  final def getOpenMiningRoundTriple()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[SvDsoStore.OpenMiningRoundTriple] =
-    lookupOpenMiningRoundTriple().map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription("No triple of OpenMiningRound contracts")
-          .asRuntimeException()
-      )
-    )
-
-  final def lookupLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[SvDsoStore.OpenMiningRound[AssignedContract]]] =
-    lookupOpenMiningRoundTriple().map(_.map { triple =>
-      AssignedContract(triple.newest, triple.domain)
-    })
-
-  /** get the latest active open mining round contract, which should always be present after bootstrapping. */
-  def getLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[SvDsoStore.OpenMiningRound[AssignedContract]] = lookupLatestActiveOpenMiningRound().map(
-    _.getOrElse(
-      throw Status.NOT_FOUND
-        .withDescription("No active OpenMiningRound contract")
-        .asRuntimeException()
-    )
-  )
 
   /** List amulets that are expired and can never be used as transfer input. */
   final def listExpiredAmulets
@@ -1057,7 +922,7 @@ trait SvDsoStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
     getLatestActiveOpenMiningRound().flatMap(getTransferContext)
 
   private def getTransferContext(
-      openMiningRound: SvDsoStore.OpenMiningRound[Contract.Has]
+      openMiningRound: MiningRoundsStore.OpenMiningRound[Contract.Has]
   )(implicit tc: TraceContext): Future[AppTransferContext] = {
     for {
       featured <- lookupFeaturedAppRight(key.dsoParty)
@@ -1421,43 +1286,6 @@ object SvDsoStore {
     )
   }
 
-  type OpenMiningRound[Ct[_, _]] =
-    Ct[splice.round.OpenMiningRound.ContractId, splice.round.OpenMiningRound]
-  type OpenMiningRoundContract =
-    OpenMiningRound[Contract]
-
-  case class OpenMiningRoundTriple(
-      oldest: OpenMiningRoundContract,
-      middle: OpenMiningRoundContract,
-      newest: OpenMiningRoundContract,
-      domain: DomainId,
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(
-        param("oldest", _.oldest),
-        param("middle", _.middle),
-        param("newest", _.newest),
-        param("domain", _.domain),
-      )
-
-    /** The time after which these can be advanced at assuming the given tick duration. */
-    def readyToAdvanceAt: Instant = {
-      val middleTickDuration = CNNodeUtil.relTimeToDuration(
-        middle.payload.tickDuration
-      )
-      Ordering[Instant].max(
-        oldest.payload.targetClosesAt,
-        Ordering[Instant].max(
-          // TODO(M3-07): when changing AmuletConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
-          middle.payload.opensAt.plus(middleTickDuration),
-          newest.payload.opensAt,
-        ),
-      )
-    }
-
-    def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
-  }
-
   case class IdleAnsSubscription(
       state: Contract[
         sub.SubscriptionIdleState.ContractId,
@@ -1471,111 +1299,6 @@ object SvDsoStore {
 
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("state", _.state), param("context", _.context))
-  }
-
-  private def noActiveDsoRules =
-    Status.NOT_FOUND.withDescription("No active DsoRules contract").asRuntimeException()
-
-  case class DsoRulesWithMemberNodeStates(
-      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-      svNodeStates: Map[
-        PartyId,
-        Contract[splice.dso.svstate.SvNodeState.ContractId, splice.dso.svstate.SvNodeState],
-      ],
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(
-        param("domainId", _.dsoRules.domain),
-        param("dsoRulesCid", _.dsoRules.contractId),
-        param("svNodeStates", _.svNodeStates),
-      )
-
-    def currentSynchronizerNodeConfigs()
-        : Seq[splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig] = {
-      // TODO(#4906): make its callers work with soft-domain migration
-      svNodeStates.values
-        .flatMap(_.payload.state.synchronizerNodes.asScala.get(dsoRules.domain.toProtoPrimitive))
-        .toSeq
-    }
-
-    def activeSvParticipantAndMediatorIds(): Seq[Member] = {
-      val svParticipants = dsoRules.contract.payload.svs
-        .values()
-        .asScala
-        .map(_.participantId)
-        .toSeq
-        .map(ParticipantId.tryFromProtoPrimitive)
-      val offboardedSvParticipants = dsoRules.contract.payload.offboardedSvs
-        .values()
-        .asScala
-        .map(_.participantId)
-        .toSeq
-        .map(ParticipantId.tryFromProtoPrimitive)
-      val svMediators = svNodeStates.values
-        .flatMap(_.payload.state.synchronizerNodes.values().asScala)
-        .flatMap(_.mediator.toScala)
-        .map(m =>
-          MediatorId
-            .fromProtoPrimitive(m.mediatorId, "mediator")
-            .fold(err => throw new IllegalArgumentException(err.message), identity)
-        )
-      svParticipants.filterNot(offboardedSvParticipants.contains) ++ svMediators
-    }
-
-    def getSvMemberName(svParty: PartyId): Future[String] =
-      dsoRules.contract.payload.svs.asScala
-        .get(svParty.toProtoPrimitive)
-        .fold(
-          Future.failed[String](
-            Status.NOT_FOUND
-              .withDescription(show"$svParty is not an active SV")
-              .asRuntimeException()
-          )
-        )(info => Future.successful(info.name))
-
-  }
-
-  case class DsoRulesWithSvNodeState(
-      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-      svParty: PartyId,
-      svNodeState: Contract[
-        splice.dso.svstate.SvNodeState.ContractId,
-        splice.dso.svstate.SvNodeState,
-      ],
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(
-        param("domainId", _.dsoRules.domain),
-        param("dsoRulesCid", _.dsoRules.contractId),
-        param("svParty", _.svParty),
-        param("svNodeState", _.svNodeState),
-      )
-
-    def isStale(
-        store: MultiDomainAcsStore
-    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] =
-      for {
-        // TODO(#4906): check whether we also need to compare the domain-id to detect staleness
-        checkDsoRules <- store.lookupContractById(splice.dsorules.DsoRules.COMPANION)(
-          dsoRules.contractId
-        )
-        checkSvNodeState <- store
-          .lookupContractById(splice.dso.svstate.SvNodeState.COMPANION)(svNodeState.contractId)
-      } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
-
-    def lookupSequencerConfigFor(
-        decentralizedSynchronizerId: DomainId,
-        domainTimeLowerBound: Instant,
-        migrationId: Long,
-    ): Option[splice.dso.decentralizedsynchronizer.SequencerConfig] = {
-      for {
-        synchronizerNodeConfig <- svNodeState.payload.state.synchronizerNodes.asScala
-          .get(decentralizedSynchronizerId.toProtoPrimitive)
-        sequencerConfig <- synchronizerNodeConfig.sequencer.toScala
-        if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
-          .exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
-      } yield sequencerConfig
-    }
   }
 
   case class RoundCounterpartyBatch[+T](

@@ -13,7 +13,7 @@ import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePolling
   Tick,
 }
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext

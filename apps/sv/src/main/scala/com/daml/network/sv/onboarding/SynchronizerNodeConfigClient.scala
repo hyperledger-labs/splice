@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.splice.cometbft.{
 }
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.DsoRulesStore
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
 import com.digitalasset.canton.topology.PartyId
@@ -58,7 +59,7 @@ trait SynchronizerNodeConfigClient {
   protected def getCometBftNodeConfigDsoState(dsoStore: SvDsoStore, svParty: PartyId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): OptionT[Future, (SvDsoStore.DsoRulesWithSvNodeState, Option[SynchronizerNodeConfig])] = {
+  ): OptionT[Future, (DsoRulesStore.DsoRulesWithSvNodeState, Option[SynchronizerNodeConfig])] = {
     for {
       rulesAndState <- OptionT.liftF(dsoStore.getDsoRulesWithSvNodeState(svParty))
       domainId = rulesAndState.dsoRules.domain
@@ -71,7 +72,7 @@ trait SynchronizerNodeConfigClient {
   }
 
   protected def updateSynchronizerNodeConfig(
-      rulesAndState: SvDsoStore.DsoRulesWithSvNodeState,
+      rulesAndState: DsoRulesStore.DsoRulesWithSvNodeState,
       newSvNodeConfig: SynchronizerNodeConfig,
       store: SvDsoStore,
       connection: CNLedgerConnection,

@@ -76,6 +76,22 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetDsoInfo(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetDsoInfoResponse, definitions.GetDsoInfoResponse] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoInfoResponse] =
+      client.getDsoInfo(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDsoInfoResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
   /** Very similar to the AppTransferContext we use in Daml, except
     * (1) this class has contract instances, not just (interface) contract-ids of the respective Daml contracts.
     * (2) this class has no featuredAppRight contract.

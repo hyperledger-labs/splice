@@ -6,8 +6,7 @@ package com.daml.network.sv.automation.leaderbased
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.splice
-import com.daml.network.sv.store.SvDsoStore
-
+import com.daml.network.store.MiningRoundsStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -105,7 +104,7 @@ class AdvanceOpenMiningRoundTrigger(
 object AdvanceOpenMiningRoundTrigger {
   case class Task(
       amuletRulesId: splice.amuletrules.AmuletRules.ContractId,
-      openRounds: SvDsoStore.OpenMiningRoundTriple,
+      openRounds: MiningRoundsStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*

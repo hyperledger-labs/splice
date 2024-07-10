@@ -4,8 +4,8 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.{
-  AppTransferContext,
   AmuletRules_MiningRound_Archive,
+  AppTransferContext,
 }
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
@@ -13,13 +13,13 @@ import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.ans.*
 import com.daml.network.codegen.java.splice.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
-  SynchronizerNodeConfigLimits,
   DsoDecentralizedSynchronizerConfig,
+  SynchronizerNodeConfigLimits,
 }
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
-  ARC_AnsEntryContext,
   ARC_AmuletRules,
+  ARC_AnsEntryContext,
   ARC_DsoRules,
 }
 import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
@@ -37,7 +37,7 @@ import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
-import com.daml.network.codegen.java.splice.wallet.payment.{Unit, PaymentAmount}
+import com.daml.network.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
 import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   Subscription,
   SubscriptionData,
@@ -49,13 +49,13 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.{Limit, PageLimit, StoreTest}
+import com.daml.network.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
+import com.daml.network.sv.config.{SvDecentralizedSynchronizerConfig, SvSynchronizerConfig}
 import com.daml.network.sv.history.DsoRulesCloseVoteRequest
 import com.daml.network.sv.store.db.DbSvDsoStore
 import com.daml.network.sv.store.SvDsoStore.{IdleAnsSubscription, RoundCounterpartyBatch}
-import com.daml.network.sv.store.{SvStore, SvDsoStore}
+import com.daml.network.sv.store.{SvDsoStore, SvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   AssignedContract,
@@ -227,7 +227,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           (oldest, middle, newest) <- createMiningRoundsTriple(store)
           result <- store.getOpenMiningRoundTriple()
         } yield result should be(
-          SvDsoStore.OpenMiningRoundTriple(
+          MiningRoundsStore.OpenMiningRoundTriple(
             oldest = oldest,
             middle = middle,
             newest = newest,

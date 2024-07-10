@@ -6,6 +6,7 @@ import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
 import DisableConditionally from './DisableConditionally';
+import DsoViewPrettyJSON, { SvUiState } from './Dso';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
 import ErrorRouterPage from './ErrorRouterPage';
@@ -46,4 +47,6 @@ export {
   TitledTable,
   TransferButton,
   SubscriptionButton,
+  DsoViewPrettyJSON,
+  SvUiState,
 };

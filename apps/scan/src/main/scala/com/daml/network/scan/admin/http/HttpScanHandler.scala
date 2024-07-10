@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.splice.round.{
   SummarizingMiningRound,
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
@@ -51,6 +52,8 @@ import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
+    svParty: PartyId,
+    svUserName: String,
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
     dsoAnsResolver: DsoAnsResolver,
@@ -70,6 +73,29 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getDsoPartyId") { _ => _ =>
       Future.successful(definitions.GetDsoPartyIdResponse(store.key.dsoParty.toProtoPrimitive))
+    }
+  }
+
+  def getDsoInfo(
+      respond: v0.ScanResource.GetDsoInfoResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
+      for {
+        latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+        amuletRules <- store.getAmuletRules()
+        rulesAndStates <- store.getDsoRulesWithMemberNodeStates()
+        dsoRules = rulesAndStates.dsoRules
+      } yield definitions.GetDsoInfoResponse(
+        svUser = svUserName,
+        svPartyId = svParty.toProtoPrimitive,
+        dsoPartyId = store.key.dsoParty.toProtoPrimitive,
+        votingThreshold = CNThresholds.requiredNumVotes(dsoRules),
+        latestMiningRound = latestOpenMiningRound.contract.toHttp,
+        amuletRules = amuletRules.toHttp,
+        dsoRules = dsoRules.contract.toHttp,
+        svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
+      )
     }
   }
 

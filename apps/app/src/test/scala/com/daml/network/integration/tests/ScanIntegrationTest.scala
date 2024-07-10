@@ -3,6 +3,9 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -19,18 +22,21 @@ import com.daml.network.sv.automation.leaderbased.{
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.http.v0.definitions.TransactionHistoryRequest
-import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
+import com.daml.network.http.v0.definitions.{
+  BalanceChange,
+  TransactionHistoryRequest,
+  TransactionHistoryResponseItem,
+}
 import com.daml.network.store.Limit
+import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.daml.network.http.v0.definitions.BalanceChange
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
-
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+
 import scala.util.Success
 
 class ScanIntegrationTest
@@ -58,6 +64,50 @@ class ScanIntegrationTest
         )(config)
       )
       .withTrafficTopupsEnabled
+
+  "return dso info same as the sv app" in { implicit env =>
+    val scan = sv1ScanBackend.getDsoInfo()
+    inside(sv1Backend.getDsoInfo()) {
+      case HttpSvAppClient.DsoInfo(
+            svUser,
+            svParty,
+            dsoParty,
+            votingThreshold,
+            latestMiningRound,
+            amuletRules,
+            dsoRules,
+            svNodeStates,
+          ) =>
+        scan.svUser should be(svUser)
+        scan.svPartyId should be(svParty.toProtoPrimitive)
+        scan.dsoPartyId should be(dsoParty.toProtoPrimitive)
+        scan.votingThreshold should be(votingThreshold)
+        scan.latestMiningRound should be(latestMiningRound.toHttp)
+        scan.amuletRules should be(amuletRules.toHttp)
+        scan.dsoRules should be(dsoRules.toHttp)
+        scan.svNodeStates should be(svNodeStates.map(_._2.toHttp))
+    }
+    // sanity checks
+    scan.dsoRules.contractId should be(
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(DsoRules.COMPANION)(dsoParty)
+        .loneElement
+        .id
+        .contractId
+    )
+    scan.amuletRules.contractId should be(
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(AmuletRules.COMPANION)(dsoParty)
+        .loneElement
+        .id
+        .contractId
+    )
+    scan.svNodeStates.map(_.contractId) should be(
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(SvNodeState.COMPANION)(dsoParty)
+        .map(_.id.contractId)
+    )
+  }
 
   "list transaction pages in ascending and descending order" in { implicit env =>
     val aliceWalletUser = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

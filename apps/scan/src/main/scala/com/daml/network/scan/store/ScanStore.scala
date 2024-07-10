@@ -7,13 +7,19 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit}
+import com.daml.network.store.{
+  CNNodeAppStore,
+  DsoRulesStore,
+  Limit,
+  MiningRoundsStore,
+  MultiDomainAcsStore,
+  PageLimit,
+}
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.util.{
-  AssignedContract,
   AmuletConfigSchedule,
   Contract,
   ContractWithState,
@@ -26,7 +32,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -43,7 +48,11 @@ object SortOrder {
 final case class ScanInfo(publicUrl: String, memberName: String)
 
 /** Utility class grouping the two kinds of stores managed by the DsoApp. */
-trait ScanStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
+trait ScanStore
+    extends CNNodeAppStore
+    with PackageIdResolver.HasAmuletRules
+    with DsoRulesStore
+    with MiningRoundsStore {
 
   def aggregate()(implicit
       tc: TraceContext
@@ -128,23 +137,6 @@ trait ScanStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
   def lookupAnsRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
-
-  def lookupDsoRules()(implicit
-      tc: TraceContext
-  ): Future[
-    Option[ContractWithState[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]]
-  ]
-
-  private def getDsoRules()(implicit
-      tc: TraceContext
-  ): Future[ContractWithState[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]] =
-    lookupDsoRules().map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription("No active DsoRules contract")
-          .asRuntimeException()
-      )
-    )
 
   def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal]
   protected def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
@@ -242,31 +234,6 @@ trait ScanStore extends CNNodeAppStore with PackageIdResolver.HasAmuletRules {
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
-
-  def lookupSvNodeState(svPartyId: PartyId)(implicit
-      tc: TraceContext
-  ): Future[Option[
-    AssignedContract[
-      splice.dso.svstate.SvNodeState.ContractId,
-      splice.dso.svstate.SvNodeState,
-    ]
-  ]]
-
-  def getSvNodeState(svPartyId: PartyId)(implicit
-      tc: TraceContext
-  ): Future[
-    AssignedContract[
-      splice.dso.svstate.SvNodeState.ContractId,
-      splice.dso.svstate.SvNodeState,
-    ]
-  ] =
-    lookupSvNodeState(svPartyId).map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(show"No SvNodeState found for $svPartyId")
-          .asRuntimeException()
-      )
-    )
 }
 
 object ScanStore {

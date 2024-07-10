@@ -7,6 +7,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.*
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import io.circe.JsonObject
 
 import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
@@ -108,6 +109,76 @@ class ScanFrontendTimeBasedIntegrationTest
             Seq(s"${aliceValidatorWalletParty} 0.083 CC"),
           )
         }
+      }
+    }
+
+    "see DSO and Canton Coin Info" in { implicit env =>
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan homepage and switch to the Network Info Tab", {
+            go to s"http://localhost:${scanUIPort}"
+            click on "navlink-/dso"
+          },
+        )(
+          "The tabs 'DSO Info' and 'Canton Coin Info' are visible",
+          _ => {
+            findAll(id("information-tab-dso-info")).length shouldBe 1
+            findAll(id("information-tab-cc-info")).length shouldBe 1
+          },
+        )
+
+        actAndCheck(
+          "Click on DSO Info", {
+            click on "information-tab-dso-info"
+          },
+        )(
+          "The DSO info is visible",
+          _ => {
+            val dsoInfo = sv1ScanBackend.getDsoInfo()
+            val contract = find(id("dso-rules-information"))
+              .map(_.text)
+              .map { text =>
+                val json =
+                  io.circe.parser.parse(text).valueOrFail(s"Couldn't parse JSON from $text")
+                json.hcursor
+                  .downField("dsoRules")
+                  .downField("payload")
+                  .as[JsonObject]
+                  .valueOrFail(s"Couldn't find dsoRules in $text")
+              }
+            contract should be(
+              Some(
+                dsoInfo.dsoRules.payload.asObject.valueOrFail("This is definitely an object.")
+              )
+            )
+          },
+        )
+
+        actAndCheck(
+          "Click on Canton Coin Info", {
+            click on "information-tab-cc-info"
+          },
+        )(
+          "The Canton Coin info is visible",
+          _ => {
+            val amuletRules = sv1ScanBackend
+              .getAmuletRules()
+              .contract
+              .toHttp
+              .payload
+              .asObject
+              .valueOrFail("This is definitely an object.")
+            find(id("amulet-rules-information"))
+              .map(_.text)
+              .map(json =>
+                io.circe.parser
+                  .parse(json)
+                  .valueOrFail(s"Couldn't parse JSON from $json")
+                  .asObject
+                  .valueOrFail(s"Could not decode $json as Amulet rules.")
+              ) should be(Some(amuletRules))
+          },
+        )
       }
     }
 

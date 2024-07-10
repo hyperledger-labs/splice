@@ -1,6 +1,7 @@
 import { ScanClientProvider, useScanClient } from './ScanClientContext';
 import useActivity from './useActivity';
 import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
+import useDsoInfo from './useDsoInfo';
 import useGetAmuletRules from './useGetAmuletRules';
 import useGetAnsRules from './useGetAnsRules';
 import useGetDsoPartyId from './useGetDsoPartyId';
@@ -48,4 +49,5 @@ export {
   useLookupAnsEntryByParty,
   useLookupAnsEntryByPartyFromResponse,
   useOpenRounds,
+  useDsoInfo,
 };

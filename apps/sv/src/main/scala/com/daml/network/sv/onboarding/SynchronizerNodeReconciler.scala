@@ -12,7 +12,7 @@ import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
 import com.daml.network.util.PrettyInstances.*

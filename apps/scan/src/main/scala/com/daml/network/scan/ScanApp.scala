@@ -87,8 +87,7 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      // We don't care about the primary party in scan as that points to the SV party while we need the DSO party
-      // which we read below.
+      // The primary party in scan as that points to the SV party
       serviceUserPrimaryParty: PartyId,
   )(implicit tc: TraceContext): Future[ScanApp.State] = {
     val appInitConnection = ledgerClient
@@ -182,6 +181,8 @@ class ScanApp(
       }
       dsoAnsResolver = new DsoAnsResolver(dsoParty)
       internalHandler = new HttpScanHandler(
+        serviceUserPrimaryParty,
+        config.svUser,
         participantAdminConnection,
         store,
         dsoAnsResolver,
