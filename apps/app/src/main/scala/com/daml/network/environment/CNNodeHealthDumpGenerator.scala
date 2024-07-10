@@ -17,7 +17,6 @@ case class CNNodeStatus2() extends CantonStatus {
     Pretty.prettyOfString(_ => "Not implemented")
 }
 
-// TODO(#1159): Properly implement or remove health dumping
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 class CNNodeHealthDumpGenerator(
     override val environment: CNNodeEnvironment,
