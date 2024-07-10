@@ -32,7 +32,7 @@ ensure_damlc_exists() {
 
 ensure_damlc_exists
 
-DAML_PROJECT_FILES="$(find "$REPO_ROOT/daml" -name daml.yaml -not -ipath '*-test*' -not -ipath '*splitwell*' -not -ipath '*app-manager*')"
+DAML_PROJECT_FILES="$(find "$REPO_ROOT/daml" -maxdepth 2 \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml -not -ipath '*-test*' -not -ipath '*splitwell*' -not -ipath '*app-manager*' -print)"
 for project_file in $DAML_PROJECT_FILES
 do
     project="$(basename "$(dirname "$project_file")")"
