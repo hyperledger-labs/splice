@@ -5,13 +5,13 @@ import { z } from 'zod';
 // Configuration specified in files that are not part of this build.
 // To use this external configuration, add a script file to the web site that is loaded
 // before the application code, and writes the config to the global "window" variable.
-const externalConfig = window.canton_network_config;
+const externalConfig = window.splice_config;
 
 // The configuration can also be specified in an environment variable,
 // where the value of the variable is the config object serialized as a JSON string.
 // The environment variable is evaluated at build time and takes precedence over
 // the external config.
-const envConfigString = import.meta.env.VITE_CANTON_NETWORK_CONFIG;
+const envConfigString = import.meta.env.VITE_SPLICE_CONFIG;
 
 export class ConfigReader<
   A extends z.ZodRawShape,
@@ -29,13 +29,13 @@ export class ConfigReader<
       const envConfig = JSON.parse(envConfigString);
       // Printing whole config files to the log is usually a bad idea because it can leak secrets,
       // but frontend configs are inherently unsafe and must not contain any secrets.
-      console.info(`Config from VITE_CANTON_NETWORK_CONFIG:`, envConfigString);
+      console.info(`Config from VITE_SPLICE_CONFIG:`, envConfigString);
       return this.schema.parse(envConfig);
     } else if (externalConfig !== undefined) {
       return this.schema.parse(externalConfig);
     } else {
       throw new Error(
-        `No configuration found. Make sure 'window.canton_network_config' is set before the UI code is loaded.`
+        `No configuration found. Make sure 'window.splice_config' is set before the UI code is loaded.`
       );
     }
   }

@@ -1,6 +1,6 @@
 const host = window.location.hostname;
 const cluster = "${CN_APP_SPLITWELL_UI_CLUSTER}";
-window.canton_network_config = {
+window.splice_config = {
   auth: {
     algorithm: "rs-256",
     authority: "${CN_APP_SPLITWELL_UI_AUTH_URL}",

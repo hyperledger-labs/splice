@@ -1,4 +1,4 @@
-window.canton_network_config = {
+window.splice_config = {
   // HMAC256-based auth with browser self-signed tokens
   auth: {
     algorithm: 'hs-256-unsafe',

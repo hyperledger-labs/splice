@@ -905,6 +905,19 @@ function subcmd_ui_cleanup_amulet() {
   simple_rename "Amulet(?=( Operation| Expired| Unlocked| Owner| Balance| Creation| Price))///Canton Coin" "$frontend_only"
 }
 
+### UI cleanup - rename canton_network_config
+
+subcommand_whitelist[ui_rename_cn]='Rename: UI cleanup to rename canton network to splice'
+function subcmd_ui_rename_cn() {
+  assert_clean_working_dir
+
+  local ignore_unrelated="-e 'daml/**'"
+  local frontend_only="-i '*.tsx' -i '*.ts' -i '*.js' -i 'start-frontends.sh' $ignore_unrelated"
+
+  simple_rename "canton_network///splice" "$frontend_only"
+  simple_rename "CANTON_NETWORK///SPLICE" "$frontend_only"
+}
+
 #### No ANS and Amulet in Cluster
 
 subcommand_whitelist[cluster_ans_amulet]='Rename: remove ANS and Amulet in cluster and docs'

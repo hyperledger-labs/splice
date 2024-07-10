@@ -62,7 +62,7 @@ function start_frontend() {
     "trap \"rm -f ${config_file}\" EXIT"
 
   tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
-    "BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL VITE_CANTON_NETWORK_CONFIG=\"\$(cat $config_file)\" \
+    "BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL VITE_SPLICE_CONFIG=\"\$(cat $config_file)\" \
     npm start 2>&1 | tee -a $log_file" C-m
 }
 

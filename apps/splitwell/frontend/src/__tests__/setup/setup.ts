@@ -15,14 +15,14 @@ type Config = typeof config;
 export type Services = Config['services'];
 
 // Provide a global variable for the app config in the test environment
-window.canton_network_config = config;
+window.splice_config = config;
 declare global {
   interface Window {
-    canton_network_config: Config; // (make typescript happy)
+    splice_config: Config; // (make typescript happy)
   }
 }
 
-export const server: SetupServer = buildServer(window.canton_network_config.services);
+export const server: SetupServer = buildServer(window.splice_config.services);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

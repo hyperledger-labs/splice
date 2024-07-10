@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-window.canton_network_config = {
+window.splice_config = {
   // URL of SV API.
   // Edit this to match the SV you're trying to connect to.
   // Note that this gets overwritten in `start-frontends.sh`.

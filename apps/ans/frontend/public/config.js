@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-window.canton_network_config = {
+window.splice_config = {
   // note that this gets overwritten via environment variables set in `start-frontends.sh`
   auth: {
     algorithm: 'hs-256-unsafe',

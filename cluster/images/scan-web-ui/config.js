@@ -1,5 +1,5 @@
 const cluster = "${CN_APP_CNS_UI_CLUSTER}";
-window.canton_network_config = {
+window.splice_config = {
   services: {
     scan: {
       // URL of scan backend.

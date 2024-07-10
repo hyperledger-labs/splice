@@ -12,14 +12,14 @@ import { config } from './config';
 vi.stubGlobal('crypto', crypto.webcrypto);
 
 // Provide a global variable for the app config in the test environment
-window.canton_network_config = config;
+window.splice_config = config;
 declare global {
   interface Window {
-    canton_network_config: typeof config; // (make typescript happy)
+    splice_config: typeof config; // (make typescript happy)
   }
 }
 
-export const server: SetupServer = buildServer(window.canton_network_config.services.sv.url);
+export const server: SetupServer = buildServer(window.splice_config.services.sv.url);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
