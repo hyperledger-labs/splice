@@ -150,8 +150,8 @@ class SvOnboardingAddlIntegrationTest
         }
       })
     }
-    actAndCheck(timeUntilSuccess = 1.minute)("SV2 comes back online", sv2Backend.start())(
-      "SV4's onboarding gathers suffcient confirmations and is completed",
+    actAndCheck(timeUntilSuccess = 1.minute)("SV2 comes back online", sv2Backend.startSync())(
+      "SV4's onboarding gathers sufficient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
