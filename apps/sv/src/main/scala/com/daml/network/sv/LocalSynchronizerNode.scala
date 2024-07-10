@@ -20,6 +20,7 @@ import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
@@ -78,7 +79,10 @@ final class LocalSynchronizerNode(
   )(implicit traceContext: TraceContext) = {
     logger.info(s"Adding identity transactions for $node $uid")
     for {
-      txs <- participantAdminConnection.getIdentityTransactions(uid, Some(domainId))
+      txs <- participantAdminConnection.getIdentityTransactions(
+        uid,
+        TopologyStoreId.DomainStore(domainId),
+      )
       _ <-
         if (containsIdentityTransactions(uid, txs)) {
           logger.info("Identity transactions have already been uploaded")
@@ -86,7 +90,7 @@ final class LocalSynchronizerNode(
         } else
           for {
             _ <- participantAdminConnection.addTopologyTransactions(
-              Some(domainId),
+              TopologyStoreId.DomainStore(domainId),
               identityTransactions,
             )
             _ <- waitForIdentityTransaction(domainId, uid)
@@ -102,15 +106,17 @@ final class LocalSynchronizerNode(
       RetryFor.WaitingOnInitDependency,
       "identity_transaction",
       show"the identity transactions for $uid are visible",
-      participantAdminConnection.getIdentityTransactions(uid, Some(domainId)).map { txs =>
-        if (!containsIdentityTransactions(uid, txs)) {
-          throw Status.NOT_FOUND
-            .withDescription(
-              show"identity transactions for $uid"
-            )
-            .asRuntimeException()
-        }
-      },
+      participantAdminConnection
+        .getIdentityTransactions(uid, TopologyStoreId.DomainStore(domainId))
+        .map { txs =>
+          if (!containsIdentityTransactions(uid, txs)) {
+            throw Status.NOT_FOUND
+              .withDescription(
+                show"identity transactions for $uid"
+              )
+              .asRuntimeException()
+          }
+        },
       logger,
     )
 
@@ -170,7 +176,10 @@ final class LocalSynchronizerNode(
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
-      identity <- mediatorAdminConnection.getIdentityTransactions(mediatorId.uid, domainId = None)
+      identity <- mediatorAdminConnection.getIdentityTransactions(
+        mediatorId.uid,
+        TopologyStoreId.AuthorizedStore,
+      )
       _ <- addIdentityTransactions(
         "mediator",
         domainId,
@@ -302,7 +311,10 @@ final class LocalSynchronizerNode(
     )
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getIdentityTransactions(sequencerId.uid, domainId = None)
+      identity <- sequencerAdminConnection.getIdentityTransactions(
+        sequencerId.uid,
+        TopologyStoreId.AuthorizedStore,
+      )
       _ <- addIdentityTransactions(
         "sequencer",
         domainId,

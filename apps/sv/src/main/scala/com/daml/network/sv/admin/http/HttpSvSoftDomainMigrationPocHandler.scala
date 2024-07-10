@@ -126,9 +126,9 @@ class HttpSvSoftDomainMigrationPocHandler(
       .toList
       .traverse { namespace =>
         participantAdminConnection.listAllTransactions(
-          Some(TopologyStoreId.DomainStore(decentralizedSynchronizerId)),
+          TopologyStoreId.DomainStore(decentralizedSynchronizerId),
           TimeQuery.Range(None, None),
-          includeMappings = Seq(
+          includeMappings = Set(
             TopologyMappingX.Code.OwnerToKeyMappingX,
             TopologyMappingX.Code.NamespaceDelegationX,
           ),
@@ -137,9 +137,9 @@ class HttpSvSoftDomainMigrationPocHandler(
       }
       .map(_.flatten)
     decentralizedNamespaceDefinition <- participantAdminConnection.listAllTransactions(
-      Some(TopologyStoreId.DomainStore(decentralizedSynchronizerId)),
+      TopologyStoreId.DomainStore(decentralizedSynchronizerId),
       TimeQuery.Range(None, None),
-      includeMappings = Seq(TopologyMappingX.Code.DecentralizedNamespaceDefinitionX),
+      includeMappings = Set(TopologyMappingX.Code.DecentralizedNamespaceDefinitionX),
     )
   } yield (identityTransactions ++ decentralizedNamespaceDefinition).map(_.transaction)
 
@@ -204,7 +204,10 @@ class HttpSvSoftDomainMigrationPocHandler(
           )
         participantId <- participantAdminConnection.getParticipantId()
         decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions()
-        _ <- participantAdminConnection.addTopologyTransactions(None, decentralizedNamespaceTxs)
+        _ <- participantAdminConnection.addTopologyTransactions(
+          TopologyStoreId.AuthorizedStore,
+          decentralizedNamespaceTxs,
+        )
         signedBy = participantId.uid.namespace.fingerprint
         _ <- retryProvider.ensureThatB(
           RetryFor.ClientCalls,
@@ -242,7 +245,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         )
         // add sequencer keys, note that in 3.0 not adding these does not fail but in 3.1 it will
         _ <- participantAdminConnection.addTopologyTransactions(
-          None,
+          TopologyStoreId.AuthorizedStore,
           synchronizerIdentities.flatMap(_.sequencerIdentityTransactions),
         )
         _ <- retryProvider.ensureThatB(
@@ -281,7 +284,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         )
         // add mediator keys, note that in 3.0 not adding these does not fail but in 3.1 it will
         _ <- participantAdminConnection.addTopologyTransactions(
-          None,
+          TopologyStoreId.AuthorizedStore,
           synchronizerIdentities.flatMap(_.mediatorIdentityTransactions),
         )
         _ <- retryProvider.ensureThatB(

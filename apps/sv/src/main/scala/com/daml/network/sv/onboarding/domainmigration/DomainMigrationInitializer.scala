@@ -259,10 +259,10 @@ class DomainMigrationInitializer(
         "mediator synced topology",
         for {
           sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
-            Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
+            TopologyStoreId.DomainStore(nodeIdentities.domainId)
           )
           mediatorTopology <- localSynchronizerNode.mediatorAdminConnection.listAllTransactions(
-            Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
+            TopologyStoreId.DomainStore(nodeIdentities.domainId)
           )
         } yield {
           if (sequencerTopology.size != mediatorTopology.size) {

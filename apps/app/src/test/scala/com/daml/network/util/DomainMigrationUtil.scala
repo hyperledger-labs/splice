@@ -58,13 +58,13 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
     forAllNodesAssert(nodes)("all topology is synced") { node =>
       node.oldParticipantConnection
         .listAllTransactions(
-          Some(TopologyStoreId.DomainStore(domainId))
+          TopologyStoreId.DomainStore(domainId)
         )
         .map(node -> _)
     } { case (node, topologyState) =>
       node.newParticipantConnection
         .listAllTransactions(
-          Some(TopologyStoreId.DomainStore(domainId))
+          TopologyStoreId.DomainStore(domainId)
         )
         .futureValue
         .size shouldBe topologyState.size

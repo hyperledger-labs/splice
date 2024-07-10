@@ -150,7 +150,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipantX]] =
     OptionT(
       listPartyToParticipant(
-        filterStore = domainId.filterString,
+        filterStore = TopologyStoreId.DomainStore(domainId).filterName,
         filterParty = partyId.filterString,
       ).map { txs =>
         txs.headOption
@@ -282,7 +282,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommandsX.Read.ListDecentralizedNamespaceDefinition(
         BaseQueryX(
-          filterStore = domainId.filterString,
+          filterStore = TopologyStoreId.DomainStore(domainId).filterName,
           proposals = proposals.proposals,
           timeQuery = timeQuery,
           ops = None,
@@ -298,19 +298,23 @@ abstract class TopologyAdminConnection(
 
   def getIdentityTransactions(
       id: UniqueIdentifier,
-      domainId: Option[DomainId],
+      store: TopologyStoreId,
   )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
-    getTransactions(
-      Set(TopologyMappingX.Code.NamespaceDelegationX, TopologyMappingX.Code.OwnerToKeyMappingX),
-      Some(id),
-      domainId,
-    )
+    listAllTransactions(
+      store,
+      includeMappings = Set(
+        TopologyMappingX.Code.NamespaceDelegationX,
+        TopologyMappingX.Code.OwnerToKeyMappingX,
+        TopologyMappingX.Code.IdentifierDelegationX,
+      ),
+      filterNamespace = Some(id.namespace),
+    ).map(_.map(_.transaction))
 
   def listAllTransactions(
-      store: Option[TopologyStoreId],
+      store: TopologyStoreId,
       timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: Boolean = false,
-      includeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
+      includeMappings: Set[TopologyMappingX.Code] = Set.empty,
       filterNamespace: Option[Namespace] = None,
   )(implicit
       tc: TraceContext
@@ -318,7 +322,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommandsX.Read.ListAll(
         query = BaseQueryX(
-          filterStore = store.map(_.filterName).getOrElse(""),
+          filterStore = store.filterName,
           proposals = proposals,
           timeQuery = timeQuery,
           ops = None,
@@ -328,60 +332,10 @@ abstract class TopologyAdminConnection(
         filterNamespace = filterNamespace.fold("")(_.filterString),
         excludeMappings =
           if (includeMappings.isEmpty) Seq.empty
-          else TopologyMappingX.Code.all.diff(includeMappings).map(_.code),
+          else TopologyMappingX.Code.all.diff(includeMappings.toSeq).map(_.code),
       )
     ).map(_.result)
   }
-
-  private def getTransactions(
-      transactionType: Set[TopologyMappingX.Code],
-      id: Option[UniqueIdentifier],
-      domainId: Option[DomainId],
-      proposals: Boolean = false,
-  )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
-    listAllTransactions(domainId.map(TopologyStoreId.DomainStore(_)), proposals = proposals)
-      .map(_.map(_.transaction))
-      .map { transactions =>
-        transactions
-          .filter(tx =>
-            transactionType.contains(
-              tx.transaction.mapping.code
-            ) && id.forall(id =>
-              tx.transaction.mapping.maybeUid.contains(
-                id
-              ) || tx.transaction.mapping.namespace == id.namespace
-            )
-          )
-      }
-
-  def getIdentityBootstrapTransactions(domainId: Option[DomainId], id: UniqueIdentifier)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[GenericSignedTopologyTransactionX]] =
-    runCmd(
-      TopologyAdminCommandsX.Read.ListAll(
-        BaseQueryX(
-          filterStore = domainId.map(_.filterString).getOrElse(AuthorizedStore.filterName),
-          proposals = false,
-          timeQuery = TimeQuery.HeadState,
-          ops = None,
-          filterSigningKey = id.namespace.fingerprint.toProtoPrimitive,
-          protocolVersion = None,
-        ),
-        filterNamespace = "",
-        excludeMappings = Seq.empty,
-      )
-    ).map { transactions =>
-      transactions.result
-        .map(_.transaction)
-        .filter(tx =>
-          Set(
-            TopologyMappingX.Code.NamespaceDelegationX,
-            TopologyMappingX.Code.OwnerToKeyMappingX,
-            TopologyMappingX.Code.IdentifierDelegationX,
-          )
-            .contains(tx.transaction.mapping.code)
-        )
-    }
 
   def ensureInitialOwnerToKeyMapping(
       member: Member,
@@ -904,37 +858,8 @@ abstract class TopologyAdminConnection(
     )
   }
 
-  def addVettedPackageTransactionAndEnsurePersisted(
-      domainId: DomainId,
-      tx: GenericSignedTopologyTransactionX,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    logger.info(
-      s"Adding vetted package topology transactions $tx"
-    )
-    val vettedPkgs = tx
-      .selectMapping[VettedPackagesX]
-      .getOrElse(
-        sys.error(s"Domain dump did contain topology transaction that was not VettedPackagesX: $tx")
-      )
-    val participant = vettedPkgs.transaction.mapping.participantId
-    retryProvider.ensureThatB(
-      RetryFor.ClientCalls,
-      "replay_vetted_packages",
-      s"Vetted packages for $participant with serial ${vettedPkgs.serial} has been added",
-      listVettedPackages(participant, domainId).map { txs =>
-        txs.exists(_.base.serial >= vettedPkgs.serial)
-      }, {
-        logger.debug(s"Submitting missing vetted packages: $vettedPkgs")
-        addTopologyTransactions(Some(domainId), Seq(vettedPkgs))
-      },
-      logger,
-    )
-  }
-
   def addTopologyTransactions(
-      domainId: Option[DomainId],
+      store: TopologyStoreId,
       txs: Seq[GenericSignedTopologyTransactionX],
   )(implicit
       traceContext: TraceContext
@@ -943,10 +868,7 @@ abstract class TopologyAdminConnection(
       TopologyAdminCommandsX.Write
         .AddTransactions(
           txs,
-          domainId
-            .map(TopologyStoreId.DomainStore(_))
-            .getOrElse(TopologyStoreId.AuthorizedStore)
-            .filterName,
+          store.filterName,
         )
     )
 
@@ -1360,26 +1282,6 @@ abstract class TopologyAdminConnection(
         domainId.filterString,
       )
     ).map(_.map(r => TopologyResult(r.context, DomainParametersStateX(domainId, r.item))))
-  }
-
-  def listVettedPackages(
-      participantId: ParticipantId,
-      domainId: DomainId,
-      timeQuery: TimeQuery = TimeQuery.HeadState,
-  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[VettedPackagesX]]] = {
-    runCmd(
-      TopologyAdminCommandsX.Read.ListVettedPackages(
-        BaseQueryX(
-          filterStore = domainId.filterString,
-          proposals = false,
-          timeQuery,
-          None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        participantId.filterString,
-      )
-    ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {

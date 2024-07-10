@@ -8,7 +8,8 @@ import com.daml.network.environment.{RetryFor, RetryProvider, TopologyAdminConne
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, NodeIdentity, UniqueIdentifier}
+import com.digitalasset.canton.topology.{NodeIdentity, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
@@ -26,7 +27,6 @@ class NodeInitializer(
   def initializeAndWait(
       dump: NodeIdentitiesDump,
       targetId: Option[NodeIdentity] = None,
-      domainId: Option[DomainId] = None,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(show"Initializing node from dump: $dump")
     val expectedId = targetId.getOrElse(dump.id)
@@ -36,7 +36,7 @@ class NodeInitializer(
         "node_init",
         s"node is initialized with id $expectedId",
         connection.isNodeInitialized(),
-        initializeFromDump(dump, Some(expectedId), domainId),
+        initializeFromDump(dump, Some(expectedId)),
         logger,
       )
       id <- connection.identity()
@@ -56,7 +56,6 @@ class NodeInitializer(
   def initializeFromDump(
       dump: NodeIdentitiesDump,
       targetId: Option[NodeIdentity] = None,
-      domainId: Option[DomainId] = None,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     val expectedId = targetId.getOrElse(dump.id)
     for {
@@ -80,7 +79,7 @@ class NodeInitializer(
           logger.warn(
             "Bootstrapping from bootstrap transactions is deprecated. Please update your node identities dump."
           )
-          importBootstrapTxs(bootstrapTxs, dump.id.uid, domainId)
+          importBootstrapTxs(bootstrapTxs, dump.id.uid)
         }
       }
       _ <- dump.authorizedStoreSnapshot.traverse_ { snapshot =>
@@ -129,16 +128,16 @@ class NodeInitializer(
   private def importBootstrapTxs(
       bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
       uid: UniqueIdentifier,
-      domainId: Option[DomainId],
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = for {
-    uploadedBootstrapTxs <- connection.getIdentityBootstrapTransactions(domainId, uid)
+    uploadedBootstrapTxs <- connection.getIdentityTransactions(uid, TopologyStoreId.AuthorizedStore)
     missingBootstrapTxs = bootstrapTxs.filter(!uploadedBootstrapTxs.contains(_))
     // things blow up later in init if we upload the same tx multiple times ¯\_(ツ)_/¯
     _ <- {
       logger.info(
         s"Uploading ${missingBootstrapTxs.size} missing bootstrap transactions"
       )
-      connection.addTopologyTransactions(domainId, missingBootstrapTxs)
+      // This will be broadcast to the domain store.
+      connection.addTopologyTransactions(TopologyStoreId.AuthorizedStore, missingBootstrapTxs)
     }
   } yield ()
 

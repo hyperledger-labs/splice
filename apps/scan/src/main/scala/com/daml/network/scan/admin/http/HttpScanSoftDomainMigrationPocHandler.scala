@@ -98,7 +98,7 @@ class HttpScanSoftDomainMigrationPocHandler(
           ) { c =>
             for {
               id <- c.getSequencerId
-              txs <- c.getIdentityBootstrapTransactions(None, id.uid)
+              txs <- c.getIdentityTransactions(id.uid, TopologyStoreId.AuthorizedStore)
             } yield (id, txs)
           }
           (mediatorId, mediatorIdentityTransactions) <- withMediatorAdminConnection(
@@ -106,7 +106,7 @@ class HttpScanSoftDomainMigrationPocHandler(
           ) { c =>
             for {
               id <- c.getMediatorId
-              txs <- c.getIdentityBootstrapTransactions(None, id.uid)
+              txs <- c.getIdentityTransactions(id.uid, TopologyStoreId.AuthorizedStore)
             } yield (id, txs)
           }
         } yield ScanSoftDomainMigrationPocResource.GetSynchronizerIdentitiesResponse(
@@ -136,9 +136,9 @@ class HttpScanSoftDomainMigrationPocHandler(
     for {
       signedTransactionsProposals <- participantAdminConnection
         .listAllTransactions(
-          store = Some(TopologyStoreId.AuthorizedStore),
+          store = TopologyStoreId.AuthorizedStore,
           proposals = true,
-          includeMappings = Seq(
+          includeMappings = Set(
             TopologyMappingX.Code.DomainParametersStateX,
             TopologyMappingX.Code.SequencerDomainStateX,
             TopologyMappingX.Code.MediatorDomainStateX,
@@ -147,9 +147,9 @@ class HttpScanSoftDomainMigrationPocHandler(
         .map(_.map(_.transaction))
       signedTransactionsNonProposals <- participantAdminConnection
         .listAllTransactions(
-          store = Some(TopologyStoreId.AuthorizedStore),
+          store = TopologyStoreId.AuthorizedStore,
           proposals = false,
-          includeMappings = Seq(
+          includeMappings = Set(
             TopologyMappingX.Code.DomainParametersStateX,
             TopologyMappingX.Code.SequencerDomainStateX,
             TopologyMappingX.Code.MediatorDomainStateX,

@@ -342,7 +342,9 @@ class FoundingNodeInitializer(
                   synchronizerNode.mediatorAdminConnection,
                   synchronizerNode.sequencerAdminConnection,
                 ).traverse { con =>
-                  con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
+                  con
+                    .getId()
+                    .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
                 }.map(_.flatten),
                 // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
                 // been proposed.
