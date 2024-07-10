@@ -881,6 +881,14 @@ Creating a new alert can be done through the UI.
 - Click `View Yaml`
 - Copy the yaml in a new/existing provisioning file in the `grafana-alerting` folder
 
+If you want to test your alert on a separate channel before merging you can set the following variables before deploying a scratchnet:
+```
+export SLACK_ACCESS_TOKEN="Ask a team member for the token"
+export SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME="tmp-canton-network-deployments"
+export SLACK_ALERT_NOTIFICATION_CHANNEL="C0702L4N161"
+export ENABLE_ALERTS_FOR_TESTING=true
+```
+
 ###### Updating an alert
 
 To edit an alert follow the following steps:
