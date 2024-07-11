@@ -6,8 +6,8 @@
 set -euo pipefail
 
 text="$1"
-# The default channel is #team-canton-network-internal-alerts
-channel="${2:-C064MTNQT88}"
+# The default channel is #team-canton-network-internal-ci
+channel="${2:-C05DT77QF5M}"
 
 echo "posting slack message"
 
