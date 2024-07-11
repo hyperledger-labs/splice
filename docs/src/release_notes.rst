@@ -25,6 +25,9 @@ Upcoming
 
 * Daml
 
+  * Fixed a bug in ``AmuletRules_ComputeFees`` where the fee computation for locks was too high
+    as it did not do the same deduplication of lock-holders as is done by ``AmuletRules_Transfer``.
+
   * All Dars have been rebuilt from source files that include the same copyright prefix
     as in the Splice repository. This bumps dar versions in all packages.
     Incorporating that will require a governance vote to upgrade the package configs to:

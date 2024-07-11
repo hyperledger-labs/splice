@@ -563,9 +563,10 @@ computeFees dso context sender outputs = do
   return $ map (computeOutputFee transferConfigAmulet sender) outputs
 
 computeOutputFee : TransferConfig Amulet -> Party -> TransferOutput -> Decimal
-computeOutputFee transferConfigAmulet sender out =
+computeOutputFee transferConfigAmulet sender out0 =
     transferConfigAmulet.createFee.fee + lockingFee + transferFee
   where
+    out = dedupOutputLockHolders out0
     lockingFee = optional 0.0 (\l -> transferConfigAmulet.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
     transferFee
       | sender == out.receiver = 0.0
@@ -804,20 +805,21 @@ summarizeAndConsumeInputs csum dso sender inps = do
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
-
-preprocessOutputs : TransferConfig Amulet -> Party -> [TransferOutput] -> Update TransferOutputsSummary
-preprocessOutputs transferConfigAmulet sender outs =
-    mapA (preprocessOutput . dedupOutputLockHolders) outs
+-- | Deduplicate lock-holders to store them and charge for them at most once
+dedupOutputLockHolders : TransferOutput -> TransferOutput
+dedupOutputLockHolders out =
+    out with lock = fmap (dedupLockHolders out.receiver) out.lock
   where
-    -- deduplicate lock-holders to store them and charge for them at most once
-    dedupOutputLockHolders out = out with lock = fmap (dedupLockHolders out.receiver) out.lock
-
     dedupLockHolders : Party -> TimeLock -> TimeLock
     dedupLockHolders receiver (TimeLock with expiresAt; holders) =
       TimeLock with
         expiresAt
         holders = dedupSort $ filter (receiver /=) holders
 
+preprocessOutputs : TransferConfig Amulet -> Party -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessOutputs transferConfigAmulet sender outs =
+    mapA (preprocessOutput . dedupOutputLockHolders) outs
+  where
     preprocessOutput out@(TransferOutput with receiver; amount; lock; receiverFeeRatio)
       | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
           error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
