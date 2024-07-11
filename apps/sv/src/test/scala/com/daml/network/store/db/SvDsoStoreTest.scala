@@ -177,11 +177,13 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )(
       _.lookupElectionRequestByRequesterWithOffset(userParty(1), epoch = 1)
     )
+    val now = Instant.now()
+    val timeInThePast = now.truncatedTo(ChronoUnit.MICROS).minusSeconds(3600)
     lookupTests("lookupAnsEntryByNameWithOffset")(
       create = ansEntry(userParty(1), "good"),
-      noise = Seq(ansEntry(userParty(2), "bad")),
+      noise = Seq(ansEntry(userParty(2), "bad"), ansEntry(userParty(3), "expired", timeInThePast)),
     )(
-      _.lookupAnsEntryByNameWithOffset("good")
+      _.lookupAnsEntryByNameWithOffset("good", CantonTimestamp.assertFromInstant(now))
     )
     def paymentId(n: Int) = new SubscriptionInitialPayment.ContractId(validContractId(n))
     def newReferenceId = new SubscriptionRequest.ContractId(nextCid())
@@ -1295,14 +1297,18 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def ansEntry(user: PartyId, name: String) = {
+  private def ansEntry(
+      user: PartyId,
+      name: String,
+      expiresAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
+  ) = {
     val template = new AnsEntry(
       user.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       name,
       s"https://example.com/$name",
       s"Test with $name",
-      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
+      expiresAt,
     )
 
     contract(

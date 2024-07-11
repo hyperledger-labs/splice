@@ -47,6 +47,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
@@ -897,6 +898,9 @@ abstract class ScanStoreTest
       }
     }
 
+    val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+    val timeInThePast = now.minusSeconds(3600)
+
     "listEntries" should {
       "list entries with prefix" in {
         for {
@@ -904,18 +908,22 @@ abstract class ScanStoreTest
           unwantedContract = ansEntry(1, "unwanted")
           wantedContract = ansEntry(2, "wanted")
           wantedContract2 = ansEntry(3, "wanted2")
+          expiredContract = ansEntry(4, "wanted3", timeInThePast)
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract2)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(expiredContract)(store.multiDomainAcsStore)
           expectedResult = Seq(
             ContractWithState(wantedContract, Assigned(dummyDomain)),
             ContractWithState(wantedContract2, Assigned(dummyDomain)),
           )
         } yield {
-          store.listEntries("wanted").futureValue should be(
+          store
+            .listEntries("wanted", CantonTimestamp.assertFromInstant(now))
+            .futureValue should be(
             expectedResult
           )
-          store.listEntries("dummy").futureValue should be(
+          store.listEntries("dummy", CantonTimestamp.assertFromInstant(now)).futureValue should be(
             Seq.empty
           )
         }
@@ -926,7 +934,7 @@ abstract class ScanStoreTest
       "return None for no entry" in {
         for {
           store <- mkStore()
-          result <- store.lookupEntryByName("nope")
+          result <- store.lookupEntryByName("nope", CantonTimestamp.assertFromInstant(now))
         } yield result should be(None)
       }
 
@@ -934,13 +942,24 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           unwantedContract = ansEntry(1, "unwanted")
-          wantedContract = ansEntry(2, "wanted")
+          expiredContract = ansEntry(2, "wanted", timeInThePast)
+          wantedContract = ansEntry(3, "wanted")
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(expiredContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
-          expectedResult = Some(ContractWithState(wantedContract, Assigned(dummyDomain)))
         } yield {
-          store.lookupEntryByName("wanted").futureValue should be(
-            expectedResult
+          store
+            .lookupEntryByName(
+              "wanted",
+              CantonTimestamp.assertFromInstant(timeInThePast.minusSeconds(10)),
+            )
+            .futureValue should be(
+            Some(ContractWithState(expiredContract, Assigned(dummyDomain)))
+          )
+          store
+            .lookupEntryByName("wanted", CantonTimestamp.assertFromInstant(now))
+            .futureValue should be(
+            Some(ContractWithState(wantedContract, Assigned(dummyDomain)))
           )
         }
       }
@@ -951,13 +970,24 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           unwantedContract = ansEntry(1, "unwanted")
+          expiredContract = ansEntry(2, "expired", timeInThePast)
           bContract = ansEntry(2, "b")
           aContract = ansEntry(2, "a")
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(expiredContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
-          expectedResult = Some(ContractWithState(aContract, Assigned(dummyDomain)))
-        } yield store.lookupEntryByParty(userParty(2)).futureValue should be(expectedResult)
+        } yield {
+          store
+            .lookupEntryByParty(
+              userParty(2),
+              CantonTimestamp.assertFromInstant(timeInThePast.minusSeconds(10)),
+            )
+            .futureValue should be(Some(ContractWithState(aContract, Assigned(dummyDomain))))
+          store
+            .lookupEntryByParty(userParty(2), CantonTimestamp.assertFromInstant(now))
+            .futureValue should be(Some(ContractWithState(aContract, Assigned(dummyDomain))))
+        }
       }
     }
 
@@ -1438,14 +1468,18 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
   }
 
-  def ansEntry(n: Int, name: String) = {
+  def ansEntry(
+      n: Int,
+      name: String,
+      expiresAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
+  ) = {
     val template = new AnsEntry(
       userParty(n).toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       name,
       s"https://example.com/$name",
       s"Test with $name",
-      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
+      expiresAt,
     )
 
     contract(

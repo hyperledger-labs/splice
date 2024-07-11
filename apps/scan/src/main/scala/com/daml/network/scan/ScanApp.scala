@@ -187,6 +187,7 @@ class ScanApp(
         store,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
+        clock,
         loggerFactory,
       )
 

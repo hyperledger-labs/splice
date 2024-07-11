@@ -173,8 +173,10 @@ class ExecuteConfirmedActionTrigger(
         arcAnsEntryContext.ansEntryContextAction match {
           case _: ANSRARC_CollectInitialEntryPayment =>
             store.lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid).flatMap {
-              case Some(context) =>
-                store.lookupAnsEntryByName(context.payload.name).map(_.isDefined)
+              case Some(ansContext) =>
+                store
+                  .lookupAnsEntryByName(ansContext.payload.name, context.clock.now)
+                  .map(_.isDefined)
               case None =>
                 // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
                 Future.successful(true)

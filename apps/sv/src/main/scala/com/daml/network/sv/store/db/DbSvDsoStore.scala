@@ -1141,7 +1141,8 @@ class DbSvDsoStore(
   }
 
   override def lookupAnsEntryByNameWithOffset(
-      name: String
+      name: String,
+      now: CantonTimestamp,
   )(implicit tc: TraceContext): Future[
     MultiDomainAcsStore.QueryResult[Option[AssignedContract[AnsEntry.ContractId, AnsEntry]]]
   ] = waitUntilAcsIngested {
@@ -1154,7 +1155,8 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(AnsEntry.TEMPLATE_ID)}
                     and ans_entry_name = ${lengthLimited(name)}
-                    and assigned_domain is not null""",
+                    and assigned_domain is not null
+                    and acs.contract_expires_at >= $now""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupAnsEntryByNameWithOffset",

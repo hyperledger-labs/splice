@@ -66,7 +66,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           transferContextOpt <- dsoStore.getDsoTransferContextForRound(payment.payload.round)
           result <- transferContextOpt match {
             case Some(transferContext) =>
-              dsoStore.lookupAnsEntryByName(ansContext.payload.name).flatMap {
+              dsoStore.lookupAnsEntryByName(ansContext.payload.name, context.clock.now).flatMap {
                 case Some(entry) =>
                   collectPayment(
                     ansContext.contract.contractId,

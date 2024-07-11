@@ -207,7 +207,11 @@ class DbScanStore(
       } yield contractWithState
     }
 
-  override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
+  override def listEntries(
+      namePrefix: String,
+      now: CantonTimestamp,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[
     Seq[ContractWithState[AnsEntry.ContractId, AnsEntry]]
@@ -224,6 +228,7 @@ class DbScanStore(
                 template_id_qualified_name = ${QualifiedName(
                 AnsEntry.COMPANION.TEMPLATE_ID
               )} and ans_entry_name ^@ $limitedPrefix
+              and acs.contract_expires_at >= $now
             """,
             orderLimit = sql"""
                 order by ans_entry_name
@@ -238,7 +243,8 @@ class DbScanStore(
   }
 
   override def lookupEntryByParty(
-      partyId: PartyId
+      partyId: PartyId,
+      now: CantonTimestamp,
   )(implicit tc: TraceContext): Future[
     Option[ContractWithState[AnsEntry.ContractId, AnsEntry]]
   ] = waitUntilAcsIngested {
@@ -255,6 +261,7 @@ class DbScanStore(
               )}
                 and ans_entry_owner = $partyId
                 and ans_entry_name >= ''
+                and acs.contract_expires_at >= $now
             """,
             orderLimit = sql"""
                 order by ans_entry_name
@@ -266,7 +273,9 @@ class DbScanStore(
     } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
   }
 
-  override def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
+  override def lookupEntryByName(name: String, now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[
     Option[ContractWithState[AnsEntry.ContractId, AnsEntry]]
   ] = waitUntilAcsIngested {
     (for {
@@ -281,6 +290,7 @@ class DbScanStore(
                 AnsEntry.COMPANION.TEMPLATE_ID
               )}
               and ans_entry_name = ${lengthLimited(name)}
+              and acs.contract_expires_at >= $now
                  """,
             orderLimit = sql"limit 1",
           ).headOption,

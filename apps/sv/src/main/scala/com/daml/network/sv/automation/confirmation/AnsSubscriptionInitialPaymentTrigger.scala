@@ -106,7 +106,7 @@ class AnsSubscriptionInitialPaymentTrigger(
                     }
                     // if there are existing accepted confirmation of other payment and with the same ans entry name, we will reject this payment.
                     if (otherPaymentAcceptedConfirmations.isEmpty)
-                      dsoStore.lookupAnsEntryByName(entryName).flatMap {
+                      dsoStore.lookupAnsEntryByName(entryName, context.clock.now).flatMap {
                         case None =>
                           // confirm to collect the payment and create the entry
                           confirmCollectPayment(

@@ -50,6 +50,7 @@ import com.daml.network.http.UrlValidator
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.Clock
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -58,6 +59,7 @@ class HttpScanHandler(
     store: ScanStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
+    clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -698,7 +700,11 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listEntries") { _ => _ =>
       for {
-        entryContracts <- store.listEntries(namePrefix.getOrElse(""), PageLimit.tryCreate(pageSize))
+        entryContracts <- store.listEntries(
+          namePrefix.getOrElse(""),
+          clock.now,
+          PageLimit.tryCreate(pageSize),
+        )
         entries = entryContracts.map { contract =>
           definitions.AnsEntry(
             Some(contract.contractId.contractId),
@@ -743,7 +749,7 @@ class HttpScanHandler(
                   .OK(definitions.LookupEntryByNameResponse(dsoAnsEntry.toHttp))
               )
             case None =>
-              store.lookupEntryByName(name).map {
+              store.lookupEntryByName(name, clock.now).map {
                 case Some(entry) =>
                   v0.ScanResource.LookupAnsEntryByNameResponse.OK(
                     definitions.LookupEntryByNameResponse(
@@ -792,7 +798,7 @@ class HttpScanHandler(
               )
             case None =>
               store
-                .lookupEntryByParty(partyId)
+                .lookupEntryByParty(partyId, clock.now)
                 .flatMap {
                   case Some(entry) =>
                     Future.successful(

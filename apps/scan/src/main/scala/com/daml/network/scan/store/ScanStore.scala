@@ -203,19 +203,20 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
+  def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(
+      implicit tc: TraceContext
   ): Future[
     Seq[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
   def lookupEntryByParty(
-      partyId: PartyId
+      partyId: PartyId,
+      now: CantonTimestamp,
   )(implicit tc: TraceContext): Future[
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
-  def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
+  def lookupEntryByName(name: String, now: CantonTimestamp)(implicit tc: TraceContext): Future[
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
@@ -354,6 +355,7 @@ object ScanStore {
             contract = contract,
             ansEntryName = Some(contract.payload.name),
             ansEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
         },
         mkFilter(splice.decentralizedsynchronizer.MemberTraffic.COMPANION)(vt =>

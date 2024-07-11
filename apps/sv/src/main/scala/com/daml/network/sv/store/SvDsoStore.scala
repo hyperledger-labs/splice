@@ -847,16 +847,19 @@ trait SvDsoStore
     }.getOrElse(Future successful Seq.empty))
   }
 
-  def lookupAnsEntryByNameWithOffset(name: String)(implicit tc: TraceContext): Future[
+  def lookupAnsEntryByNameWithOffset(name: String, now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[
     QueryResult[Option[AssignedContract[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]]
   ]
 
   def lookupAnsEntryByName(
-      name: String
+      name: String,
+      now: CantonTimestamp,
   )(implicit
       tc: TraceContext
   ): Future[Option[AssignedContract[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]] =
-    lookupAnsEntryByNameWithOffset(name).map(_.value)
+    lookupAnsEntryByNameWithOffset(name, now).map(_.value)
 
   final def lookupAnsEntryContext(contractId: splice.ans.AnsEntryContext.ContractId)(implicit
       tc: TraceContext
