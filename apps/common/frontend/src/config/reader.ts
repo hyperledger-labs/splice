@@ -21,7 +21,7 @@ export class ConfigReader<
   private schema;
 
   constructor(schema: T) {
-    this.schema = schema.strict();
+    this.schema = schema;
   }
 
   loadConfig(): z.infer<T> {

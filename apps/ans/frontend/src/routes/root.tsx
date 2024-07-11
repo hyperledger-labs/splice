@@ -6,6 +6,7 @@ import { Outlet } from 'react-router-dom';
 import { Box, Button, Stack } from '@mui/material';
 
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
+import { config } from '../utils/config';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
@@ -15,7 +16,7 @@ const Root: React.FC = () => {
     <ErrorBoundary>
       <Box height="100%" sx={{ display: 'flex', flexDirection: 'column' }}>
         <Box bgcolor="colors.neutral.20">
-          <Header title="Canton Name Service">
+          <Header title={config.spliceInstanceNames.nameServiceName}>
             <Stack direction="row" alignItems="center" spacing={1}>
               {primaryPartyId && ( // Using a DirectoryEntry here seems a bit circular
                 <PartyId partyId={primaryPartyId} id="logged-in-user" />

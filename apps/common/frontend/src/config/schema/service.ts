@@ -9,3 +9,11 @@ export const serviceSchema = z.object({
 export const walletSchema = z.object({
   uiUrl: z.string().url(),
 });
+
+export const spliceInstanceNamesSchema = z.object({
+  networkName: z.string(),
+  amuletName: z.string(),
+  amuletNameAcronym: z.string(),
+  nameServiceName: z.string(),
+  nameServiceNameAcronym: z.string(),
+});

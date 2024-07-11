@@ -9,7 +9,7 @@ import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
-import { ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
+import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 export const PostPayment: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -142,9 +142,10 @@ const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
           Why <i>unverified</i>.ans?
         </Typography>
         <Typography variant="body1" color="colors.neutral.80">
-          There is no verification of a user’s identity for CNS entry names at this point so entries
-          are required to include ".unverified" in the name to allow for the later addition of
-          verified entries.
+          There is no verification of a user’s identity for
+          {config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} entry names at this
+          point so entries are required to include ".unverified" in the name to allow for the later
+          addition of verified entries.
         </Typography>
       </Stack>
     );

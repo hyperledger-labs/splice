@@ -3,6 +3,8 @@
 import { Search } from '@mui/icons-material';
 import { InputBase, styled, InputBaseProps, InputAdornment } from '@mui/material';
 
+import { config } from '../utils/config';
+
 const SearchbarStyled = styled(InputBase)<InputBaseProps>(({ theme }) => ({
   border: `1px solid ${theme.palette.colors.neutral[15]}`,
   borderRadius: '4px',
@@ -20,7 +22,11 @@ const Searchbar: React.FC<InputBaseProps> = props => (
         <Search color="secondary" />
       </InputAdornment>
     }
-    endAdornment={<InputAdornment position="end">.unverified.cns</InputAdornment>}
+    endAdornment={
+      <InputAdornment position="end">
+        .unverified.{config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase()}
+      </InputAdornment>
+    }
     {...props}
   />
 );

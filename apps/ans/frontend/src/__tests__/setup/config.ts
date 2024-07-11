@@ -31,6 +31,13 @@ const config = {
       url: 'http://localhost:5003/api/validator',
     },
   },
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
 };
 
 export { config };

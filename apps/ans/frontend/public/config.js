@@ -32,4 +32,11 @@ window.splice_config = {
     },
     // END_ANS_CLUSTER_BACKEND_CONFIG
   },
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
 };

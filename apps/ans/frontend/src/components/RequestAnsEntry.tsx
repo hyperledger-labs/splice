@@ -47,7 +47,9 @@ const RequestAnsEntry: React.FC = () => {
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>
-      <Typography variant="body1">Register your name in the Canton Network</Typography>
+      <Typography variant="body1">
+        Register your name in the {config.spliceInstanceNames.networkName}
+      </Typography>
       <Typography variant="h3">Search for the name you’d like to register</Typography>
       <Stack direction="row" spacing={2}>
         <Searchbar
