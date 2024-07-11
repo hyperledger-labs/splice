@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-# This script returns recent activity (comments only) on issues in the Flaky Tests milestone that are not labeled as "now", "infrequent/no repro", or "blocked-on-upstream", and that are assigned to no one.
+# This script returns recent activity (comments only) on issues in the Flaky Tests milestone that are not labeled as "infrequent/no repro", or "blocked-on-upstream", or "workaround-inplace" and that are assigned to no one.
 
 # The purpose is to help the monitoring team keep track of activity on issues that they may not be subscribed to and require attention.
 
@@ -49,6 +49,7 @@ gh api graphql --paginate --slurp -f query="$(cat "$REPO_ROOT/scripts/monitor-fl
     # Step 3: filter out issues based on labels
     jq '. | map(select(.labels | test("infrequent/no repro") | not))' | \
     jq '. | map(select(.labels | test("blocked-on-upstream") | not))' | \
+    jq '. | map(select(.labels | test("stability:workaround-inplace") | not))' | \
     # Step 4: sort by last comment update, fallback to issue creation if 0 comments
     jq 'sort_by(.timestamp) | reverse' | \
     # Step 5: take latest "-l" results, or default 5
