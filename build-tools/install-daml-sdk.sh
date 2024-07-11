@@ -19,7 +19,7 @@ else
     echo "== Skipping installation of a bootstrapping release of the Daml SDK assuming a recent version (>= 2.8.x) is installed"
 fi
 
-# Get the Daml version is present in the JSON file
+# Get the Daml version is present in the YAML file
 yaml_file="$REPO_ROOT/daml.yaml"
 daml_version=$(yq e '.sdk-version' "$yaml_file")
 if [ -z "$daml_version" ]; then
