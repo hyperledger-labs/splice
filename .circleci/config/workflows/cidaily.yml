@@ -198,6 +198,7 @@ workflow:
             - canton-network-vpn
           cluster: "cidaily"
           use_published_artifacts: false
+          silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -256,6 +257,7 @@ workflow:
             - slack-context
           cluster: "cidaily"
           use_published_artifacts: false
+          silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
             - artifacts_push

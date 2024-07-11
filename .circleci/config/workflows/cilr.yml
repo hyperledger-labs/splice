@@ -13,7 +13,7 @@ workflow:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cilr"
+          workflow_names: "reset_sv_runbook_cilr"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:

@@ -4374,6 +4374,7 @@ workflows:
             - canton-network-vpn
           cluster: "cidaily"
           use_published_artifacts: false
+          silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -4432,6 +4433,7 @@ workflows:
             - slack-context
           cluster: "cidaily"
           use_published_artifacts: false
+          silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -4549,7 +4551,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cilr"
+          workflow_names: "reset_sv_runbook_cilr"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
