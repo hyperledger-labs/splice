@@ -4,7 +4,11 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.scan.config.ScanSynchronizerConfig
+import com.daml.network.sv.LocalSynchronizerNode
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.sequencing.SequencerConnections
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -65,17 +69,25 @@ class SoftDomainMigrationTopologySetupIntegrationTest extends CNNodeIntegrationT
     env.svs.local.foreach { sv =>
       sv.initializeSynchronizer(prefix)
     }
-  // TODO(#13372) Reenable this once Canton fixes this
-  // env.svs.local.foreach { sv =>
-  //   sv.participantClient.domains.register_with_config(
-  //     DomainConnectionConfig(
-  //       DomainAlias.tryCreate(prefix),
-  //       SequencerConnections.single(LocalSynchronizerNode.toSequencerConnection(
-  //         sv.config.synchronizerNodes(prefix).sequencer.internalApi,
-  //       ))
-  //     ),
-  //     handshakeOnly = false,
-  //   )
-  // }
+    val domainAlias = DomainAlias.tryCreate(prefix)
+    env.svs.local.foreach { sv =>
+      val participant = sv.participantClient
+      participant.domains.register_with_config(
+        DomainConnectionConfig(
+          domainAlias,
+          SequencerConnections.single(
+            LocalSynchronizerNode.toSequencerConnection(
+              sv.config.synchronizerNodes(prefix).sequencer.internalApi
+            )
+          ),
+        ),
+        handshakeOnly = false,
+      )
+      val domainId = participant.domains.id_of(domainAlias)
+      participant.health.ping(
+        participant.id,
+        domainId = Some(domainId),
+      )
+    }
   }
 }

@@ -38,6 +38,7 @@ import com.digitalasset.canton.topology.store.{
   TimeQuery,
   TopologyStoreId,
 }
+import StoredTopologyTransactionX.GenericStoredTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   MediatorDomainStateX,
@@ -349,6 +350,27 @@ class HttpSvSoftDomainMigrationPocHandler(
     f(connection).andThen { _ => connection.close() }
   }
 
+  // Takes a list of (ordered) signed topology transactions and turns them into
+  // StoredTopologyTransactions ensuring that only the latest serial has validUntil = None
+  private def toStoredTopologyBootstrapTransactions(
+      ts: Seq[GenericSignedTopologyTransactionX]
+  ): Seq[GenericStoredTopologyTransactionX] =
+    ts.foldRight(
+      (Set.empty[TopologyMappingX.MappingHash], Seq.empty[GenericStoredTopologyTransactionX])
+    ) { case (tx, (newerMappings, acc)) =>
+      (
+        newerMappings + tx.transaction.mapping.uniqueKey,
+        StoredTopologyTransactionX(
+          SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
+          EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
+          Option.when(newerMappings.contains(tx.transaction.mapping.uniqueKey))(
+            EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor)
+          ),
+          tx.copy(isProposal = false),
+        ) +: acc,
+      )
+    }._2
+
 // TODO(#13301) Add safeguards that data written to authorized store is sensible
   override def initializeSynchronizer(
       respond: SvSoftDomainMigrationPocResource.InitializeSynchronizerResponse.type
@@ -394,20 +416,15 @@ class HttpSvSoftDomainMigrationPocHandler(
         .map(_.mediatorDomainState)
         .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
       node = synchronizerNodes(domainIdPrefix)
-      bootstrapTransactions = (decentralizedNamespaceTxs ++
-        synchronizerIdentities.flatMap(_.sequencerIdentityTransactions) ++
-        synchronizerIdentities.flatMap(_.mediatorIdentityTransactions) ++
-        Seq(
-          domainParameters,
-          sequencerDomainState,
-          mediatorDomainState,
-        )).map(signed =>
-        StoredTopologyTransactionX(
-          SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
-          EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
-          None,
-          signed.copy(isProposal = false),
-        )
+      bootstrapTransactions = toStoredTopologyBootstrapTransactions(
+        decentralizedNamespaceTxs ++
+          synchronizerIdentities.flatMap(_.sequencerIdentityTransactions) ++
+          synchronizerIdentities.flatMap(_.mediatorIdentityTransactions) ++
+          Seq(
+            domainParameters,
+            sequencerDomainState,
+            mediatorDomainState,
+          )
       )
       staticDomainParameters = node.parameters
         .toStaticDomainParameters(
