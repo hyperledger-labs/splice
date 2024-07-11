@@ -52,14 +52,15 @@ in pkgs.mkShell {
     ps
     pulumi-bin
     python3
+    python3Packages.aiohttp
+    python3Packages.colorlog
     (python3Packages.datadog.overrideAttrs (old: {
                                              doCheck = false;
                                              doInstallCheck = false;
                                      }))
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
-    python3Packages.aiohttp
-    python3Packages.colorlog
+    python3Packages.pyyaml
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
@@ -78,7 +79,7 @@ in pkgs.mkShell {
 
   CANTON = "${pkgs.canton}";
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
-  SDK_VERSION = "${sources.sdk_version}";
+  SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
   PULUMI_HOME = "${pkgs.pulumi-bin}";

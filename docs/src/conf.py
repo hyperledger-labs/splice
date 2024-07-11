@@ -18,6 +18,7 @@ import os
 # sys.path.insert(0, os.path.abspath('.'))
 
 import json
+import yaml
 from datetime import date
 
 
@@ -103,7 +104,11 @@ repo_root = os.getenv("REPO_ROOT")
 with open(repo_root + "/nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_version = obj['version']
-    daml_sdk_version = obj['sdk_version']
+    daml_sdk_tooling_version = obj['tooling_sdk_version']
+
+with open(repo_root + "/daml.yaml") as f:
+    obj = yaml.safe_load(f)
+    daml_sdk_version = obj['sdk-version']
 
 with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
     canton_subdir = f.readline()
@@ -124,6 +129,7 @@ rst_prolog = f"""
 .. |chart_version_literal| replace:: ``{chart_version}``
 .. |canton_version| replace:: {canton_version}
 .. |canton_subdir| replace:: {canton_subdir}
+.. |daml_sdk_tooling_version| replace:: {daml_sdk_tooling_version}
 .. |daml_sdk_version| replace:: {daml_sdk_version}
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
