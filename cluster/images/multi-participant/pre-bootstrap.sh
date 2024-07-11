@@ -44,6 +44,7 @@ canton.participants.participant_$index = {
         }
         parameters {
             max-connections = 32
+            migrate-and-start = yes
         }
     }
 
