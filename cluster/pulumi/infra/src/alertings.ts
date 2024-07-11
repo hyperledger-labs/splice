@@ -1,7 +1,7 @@
 import { config } from 'cn-pulumi-common';
 
 export const enableAlerts =
-  config.envFlag('GCP_CLUSTER_PROD_LIKE') || config.optionalEnv('ENABLE_ALERTS_FOR_TESTING');
+  config.envFlag('GCP_CLUSTER_PROD_LIKE') || config.envFlag('ENABLE_ALERTS_FOR_TESTING');
 export const slackAlertNotificationChannel =
   config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 

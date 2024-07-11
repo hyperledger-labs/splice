@@ -6,21 +6,27 @@ import { slackToken } from './alertings';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
-const slackAlertNotificationChannel =
-  config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
-  'team-canton-network-internal-alerts';
-const notificationChannel = new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
-  displayName: `${CLUSTER_BASENAME} Slack Alert Notification Channel`,
-  type: 'slack',
-  labels: {
-    channel_name: `#${slackAlertNotificationChannel}`,
-  },
-  sensitiveLabels: {
-    authToken: slackToken(),
-  },
-});
+export function getNotificationChannel(
+  name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
+): gcp.monitoring.NotificationChannel {
+  const slackAlertNotificationChannel =
+    config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
+    'team-canton-network-internal-alerts';
+  return new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
+    displayName: name,
+    type: 'slack',
+    labels: {
+      channel_name: `#${slackAlertNotificationChannel}`,
+    },
+    sensitiveLabels: {
+      authToken: slackToken(),
+    },
+  });
+}
 
-export function installGcpLoggingAlerts(): void {
+export function installGcpLoggingAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
   const logWarningsMetric = new gcp.logging.Metric('log_warnings', {
     name: `log_warnings_${CLUSTER_BASENAME}`,
     description: 'Logs with a severity level of warning or above',
@@ -134,7 +140,9 @@ ${conditionalString(
 }
 
 // https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#control_plane_upgrade_logs
-export function installMaintenanceUpdateAlerts(): void {
+export function installMaintenanceUpdateAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
   const logGkeClusterUpdate = new gcp.logging.Metric('log_gke_cluster_update', {
     name: `log_gke_cluster_update_${CLUSTER_BASENAME}`,
     description: 'Logs with ClusterUpdate events',
