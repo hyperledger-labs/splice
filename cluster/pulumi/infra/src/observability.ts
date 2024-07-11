@@ -542,7 +542,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   createGrafanaDashboards(namespaceName);
   // enable the slack alerts only for "prod" clusters
   if (enableAlerts) {
-    createGrafanaContactPoints(namespaceName);
+    grafanaContactPoints(namespaceName, slackToken(), slackAlertNotificationChannel);
+  } else {
+    grafanaContactPoints(namespaceName, 'None', 'None');
   }
   createGrafanaAlerting(namespaceName);
   createGrafanaServiceAccount(
@@ -653,7 +655,11 @@ function createGrafanaServiceAccount(
   });
 }
 
-function createGrafanaContactPoints(namespace: Input<string>) {
+function grafanaContactPoints(
+  namespace: Input<string>,
+  slackToken: string,
+  slackAlertNotificationChannel: string
+) {
   new k8s.core.v1.Secret(
     'slack-alert-notification-channel',
     {
@@ -666,7 +672,7 @@ function createGrafanaContactPoints(namespace: Input<string>) {
       data: {
         'slackContactPoint.yaml': Buffer.from(
           readGrafanaAlertingFile('slack_contact_point.yaml')
-            .replaceAll('$SLACK_ACCESS_TOKEN', slackToken())
+            .replaceAll('$SLACK_ACCESS_TOKEN', slackToken)
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
         ).toString('base64'),
       },
