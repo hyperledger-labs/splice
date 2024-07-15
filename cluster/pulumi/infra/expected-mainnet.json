@@ -1164,19 +1164,20 @@
             }
           }
         },
-        "defaults": {
-          "autoscaling": {
-            "maxReplicas": 10
+        "autoscaling": {
+          "maxReplicas": 10
+        },
+        "podDisruptionBudget": {
+          "minAvailable": 1
+        },
+        "resources": {
+          "limits": {
+            "cpu": "4",
+            "memory": "2024Mi"
           },
-          "resources": {
-            "limits": {
-              "cpu": 4,
-              "memory": "2024Mi"
-            },
-            "requests": {
-              "cpu": "500m",
-              "memory": "512Mi"
-            }
+          "requests": {
+            "cpu": "500m",
+            "memory": "512Mi"
           }
         },
         "service": {
@@ -1247,19 +1248,20 @@
             }
           }
         },
-        "defaults": {
-          "autoscaling": {
-            "maxReplicas": 10
+        "autoscaling": {
+          "maxReplicas": 10
+        },
+        "podDisruptionBudget": {
+          "minAvailable": 1
+        },
+        "resources": {
+          "limits": {
+            "cpu": "4",
+            "memory": "2024Mi"
           },
-          "resources": {
-            "limits": {
-              "cpu": 4,
-              "memory": "2024Mi"
-            },
-            "requests": {
-              "cpu": "500m",
-              "memory": "512Mi"
-            }
+          "requests": {
+            "cpu": "500m",
+            "memory": "512Mi"
           }
         },
         "service": {

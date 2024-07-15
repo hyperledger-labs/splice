@@ -273,20 +273,21 @@ function configureGatewayService(
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
       values: {
-        defaults: {
-          resources: {
-            requests: {
-              cpu: '500m',
-              memory: '512Mi',
-            },
-            limits: {
-              cpu: 4,
-              memory: '2024Mi',
-            },
+        resources: {
+          requests: {
+            cpu: '500m',
+            memory: '512Mi',
           },
-          autoscaling: {
-            maxReplicas: 10,
+          limits: {
+            cpu: '4',
+            memory: '2024Mi',
           },
+        },
+        autoscaling: {
+          maxReplicas: 10,
+        },
+        podDisruptionBudget: {
+          minAvailable: 1,
         },
         service: {
           loadBalancerIP: ingressIp,
