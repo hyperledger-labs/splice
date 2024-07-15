@@ -702,7 +702,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "docs-docs",
     "provider": "",
@@ -790,7 +790,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -873,7 +873,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -953,7 +953,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "splitwell-participant-2",
     "provider": "",
@@ -1075,7 +1075,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -1304,7 +1304,7 @@
         "useSequencerConnectionsFromScan": true,
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",
@@ -1476,7 +1476,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -1608,7 +1608,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -1671,7 +1671,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1724,7 +1724,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1858,7 +1858,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-participant-2",
     "provider": "",
@@ -1984,7 +1984,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2218,7 +2218,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2325,7 +2325,7 @@
           }
         }
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -2529,7 +2529,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -2602,7 +2602,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -2682,7 +2682,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -2788,7 +2788,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -2951,7 +2951,7 @@
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

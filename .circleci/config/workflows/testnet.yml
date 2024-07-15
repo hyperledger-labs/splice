@@ -8,9 +8,10 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/testnet
+                - release-line-0.1.15
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -24,7 +25,7 @@ workflow:
           filters:
             branches:
               only:
-                - deployment/testnet
+                - release-line-0.1.15
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           migration_id: << pipeline.parameters.migration-id >>

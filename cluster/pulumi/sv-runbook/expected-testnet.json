@@ -207,7 +207,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -458,7 +458,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "global-domain-2-cometbft",
     "provider": "",
@@ -535,7 +535,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "global-domain-2",
     "provider": "",
@@ -603,7 +603,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "loopback",
     "provider": "",
@@ -680,7 +680,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "participant-2",
     "provider": "",
@@ -740,7 +740,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "scan",
     "provider": "",
@@ -819,7 +819,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -923,8 +923,8 @@
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
-            "partyId": "dummy::partyId",
-            "percentage": "33.33"
+            "beneficiary": "dummy::partyId",
+            "weight": "3333"
           }
         ],
         "failOnAppVersionMismatch": true,
@@ -956,7 +956,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-app",
     "provider": "",
@@ -1077,7 +1077,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1154,7 +1154,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1231,7 +1231,7 @@
           }
         ]
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1336,7 +1336,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.1.10"
+      "version": "0.1.15"
     },
     "name": "validator",
     "provider": "",
