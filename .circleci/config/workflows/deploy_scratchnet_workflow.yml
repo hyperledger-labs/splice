@@ -45,6 +45,11 @@
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
+      - autoscaler_prevent_scaledown:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          requires:
+            - set_scratchnet
       - artifacts_push:
           <<: *main-branch-never
           context:
@@ -200,7 +205,6 @@
           cluster: "user-selected-scratchnet"
           migration_id: 1
           parallelism: 1
-          wait_for_disabled_autoscaler: true
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
@@ -221,7 +225,6 @@
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
-          wait_for_disabled_autoscaler: true
           <<: *main-branch-never
           context:
             - artifactory
@@ -246,21 +249,12 @@
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
-          wait_for_disabled_autoscaler: true
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
-          requires:
-            - migrate_cluster
-      - disable_autoscaler:
-          context:
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          migration_id: 1
           requires:
             - migrate_cluster
       - backup_cluster:
@@ -297,13 +291,14 @@
             - restore_node_after_migration
             - migrate_sv_runbook
             - migrate_validator_runbook
-      - enable_autoscaler:
+      - autoscaler_allow_scaledown:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
+            - restore_node_after_migration
+            - migrate_sv_runbook
+            - migrate_validator_runbook
+
 
   # Simple deployment with no migration
   deploy_scratchnet_basic:

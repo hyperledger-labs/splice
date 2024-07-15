@@ -17,8 +17,7 @@ workflow:
             - slack-context
           workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
-      - enable_autoscaler:
-          name: "ensure_autoscaler_enabled"
+      - autoscaler_prevent_scaledown:
           <<: *main-branch-only
           cluster: "ciperiodic"
           requires:
@@ -128,7 +127,6 @@ workflow:
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
-          wait_for_disabled_autoscaler: true
           requires:
             - trigger_global_domain_migration
       - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
@@ -155,7 +153,6 @@ workflow:
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
-          wait_for_disabled_autoscaler: true
           requires:
             - migrate_cluster
       - hard_migration:
@@ -179,15 +176,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          wait_for_disabled_autoscaler: true
-          requires:
-            - migrate_cluster
-      - disable_autoscaler:
-          context:
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
           migration_id: 1
           requires:
             - migrate_cluster
@@ -249,7 +237,7 @@ workflow:
             - canton-network-vpn
           requires:
             - preflight_sv_check_redeployed
-      - enable_autoscaler:
+      - autoscaler_allow_scaledown:
           <<: *main-branch-only
           cluster: "ciperiodic"
           requires:

@@ -1,64 +1,6 @@
 jobs:
 
-  disable_autoscaler:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      migration_id:
-        type: integer
-        default: 0
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Activate cluster
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          cmd: cncluster activate
-          cmd_retry_count: 5
-      - run_bash_command_in_nix:
-          cmd_name: wait for deployment to finish
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
-          cmd: |
-            validator_app="validator-app"
-            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-            cncluster wait splitwell $validator_app << parameters.migration_id >>
-            cncluster wait sv-1 $validator_app << parameters.migration_id >>
-            cncluster wait validator1 $validator_app << parameters.migration_id >>
-            if (env-bool IS_DEVNET); then
-              cncluster wait sv-2 $validator_app << parameters.migration_id >>
-              cncluster wait sv-3 $validator_app << parameters.migration_id >>
-              cncluster wait sv-4 $validator_app << parameters.migration_id >>
-            fi
-            if ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
-              cncluster wait sv $validator_app << parameters.migration_id >>
-            fi
-            echo "Done waiting. All pods in the cluster are:"
-            kubectl get pods -A
-          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-          cmd_retry_count: 2
-          cmd_before_retry: |-
-            echo "VPN connection seems to have died, restarting VPN and retrying..."
-            /tmp/vpn-scripts/restart-vpn.sh
-      - run_bash_command_in_nix:
-          cmd_name: Disable autoscaler
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          cmd: |
-            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --no-enable-autoscaling
-
-
-  enable_autoscaler:
+  autoscaler_prevent_scaledown:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -70,24 +12,17 @@ jobs:
       - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: Enable autoscaler
+          cmd_name: Prevent autoscaler scaledown
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
-            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --enable-autoscaling --min-nodes=${GCP_CLUSTER_MIN_NODES} --max-nodes=${GCP_CLUSTER_MAX_NODES}
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MAX_NODES}
           cmd_retry_count: 5
 
-  autoscaler_set_min_nodes:
+  autoscaler_allow_scaledown:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      num_nodes_from_env_var:
-        type: string
-        default: ""
-      num_nodes:
-        # Will be ignored if num_nodes_from_env_var is set
-        type: integer
-        default: 0
     docker:
       - image: cimg/base:2024.01
     environment:
@@ -96,14 +31,10 @@ jobs:
       - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: Enable autoscaler
+          cmd_name: Allow the autoscaler to scaledown
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
-            if [ -n "<< parameters.num_nodes_from_env_var >>" ]; then
-              gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${<< parameters.num_nodes_from_env_var >>}
-            else
-              gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=<< parameters.num_nodes >>
-            fi
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
           cmd_retry_count: 5
 

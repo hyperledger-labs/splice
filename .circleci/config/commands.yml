@@ -401,6 +401,9 @@ commands:
 
               cncluster prefresh
               cncluster ci_reset_unlock
+
+              # Ensure the apps node pool can scale down (this might have been left as prevented if a scratchnet CCI deployment has failed)
+              gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
             elif ! cncluster ci_warn_lock_expiry; then
               .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
