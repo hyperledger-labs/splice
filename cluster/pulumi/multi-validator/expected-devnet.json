@@ -4242,7 +4242,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "400Gi"
+          "volumeSize": "600Gi"
         },
         "persistence": {
           "secretName": "postgres-0-secret"
@@ -4302,7 +4302,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "400Gi"
+          "volumeSize": "600Gi"
         },
         "persistence": {
           "secretName": "postgres-1-secret"
@@ -4362,7 +4362,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "400Gi"
+          "volumeSize": "600Gi"
         },
         "persistence": {
           "secretName": "postgres-2-secret"
@@ -4422,7 +4422,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "400Gi"
+          "volumeSize": "600Gi"
         },
         "persistence": {
           "secretName": "postgres-3-secret"
@@ -4482,7 +4482,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "400Gi"
+          "volumeSize": "600Gi"
         },
         "persistence": {
           "secretName": "postgres-4-secret"
