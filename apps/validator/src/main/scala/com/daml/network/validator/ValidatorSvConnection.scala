@@ -6,7 +6,7 @@ package com.daml.network.validator
 import cats.data.EitherT
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{BuildInfo, HttpAppConnection, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.TemplateJsonDecoder
@@ -28,14 +28,14 @@ final class ValidatorSvConnection private (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */
   def onboardValidator(validator: PartyId, secret: String, contactPoint: String)(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -54,7 +54,7 @@ object ValidatorSvConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ValidatorSvConnection] =
     HttpAppConnection.checkVersionOrClose(

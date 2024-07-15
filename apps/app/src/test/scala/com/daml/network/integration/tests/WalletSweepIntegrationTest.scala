@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.automation.Trigger
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs
-import com.daml.network.environment.{BaseLedgerConnection, CNNodeEnvironmentImpl}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.updateAllValidatorConfigs
+import com.daml.network.environment.{BaseLedgerConnection, EnvironmentImpl}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.util.CNNodeUtil.ccToDollars
-import com.daml.network.util.{CNNodeUtil, TriggerTestUtil, WalletTestUtil}
+import com.daml.network.util.SpliceUtil.ccToDollars
+import com.daml.network.util.{SpliceUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.automation.AutoAcceptTransferOffersTrigger
 import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -21,7 +21,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.DurationInt
 
 class WalletSweepIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TriggerTestUtil {
 
@@ -29,15 +29,15 @@ class WalletSweepIntegrationTest
   val minBalanceUsd: BigDecimal = BigDecimal(2)
   val amuletPrice: BigDecimal = BigDecimal(1)
 
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.bigDecimal)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.bigDecimal)
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) => {
         val aliceParticipant =
-          CNNodeConfigTransforms
+          ConfigTransforms
             .getParticipantIds(config.parameters.clock)("alice_validator_user")
         val aliceLedgerApiUser =
           config.validatorApps(InstanceName.tryCreate("aliceValidator")).ledgerApiUser
@@ -46,7 +46,7 @@ class WalletSweepIntegrationTest
             s"${BaseLedgerConnection.sanitizeUserIdToPartyString(aliceLedgerApiUser)}::${aliceParticipant.split("::").last}"
           )
         val sv1Participant =
-          CNNodeConfigTransforms
+          ConfigTransforms
             .getParticipantIds(config.parameters.clock)("sv1")
         val sv1LedgerApiUser =
           config.svApps(InstanceName.tryCreate("sv1")).svPartyHint.value
@@ -203,14 +203,14 @@ class WalletSweepIntegrationTest
     }
   }
 
-  private def sv1Balance()(implicit env: CNNodeTestConsoleEnvironment) = BigDecimal(
+  private def sv1Balance()(implicit env: SpliceTestConsoleEnvironment) = BigDecimal(
     ccToDollars(
       sv1WalletClient.balance().unlockedQty.bigDecimal,
       amuletPrice.bigDecimal,
     )
   )
 
-  private def sweepAndTransfersAreIdle()(implicit env: CNNodeTestConsoleEnvironment) =
+  private def sweepAndTransfersAreIdle()(implicit env: SpliceTestConsoleEnvironment) =
     clue("There are no outstanding transfer offers to accept or complete") {
       eventually() {
         sv1Balance() shouldBe <(maxBalanceUsd)
@@ -221,7 +221,7 @@ class WalletSweepIntegrationTest
 
   // triggers relevant to outstanding sweep transfer offers
   private def autoAcceptTransferOffersTriggers(implicit
-      environment: CNNodeTestConsoleEnvironment
+      environment: SpliceTestConsoleEnvironment
   ): Seq[Trigger] = {
     val aliceUserName = aliceValidatorWalletClient.config.ledgerApiUser
     Seq(
@@ -232,7 +232,7 @@ class WalletSweepIntegrationTest
     )
   }
 
-  private def assertSweepCompleted()(implicit env: CNNodeTestConsoleEnvironment) = {
+  private def assertSweepCompleted()(implicit env: SpliceTestConsoleEnvironment) = {
     // The merging of the two tapped amulets loses 1 x base transfer fee,
     // but may occur after the amount of the transfer offer is computed.
     // When that happens, we end up having slightly less than the minimum balance.

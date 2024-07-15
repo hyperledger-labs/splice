@@ -2,11 +2,11 @@ package com.daml.network.integration.tests
 
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  IntegrationTestWithSharedEnvironment,
+  TestCommon,
+  SpliceTestConsoleEnvironment,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
@@ -101,7 +101,7 @@ trait CustomMatchers {
 }
 
 abstract class FrontendIntegrationTest(override val frontendNames: String*)
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with FrontendTestCommon
     with ParallelTestExecution {
 
@@ -116,7 +116,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     env
   }
 
-  override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
+  override def testFinished(testName: String, env: SpliceTestConsoleEnvironment): Unit = {
     // testFinished runs before afterEach and tears down all our apps.
     // Therefore, we stop the web browsers here so we don't get log warnings
     // because the frontends fail to connect to backends.
@@ -126,7 +126,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
 }
 
 abstract class FrontendIntegrationTestWithSharedEnvironment(override val frontendNames: String*)
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with FrontendTestCommon {
 
   override def beforeAll() = {
@@ -136,7 +136,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
     }
   }
 
-  override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
+  override def testFinished(testName: String, env: SpliceTestConsoleEnvironment): Unit = {
     clearWebDrivers(provideEnvironment(testName).executionContext)
     super.testFinished(testName, env)
   }
@@ -148,7 +148,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
   }
 }
 
-trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMatchers {
+trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers {
 
   protected lazy val autostartWebDrivers: Boolean = true
 

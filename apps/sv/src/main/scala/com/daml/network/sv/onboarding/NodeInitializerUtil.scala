@@ -5,12 +5,12 @@ package com.daml.network.sv.onboarding
 
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
-  CNLedgerClient,
+  SpliceLedgerClient,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
 }
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.LocalSynchronizerNode
@@ -43,7 +43,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val domainUnpausedSync: DomainUnpausedSynchronization
   protected val participantAdminConnection: ParticipantAdminConnection
   protected val cometBftNode: Option[CometBftNode]
-  protected val ledgerClient: CNLedgerClient
+  protected val ledgerClient: SpliceLedgerClient
 
   protected def newSvStore(
       key: SvStore.Key,
@@ -65,7 +65,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def newSvSvAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -111,7 +111,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateJsonDecoder: TemplateJsonDecoder,
   ) =
     new SvDsoAutomationService(

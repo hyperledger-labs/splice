@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -12,13 +12,13 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 class ScanConnectionIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging

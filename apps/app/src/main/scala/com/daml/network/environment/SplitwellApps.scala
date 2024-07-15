@@ -3,7 +3,7 @@
 
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.splitwell.{SplitwellApp, SplitwellAppBootstrap}
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -18,7 +18,7 @@ class SplitwellApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, SplitwellAppBackendConfig],
-    parametersFor: String => SharedCNNodeAppParameters,
+    parametersFor: String => SharedSpliceAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -26,7 +26,7 @@ class SplitwellApps(
       // this trait.
       SplitwellApp,
       SplitwellAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
       SplitwellAppBootstrap,
     ](
       create,

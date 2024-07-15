@@ -4,10 +4,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.console.*
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.concurrent.Threading
@@ -21,16 +18,16 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import com.digitalasset.canton.data.CantonTimestamp
 
-trait TimeTestUtil extends CNNodeTestCommon {
-  this: CommonCNNodeAppInstanceReferences & WalletTestUtil =>
+trait TimeTestUtil extends TestCommon {
+  this: CommonAppInstanceReferences & WalletTestUtil =>
 
-  def getLedgerTime(implicit env: CNNodeTestConsoleEnvironment) =
+  def getLedgerTime(implicit env: SpliceTestConsoleEnvironment) =
     sv1Backend.participantClient.ledger_api.time.get()
 
   // Advance time by `duration`; works only if the used Canton instance uses simulated time.
   protected def advanceTime(
       duration: Duration
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     clue(s"attempting to advance time by $duration") {
       if (duration.isNegative()) {
         fail("Cannot advance time by negative duration.");
@@ -96,7 +93,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       amulet: HttpWalletAppClient.AmuletPosition,
       outputs: Seq[splice.amuletrules.TransferOutput],
       now: CantonTimestamp,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
+  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment) = {
     val amuletRules = sv1ScanBackend.getAmuletRules()
     val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
     val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
@@ -145,7 +142,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     *
     * See the docstring for `advanceTimeAndWaitForRoundAutomation` for caveats on its usage.
     */
-  def advanceRoundsByOneTick(implicit env: CNNodeTestConsoleEnvironment) = {
+  def advanceRoundsByOneTick(implicit env: SpliceTestConsoleEnvironment) = {
     advanceTimeAndWaitForRoundAutomation(tickDurationWithBuffer)
   }
 
@@ -163,7 +160,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   @nowarn("msg=match may not be exhaustive")
   def advanceTimeAndWaitForRoundAutomation(
       duration: Duration
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val (previousOpenRounds, previousIssuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
     val Seq(lowestOpen, middleOpen, highestOpen) =
       previousOpenRounds.map(_.contract.payload.round.number)
@@ -215,7 +212,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     *  past its target closing time is open. The function fails if no open
     *  mining round exists where this is possible.
     */
-  def advanceTimeToRoundOpen(implicit env: CNNodeTestConsoleEnvironment) = {
+  def advanceTimeToRoundOpen(implicit env: SpliceTestConsoleEnvironment) = {
     val now = sv1Backend.participantClient.ledger_api.time.get().toInstant
     val (openRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
     val earliestOpen = openRounds
@@ -237,7 +234,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorAppRef: ValidatorAppBackendReference,
       multiple: Double = 1.0,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val now = sv1Backend.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
@@ -250,14 +247,14 @@ trait TimeTestUtil extends CNNodeTestCommon {
   }
 
   def getSortedOpenMiningRounds(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       validatorPartyId: PartyId,
   ): Seq[OpenMiningRound.Contract] = participantClient.ledger_api_extensions.acs
     .filterJava(OpenMiningRound.COMPANION)(validatorPartyId)
     .sortBy(_.data.round.number)
 
   def getSortedIssuingRounds(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       validatorPartyId: PartyId,
   ): Seq[IssuingMiningRound.Contract] = participantClient.ledger_api_extensions.acs
     .filterJava(IssuingMiningRound.COMPANION)(

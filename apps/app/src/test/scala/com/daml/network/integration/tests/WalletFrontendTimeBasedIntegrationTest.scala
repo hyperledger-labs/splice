@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.{
   FrontendLoginUtil,
   TimeTestUtil,
@@ -23,8 +23,8 @@ class WalletFrontendTimeBasedIntegrationTest
 
   val amuletPrice = 2
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
 

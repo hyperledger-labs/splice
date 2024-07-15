@@ -1,11 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.{
-  CNNodeUtil,
+  SpliceUtil,
   SynchronizerFeesTestUtil,
   FrontendLoginUtil,
   WalletFrontendTestUtil,
@@ -31,11 +31,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val amuletPrice = 2
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)

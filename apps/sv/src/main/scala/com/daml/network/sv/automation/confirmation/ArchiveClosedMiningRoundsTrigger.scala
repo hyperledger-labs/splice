@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.splice.round.ClosedMiningRound
 import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
@@ -31,7 +31,7 @@ import ArchiveClosedMiningRoundsTrigger.*
 class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -92,7 +92,7 @@ class ArchiveClosedMiningRoundsTrigger(
           update = update,
         )
         .withDedup(
-          commandId = CNLedgerConnection.CommandId(
+          commandId = SpliceLedgerConnection.CommandId(
             "com.daml.network.sv.createMiningRoundArchiveConfirmation",
             Seq(svParty, dsoParty),
             closedRound.contractId.contractId,

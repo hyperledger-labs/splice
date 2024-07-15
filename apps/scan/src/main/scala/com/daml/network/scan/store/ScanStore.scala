@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.store.{
-  CNNodeAppStore,
+  AppStore,
   DsoRulesStore,
   Limit,
   MiningRoundsStore,
@@ -49,7 +49,7 @@ final case class ScanInfo(publicUrl: String, memberName: String)
 
 /** Utility class grouping the two kinds of stores managed by the DsoApp. */
 trait ScanStore
-    extends CNNodeAppStore
+    extends AppStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore {

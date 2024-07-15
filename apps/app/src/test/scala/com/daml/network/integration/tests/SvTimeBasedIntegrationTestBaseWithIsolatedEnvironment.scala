@@ -1,14 +1,14 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.util.SvUtil
@@ -39,7 +39,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   )
 
   protected def getOpenMiningRounds()(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): OpenMiningRoundsTriplet = {
     val rounds = getSortedOpenMiningRounds(
       sv1Backend.participantClientWithAdminToken,
@@ -51,7 +51,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
 
   protected def advanceTimeAndCheckOpenRounds(
       toAdvanceAt: Instant
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val duration = JavaDuration.between(now.toInstant, toAdvanceAt)
     val timeShift = JavaDuration.ofSeconds(10)
@@ -88,7 +88,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
 
   protected def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, JavaDuration]
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = eventually() {
     val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>
@@ -103,12 +103,12 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with SvTimeBasedIntegrationTestUtil {
-  protected val baseEnvironmentDefinition: CNNodeEnvironmentDefinition = CNNodeEnvironmentDefinition
+  protected val baseEnvironmentDefinition: EnvironmentDefinition = EnvironmentDefinition
     .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
     .addConfigTransforms((_, config) =>
-      CNNodeConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
+      ConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
         config
       )
     )
@@ -124,21 +124,21 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     )
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     baseEnvironmentDefinition
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
+  override def environmentDefinition: EnvironmentDefinition =
     baseEnvironmentDefinition.withoutLeaderReplacement
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil {
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging

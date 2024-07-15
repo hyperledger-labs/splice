@@ -80,7 +80,7 @@ trait ProcessTestUtil { this: BaseTest =>
     })
   }
 
-  protected def withBundledCN[A](
+  protected def withBundledSplice[A](
       configs: Seq[File],
       logSuffix: String,
   )(test: => A): A = {

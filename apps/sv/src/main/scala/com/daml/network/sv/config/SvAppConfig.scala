@@ -7,15 +7,15 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
   BackupDumpConfig,
-  CNDbConfig,
-  CNNodeBackendConfig,
-  CNNodeParametersConfig,
-  CNParticipantClientConfig,
+  SpliceDbConfig,
+  SpliceBackendConfig,
+  SpliceParametersConfig,
+  ParticipantClientConfig,
   GcpBucketConfig,
   ParticipantBootstrapDumpConfig,
 }
 import com.daml.network.sv.SvAppClientConfig
-import com.daml.network.util.CNNodeUtil
+import com.daml.network.util.SpliceUtil
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -74,12 +74,12 @@ object SvOnboardingConfig {
       name: String,
       founderSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
-      initialTickDuration: NonNegativeFiniteDuration = CNNodeUtil.defaultInitialTickDuration,
+      initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
-      initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
+      initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -159,14 +159,14 @@ final case class BeneficiaryConfig(
 
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CNDbConfig,
+    override val storage: SpliceDbConfig,
     ledgerApiUser: String,
     // The SV app shares the primary party with the validator app. To discover it we query the
     // validator user. Additionally, the founding SV app is expected to create that user,
     // so it needs to know the expected user name.
     validatorLedgerApiUser: String,
     auth: AuthConfig,
-    participantClient: CNParticipantClientConfig,
+    participantClient: ParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvSynchronizerConfig,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
@@ -189,7 +189,7 @@ case class SvAppBackendConfig(
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
-    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
@@ -203,7 +203,7 @@ case class SvAppBackendConfig(
     contactPoint: String,
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
-) extends CNNodeBackendConfig {
+) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig

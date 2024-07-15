@@ -2,11 +2,11 @@ package com.daml.network.util
 
 import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.network.console.{AnsExternalAppReference, WalletAppClientReference}
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.digitalasset.canton.topology.PartyId
 
-trait AnsEntryTestUtil extends CNNodeTestCommon with AnsTestUtil {
-  this: CommonCNNodeAppInstanceReferences =>
+trait AnsEntryTestUtil extends TestCommon with AnsTestUtil {
+  this: CommonAppInstanceReferences =>
   def initialiseAnsEntry(
       userName: String,
       userParty: PartyId,

@@ -7,7 +7,11 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.splice.wallet.payment.{Unit, PaymentAmount}
 import com.daml.network.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  SpliceLedgerConnection,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.wallet.WalletResource as r0
 import com.daml.network.http.v0.{external, definitions as d0}
@@ -94,7 +98,7 @@ class HttpExternalWalletHandler(
                   user,
                   dedup = Some(
                     (
-                      CNLedgerConnection.CommandId(
+                      SpliceLedgerConnection.CommandId(
                         "com.daml.network.wallet.createTransferOffer",
                         Seq(
                           sender,
@@ -243,7 +247,7 @@ class HttpExternalWalletHandler(
                     user,
                     dedup = Some(
                       (
-                        CNLedgerConnection.CommandId(
+                        SpliceLedgerConnection.CommandId(
                           "com.daml.network.wallet.createBuyTrafficRequest",
                           Seq(
                             receivingValidator,

@@ -4,7 +4,7 @@
 package com.daml.network.admin.http
 
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.environment.CNNodeStatus
+import com.daml.network.environment.SpliceStatus
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.digitalasset.canton.config.AdminServerConfig
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -58,10 +58,10 @@ object HttpAdminService {
   )(implicit ac: ActorSystem, ec: ExecutionContext, tracer: Tracer, elc: ErrorLoggingContext)
       extends HttpAdminService {
 
-    private def status(): Future[NodeStatus[CNNodeStatus]] = node
+    private def status(): Future[NodeStatus[SpliceStatus]] = node
       .map { n =>
         n.status
-          .map(CNNodeStatus.fromNodeStatus)
+          .map(SpliceStatus.fromNodeStatus)
           .map(NodeStatus.Success(_))
       }
       .getOrElse(Future.successful(NodeStatus.NotInitialized(false)))

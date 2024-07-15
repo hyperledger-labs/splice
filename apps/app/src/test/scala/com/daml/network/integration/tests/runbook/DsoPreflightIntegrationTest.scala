@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
@@ -18,8 +18,8 @@ class DsoPreflightIntegrationTest
   override lazy val resetRequiredTopologyState: Boolean = false
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )
 

@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -32,8 +32,8 @@ class SvFrontendIntegrationTest
     with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
 
   "SV UIs" should {
@@ -351,7 +351,7 @@ class SvFrontendIntegrationTest
     def testCreateAndVoteDsoRulesAction(action: String)(
         fillUpForm: WebDriverType => Unit
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
-        env: CNNodeTestConsoleEnvironment
+        env: SpliceTestConsoleEnvironment
     ) = {
       val requestReasonUrl = "This is a request reason url."
       val requestReasonBody = "This is a request reason."

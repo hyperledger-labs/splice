@@ -1,29 +1,29 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletRewardsTimeBasedIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // TODO (#10859) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "A wallet" should {
 

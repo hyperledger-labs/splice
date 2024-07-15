@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.digitalasset.canton.logging.SuppressionRule
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.splitwell.automation.SplitwellInstallRequestTrigger
 import com.daml.network.sv.automation.SvDsoAutomationService
 import org.slf4j.event.Level

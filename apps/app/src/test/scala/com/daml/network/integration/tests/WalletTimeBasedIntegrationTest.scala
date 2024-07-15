@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.*
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.leaderbased.{
   AnsSubscriptionRenewalPaymentTrigger,
@@ -22,7 +22,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import java.time.Duration
 
 class WalletTimeBasedIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil
@@ -34,8 +34,8 @@ class WalletTimeBasedIntegrationTest
   private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)

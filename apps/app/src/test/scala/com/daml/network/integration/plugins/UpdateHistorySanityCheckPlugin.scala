@@ -1,11 +1,11 @@
 package com.daml.network.integration.plugins
 
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.network.config.CNNodeConfig
+import com.daml.network.config.SpliceConfig
 import com.daml.network.console.ScanAppBackendReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -29,13 +29,13 @@ class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
     with Matchers
     with Inspectors {
 
   override def beforeEnvironmentDestroyed(
-      config: CNNodeConfig,
-      environment: CNNodeTestConsoleEnvironment,
+      config: SpliceConfig,
+      environment: SpliceTestConsoleEnvironment,
   ): Unit = {
     // Only SV1 will work.
     // Also, it might not be initialized if the test uses `manualStart` and it wasn't ever started.

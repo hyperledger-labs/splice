@@ -12,9 +12,9 @@ import com.digitalasset.canton.participant.config.{BaseParticipantConfig, Remote
   * @param adminApi the configuration to connect the console to the remote admin api
   * @param ledgerApi the configuration to connect the console to the remote ledger api
   */
-case class CNParticipantClientConfig(
+case class ParticipantClientConfig(
     adminApi: ClientConfig,
-    ledgerApi: CNLedgerApiClientConfig,
+    ledgerApi: LedgerApiClientConfig,
 ) extends BaseParticipantConfig {
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig

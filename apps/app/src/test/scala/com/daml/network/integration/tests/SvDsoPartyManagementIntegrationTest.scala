@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice
-import com.daml.network.console.CNParticipantClientReference
+import com.daml.network.console.ParticipantClientReference
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
@@ -173,7 +173,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
 
         wc("sv3Wallet").tap(100.0)
 
-        def checksv3AmuletContract(participant: CNParticipantClientReference, party: PartyId) = {
+        def checksv3AmuletContract(participant: ParticipantClientReference, party: PartyId) = {
           val amulets = getAmulets(participant, party, _.data.owner == sv3Party.toProtoPrimitive)
           inside(amulets) { case Seq(amulet) =>
             amulet.data.dso shouldBe dsoPartyStr
@@ -197,7 +197,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
   }
 
   private def getAmulets(
-      participant: CNParticipantClientReference,
+      participant: ParticipantClientReference,
       party: PartyId,
       predicate: splice.amulet.Amulet.Contract => Boolean = _ => true,
   ): Seq[splice.amulet.Amulet.Contract] = {

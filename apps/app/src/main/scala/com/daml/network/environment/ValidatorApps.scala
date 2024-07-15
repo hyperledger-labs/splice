@@ -3,7 +3,7 @@
 
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -18,7 +18,7 @@ class ValidatorApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, ValidatorAppBackendConfig],
-    parametersFor: String => SharedCNNodeAppParameters,
+    parametersFor: String => SharedSpliceAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -26,7 +26,7 @@ class ValidatorApps(
       // this trait.
       ValidatorApp,
       ValidatorAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
       ValidatorAppBootstrap,
     ](
       create,

@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.integration.tests.auth.PreflightAuthUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -14,14 +14,14 @@ import scala.util.Using
 /** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-4) have initialized fine.
   */
 class CometBftPreflightIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with PreflightAuthUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )
 

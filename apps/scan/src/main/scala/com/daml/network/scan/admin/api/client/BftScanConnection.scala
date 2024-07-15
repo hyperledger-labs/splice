@@ -12,8 +12,8 @@ import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMinin
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules
-import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.{BaseAppConnection, SpliceLedgerClient, RetryFor, RetryProvider}
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
@@ -47,7 +47,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Random, Success, Try}
 
 class BftScanConnection(
-    override protected val amuletLedgerClient: CNLedgerClient,
+    override protected val amuletLedgerClient: SpliceLedgerClient,
     override protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration,
     val scanList: ScanList,
     protected val clock: Clock,
@@ -490,7 +490,7 @@ object BftScanConnection {
   }
 
   def apply(
-      cnLedgerClient: CNLedgerClient,
+      cnLedgerClient: SpliceLedgerClient,
       config: BftScanClientConfig,
       upgradesConfig: UpgradesConfig,
       clock: Clock,
@@ -500,7 +500,7 @@ object BftScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
@@ -578,7 +578,7 @@ object BftScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection] =
     (uri: Uri, amuletRulesCacheTimeToLive: NonNegativeFiniteDuration) =>

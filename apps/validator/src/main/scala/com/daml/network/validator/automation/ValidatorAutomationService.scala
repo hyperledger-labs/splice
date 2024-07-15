@@ -7,12 +7,12 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
-  CNNodeAppAutomationService,
+  SpliceAppAutomationService,
   TransferFollowTrigger,
 }
 import com.daml.network.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import com.daml.network.environment.*
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
@@ -52,7 +52,7 @@ class ValidatorAutomationService(
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
     scanConnection: BftScanConnection,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,
     domainConnector: DomainConnector,
@@ -67,10 +67,10 @@ class ValidatorAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     mat: Materializer,
     tracer: Tracer,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       automationConfig,
       clock,
       domainTimeSync,

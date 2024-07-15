@@ -7,20 +7,20 @@ import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmu
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.schedule.Schedule
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 
 import scala.jdk.CollectionConverters.*
 
 class SvTimeBasedPruneAmuletConfigScheduleIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 
   "dso delegate" should {

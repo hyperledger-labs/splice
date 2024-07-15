@@ -21,7 +21,7 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
 }
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
+import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
@@ -44,7 +44,7 @@ class UpdateHistoryTest
     with HasExecutionContext
     with StoreErrors
     with HasActorSystem
-    with CNPostgresTest
+    with SplicePostgresTest
     with AcsJdbcTypes
     with AcsTables {
 
@@ -595,7 +595,7 @@ class UpdateHistoryTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 
   private val storeName1 = "store1"

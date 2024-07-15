@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.GroupKey
-import CNNodeTests.BracketSynchronous.*
+import SpliceTests.BracketSynchronous.*
 import com.daml.network.util.{
   FrontendLoginUtil,
   MultiDomainTestUtil,
@@ -28,12 +28,12 @@ class SplitwellUpgradeFrontendIntegrationTest
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
+      .addConfigTransform((_, config) => ConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        CNNodeEnvironmentDefinition
+        EnvironmentDefinition
           .simpleTopology1Sv(this.getClass.getSimpleName)
           .setup(env)
         for {

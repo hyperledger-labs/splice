@@ -3,7 +3,7 @@
 
 package com.daml.network.automation
 
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DomainIngestionService(
     sink: DomainStore.IngestionSink,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends PeriodicTaskTrigger(

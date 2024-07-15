@@ -6,7 +6,7 @@ package com.daml.network.scan.store.db
 import cats.data.NonEmptyList
 import com.daml.network.scan.admin.api.client.{BftScanConnection, ScanAggregatesConnection}
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerClient, RetryProvider}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.TracedLogger
@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.util.{Failure, Success}
 import ScanAggregator.*
 import com.daml.network.config.UpgradesConfig
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 
 trait ScanAggregatesReader extends AutoCloseable {
   def readRoundAggregateFromDso(round: Long)(implicit
@@ -36,13 +36,13 @@ trait ScanAggregatesReader extends AutoCloseable {
 
 final case class ScanAggregatesReaderContext(
     clock: Clock,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     upgradesConfig: UpgradesConfig,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     ec: ExecutionContextExecutor,
     mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
 )
 object ScanAggregatesReader {

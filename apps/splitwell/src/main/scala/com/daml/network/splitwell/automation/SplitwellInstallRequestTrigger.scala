@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.AssignedContract
@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class SplitwellInstallRequestTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -67,7 +67,7 @@ class SplitwellInstallRequestTrigger(
               acceptCmd,
             )
             .withDedup(
-              commandId = CNLedgerConnection.CommandId(
+              commandId = SpliceLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createSplitwellInstall",
                 Seq(provider, user),
                 req.domain.toProtoPrimitive,

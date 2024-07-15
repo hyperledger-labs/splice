@@ -4,9 +4,9 @@
 package com.daml.network.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.{LedgerClient, ReassignmentEvent}
-import com.daml.network.store.CNNodeAppStore
+import com.daml.network.store.AppStore
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -16,8 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AssignTrigger(
     override protected val context: TriggerContext,
-    store: CNNodeAppStore,
-    connection: CNLedgerConnection,
+    store: AppStore,
+    connection: SpliceLedgerConnection,
     partyId: PartyId,
 )(implicit
     ec: ExecutionContext,

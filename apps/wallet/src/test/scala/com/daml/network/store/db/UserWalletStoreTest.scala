@@ -1449,7 +1449,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 class DbUserWalletStoreTest
     extends UserWalletStoreTest
     with HasActorSystem
-    with CNPostgresTest
+    with SplicePostgresTest
     with AcsJdbcTypes
     with AcsTables {
 
@@ -1489,6 +1489,6 @@ class DbUserWalletStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 }

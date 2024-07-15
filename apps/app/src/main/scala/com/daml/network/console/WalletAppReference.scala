@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions.{
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
@@ -30,9 +30,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 abstract class WalletAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/validator"
   override protected val instanceType = "Wallet user"
@@ -442,11 +442,11 @@ abstract class WalletAppReference(
   }
 }
 
-/** Client (aka remote) reference to a wallet app in the style of CNParticipantClientReference, i.e.,
+/** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class WalletAppClientReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
     val config: WalletAppClientConfig,
 ) extends WalletAppReference(consoleEnvironment, name) {

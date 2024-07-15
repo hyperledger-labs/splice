@@ -17,15 +17,15 @@ import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAut
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.environment.*
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
 import com.daml.network.migration.AcsExporter
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{
   HttpSvAdminHandler,
@@ -93,7 +93,7 @@ import scala.jdk.OptionConverters.*
 class SvApp(
     override val name: InstanceName,
     val config: SvAppBackendConfig,
-    val amuletAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedSpliceAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -106,7 +106,7 @@ class SvApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CNNodeBase[SvApp.State](
+) extends NodeBase[SvApp.State](
       config.ledgerApiUser,
       config.participantClient,
       amuletAppParameters,
@@ -163,7 +163,7 @@ class SvApp(
   }
 
   override def initializeNode(
-      ledgerClient: CNLedgerClient
+      ledgerClient: SpliceLedgerClient
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
@@ -222,7 +222,7 @@ class SvApp(
 
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
       localSynchronizerNode: Option[LocalSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
@@ -675,7 +675,7 @@ class SvApp(
   }
 
   private def expectConfiguredValidatorOnboardings(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       decentralizedSynchronizer: DomainId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[List[Unit]] = {
@@ -701,7 +701,7 @@ class SvApp(
   private def expectConfiguredValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       decentralizedSynchronizer: DomainId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[Unit] =
@@ -727,7 +727,7 @@ class SvApp(
 
   private def ensureAmuletPriceVoteHasAmuletPrice(
       defaultAmuletPriceVote: BigDecimal,
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       logger: TracedLogger,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] =
     dsoStoreWithIngestion.store.lookupAmuletPriceVoteByThisSv().flatMap {
@@ -763,7 +763,7 @@ object SvApp {
       dsoAutomation: SvDsoAutomationService,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       decoder: TemplateJsonDecoder,
   ) extends FlagCloseableAsync
       with HasHealth {
@@ -794,7 +794,7 @@ object SvApp {
   def prepareValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       decentralizedSynchronizer: DomainId,
       clock: Clock,
       logger: TracedLogger,
@@ -824,7 +824,7 @@ object SvApp {
                 _ <- svStoreWithIngestion.connection
                   .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
                   .withDedup(
-                    commandId = CNLedgerConnection
+                    commandId = SpliceLedgerConnection
                       .CommandId(
                         "com.daml.network.sv.expectValidatorOnboarding",
                         Seq(svParty),
@@ -845,7 +845,7 @@ object SvApp {
 
   def updateAmuletPriceVote(
       desiredAmuletPrice: BigDecimal,
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val dsoStore = dsoStoreWithIngestion.store
@@ -882,7 +882,7 @@ object SvApp {
   }
 
   def getElectionRequest(
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore]
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore]
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -896,7 +896,7 @@ object SvApp {
   def createElectionRequest(
       requester: String,
       ranking: Seq[String],
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -935,7 +935,7 @@ object SvApp {
                 cmd,
               )
               .withDedup(
-                commandId = CNLedgerConnection.CommandId(
+                commandId = SpliceLedgerConnection.CommandId(
                   "com.daml.network.sv.requestElection",
                   Seq(
                     store.key.svParty,
@@ -957,7 +957,7 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       expiration: Json,
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -1000,7 +1000,7 @@ object SvApp {
                 cmd,
               )
               .withDedup(
-                commandId = CNLedgerConnection.CommandId(
+                commandId = SpliceLedgerConnection.CommandId(
                   "com.daml.network.sv.requestVote",
                   Seq(
                     dsoStoreWithIngestion.store.key.dsoParty,
@@ -1020,7 +1020,7 @@ object SvApp {
       isAccepted: Boolean,
       reasonUrl: String,
       reasonDescription: String,
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit
@@ -1182,7 +1182,7 @@ object SvApp {
   ): Boolean = dsoRules.payload.isDevNet
 
   private def initializeValidator(
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -1232,7 +1232,7 @@ object SvApp {
                     cmd,
                   )
                   .withDedup(
-                    commandId = CNLedgerConnection.CommandId(
+                    commandId = SpliceLedgerConnection.CommandId(
                       "com.daml.network.sv.createSvValidatorLicense",
                       Seq(
                         store.key.dsoParty,

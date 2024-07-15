@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.config.CNNodeConfigTransforms
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -40,14 +40,14 @@ import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import scala.util.Success
 
 class ScanIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
   private val defaultPageSize = Limit.MaxPageSize
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
@@ -59,7 +59,7 @@ class ScanIntegrationTest
           ))(config)
       )
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
@@ -454,7 +454,7 @@ class ScanIntegrationTest
           val senderFee = BigDecimal(transfer.sender.senderFee)
           val holdingFees = BigDecimal(transfer.sender.holdingFees)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-          senderFee shouldBe walletUsdToAmulet(CNNodeUtil.defaultCreateFee.fee)
+          senderFee shouldBe walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee)
 
           val totalSenderFee = senderFee + holdingFees + senderChangeFee
           inputAmuletAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
@@ -704,10 +704,10 @@ class ScanIntegrationTest
   }
 
   def expectedSenderFee(amount: BigDecimal) = {
-    val initialRate = CNNodeUtil.defaultTransferFee.initialRate
-    val step1 = CNNodeUtil.defaultTransferFee.steps.get(0)
-    val step2 = CNNodeUtil.defaultTransferFee.steps.get(1)
-    val step3 = CNNodeUtil.defaultTransferFee.steps.get(2)
+    val initialRate = SpliceUtil.defaultTransferFee.initialRate
+    val step1 = SpliceUtil.defaultTransferFee.steps.get(0)
+    val step2 = SpliceUtil.defaultTransferFee.steps.get(1)
+    val step3 = SpliceUtil.defaultTransferFee.steps.get(2)
     val (step1Amount, step1Mult) = (walletUsdToAmulet(step1._1), step1._2)
     val (step2Amount, step2Mult) = (walletUsdToAmulet(step2._1), step2._2)
     // ensuring the right steps are hardcoded here.
@@ -716,10 +716,10 @@ class ScanIntegrationTest
       initialRate * (amount min step1Amount) +
         step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
         step2Mult * ((amount - step1Amount - step2Amount) max 0)
-    walletUsdToAmulet(CNNodeUtil.defaultCreateFee.fee) + steppedRate
+    walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee) + steppedRate
   }
 
-  def triggerTopupAliceAndBob()(implicit env: CNNodeTestConsoleEnvironment): (Boolean, Boolean) = {
+  def triggerTopupAliceAndBob()(implicit env: SpliceTestConsoleEnvironment): (Boolean, Boolean) = {
     val aliceTopupTrigger =
       aliceValidatorBackend.appState.automation.trigger[TopupMemberTrafficTrigger]
     val bobTopupTrigger =

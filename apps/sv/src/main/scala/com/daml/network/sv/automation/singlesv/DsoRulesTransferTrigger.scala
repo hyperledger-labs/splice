@@ -5,7 +5,7 @@ package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AmuletConfigSchedule
@@ -23,7 +23,7 @@ import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand.
 final class DsoRulesTransferTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

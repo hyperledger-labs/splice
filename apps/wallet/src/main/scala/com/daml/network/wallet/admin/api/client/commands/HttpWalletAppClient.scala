@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, wallet as http}
 import com.daml.network.http.v0.external.wallet as externalHttp
 import com.daml.network.http.v0.wallet.{
@@ -40,7 +40,7 @@ object HttpWalletAppClient {
     override type Client = http.WalletClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -52,7 +52,7 @@ object HttpWalletAppClient {
     override type Client = externalHttp.WalletClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

@@ -5,9 +5,9 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.TransferFollowTrigger.LubTask
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.store.CNNodeAppStore
+import com.daml.network.store.AppStore
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -24,8 +24,8 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class TransferFollowTrigger(
     override protected val context: TriggerContext,
-    store: CNNodeAppStore,
-    connection: CNLedgerConnection,
+    store: AppStore,
+    connection: SpliceLedgerConnection,
     partyId: PartyId,
     retrieve: TraceContext => Future[Seq[LubTask]],
 )(implicit

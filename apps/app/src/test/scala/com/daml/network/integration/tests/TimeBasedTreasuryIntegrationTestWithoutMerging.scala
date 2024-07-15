@@ -2,15 +2,15 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.console.WalletAppClientReference
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{CNNodeUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{SpliceUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -24,20 +24,20 @@ import scala.jdk.CollectionConverters.*
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with HasExecutionContext
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // for testing that input limits are respected.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
-        CNNodeConfigTransforms
+        ConfigTransforms
           .updateAllSvAppFoundCollectiveConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
       )
   }
@@ -323,7 +323,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // 4 amulets at once by default & so even in the case it starts expiring amulets, we have one unexpired amulet for the test.
     // If this test flakes because the automation already expired all expired amulets, increase the number of
     // soon-to-be-expired amulets we create here
-    (1 to 5).map(_ => aliceWalletClient.tap(CNNodeUtil.defaultHoldingFee.rate))
+    (1 to 5).map(_ => aliceWalletClient.tap(SpliceUtil.defaultHoldingFee.rate))
 
     eventually() {
       aliceWalletClient.list().amulets should have length 6
@@ -420,7 +420,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       }
   }
 
-  private def getOpenIssuingRounds(now: Instant)(implicit env: CNNodeTestConsoleEnvironment) = {
+  private def getOpenIssuingRounds(now: Instant)(implicit env: SpliceTestConsoleEnvironment) = {
     val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))
   }

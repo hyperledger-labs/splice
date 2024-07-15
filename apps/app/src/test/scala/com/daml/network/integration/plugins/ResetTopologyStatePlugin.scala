@@ -1,9 +1,9 @@
 package com.daml.network.integration.plugins
 
-import com.daml.network.config.CNNodeConfig
+import com.daml.network.config.SpliceConfig
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -13,13 +13,13 @@ import io.grpc.StatusRuntimeException
 import scala.util.control.NonFatal
 
 abstract class ResetTopologyStatePlugin
-    extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTests.CNNodeTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTests.SpliceTestConsoleEnvironment]
     with BaseTest {
 
   private val MAX_RETRIES = 15
 
   protected def resetTopologyState(
-      env: CNNodeTests.CNNodeTestConsoleEnvironment,
+      env: SpliceTests.SpliceTestConsoleEnvironment,
       domainId: DomainId,
       sv1: SvAppBackendReference,
   ): Unit
@@ -27,8 +27,8 @@ abstract class ResetTopologyStatePlugin
   protected def topologyType: String
 
   override def beforeEnvironmentDestroyed(
-      config: CNNodeConfig,
-      env: CNNodeTests.CNNodeTestConsoleEnvironment,
+      config: SpliceConfig,
+      env: SpliceTests.SpliceTestConsoleEnvironment,
   ): Unit = {
 
     // Stop all nodes to stop them from submitting topology TXs.
@@ -45,7 +45,7 @@ abstract class ResetTopologyStatePlugin
     }
   }
 
-  private def attemptToResetTopologyState(env: CNNodeTests.CNNodeTestConsoleEnvironment): Unit = {
+  private def attemptToResetTopologyState(env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val sv1 = env.svs.local.find(_.name == "sv1").value
     val connectedDomain = sv1.participantClientWithAdminToken.domains
       .list_connected()

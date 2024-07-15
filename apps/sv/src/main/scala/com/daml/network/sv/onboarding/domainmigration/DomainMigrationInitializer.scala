@@ -8,12 +8,12 @@ import cats.syntax.either.*
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   BaseLedgerConnection,
-  CNLedgerClient,
+  SpliceLedgerClient,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
 }
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
@@ -61,7 +61,7 @@ class DomainMigrationInitializer(
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
-    override protected val ledgerClient: CNLedgerClient,
+    override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
@@ -75,7 +75,7 @@ class DomainMigrationInitializer(
     ) => JoiningNodeInitializer,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,

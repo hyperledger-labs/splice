@@ -34,7 +34,7 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
-import com.daml.network.util.{CNNodeUtil, Contract, Trees}
+import com.daml.network.util.{SpliceUtil, Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -92,7 +92,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   private val schedule: scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] =
-    CNNodeUtil.defaultAmuletConfigSchedule(
+    SpliceUtil.defaultAmuletConfigSchedule(
       NonNegativeFiniteDuration(Duration.ofMinutes(10)),
       10,
       dummyDomain,
@@ -141,8 +141,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Instant.now().truncatedTo(ChronoUnit.MICROS),
       Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
       new RelTime(1_000_000),
-      CNNodeUtil.defaultTransferConfig(10, holdingFee),
-      CNNodeUtil.issuanceConfig(10.0, 10.0, 10.0),
+      SpliceUtil.defaultTransferConfig(10, holdingFee),
+      SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
       new RelTime(1_000_000),
     )
 

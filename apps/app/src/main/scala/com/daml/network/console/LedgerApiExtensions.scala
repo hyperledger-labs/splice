@@ -11,7 +11,7 @@ import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
-import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
+import com.daml.network.environment.{SpliceLedgerConnection, PackageIdResolver}
 import com.daml.network.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
@@ -117,7 +117,7 @@ trait LedgerApiExtensions {
             optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
-          CNLedgerConnection.decodeExerciseResult(
+          SpliceLedgerConnection.decodeExerciseResult(
             update,
             tree,
           )
@@ -146,7 +146,7 @@ trait LedgerApiExtensions {
             optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
-          val cid = CNLedgerConnection
+          val cid = SpliceLedgerConnection
             .decodeExerciseResult(
               update,
               tree,

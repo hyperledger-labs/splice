@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
-import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.{SpliceLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.{
   HttpScanAppClient,
@@ -44,7 +44,7 @@ class SingleScanConnection private[client] (
     protected val ec: ExecutionContextExecutor,
     tc: TraceContext,
     protected val mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(
       config.adminApi,
@@ -400,7 +400,7 @@ object SingleScanConnection {
       ec: ExecutionContextExecutor,
       traceContext: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[T] =
     for {
@@ -417,7 +417,7 @@ object SingleScanConnection {
 }
 
 class CachedScanConnection private[client] (
-    protected val amuletLedgerClient: CNLedgerClient,
+    protected val amuletLedgerClient: SpliceLedgerClient,
     config: ScanAppClientConfig,
     upgradesConfig: UpgradesConfig,
     clock: Clock,
@@ -427,7 +427,7 @@ class CachedScanConnection private[client] (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends SingleScanConnection(config, upgradesConfig, clock, retryProvider, outerLoggerFactory)
     with CachingScanConnection {

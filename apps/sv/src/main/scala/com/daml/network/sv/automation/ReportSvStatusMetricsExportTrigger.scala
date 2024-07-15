@@ -13,7 +13,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.daml.network.sv.automation.ReportSvStatusMetricsExportTrigger.{
   SvCometBftMetrics,
   SvStatusMetrics,
@@ -159,7 +159,7 @@ object ReportSvStatusMetricsExportTrigger {
     private implicit val mc: MetricsContext =
       MetricsContext.Empty
 
-    private val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_cometbft"
+    private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sv_cometbft"
 
     private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
       metricsFactory.gauge(prefix :+ name, initial = initial)
@@ -182,7 +182,7 @@ object ReportSvStatusMetricsExportTrigger {
       MetricsContext(
         Map("report_publisher" -> svId.svName, "report_publisher_party" -> svId.svParty)
       )
-    private val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_status_report"
+    private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sv_status_report"
     private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
       metricsFactory.gauge(prefix :+ name, initial = initial)
 

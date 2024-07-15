@@ -15,16 +15,13 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
-  CNParticipantClientReference,
+  ParticipantClientReference,
   ScanAppBackendReference,
   SvAppBackendReference,
   SvAppReference,
   WalletAppClientReference,
 }
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
@@ -37,13 +34,13 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-trait SvTestUtil extends CNNodeTestCommon {
-  this: CommonCNNodeAppInstanceReferences =>
+trait SvTestUtil extends TestCommon {
+  this: CommonAppInstanceReferences =>
 
-  protected def svs(implicit env: CNNodeTestConsoleEnvironment) =
+  protected def svs(implicit env: SpliceTestConsoleEnvironment) =
     Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
 
-  def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
+  def allocateRandomSvParty(name: String)(implicit env: SpliceTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
     sv1Backend.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party
   }
@@ -65,7 +62,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   def confirmActionByAllMembers(
       confirmingSvs: Seq[ConfirmingSv],
       action: ActionRequiringConfirmation,
-  )(implicit env: CNNodeTestConsoleEnvironment): Seq[TransactionTree] = {
+  )(implicit env: SpliceTestConsoleEnvironment): Seq[TransactionTree] = {
     confirmingSvs.map { case ConfirmingSv(participantClient, svPartyId) =>
       confirmAction(participantClient, svPartyId, action)
     }
@@ -168,10 +165,10 @@ trait SvTestUtil extends CNNodeTestCommon {
   }
 
   private def confirmAction(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       svPartyId: PartyId,
       action: ActionRequiringConfirmation,
-  )(implicit env: CNNodeTestConsoleEnvironment): TransactionTree = {
+  )(implicit env: SpliceTestConsoleEnvironment): TransactionTree = {
     eventuallySucceeds() {
       val dsoRulesCid = participantClient.ledger_api_extensions.acs
         .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
@@ -261,5 +258,5 @@ trait SvTestUtil extends CNNodeTestCommon {
 }
 
 object SvTestUtil {
-  case class ConfirmingSv(svParticipantClient: CNParticipantClientReference, svPartyId: PartyId)
+  case class ConfirmingSv(svParticipantClient: ParticipantClientReference, svPartyId: PartyId)
 }

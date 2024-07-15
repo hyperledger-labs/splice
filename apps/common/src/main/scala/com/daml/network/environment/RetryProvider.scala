@@ -559,7 +559,7 @@ object RetryProvider {
     )
 
     private val retryCounter =
-      metricsFactory.counter(CNMetrics.MetricsPrefix :+ "retries" :+ "failures")
+      metricsFactory.counter(SpliceMetrics.MetricsPrefix :+ "retries" :+ "failures")
 
     override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
         implicit tc: TraceContext

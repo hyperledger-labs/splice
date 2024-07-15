@@ -12,7 +12,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.daml.network.sv.automation.ReportValidatorLicenseMetricsExportTrigger.{
   ValidatorLicenseMetrics
 }
@@ -127,7 +127,7 @@ object ReportValidatorLicenseMetricsExportTrigger {
     private val minTimestampValue = CantonTimestamp.MinValue.toMicros
 
     val lastActiveAt: Gauge[Long] = metricsFactory.gauge(
-      CNMetrics.MetricsPrefix :+ "validator_last_active_at_us",
+      SpliceMetrics.MetricsPrefix :+ "validator_last_active_at_us",
       minTimestampValue,
     )
 

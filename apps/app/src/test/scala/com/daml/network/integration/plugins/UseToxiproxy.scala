@@ -1,8 +1,8 @@
 package com.daml.network.integration.plugins.toxiproxy
 
-import com.daml.network.config.{CNNodeConfig, CNParticipantClientConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.config.{SpliceConfig, ParticipantClientConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -20,7 +20,7 @@ case class UseToxiproxy(
     createSvLedgerApiProxies: Boolean = false,
     createScanAppProxies: Boolean = false,
     createScanLedgerApiProxy: Boolean = false,
-) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
     with BaseTest {
 
   val client = new ToxiproxyClient()
@@ -35,12 +35,12 @@ case class UseToxiproxy(
     proxies += (name -> proxy)
   }
 
-  override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
+  override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
     def addLedgerApiProxy(
         instanceName: String,
-        participantClient: CNParticipantClientConfig,
+        participantClient: ParticipantClientConfig,
         extraPortBump: Int,
-    ): CNParticipantClientConfig = {
+    ): ParticipantClientConfig = {
       val bump = portBump + extraPortBump
       val lapiHost = participantClient.ledgerApi.clientConfig.address
       val lapiPort = participantClient.ledgerApi.clientConfig.port
@@ -135,7 +135,7 @@ case class UseToxiproxy(
     scanLedgerApiConf
   }
 
-  override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
+  override def afterEnvironmentDestroyed(config: SpliceConfig): Unit = {
     logger.debug("deleting all proxies. ")
     proxies.foreach { case (_, p) => p.delete() }
   }

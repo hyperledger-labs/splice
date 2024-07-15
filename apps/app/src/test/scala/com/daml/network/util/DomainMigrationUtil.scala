@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.util.DomainMigrationUtil.UpgradeSynchronizerNode
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
@@ -22,7 +22,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
+trait DomainMigrationUtil extends BaseTest with TestCommon {
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   // This is all test code, don't wire up a metrics factory.
   val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(

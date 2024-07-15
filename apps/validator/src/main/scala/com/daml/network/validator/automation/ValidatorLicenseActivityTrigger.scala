@@ -5,7 +5,7 @@ package com.daml.network.validator.automation
 
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
+import com.daml.network.environment.{SpliceLedgerConnection, PackageIdResolver}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.validator.store.ValidatorStore
@@ -19,7 +19,7 @@ import scala.jdk.OptionConverters.*
 
 class ValidatorLicenseActivityTrigger(
     override protected val context: TriggerContext,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     store: ValidatorStore,
     scanConnection: BftScanConnection,
 )(implicit override val ec: ExecutionContext, override val tracer: Tracer, mat: Materializer)

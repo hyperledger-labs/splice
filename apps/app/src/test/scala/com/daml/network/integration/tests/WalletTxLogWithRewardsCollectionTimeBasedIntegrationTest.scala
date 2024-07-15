@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -18,11 +18,11 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
 
   private val amuletPrice = BigDecimal(1.25).setScale(10)
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .addConfigTransforms((_, config) =>
         // without this, you can have 1 or 2 transfers in the txlog, or just 1 with different balance
         updateAutomationConfig(ConfigurableApp.Validator)(

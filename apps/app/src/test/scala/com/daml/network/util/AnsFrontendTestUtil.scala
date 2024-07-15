@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import com.daml.network.sv.util.AnsUtil
 import org.openqa.selenium.support.ui.ExpectedConditions
@@ -10,8 +10,8 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import scala.concurrent.duration.*
 
-trait AnsFrontendTestUtil extends CNNodeTestCommon with AnsTestUtil {
-  this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
+trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
+  this: CommonAppInstanceReferences & FrontendTestCommon =>
 
   private def allocateAnsEntry(
       ansUiLogin: () => Unit,

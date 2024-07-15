@@ -3,7 +3,7 @@
 
 package com.daml.network.admin.http
 
-import com.daml.network.environment.{BuildInfo, CNNodeStatus}
+import com.daml.network.environment.{BuildInfo, SpliceStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as v0
 import com.digitalasset.canton.health.admin.data
@@ -14,7 +14,7 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpAdminHandler(
-    status: => Future[data.NodeStatus[CNNodeStatus]],
+    status: => Future[data.NodeStatus[SpliceStatus]],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -30,7 +30,7 @@ class HttpAdminHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getHealthStatus") { _ => _ =>
       status
-        .map(s => respond.OK(CNNodeStatus.toHttpNodeStatus(s)))
+        .map(s => respond.OK(SpliceStatus.toHttpNodeStatus(s)))
     }
   }
 

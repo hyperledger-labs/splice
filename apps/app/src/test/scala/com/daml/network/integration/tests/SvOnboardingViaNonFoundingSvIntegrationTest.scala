@@ -3,13 +3,13 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
-import com.daml.network.config.CNNodeConfigTransforms.bumpUrl
-import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms.bumpUrl
+import com.daml.network.config.{ConfigTransforms, NetworkAppClientConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.sv.config.SvOnboardingConfig.JoinWithKey
@@ -19,7 +19,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.time.{Minute, Span}
 
 class SvOnboardingViaNonFoundingSvIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with SvTestUtil
     with StandaloneCanton {
 
@@ -31,19 +31,19 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
+        ConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
           config
         )
       )
       .withPreSetup(_ => ())
       .withOnboardingParticipantPromotionDelayEnabled() // Test onboarding with participant promotion delay
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransforms((_, configuration) => {
         val sv1ToSv2Bump = 100
@@ -66,7 +66,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .global
               .url,
           )
-        CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           if (name == "sv3") {
             config.copy(
               onboarding = config.onboarding

@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{CNNodeUtil, FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import com.daml.network.util.{SpliceUtil, FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, LocalDate}
@@ -15,10 +15,10 @@ class WalletSubscriptionsFrontendIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(2.0)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(2.0)
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(walletAmuletPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.

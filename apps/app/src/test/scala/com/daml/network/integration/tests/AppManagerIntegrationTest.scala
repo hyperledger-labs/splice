@@ -15,8 +15,8 @@ import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.http.v0.definitions.{
   AppConfiguration,
   Domain,
@@ -26,10 +26,10 @@ import com.daml.network.http.v0.definitions.{
   Timespan,
   UnapprovedReleaseConfiguration,
 }
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -40,9 +40,7 @@ import java.io.{File, FileInputStream}
 import java.security.interfaces.RSAPublicKey
 import scala.util.Success
 
-class AppManagerIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
-    with WalletTestUtil {
+class AppManagerIntegrationTest extends IntegrationTestWithSharedEnvironment with WalletTestUtil {
 
   private val splitwellBundle = new File(
     "apps/splitwell/src/test/resources/splitwell-bundle-1.0.0.tar.gz"
@@ -85,13 +83,13 @@ class AppManagerIntegrationTest
   )
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
-        (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
+        (_, config) => ConfigTransforms.disableSplitwellUserDomainConnections(config),
         (_, config) =>
-          CNNodeConfigTransforms.updateAllAppManagerConfigs_(
+          ConfigTransforms.updateAllAppManagerConfigs_(
             _.copy(
               installedAppsPollingInterval = NonNegativeFiniteDuration.ofSeconds(1)
             )

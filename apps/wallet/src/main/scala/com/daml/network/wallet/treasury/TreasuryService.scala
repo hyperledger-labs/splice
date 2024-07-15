@@ -34,11 +34,11 @@ import com.daml.network.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{AssignedContract, CNNodeUtil, DisclosedContracts, HasHealth}
+import com.daml.network.util.{AssignedContract, SpliceUtil, DisclosedContracts, HasHealth}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -80,7 +80,7 @@ import scala.util.{Failure, Success}
   * For the design, please see https://github.com/DACH-NY/canton-network-node/issues/913
   */
 class TreasuryService(
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     treasuryConfig: TreasuryConfig,
     clock: Clock,
     userStore: UserWalletStore,
@@ -479,7 +479,7 @@ class TreasuryService(
     for {
       (disclosedAmuletRules, amuletRulesInterface) <- getAmuletRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
-      openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+      openRound = SpliceUtil.selectLatestOpenMiningRound(now, openRounds)
       amuletPrice = openRound.payload.amuletPrice
       configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
@@ -520,7 +520,7 @@ class TreasuryService(
         issuingRoundsMap,
       )
     } yield {
-      val createFeeCc = CNNodeUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
+      val createFeeCc = SpliceUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity + svRewardsTotalAmuletQuantity,

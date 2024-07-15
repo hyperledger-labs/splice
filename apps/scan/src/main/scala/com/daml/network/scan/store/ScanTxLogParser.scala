@@ -14,7 +14,7 @@ import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
-import com.daml.network.util.CNNodeUtil.dollarsToCC
+import com.daml.network.util.SpliceUtil.dollarsToCC
 import com.daml.network.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId

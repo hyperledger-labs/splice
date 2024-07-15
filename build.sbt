@@ -1336,7 +1336,7 @@ lazy val `apps-app` =
       assembly / test := {}, // don't run tests during assembly
       // when building the fat jar, we need to properly merge our artefacts
       assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
-      assembly / mainClass := Some("com.daml.network.CNNodeApp"),
+      assembly / mainClass := Some("com.daml.network.SpliceApp"),
       assembly / assemblyJarName := s"cn-node-${version.value}.jar",
       // include historic dars in the jar
       Compile / unmanagedResourceDirectories += { file(file(".").absolutePath) / "daml/dars" },

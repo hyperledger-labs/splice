@@ -14,7 +14,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.admin.api.client.commands.HttpCommandException
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 
 /** HTTP Variant of Canton’s GrpcCtlRunner.
   * Canton also has an HttpCtlRunner but it’s written
@@ -31,7 +31,7 @@ class HttpCtlRunner(
       headers: List[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,

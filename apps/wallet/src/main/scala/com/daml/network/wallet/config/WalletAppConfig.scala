@@ -3,7 +3,7 @@
 
 package com.daml.network.wallet.config
 
-import com.daml.network.config.{HttpCNNodeClientConfig, NetworkAppClientConfig}
+import com.daml.network.config.{HttpClientConfig, NetworkAppClientConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.topology.PartyId
@@ -15,14 +15,14 @@ case class WalletSynchronizerConfig(
 // Inlined to avoid a dependency
 case class WalletValidatorAppClientConfig(
     adminApi: NetworkAppClientConfig
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
 case class WalletAppClientConfig(
     adminApi: NetworkAppClientConfig,
     ledgerApiUser: String,
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 

@@ -6,8 +6,8 @@ package com.daml.network.scan.admin.api.client
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.scan.admin.api.client.{BftScanConnection, SingleScanConnection}
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.{SpliceLedgerClient, RetryProvider}
+import com.daml.network.http.HttpClient
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.time.Clock
@@ -23,7 +23,7 @@ import com.daml.network.scan.store.db.ScanAggregator.*
 
 object ScanAggregatesConnection {
   def apply(
-      cnLedgerClient: CNLedgerClient,
+      cnLedgerClient: SpliceLedgerClient,
       config: BftScanConnection.BftScanClientConfig,
       upgradesConfig: UpgradesConfig,
       clock: Clock,
@@ -33,7 +33,7 @@ object ScanAggregatesConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanAggregatesConnection] = {
     BftScanConnection(cnLedgerClient, config, upgradesConfig, clock, retryProvider, loggerFactory)

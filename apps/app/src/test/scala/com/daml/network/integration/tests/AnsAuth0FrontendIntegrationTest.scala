@@ -2,8 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
-import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.config.ConfigTransforms.updateAllValidatorConfigs_
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
 import monocle.macros.syntax.lens.*
 
@@ -16,7 +16,7 @@ class AnsAuth0FrontendIntegrationTest
     with FrontendLoginUtil {
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllValidatorConfigs_(conf =>

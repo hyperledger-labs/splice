@@ -6,12 +6,12 @@ package com.daml.network.sv.store.db
 import com.daml.metrics.api.MetricDoc.MetricQualification.Latency
 import com.daml.metrics.api.MetricHandle.Gauge
 import com.daml.metrics.api.{MetricsContext, MetricDoc, MetricName}
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 class DbSvDsoStoreMetrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
 
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_dso_store"
+  val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sv_dso_store"
 
   @MetricDoc.Tag(
     summary = "Latest open mining round",

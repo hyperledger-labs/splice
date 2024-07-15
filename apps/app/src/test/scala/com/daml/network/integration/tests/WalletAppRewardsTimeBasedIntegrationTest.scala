@@ -1,11 +1,11 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.*
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
@@ -14,7 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 // Split out from WalletTimeBasedIntegrationTest due to test-isolation woes making the test in here flaky.
 class WalletAppRewardsTimeBasedIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil
@@ -23,15 +23,15 @@ class WalletAppRewardsTimeBasedIntegrationTest
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllScanAppConfigs_(
+        ConfigTransforms.updateAllScanAppConfigs_(
           // prevent ReceiveFaucetCouponTrigger from seeing stale caches
           _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
         )(config)
@@ -40,7 +40,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
       .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "A wallet" should {
 

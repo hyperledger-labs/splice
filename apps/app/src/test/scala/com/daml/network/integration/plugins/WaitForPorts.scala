@@ -3,9 +3,9 @@ package com.daml.network.integration.plugins
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.metrics.MetricsReporterConfig
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests
-import com.daml.network.config.CNNodeConfig
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests
+import com.daml.network.config.SpliceConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
 import scala.concurrent.duration.*
@@ -19,12 +19,12 @@ import sys.process.*
   * that will be required by the following test, but leaves the port in a TIME_WAIT state.
   */
 case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
-    extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTests.CNNodeTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTests.SpliceTestConsoleEnvironment]
     with BaseTest {
 
   protected val timeout = 2.minutes
 
-  override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
+  override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
     config.validatorApps.foreach(validator =>
       waitForPort(validator._1, validator._2.adminApi.port.unwrap)
     )

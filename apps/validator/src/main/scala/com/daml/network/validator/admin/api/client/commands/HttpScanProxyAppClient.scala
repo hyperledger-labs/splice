@@ -5,7 +5,7 @@ package com.daml.network.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -22,7 +22,7 @@ object HttpScanProxyAppClient {
     override type Client = scanProxy.ScanproxyClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

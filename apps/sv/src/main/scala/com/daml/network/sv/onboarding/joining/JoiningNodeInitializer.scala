@@ -11,10 +11,10 @@ import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{
-  CNNodeAppStoreWithIngestion,
+  AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
@@ -69,7 +69,7 @@ class JoiningNodeInitializer(
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
-    override protected val ledgerClient: CNLedgerClient,
+    override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
@@ -79,7 +79,7 @@ class JoiningNodeInitializer(
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
@@ -483,7 +483,7 @@ class JoiningNodeInitializer(
     * across utility methods.
     */
   class WithSvStore(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       dsoPartyHosting: JoiningNodeDsoPartyHosting,
       domainId: DomainId,
   ) {
@@ -493,7 +493,7 @@ class JoiningNodeInitializer(
     private val dsoParty = svStore.key.dsoParty
 
     def startOnboardingWithDsoPartyHosted(
-        dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+        dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
     ): Future[Unit] = {
@@ -503,7 +503,7 @@ class JoiningNodeInitializer(
 
     /** A private class to share the dsoStoreWithIngestion across utility methods. */
     private class WithDsoStore(
-        dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore]
+        dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore]
     ) {
       private val dsoStore: SvDsoStore = dsoStoreWithIngestion.store
 

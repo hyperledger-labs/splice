@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.config.CNNodeConfigTransforms
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.daml.network.util.*
@@ -18,19 +18,19 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class AutomationControlIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       // start only sv1 but not sv2-4, to speed up the test
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // Very short round ticks
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
@@ -176,7 +176,7 @@ class AutomationControlIntegrationTest
     // ------------------------------------------------------------------------
 
     // In the previous test, we had to make sure the trigger starts in a paused state by modifying the automation
-    // config using a CNNodeConfigTransforms, because the AdvanceOpenMiningRoundTrigger might start doing work
+    // config using a ConfigTransforms, because the AdvanceOpenMiningRoundTrigger might start doing work
     // before we enter the test body.
     // In this case, it's ok to pause the CollectRewardsAndMergeAmuletsTrigger inside the test body, because we
     // know the trigger won't do any work unless we explicitly give Alice some amulets.

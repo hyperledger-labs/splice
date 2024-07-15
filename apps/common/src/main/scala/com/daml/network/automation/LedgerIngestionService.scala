@@ -5,7 +5,7 @@ package com.daml.network.automation
 
 import com.daml.network.config.AutomationConfig
 import org.apache.pekko.Done
-import com.daml.network.environment.{CNLedgerSubscription, RetryFor, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerSubscription, RetryFor, RetryProvider}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.lifecycle.*
@@ -36,16 +36,16 @@ abstract class LedgerIngestionService(
   /** Allocate a new subscription that drives ingestion. */
   protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CNLedgerSubscription[?]]
+  ): Future[SpliceLedgerSubscription[?]]
 
   // Note that we are tracking the current subscription outside the retry loop instead of just
   // calling 'runOnShutdown' on every newly acquired subscription, as that would leak memory.
-  private val currentSubscription = new AtomicReference[Option[CNLedgerSubscription[?]]](None)
+  private val currentSubscription = new AtomicReference[Option[SpliceLedgerSubscription[?]]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
   retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name: String = s"terminate subscription"
-    // this is not perfectly precise, but CNLedgerSubscription.initiateShutdown is idempotent
+    // this is not perfectly precise, but SpliceLedgerSubscription.initiateShutdown is idempotent
     override def done: Boolean = false
     override def run(): Unit = currentSubscription
       .get()
@@ -89,7 +89,7 @@ abstract class LedgerIngestionService(
                       )
                       subscription.initiateShutdown()
                     }
-                    // The actual return value of the future being retried is the future inside the CNLedgerConnection,
+                    // The actual return value of the future being retried is the future inside the SpliceLedgerConnection,
                     // which signals when the subscription terminated.
                     subscription.completed.map(_ =>
                       if (retryProvider.isClosing)

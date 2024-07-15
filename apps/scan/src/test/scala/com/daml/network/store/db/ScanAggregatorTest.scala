@@ -8,7 +8,7 @@ import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAg
 import com.daml.network.scan.store.db.ScanAggregator.*
 import com.daml.network.store.StoreTest
 import com.daml.network.store.StoreErrors
-import com.daml.network.store.db.CNPostgresTest
+import com.daml.network.store.db.SplicePostgresTest
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.HasExecutionContext
@@ -34,7 +34,7 @@ class ScanAggregatorTest
     extends StoreTest
     with HasExecutionContext
     with StoreErrors
-    with CNPostgresTest
+    with SplicePostgresTest
     with AmuletTransferUtil {
 
   val amuletPrice = 1.0
@@ -649,7 +649,7 @@ class ScanAggregatorTest
 
   override protected def cleanDb(storage: DbStorage) =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 
   def mkAggregator(

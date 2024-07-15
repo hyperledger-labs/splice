@@ -36,7 +36,7 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeTxLogAppStore, TxLogQueries}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
 import com.daml.network.store.{
   IngestionSummary,
   Limit,
@@ -83,7 +83,7 @@ class DbSvDsoStore(
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeTxLogAppStore[TxLogEntry](
+) extends DbTxLogAppStore[TxLogEntry](
       storage,
       DsoTables.acsTableName,
       DsoTables.txLogTableName,

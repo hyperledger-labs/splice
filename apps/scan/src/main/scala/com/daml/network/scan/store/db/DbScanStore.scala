@@ -26,7 +26,7 @@ import com.daml.network.scan.store.{
   TxLogEntry,
 }
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeTxLogAppStore, TxLogQueries}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
 import com.daml.network.util.{
   AssignedContract,
@@ -72,7 +72,7 @@ class DbScanStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeTxLogAppStore[TxLogEntry](
+) extends DbTxLogAppStore[TxLogEntry](
       storage,
       ScanTables.acsTableName,
       ScanTables.txLogTableName,

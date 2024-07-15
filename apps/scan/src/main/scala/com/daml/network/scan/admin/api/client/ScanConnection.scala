@@ -11,13 +11,13 @@ import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMinin
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
-  CNLedgerClient,
+  SpliceLedgerClient,
   HttpAppConnection,
   PackageIdResolver,
   RetryFor,
   RetryProvider,
 }
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -102,7 +102,7 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
     for {
       openAndIssuingRounds <- getOpenAndIssuingMiningRounds()
       openRounds = openAndIssuingRounds._1
-      latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(clock.now, openRounds)
+      latestOpenMiningRound = SpliceUtil.selectLatestOpenMiningRound(clock.now, openRounds)
       amuletRules <- getAmuletRulesWithState()
     } yield TransferContextWithInstances(amuletRules, latestOpenMiningRound, openRounds)
   }
@@ -132,7 +132,7 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
     for {
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
       now = clock.now
-      openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+      openRound = SpliceUtil.selectLatestOpenMiningRound(now, openRounds)
     } yield openRound
   }
 
@@ -196,7 +196,7 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
 
 object ScanConnection {
   def singleCached(
-      amuletLedgerClient: CNLedgerClient,
+      amuletLedgerClient: SpliceLedgerClient,
       config: ScanAppClientConfig,
       upgradesConfig: UpgradesConfig,
       clock: Clock,
@@ -207,7 +207,7 @@ object ScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
@@ -233,7 +233,7 @@ object ScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[SingleScanConnection] =
     HttpAppConnection.checkVersionOrClose(
@@ -325,7 +325,7 @@ class MinimalScanConnection(
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(
       config.adminApi,
@@ -345,7 +345,7 @@ object MinimalScanConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[MinimalScanConnection] =
     HttpAppConnection.checkVersionOrClose(

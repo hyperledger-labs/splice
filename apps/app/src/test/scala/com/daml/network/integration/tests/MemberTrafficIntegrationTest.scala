@@ -2,10 +2,10 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.http.v0.definitions as d0
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -15,13 +15,13 @@ import com.digitalasset.canton.topology.Member
 import org.slf4j.event.Level
 
 class MemberTrafficIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with SynchronizerFeesTestUtil
     with WalletTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
@@ -141,7 +141,7 @@ class MemberTrafficIntegrationTest
 
   private def listMemberTrafficContracts(
       memberId: Member
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     sv1Backend.participantClient.ledger_api_extensions.acs.filterJava(MemberTraffic.COMPANION)(
       sv1Backend.getDsoInfo().dsoParty,
       _.data.memberId == memberId.toProtoPrimitive,

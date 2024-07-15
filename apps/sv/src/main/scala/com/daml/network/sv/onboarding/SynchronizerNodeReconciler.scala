@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
   MediatorConfig,
   SequencerConfig,
 }
-import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
@@ -28,7 +28,7 @@ import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 class SynchronizerNodeReconciler(
     dsoStore: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,

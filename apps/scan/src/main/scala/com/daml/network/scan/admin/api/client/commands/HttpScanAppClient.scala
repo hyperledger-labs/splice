@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.scan.store.db.ScanAggregator
@@ -40,7 +40,7 @@ object HttpScanAppClient {
     override type Client = http.ScanClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -52,7 +52,7 @@ object HttpScanAppClient {
     override type Client = externalHttp.ScanClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

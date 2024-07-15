@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.model.{BodyPartEntity, HttpHeader, HttpRes
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.app_manager_admin as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.TemplateJsonDecoder
@@ -23,7 +23,7 @@ object HttpAppManagerAdminAppClient {
     override type Client = http.AppManagerAdminClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

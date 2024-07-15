@@ -27,7 +27,7 @@ class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
       DbMultiDomainAcsStore[TestTxLogEntry]
     ]
-    with CNPostgresTest
+    with SplicePostgresTest
     with HasActorSystem
     with AcsJdbcTypes {
 
@@ -182,7 +182,7 @@ class DbMultiDomainAcsStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] = {
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
   }
 

@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_ConfirmSvOnboarding,
   DsoRules_SetConfig,
 }
-import com.daml.network.console.CNNodeAppBackendReference
+import com.daml.network.console.AppBackendReference
 import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.splice.dsorules
@@ -33,7 +33,7 @@ class SvTimeBasedOnboardingIntegrationTest
       def activeSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend)
       clue("Initialize DSO with 3 SVs") {
         startAllSync(
-          Seq[CNNodeAppBackendReference](sv1ScanBackend, sv2ScanBackend) ++
+          Seq[AppBackendReference](sv1ScanBackend, sv2ScanBackend) ++
             activeSvBackends ++
             Seq(
               sv1ValidatorBackend,

@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests.reonboard
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.tests.runbook.{
   SvUiIntegrationTestUtil,
@@ -25,12 +25,12 @@ class SvReOnboardPreflightIntegrationTest
   override lazy val resetRequiredTopologyState: Boolean = false
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )
 
-  protected def sv1ScanClient(implicit env: CNNodeTestConsoleEnvironment) = scancl("sv1Scan")
+  protected def sv1ScanClient(implicit env: SpliceTestConsoleEnvironment) = scancl("sv1Scan")
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 

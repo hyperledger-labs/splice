@@ -1,11 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.validatorlicense.*
-import com.daml.network.environment.{BuildInfo, CNNodeEnvironmentImpl}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.{BuildInfo, EnvironmentImpl}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
@@ -14,14 +14,14 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.OptionConverters.*
 
 class ValidatorLicenseMetadataTimeBasedIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil
     with TriggerTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         config.copy(

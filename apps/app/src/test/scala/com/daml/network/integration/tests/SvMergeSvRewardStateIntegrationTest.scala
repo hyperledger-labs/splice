@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.sv.automation.leaderbased.MergeSvRewardStateContractsTrigger
 import com.daml.network.util.TriggerTestUtil
@@ -11,7 +11,7 @@ import scala.jdk.CollectionConverters.*
 class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       // Single SV to allow direct ledger API submissions as the DSO
       // to create SvRewardState contracts.
       .simpleTopology1Sv(this.getClass.getSimpleName)

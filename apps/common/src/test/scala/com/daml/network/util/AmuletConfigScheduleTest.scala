@@ -18,7 +18,7 @@ class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
   private def mkConfig(
       maxNumInputs: Int
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
-    CNNodeUtil.defaultAmuletConfig(
+    SpliceUtil.defaultAmuletConfig(
       dummyTickDuration,
       maxNumInputs,
       dummyDomainId,

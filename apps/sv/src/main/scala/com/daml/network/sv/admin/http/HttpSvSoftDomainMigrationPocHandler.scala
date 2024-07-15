@@ -4,7 +4,7 @@
 package com.daml.network.sv.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.config.{CNThresholds, NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.{Thresholds, NetworkAppClientConfig, SharedSpliceAppParameters}
 import com.daml.network.environment.{
   MediatorAdminConnection,
   ParticipantAdminConnection,
@@ -13,10 +13,10 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
 }
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{sv_soft_domain_migration_poc as v0}
 import com.daml.network.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.scan.admin.api.client.SingleScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.LocalSynchronizerNode
@@ -59,20 +59,20 @@ import scala.jdk.OptionConverters.*
 
 // TODO(#13301) Validate that topology reads return the right amount of data
 class HttpSvSoftDomainMigrationPocHandler(
-    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+    dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     localSynchronizerNode: Option[LocalSynchronizerNode],
     synchronizerNodes: Map[String, SvSynchronizerNodeConfig],
     participantAdminConnection: ParticipantAdminConnection,
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
-    val amuletAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedSpliceAppParameters,
     metrics: SvAppMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvSoftDomainMigrationPocHandler[TracedUser]
     with Spanning
@@ -181,7 +181,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         sequencerDomainState = SequencerDomainStateX
           .create(
             domainId,
-            CNThresholds.sequencerConnectionsSizeThreshold(sequencers.size),
+            Thresholds.sequencerConnectionsSizeThreshold(sequencers.size),
             sequencers,
             Seq.empty,
           )
@@ -194,7 +194,7 @@ class HttpSvSoftDomainMigrationPocHandler(
           .create(
             domainId,
             NonNegativeInt.zero,
-            CNThresholds.mediatorDomainStateThreshold(mediators.size),
+            Thresholds.mediatorDomainStateThreshold(mediators.size),
             mediators,
             Seq.empty,
           )

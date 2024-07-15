@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
 import com.daml.network.util.PrettyInstances.prettyCodegenContractId
 import com.digitalasset.canton.topology.DomainId
@@ -36,7 +36,7 @@ import store.SplitwellStore
 private[automation] class UpgradeGroupTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,

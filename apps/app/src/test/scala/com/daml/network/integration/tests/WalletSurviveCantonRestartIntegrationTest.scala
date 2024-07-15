@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
 import better.files.*
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
@@ -15,7 +15,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.concurrent.duration.*
 
 class WalletSurviveCantonRestartIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with WalletTestUtil {
 
@@ -39,12 +39,12 @@ class WalletSurviveCantonRestartIntegrationTest
   )
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
       .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
+        ConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
       // Do not allocate validator users here, as we deal with all of them manually
       .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
@@ -62,7 +62,7 @@ class WalletSurviveCantonRestartIntegrationTest
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
             eventuallySucceeds(timeUntilSuccess = 40.seconds) {
-              CNNodeEnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
+              EnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
             }
             aliceValidatorBackend.waitForInitialization()
           }

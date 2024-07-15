@@ -1,17 +1,17 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms.bumpUrl
+import com.daml.network.config.ConfigTransforms.bumpUrl
 import com.daml.network.config.{
-  CNDbConfig,
-  CNParticipantClientConfig,
+  SpliceDbConfig,
+  ParticipantClientConfig,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
@@ -29,7 +29,7 @@ import org.scalatest.time.{Minute, Span}
 import java.nio.file.Files
 
 class ValidatorReonboardingIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with StandaloneCanton
     with WalletTestUtil {
@@ -48,18 +48,18 @@ class ValidatorReonboardingIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  private def aliceValidatorLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+  private def aliceValidatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("aliceValidatorWalletLocal")
 
-  private def aliceLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+  private def aliceLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("aliceWalletLocal")
 
-  private def charlieLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+  private def charlieLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("charlieWalletLocal")
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         config.copy(
@@ -71,7 +71,7 @@ class ValidatorReonboardingIntegrationTest
                 .copy(
                   adminApi =
                     aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(27502)),
                     aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
@@ -81,7 +81,7 @@ class ValidatorReonboardingIntegrationTest
                     ),
                   ),
                   storage = aliceValidatorConfig.storage match {
-                    case c: CNDbConfig.Postgres =>
+                    case c: SpliceDbConfig.Postgres =>
                       c.copy(
                         config = c.config
                           .withValue(

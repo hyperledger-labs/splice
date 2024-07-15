@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.splice.round.{
   SummarizingMiningRound,
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
@@ -92,7 +92,7 @@ class HttpScanHandler(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         dsoPartyId = store.key.dsoParty.toProtoPrimitive,
-        votingThreshold = CNThresholds.requiredNumVotes(dsoRules),
+        votingThreshold = Thresholds.requiredNumVotes(dsoRules),
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.contract.toHttp,

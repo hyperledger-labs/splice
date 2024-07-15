@@ -4,7 +4,7 @@
 package com.daml.network.wallet.util
 
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{AmuletConfigSchedule, CNNodeUtil}
+import com.daml.network.util.{AmuletConfigSchedule, SpliceUtil}
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -32,7 +32,7 @@ object TopupUtil {
     latestRound <- scanConnection.getLatestOpenMiningRound()
     amuletPrice = latestRound.payload.amuletPrice
     extraTrafficPrice = BigDecimal(synchronizerFeesConfig.extraTrafficPrice)
-  } yield CNNodeUtil
+  } yield SpliceUtil
     .synchronizerFees(topupParameters.topupAmount, extraTrafficPrice, amuletPrice)
     ._2
 

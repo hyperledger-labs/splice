@@ -8,7 +8,7 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{
-  CNNodeStatus,
+  SpliceStatus,
   MediatorAdminConnection,
   ParticipantAdminConnection,
   RetryProvider,
@@ -17,7 +17,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
-import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.store.{AppStoreWithIngestion, PageLimit}
 import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -47,8 +47,8 @@ import scala.jdk.OptionConverters.*
 class HttpSvAdminHandler(
     config: SvAppBackendConfig,
     optDomainMigrationDumpConfig: Option[Path],
-    svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+    svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
+    dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     cometBftClient: Option[CometBftClient],
     localSynchronizerNode: Option[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
@@ -401,7 +401,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
       withSequencerConnectionOrNotFound(respond.NotFound)(
-        _.getStatus.map(CNNodeStatus.toHttpNodeStatus(_))
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
   }
@@ -414,7 +414,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
       withMediatorConnectionOrNotFound(respond.NotFound)(
-        _.getStatus.map(CNNodeStatus.toHttpNodeStatus(_))
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
   }

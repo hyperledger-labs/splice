@@ -12,7 +12,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
@@ -30,7 +30,7 @@ final class PollInstalledApplicationsTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[AppManagerStore.InstalledApp] {
 

@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.OptionValues
@@ -21,8 +21,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
   private val amuletPrice = 2
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)
@@ -83,7 +83,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
     }
 
     def matchInitialTransactions(txs: Seq[Element], entryForAns: String)(implicit
-        env: CNNodeTestConsoleEnvironment
+        env: SpliceTestConsoleEnvironment
     ) = {
       inside(txs) { case rest :+ balanceChange =>
         matchLockUnlockAnsPayment(rest, entryForAns, isInitial = true)
@@ -102,7 +102,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
         entryForAns: String,
         isInitial: Boolean,
     )(implicit
-        env: CNNodeTestConsoleEnvironment
+        env: SpliceTestConsoleEnvironment
     ) = {
       inside(txs) { case ansCreation +: lockForAns +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:

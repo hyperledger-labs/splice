@@ -1,7 +1,7 @@
 package com.daml.network.integration.plugins
 
-import com.daml.network.console.{CNParticipantClientReference, SvAppBackendReference}
-import com.daml.network.integration.tests.CNNodeTests
+import com.daml.network.console.{ParticipantClientReference, SvAppBackendReference}
+import com.daml.network.integration.tests.SpliceTests
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
@@ -20,7 +20,7 @@ final class ResetSequencerDomainStateThreshold extends ResetTopologyStatePlugin 
   override protected lazy val topologyType = "sequencer domain state threshold"
 
   override protected def resetTopologyState(
-      env: CNNodeTests.CNNodeTestConsoleEnvironment,
+      env: SpliceTests.SpliceTestConsoleEnvironment,
       domainId: DomainId,
       sv1: SvAppBackendReference,
   ): Unit = {
@@ -40,7 +40,7 @@ final class ResetSequencerDomainStateThreshold extends ResetTopologyStatePlugin 
         } else {
 
           def proposeSequencerDomainStateReset(
-              client: CNParticipantClientReference
+              client: ParticipantClientReference
           ): Unit = {
             env.environment.loggerFactory
               .asInstanceOf[SuppressingLogger]

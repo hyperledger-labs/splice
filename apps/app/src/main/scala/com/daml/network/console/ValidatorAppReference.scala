@@ -7,7 +7,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
@@ -40,9 +40,9 @@ import scala.concurrent.Future
 /** Console commands that can be executed either through client or backend reference.
   */
 abstract class ValidatorAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/validator"
   override protected val instanceType = "Validator"
@@ -274,11 +274,11 @@ abstract class ValidatorAppReference(
 }
 
 final class ValidatorAppBackendReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
 )(implicit actorSystem: ActorSystem)
     extends ValidatorAppReference(consoleEnvironment, name)
-    with CNNodeAppBackendReference
+    with AppBackendReference
     with BaseInspection[ValidatorApp] {
 
   override def runningNode: Option[ValidatorAppBootstrap] =
@@ -337,7 +337,7 @@ final class ValidatorAppBackendReference(
 
   /** Remote participant this validator app is configured to interact with. */
   lazy val participantClient =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`",
       config.participantClient.getParticipantClientConfig(),
@@ -345,18 +345,18 @@ final class ValidatorAppBackendReference(
 
   /** Remote participant this validator app is configured to interact with. Uses admin tokens to bypass auth. */
   val participantClientWithAdminToken =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,
     )
 }
 
-/** Client (aka remote) reference to a validator app in the style of CNParticipantClientReference, i.e.,
+/** Client (aka remote) reference to a validator app in the style of ParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final case class ValidatorAppClientReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
     val config: ValidatorAppClientConfig,
     override val token: Option[String] = None,
@@ -368,10 +368,10 @@ final case class ValidatorAppClientReference(
 }
 
 final case class AppManagerAppClientReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
     val config: AppManagerAppClientConfig,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/validator"
   override def httpClientConfig = config.adminApi

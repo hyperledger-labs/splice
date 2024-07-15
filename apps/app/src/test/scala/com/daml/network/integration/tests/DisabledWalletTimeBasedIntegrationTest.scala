@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet.{Amulet, SvRewardCoupon, UnclaimedReward}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
+import com.daml.network.util.SpliceUtil.defaultIssuanceCurve
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.daml.network.wallet.treasury.TreasuryService
@@ -16,14 +16,14 @@ import com.digitalasset.canton.logging.SuppressionRule.LevelAndAbove
 import org.slf4j.event.Level
 
 class DisabledWalletTimeBasedIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil
     with SvTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, conf) =>
         conf.copy(validatorApps = conf.validatorApps.map {

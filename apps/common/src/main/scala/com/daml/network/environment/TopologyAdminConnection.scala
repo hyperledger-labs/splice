@@ -7,7 +7,7 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.GrpcClientMetrics
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
@@ -730,7 +730,7 @@ abstract class TopologyAdminConnection(
         Right(
           previous.copy(
             participants = newHostingParticipants,
-            threshold = CNThresholds
+            threshold = Thresholds
               .partyToParticipantThreshold(newHostingParticipants),
           )
         )
@@ -768,7 +768,7 @@ abstract class TopologyAdminConnection(
                 )
                 proposal.mapping.participantIds ==
                   newHostingParticipants.map(_.participantId)
-                  && proposal.mapping.threshold == CNThresholds.partyToParticipantThreshold(
+                  && proposal.mapping.threshold == Thresholds.partyToParticipantThreshold(
                     newHostingParticipants
                   )
               })
@@ -805,7 +805,7 @@ abstract class TopologyAdminConnection(
         Right(
           previous.copy(
             participants = newHostingParticipants,
-            threshold = CNThresholds.partyToParticipantThreshold(newHostingParticipants),
+            threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
           )
         )
       },
@@ -846,7 +846,7 @@ abstract class TopologyAdminConnection(
             val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
             previous.copy(
               participants = newHostingParticipants,
-              threshold = CNThresholds.partyToParticipantThreshold(newHostingParticipants),
+              threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
             )
           },
           show"Participant $participantId does not host party $party",
@@ -952,7 +952,7 @@ abstract class TopologyAdminConnection(
         getSequencerDomainState(domainId).map(result => {
           val newSequencers = sequencerChange(result.mapping.active)
           // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerDomainStateThreshold)
-          val newThreshold = CNThresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
+          val newThreshold = Thresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
           Either
             .cond(
               result.mapping.active.forgetNE == newSequencers && result.mapping.threshold == newThreshold,
@@ -969,7 +969,7 @@ abstract class TopologyAdminConnection(
         // The threshold in here is used by Canton traffic control
         SequencerDomainStateX.create(
           previous.domain,
-          CNThresholds
+          Thresholds
             .sequencerConnectionsSizeThreshold(newSequencers.size),
           newSequencers,
           previous.observers,
@@ -1076,7 +1076,7 @@ abstract class TopologyAdminConnection(
         MediatorDomainStateX.create(
           previous.domain,
           previous.group,
-          CNThresholds
+          Thresholds
             .mediatorDomainStateThreshold(newMediators.size),
           newMediators,
           previous.observers,
@@ -1171,7 +1171,7 @@ abstract class TopologyAdminConnection(
         val newOwners = ownerChange(previous.owners)
         DecentralizedNamespaceDefinitionX.create(
           previous.namespace,
-          CNThresholds.decentralizedNamespaceThreshold(
+          Thresholds.decentralizedNamespaceThreshold(
             newOwners.size
           ),
           newOwners,

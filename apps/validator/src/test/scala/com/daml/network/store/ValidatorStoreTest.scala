@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodege
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.codegen.java.splice.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
+import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{
   ValidatorSynchronizerConfig,
@@ -594,7 +594,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 class DbValidatorStoreTest
     extends ValidatorStoreTest
     with HasActorSystem
-    with CNPostgresTest
+    with SplicePostgresTest
     with AcsJdbcTypes
     with AcsTables {
 
@@ -632,6 +632,6 @@ class DbValidatorStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 }

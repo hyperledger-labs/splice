@@ -2,13 +2,13 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.ans as codegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
-import com.daml.network.config.CNNodeConfigTransforms
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -35,7 +35,7 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
-class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with TriggerTestUtil {
+class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
 
   import WalletTestUtil.*
 
@@ -44,8 +44,8 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
   private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       // TODO(#11927): make AnsIntegrationTest use simpleTopology4Svs
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
@@ -55,7 +55,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       )
       .addConfigTransform((_, config) =>
         // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
-        CNNodeConfigTransforms
+        ConfigTransforms
           .updateAllSvAppFoundCollectiveConfigs_(
             _.copy(
               initialAnsConfig = InitialAnsConfig(
@@ -66,7 +66,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
           )(config)
       )
 
-  def leaderExpiredAnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
+  def leaderExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
     sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]
 
   // created by the expiry test
@@ -461,7 +461,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
   private def lookupEntryByName(
       name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): Option[definitions.AnsEntry] = {
+  )(implicit env: SpliceTestConsoleEnvironment): Option[definitions.AnsEntry] = {
     val dso = sv1Backend.getDsoInfo().dsoParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(codegen.AnsEntry.COMPANION)(

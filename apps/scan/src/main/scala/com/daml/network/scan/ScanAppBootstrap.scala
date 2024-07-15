@@ -8,8 +8,8 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.http.AdminRoutes
-import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
-import com.daml.network.environment.CNNodeBootstrapBase
+import com.daml.network.config.{ANStorageFactory, SharedSpliceAppParameters}
+import com.daml.network.environment.NodeBootstrapBase
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -33,7 +33,7 @@ import scala.concurrent.Future
 class ScanAppBootstrap(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
-    val scanAppParameters: SharedCNNodeAppParameters,
+    val scanAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: ScanAppMetrics,
@@ -46,10 +46,10 @@ class ScanAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends NodeBootstrapBase[
       ScanApp,
       ScanAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
     ](
       config,
       name,
@@ -90,7 +90,7 @@ object ScanAppBootstrap {
   def apply(
       name: String,
       scanConfig: ScanAppBackendConfig,
-      amuletAppParameters: SharedCNNodeAppParameters,
+      amuletAppParameters: SharedSpliceAppParameters,
       clock: Clock,
       scanMetrics: ScanAppMetrics,
       testingConfigInternal: TestingConfigInternal,

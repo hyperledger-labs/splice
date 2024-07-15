@@ -3,7 +3,7 @@
 
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.{SvApp, SvAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -18,7 +18,7 @@ class SvApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, SvAppBackendConfig],
-    parametersFor: String => SharedCNNodeAppParameters,
+    parametersFor: String => SharedSpliceAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -26,7 +26,7 @@ class SvApps(
       // this trait.
       SvApp,
       SvAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
       SvAppBootstrap,
     ](
       create,

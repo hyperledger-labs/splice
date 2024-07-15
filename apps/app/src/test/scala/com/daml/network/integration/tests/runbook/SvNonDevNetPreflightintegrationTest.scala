@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.DataExportTestUtil
 import com.digitalasset.canton.data.CantonTimestamp
@@ -21,8 +21,8 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   override lazy val resetRequiredTopologyState: Boolean = false
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )
 
@@ -31,11 +31,11 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   protected val svUrlPrefix = if (svNumber == 1) "sv-2" else s"sv-$svNumber-eng"
   protected val svNamespace = s"sv-$svNumber"
 
-  protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = sv_client(svName)
-  protected def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
+  protected def svClient(implicit env: SpliceTestConsoleEnvironment) = sv_client(svName)
+  protected def svValidatorClient(implicit env: SpliceTestConsoleEnvironment) = vc(
     s"${svName}Validator"
   )
-  protected def svScanClient(implicit env: CNNodeTestConsoleEnvironment) = scancl(s"${svName}Scan")
+  protected def svScanClient(implicit env: SpliceTestConsoleEnvironment) = scancl(s"${svName}Scan")
 
   "SV reports devnet=false" in { implicit env =>
     svClient.getDsoInfo().dsoRules.payload.isDevNet shouldBe false

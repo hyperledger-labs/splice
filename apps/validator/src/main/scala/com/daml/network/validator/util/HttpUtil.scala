@@ -8,7 +8,7 @@ import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import cats.syntax.either.*
 import com.daml.network.environment.BaseAppConnection
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import io.circe.parser.decode
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,7 +17,7 @@ private[validator] object HttpUtil {
   def getHttpJson[T](uri: Uri)(implicit
       ec: ExecutionContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       decoder: io.circe.Decoder[T],
   ): Future[T] =
     for {

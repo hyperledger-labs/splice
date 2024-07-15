@@ -2,11 +2,11 @@ package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{BaseAppConnection, SpliceLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, DsoScan}
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState}
+import com.daml.network.util.{SpliceUtil, Contract, ContractWithState}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
@@ -65,7 +65,7 @@ class BftScanConnectionTest
                 new amuletrulesCodegen.AmuletRules.ContractId("whatever"),
                 new amuletrulesCodegen.AmuletRules(
                   partyIdA.toProtoPrimitive,
-                  CNNodeUtil.defaultAmuletConfigSchedule(
+                  SpliceUtil.defaultAmuletConfigSchedule(
                     NonNegativeFiniteDuration(Duration.ofMinutes(10)),
                     10,
                     domainId,
@@ -108,7 +108,7 @@ class BftScanConnectionTest
       initialFailedConnections: Map[Uri, Throwable] = Map.empty,
   ) = {
     new BftScanConnection(
-      mock[CNLedgerClient],
+      mock[SpliceLedgerClient],
       NonNegativeFiniteDuration.ofSeconds(1),
       new BftScanConnection.Bft(
         initialConnections,

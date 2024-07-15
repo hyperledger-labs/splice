@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class TerminatedAppPaymentTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

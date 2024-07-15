@@ -8,8 +8,8 @@ import cats.data.EitherT
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.http.AdminRoutes
-import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
-import com.daml.network.environment.CNNodeBootstrapBase
+import com.daml.network.config.{ANStorageFactory, SharedSpliceAppParameters}
+import com.daml.network.environment.NodeBootstrapBase
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -33,7 +33,7 @@ import scala.concurrent.Future
 class ValidatorAppBootstrap(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
-    val validatorAppParameters: SharedCNNodeAppParameters,
+    val validatorAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: ValidatorAppMetrics,
@@ -46,10 +46,10 @@ class ValidatorAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends NodeBootstrapBase[
       ValidatorApp,
       ValidatorAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
     ](
       config,
       name,
@@ -90,7 +90,7 @@ object ValidatorAppBootstrap {
   def apply(
       name: String,
       validatorConfig: ValidatorAppBackendConfig,
-      validatorAppParameters: SharedCNNodeAppParameters,
+      validatorAppParameters: SharedSpliceAppParameters,
       clock: Clock,
       validatorMetrics: ValidatorAppMetrics,
       testingConfigInternal: TestingConfigInternal,

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 import java.time.Duration as JavaDuration
@@ -9,13 +9,13 @@ import java.time.Duration as JavaDuration
 class SvTimeBasedBootstrappingRoundIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(
         this.getClass.getSimpleName
       ) // no need to spin up 4 SVs to see whether automation works
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(roundZeroDuration = Some(NonNegativeFiniteDuration.ofHours(24)))
         )(config)
       )

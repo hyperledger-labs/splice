@@ -4,23 +4,19 @@ import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.*
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
 import com.daml.network.config.{
-  CNDbConfig,
-  CNNodeConfigTransforms,
-  CNParticipantClientConfig,
+  SpliceDbConfig,
+  ConfigTransforms,
+  ParticipantClientConfig,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{
-  ConfigurableApp,
-  bumpUrl,
-  updateAutomationConfig,
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, bumpUrl, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
-}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
@@ -47,7 +43,7 @@ import java.util.UUID
 import java.time.Duration as JDUration
 
 class SvReonboardingIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with StandaloneCanton
     with WalletTestUtil {
@@ -71,25 +67,25 @@ class SvReonboardingIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
+  private def sv4ReonboardBackend(implicit env: SpliceTestConsoleEnvironment) = svb("sv4Reonboard")
   private def sv4WalletClient(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = wc("sv4Wallet")
-  private def validatorLocalBackend(implicit env: CNNodeTestConsoleEnvironment) = v(
+  private def validatorLocalBackend(implicit env: SpliceTestConsoleEnvironment) = v(
     "validatorLocal"
   )
-  private def validatorLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+  private def validatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("validatorWalletLocal")
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
       .withPreSetup(_ => ())
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransforms(
         (_, config) =>
@@ -101,7 +97,7 @@ class SvReonboardingIntegrationTest
                 sv4Config
                   .copy(
                     storage = sv4Config.storage match {
-                      case c: CNDbConfig.Postgres =>
+                      case c: SpliceDbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(
@@ -122,7 +118,7 @@ class SvReonboardingIntegrationTest
                   .copy(
                     adminApi = referenceValidatorConfig.adminApi
                       .copy(internalPort = Some(Port.tryCreate(27503))),
-                    participantClient = CNParticipantClientConfig(
+                    participantClient = ParticipantClientConfig(
                       ClientConfig(port = Port.tryCreate(27502)),
                       referenceValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
@@ -132,7 +128,7 @@ class SvReonboardingIntegrationTest
                       ),
                     ),
                     storage = referenceValidatorConfig.storage match {
-                      case c: CNDbConfig.Postgres =>
+                      case c: SpliceDbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(

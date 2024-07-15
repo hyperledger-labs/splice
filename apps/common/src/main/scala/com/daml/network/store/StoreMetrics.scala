@@ -6,12 +6,12 @@ package com.daml.network.store
 import com.daml.metrics.api.MetricDoc.MetricQualification.Latency
 import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.{MetricDoc, MetricName}
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 class StoreMetrics(metricsFactory: CantonLabeledMetricsFactory) {
 
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "store"
+  val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "store"
 
   @MetricDoc.Tag(
     summary = "How long it takes to signal offset ingestion.",

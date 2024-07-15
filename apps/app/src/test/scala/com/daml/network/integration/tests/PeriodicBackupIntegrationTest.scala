@@ -2,16 +2,16 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.{
   BackupDumpConfig,
-  CNNodeConfigTransforms,
+  ConfigTransforms,
   GcpBucketConfig,
   PeriodicBackupDumpConfig,
 }
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -22,8 +22,7 @@ import org.slf4j.event.Level
 
 import java.nio.file.{Path, Paths}
 
-abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
-    extends CNNodeIntegrationTest {
+abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig] extends IntegrationTest {
 
   protected val backupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10)
 
@@ -34,12 +33,12 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
   protected def readDump(filename: String): String
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.updateAllValidatorAppConfigs_(c =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
           c.copy(participantIdentitiesBackup = Some(backupDumpConfig))
         )(conf)
       )

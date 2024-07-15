@@ -6,13 +6,13 @@ package com.daml.network.scan.store.db
 import com.daml.metrics.api.MetricDoc.MetricQualification.Latency
 import com.daml.metrics.api.MetricHandle.Gauge
 import com.daml.metrics.api.{MetricsContext, MetricDoc, MetricName}
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.daml.metrics.CacheMetrics
 
 class DbScanStoreMetrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
 
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "scan_store"
+  val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan_store"
 
   @MetricDoc.Tag(
     summary = "Earliest aggregated round",

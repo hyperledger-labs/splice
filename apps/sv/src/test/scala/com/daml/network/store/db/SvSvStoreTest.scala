@@ -131,7 +131,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 class DbSvSvStoreTest
     extends SvSvStoreTest
     with HasActorSystem
-    with CNPostgresTest
+    with SplicePostgresTest
     with AcsJdbcTypes
     with AcsTables {
 
@@ -169,6 +169,6 @@ class DbSvSvStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 }

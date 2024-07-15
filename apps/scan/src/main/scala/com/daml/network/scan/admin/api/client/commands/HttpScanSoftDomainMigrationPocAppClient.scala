@@ -8,7 +8,7 @@ import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan_soft_domain_migration_poc as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
@@ -27,7 +27,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
     override type Client = http.ScanSoftDomainMigrationPocClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -42,7 +42,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
     override type Client = externalHttp.ScanClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

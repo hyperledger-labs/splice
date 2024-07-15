@@ -4,7 +4,7 @@
 package com.daml.network.store
 
 import com.daml.network.codegen.java.splice
-import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract}
+import com.daml.network.util.{AssignedContract, SpliceUtil, Contract}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -13,7 +13,7 @@ import io.grpc.Status
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
-trait MiningRoundsStore extends CNNodeAppStore {
+trait MiningRoundsStore extends AppStore {
 
   /** Lookup the triple of open mining rounds that should always be present
     * after bootstrapping.
@@ -101,7 +101,7 @@ object MiningRoundsStore {
 
     /** The time after which these can be advanced at assuming the given tick duration. */
     def readyToAdvanceAt: Instant = {
-      val middleTickDuration = CNNodeUtil.relTimeToDuration(
+      val middleTickDuration = SpliceUtil.relTimeToDuration(
         middle.payload.tickDuration
       )
       Ordering[Instant].max(

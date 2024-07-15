@@ -3,13 +3,13 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
 class SvOffboardingIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with StandaloneCanton {
 
@@ -36,16 +36,16 @@ class SvOffboardingIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(22_000)(conf)
+        ConfigTransforms.bumpRemoteSplitwellPortsBy(22_000)(conf)
       )
       .withSequencerConnectionsFromScanDisabled(22_000)
       .addConfigTransforms((_, config) =>

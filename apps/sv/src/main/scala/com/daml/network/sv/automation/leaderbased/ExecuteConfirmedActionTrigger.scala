@@ -26,7 +26,7 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
   CRARC_MiningRound_StartIssuing,
 }
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.sv.SvApp.{isDevNet, isDsoMemberName, isDsoMemberParty}
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
@@ -67,7 +67,7 @@ class ExecuteConfirmedActionTrigger(
       else
         for {
           dsoRules <- store.getDsoRules()
-          requiredNumConfirmations = CNThresholds.requiredNumVotes(dsoRules)
+          requiredNumConfirmations = Thresholds.requiredNumVotes(dsoRules)
           confirmations <- store.listConfirmations(action)
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-

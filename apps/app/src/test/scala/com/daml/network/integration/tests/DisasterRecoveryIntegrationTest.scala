@@ -2,25 +2,21 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.daml.network.config.{
-  CNNodeConfigTransforms,
-  CNParticipantClientConfig,
-  NetworkAppClientConfig,
-}
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.{ConfigTransforms, ParticipantClientConfig, NetworkAppClientConfig}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
-  CNNodeAppBackendReference,
+  AppBackendReference,
   ScanAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
+import com.daml.network.environment.{EnvironmentImpl, RetryProvider}
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.{SvDecentralizedSynchronizerConfig, SvSynchronizerConfig}
@@ -65,7 +61,7 @@ import scala.concurrent.duration.*
 import scala.util.Using
 
 class DisasterRecoveryIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with DomainMigrationUtil
     with StandaloneCanton
@@ -95,15 +91,15 @@ class DisasterRecoveryIntegrationTest
 
   // Any app with port starting with 28 or with name suffixed by 'Local' is an app started after the disaster
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
       .withPreSetup(_ => ())
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransforms(
         (_, conf) =>
@@ -162,7 +158,7 @@ class DisasterRecoveryIntegrationTest
                   .validatorApps(InstanceName.tryCreate("aliceValidator"))
                 aliceValidatorConf
                   .copy(
-                    participantClient = CNParticipantClientConfig(
+                    participantClient = ParticipantClientConfig(
                       ClientConfig(port = Port.tryCreate(28502)),
                       aliceValidatorConf.participantClient.ledgerApi.copy(
                         clientConfig =
@@ -201,16 +197,16 @@ class DisasterRecoveryIntegrationTest
           ),
       )
       .addConfigTransforms((_, conf) =>
-        (CNNodeConfigTransforms
+        (ConfigTransforms
           .setSomeSvAppPortsPrefix(28, Seq("sv1Local", "sv2Local", "sv3Local", "sv4Local")) compose
-          CNNodeConfigTransforms.setSomeScanAppPortsPrefix(28, Seq("sv1ScanLocal")) compose
-          CNNodeConfigTransforms
+          ConfigTransforms.setSomeScanAppPortsPrefix(28, Seq("sv1ScanLocal")) compose
+          ConfigTransforms
             .setSomeValidatorAppPortsPrefix(28, Seq("sv1ValidatorLocal", "aliceValidatorLocal")))(
           conf
         )
       )
       .addConfigTransform((_, conf) =>
-        CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+        ConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
           if (name == "aliceValidator") {
             // update validator app config for the aliceValidator to remove the extra domain and update port
             val newConfig = validatorConfig.copy(
@@ -269,7 +265,7 @@ class DisasterRecoveryIntegrationTest
   private def runTest(
       cantonInstanceSuffix: String,
       getAndWriteDumps: (Seq[SynchronizerNodeIdentities], Instant) => Unit,
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     import env.environment.scheduler
     import env.executionContext
 
@@ -298,7 +294,7 @@ class DisasterRecoveryIntegrationTest
         s"sequencers-mediators-before-disaster-$cantonInstanceSuffix",
         participants = false,
       )() {
-        val allAppsBeforeDisaster = Seq[CNNodeAppBackendReference](
+        val allAppsBeforeDisaster = Seq[AppBackendReference](
           sv1ScanBackend,
           sv1Backend,
           sv2Backend,
@@ -584,7 +580,7 @@ class DisasterRecoveryIntegrationTest
   }
 
   private def waitForSvParticipantsToCatchup(timestamp: Instant)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     clue(s"Waiting for all SVs participants to be caught up to ${timestamp}") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>

@@ -1,19 +1,16 @@
 package com.daml.network.integration.tests.auth
 
 import com.daml.network.console.SvAppClientReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.integration.tests.runbook.PreflightIntegrationTestUtil
 import com.digitalasset.canton.integration.BaseIntegrationTest
 
 trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   this: BaseIntegrationTest[
-    CNNodeEnvironmentImpl,
-    CNNodeTestConsoleEnvironment,
-  ] & CNNodeTestCommon =>
+    EnvironmentImpl,
+    SpliceTestConsoleEnvironment,
+  ] & TestCommon =>
   private val sv1ClientId = "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn"
   private val sv2ClientId = "rv4bllgKWAiW9tBtdvURMdHW42MAXghz"
   private val sv3ClientId = "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk"
@@ -32,7 +29,7 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
   protected def svClientWithToken(
       name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = {
+  )(implicit env: SpliceTestConsoleEnvironment): SvAppClientReference = {
     val clientId = clientIds.get(name).value
     val token = eventuallySucceeds() {
       getAuth0ClientCredential(

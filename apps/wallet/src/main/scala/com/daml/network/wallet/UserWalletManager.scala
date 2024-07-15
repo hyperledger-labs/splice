@@ -7,7 +7,7 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerClient, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,

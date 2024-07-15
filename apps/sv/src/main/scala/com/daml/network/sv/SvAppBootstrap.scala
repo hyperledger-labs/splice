@@ -8,8 +8,8 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.http.AdminRoutes
-import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
-import com.daml.network.environment.CNNodeBootstrapBase
+import com.daml.network.config.{ANStorageFactory, SharedSpliceAppParameters}
+import com.daml.network.environment.NodeBootstrapBase
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -33,7 +33,7 @@ import scala.concurrent.Future
 class SvAppBootstrap(
     override val name: InstanceName,
     val config: SvAppBackendConfig,
-    val svAppParameters: SharedCNNodeAppParameters,
+    val svAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: SvAppMetrics,
@@ -46,10 +46,10 @@ class SvAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends NodeBootstrapBase[
       SvApp,
       SvAppBackendConfig,
-      SharedCNNodeAppParameters,
+      SharedSpliceAppParameters,
     ](
       config,
       name,
@@ -90,7 +90,7 @@ object SvAppBootstrap {
   def apply(
       name: String,
       svConfig: SvAppBackendConfig,
-      svAppParameters: SharedCNNodeAppParameters,
+      svAppParameters: SharedSpliceAppParameters,
       clock: Clock,
       svMetrics: SvAppMetrics,
       testingConfigInternal: TestingConfigInternal,

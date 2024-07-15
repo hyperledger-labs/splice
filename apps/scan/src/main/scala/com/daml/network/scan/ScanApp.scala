@@ -9,10 +9,10 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.codegen.java.splice.round as roundCodegen
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.environment.{
-  CNLedgerClient,
-  CNNode,
+  SpliceLedgerClient,
+  Node,
   DarResources,
   ParticipantAdminConnection,
   RetryFor,
@@ -59,7 +59,7 @@ import org.apache.pekko.stream.Materializer
 class ScanApp(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
-    val amuletAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedSpliceAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -72,7 +72,7 @@ class ScanApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CNNode[ScanApp.State](
+) extends Node[ScanApp.State](
       config.svUser,
       config.participantClient,
       amuletAppParameters,
@@ -86,7 +86,7 @@ class ScanApp(
     super.packages ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
   override def initialize(
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
       // The primary party in scan as that points to the SV party
       serviceUserPrimaryParty: PartyId,
   )(implicit tc: TraceContext): Future[ScanApp.State] = {

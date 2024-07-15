@@ -7,15 +7,15 @@ import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_OffboardSv,
 }
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.http.v0.definitions.{CometBftJsonRpcRequest, CometBftJsonRpcRequestId}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.plugins.CometBftNetworkPlugin
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.cometbft.{CometBftConnectionConfig, CometBftHttpRpcClient}
 import com.daml.network.sv.config.CometBftConfig
@@ -29,18 +29,18 @@ import monocle.macros.syntax.lens.*
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment with SvTestUtil {
+class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment with SvTestUtil {
 
   import ExecutionContext.Implicits.global
   registerPlugin(new CometBftNetworkPlugin("sv_cometbft_integration_test", NamedLoggerFactory.root))
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
-          CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
+          ConfigTransforms.updateAllSvAppConfigs_ { config =>
             config
               .focus(_.cometBftConfig)
               .replace(
@@ -198,7 +198,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       method: String,
       params: Map[String, Json],
       responseKeys: Seq[String],
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val id_ = CometBftJsonRpcRequestId.fromNested2(id)
     val method_ = CometBftJsonRpcRequest.Method.from(method).value
     val response = sv1Backend.cometBftJsonRpcRequest(id_, method_, params)

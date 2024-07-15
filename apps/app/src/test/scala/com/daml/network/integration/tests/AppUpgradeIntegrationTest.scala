@@ -6,14 +6,14 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.util.{ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
 
 import java.nio.file.{Path, Paths}
 import better.files.*
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.environment.{BuildInfo, DarResources}
 import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -29,7 +29,7 @@ import scala.util.Using.Releasable
 import scala.concurrent.duration.*
 
 class AppUpgradeIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with SplitwellTestUtil
     with WalletTestUtil {
@@ -39,7 +39,7 @@ class AppUpgradeIntegrationTest
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
-  override def environmentDefinition = CNNodeEnvironmentDefinition
+  override def environmentDefinition = EnvironmentDefinition
     .simpleTopology4Svs(this.getClass.getSimpleName)
     .withManualStart
     // We don't currently register the upgrade of splitwell in app manager, just want to test
@@ -50,7 +50,7 @@ class AppUpgradeIntegrationTest
     .withSequencerConnectionsFromScanDisabled()
     .addConfigTransform((_, config) => {
       // Makes the test a bit faster and easier to debug. See #11488
-      CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
     })
     .addConfigTransform((_, config) => {
       config
@@ -83,14 +83,14 @@ class AppUpgradeIntegrationTest
         val testId = env.environment.config.name.value
 
         Using.resource(
-          AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade", loggerFactory)
+          AppUpgradeIntegrationTest.MultiProcessResource("forUpgrade", loggerFactory)
         )(cnProcs => {
           // Do not start the old sv4 backend nor alice's validators, they will join only after upgrade
           Seq("sv1-node", "sv2-node", "sv3-node", "bobSplitwellValidators").foreach(conf => {
             val version = getBaseVersion()
             val bundledConfig = getConfigFileFromBundle(version, conf)
             val inputConfig = generateConfig(bundledConfig, version, testId)
-            cnProcs.startBundledCN(conf, inputConfig)
+            cnProcs.startBundledSplice(conf, inputConfig)
           })
 
           eventually(5.minute) {
@@ -133,7 +133,7 @@ class AppUpgradeIntegrationTest
             }
 
           clue("Upgrading bob's and splitwell validator") {
-            cnProcs.stopBundledCN("bobSplitwellValidators")
+            cnProcs.stopBundledSplice("bobSplitwellValidators")
             bobValidatorBackend.startSync()
             splitwellValidatorBackend.startSync()
             splitwellBackend.startSync()
@@ -149,9 +149,9 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Upgrading sv-2 & sv-3") {
-            cnProcs.stopBundledCN("sv2-node")
+            cnProcs.stopBundledSplice("sv2-node")
             startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
-            cnProcs.stopBundledCN("sv3-node")
+            cnProcs.stopBundledSplice("sv3-node")
             // No scan for sv3
             startAllSync(sv3Backend, sv3ValidatorBackend)
           }
@@ -170,7 +170,7 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Upgrading also sv1") {
-            cnProcs.stopBundledCN("sv1-node")
+            cnProcs.stopBundledSplice("sv1-node")
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
@@ -477,16 +477,16 @@ class AppUpgradeIntegrationTest
 
 object AppUpgradeIntegrationTest {
 
-  final case class MultiCnProcessResource(logSuffix: String, loggerFactory: NamedLoggerFactory)
+  final case class MultiProcessResource(logSuffix: String, loggerFactory: NamedLoggerFactory)
       extends NamedLogging {
 
     val processes = scala.collection.mutable.Map[String, Process]()
 
-    def startBundledCN(name: String, config: Path): Unit = {
+    def startBundledSplice(name: String, config: Path): Unit = {
       val version = getBaseVersion()
       val process = ProcessTestUtil.startProcess(
         Seq(
-          getBundledCn(version).toString,
+          getBundledSplice(version).toString,
           "daemon",
           "--log-level-canton=DEBUG",
           "--log-level-stdout=OFF",
@@ -502,7 +502,7 @@ object AppUpgradeIntegrationTest {
       processes += (name -> process.process)
     }
 
-    def stopBundledCN(name: String) = {
+    def stopBundledSplice(name: String) = {
       processes
         .get(name)
         .foreach(p => {
@@ -517,7 +517,7 @@ object AppUpgradeIntegrationTest {
       processes.foreach(_._2.waitFor())
     }
 
-    def getBundledCn(version: String) = {
+    def getBundledSplice(version: String) = {
       val dir = getDir(bundleDir(version))
       val bundledCn = dir.resolve("bin/cn-node")
       if (!bundledCn.toFile.exists()) {
@@ -529,9 +529,9 @@ object AppUpgradeIntegrationTest {
     }
   }
 
-  object MultiCnProcessResource {
-    implicit val releasable: Releasable[MultiCnProcessResource] =
-      (resource: MultiCnProcessResource) => resource.destroyAllAndWait()
+  object MultiProcessResource {
+    implicit val releasable: Releasable[MultiProcessResource] =
+      (resource: MultiProcessResource) => resource.destroyAllAndWait()
   }
 
   def getDir(dir: Path) = {

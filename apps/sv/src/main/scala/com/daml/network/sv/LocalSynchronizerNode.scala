@@ -4,7 +4,7 @@
 package com.daml.network.sv
 
 import com.daml.network.environment.*
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
@@ -51,7 +51,7 @@ final class LocalSynchronizerNode(
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends RetryProvider.Has

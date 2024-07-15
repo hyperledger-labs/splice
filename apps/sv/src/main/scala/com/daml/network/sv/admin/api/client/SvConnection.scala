@@ -5,7 +5,7 @@ package com.daml.network.sv.admin.api.client
 
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -25,14 +25,14 @@ final class SvConnection private (
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, upgradesConfig, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */
   def startSvOnboarding(token: String)(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -45,7 +45,7 @@ final class SvConnection private (
       candidateParticipantId: ParticipantId,
       candidateParty: PartyId,
   )(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -64,7 +64,7 @@ final class SvConnection private (
   def onboardSvSequencer(
       sequencerId: SequencerId
   )(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -77,7 +77,7 @@ final class SvConnection private (
     )
 
   def getDsoInfo()(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
@@ -99,7 +99,7 @@ object SvConnection {
       ec: ExecutionContextExecutor,
       tc: TraceContext,
       mat: Materializer,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[SvConnection] =
     HttpAppConnection.checkVersionOrClose(

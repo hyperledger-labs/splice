@@ -5,12 +5,12 @@ package com.daml.network.splitwell.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNDbConfig,
-  CNNodeBackendConfig,
-  CNNodeParametersConfig,
-  CNParticipantClientConfig,
+  SpliceDbConfig,
+  SpliceBackendConfig,
+  SpliceParametersConfig,
+  ParticipantClientConfig,
   SynchronizerConfig,
-  HttpCNNodeClientConfig,
+  HttpClientConfig,
   NetworkAppClientConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -32,16 +32,16 @@ case class SplitwellDomains(
 
 case class SplitwellAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CNDbConfig,
+    override val storage: SpliceDbConfig,
     providerUser: String,
-    participantClient: CNParticipantClientConfig,
+    participantClient: ParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     domains: SplitwellSynchronizerConfig,
-    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
-) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
+    parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
+) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
 
@@ -52,9 +52,9 @@ case class SplitwellAppClientConfig(
     // Admin API for reads.
     adminApi: NetworkAppClientConfig,
     // Ledger API for writes.
-    participantClient: CNParticipantClientConfig,
+    participantClient: ParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     ledgerApiUser: String,
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

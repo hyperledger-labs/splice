@@ -7,9 +7,9 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
-  CNNodeAppAutomationService,
+  SpliceAppAutomationService,
 }
-import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -27,14 +27,14 @@ class SvSvAutomationService(
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       config.automation,
       clock,
       domainTimeSync,

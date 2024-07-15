@@ -10,31 +10,31 @@ import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import com.daml.network.config.{
-  CNNodeConfigTransforms,
-  CNParticipantClientConfig,
+  ConfigTransforms,
+  ParticipantClientConfig,
   NetworkAppClientConfig,
   SynchronizerConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.config.ConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.console.{
-  CNParticipantClientReference,
+  ParticipantClientReference,
   ScanAppBackendReference,
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
 import com.daml.network.environment.{
-  CNNodeEnvironmentImpl,
+  EnvironmentImpl,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
 }
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
@@ -46,7 +46,7 @@ import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipT
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
-  CNNodeUtil,
+  SpliceUtil,
   DomainMigrationUtil,
   ProcessTestUtil,
   SplitwellTestUtil,
@@ -93,7 +93,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class DecentralizedSynchronizerMigrationIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ProcessTestUtil
     with SvTestUtil
     with WalletTestUtil
@@ -111,12 +111,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   override def updateHistoryScanName = "sv1ScanLocal"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransforms((_, config) => {
         config.copy(
@@ -169,7 +169,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 .validatorApps(InstanceName.tryCreate("bobValidator"))
               bobValidatorConfig
                 .copy(
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(5902)),
                     bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
@@ -195,7 +195,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       url = None,
                     )
                   ),
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(27502)),
                     aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
@@ -234,7 +234,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       url = Some("http://localhost:27108"),
                     )
                   ),
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(27702)),
                     splitwellValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
@@ -303,7 +303,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   adminApi = splitwellBackendConfig.adminApi.copy(internalPort =
                     Some(Port.tryCreate(27113))
                   ),
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(27702)),
                     splitwellBackendConfig.participantClient.ledgerApi.copy(
                       clientConfig =
@@ -336,7 +336,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 ),
                 adminApi =
                   aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
-                participantClient = CNParticipantClientConfig(
+                participantClient = ParticipantClientConfig(
                   ClientConfig(port = Port.tryCreate(27502)),
                   aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
                     clientConfig =
@@ -351,25 +351,25 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         )
       })
       .addConfigTransforms((_, conf) =>
-        (CNNodeConfigTransforms
+        (ConfigTransforms
           .bumpSomeSvAppPortsBy(
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
-          CNNodeConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
+          ConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           )
           compose
-          CNNodeConfigTransforms
+          ConfigTransforms
             .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
-          CNNodeConfigTransforms
+          ConfigTransforms
             .bumpSomeValidatorAppPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
       )
       .addConfigTransform(
         // update validator app config for the aliceValidator and splitwellValidator to set the migrationDumpPath
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+          ConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
             if (name == "aliceValidator" || name == "splitwellValidator")
               validatorConfig.copy(
                 domainMigrationDumpPath =
@@ -380,7 +380,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       )
       .addConfigTransforms(
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
+          ConfigTransforms.updateAllSvAppConfigs((name, c) =>
             if (name.endsWith("Local")) {
               c.copy(
                 onboarding = Some(
@@ -411,7 +411,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.environment.scheduler
@@ -996,7 +996,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       nodes: Seq[ParticipantAdminConnection],
       rate: NonNegativeInt,
   )(implicit
-      env: CNNodeTestConsoleEnvironment,
+      env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
     nodes
@@ -1046,7 +1046,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   }
 
   private def getSequencerUrlSet(
-      participantConnection: CNParticipantClientReference,
+      participantConnection: ParticipantClientReference,
       domainAlias: DomainAlias,
   ): Set[String] = {
     val sequencerConnections = participantConnection.domains
@@ -1064,7 +1064,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   private def createSplitwellGroupAndTransfer(
       aliceUserParty: PartyId,
       charlieUserParty: PartyId,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     startAllSync(
       splitwellValidatorBackend,
       splitwellBackend,

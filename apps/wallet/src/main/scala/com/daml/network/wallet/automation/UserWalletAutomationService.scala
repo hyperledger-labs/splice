@@ -8,7 +8,7 @@ import com.daml.network.automation.UnassignTrigger.GetTargetDomain
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
-  CNNodeAppAutomationService,
+  SpliceAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
 }
@@ -33,7 +33,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     decentralizedSynchronizer: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -51,7 +51,7 @@ class UserWalletAutomationService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       automationConfig,
       clock,
       domainTimeSync,
@@ -166,7 +166,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
   // defined because instances are created by UserWalletService, not immediately
   // available in the app state
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
-    CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
+    SpliceAppAutomationService.expectedTriggerClasses ++ Seq(
       aTrigger[ExpireTransferOfferTrigger],
       aTrigger[ExpireAcceptedTransferOfferTrigger],
       aTrigger[ExpireBuyTrafficRequestsTrigger],

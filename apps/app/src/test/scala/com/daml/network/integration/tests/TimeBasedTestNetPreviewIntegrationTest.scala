@@ -1,26 +1,26 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class TimeBasedTestNetPreviewIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with SvTestUtil
     with TimeTestUtil
     with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
+      .addConfigTransform((_, config) => ConfigTransforms.noDevNet(config))
 
   "TestNet initializes correctly" in { implicit env =>
     clue("DSO contains 4 SV") {

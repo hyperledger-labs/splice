@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.splice.wallet.{
 }
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -33,7 +33,7 @@ class AcceptedTransferOfferTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     treasury: TreasuryService,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

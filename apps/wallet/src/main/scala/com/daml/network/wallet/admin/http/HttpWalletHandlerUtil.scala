@@ -5,7 +5,7 @@ package com.daml.network.wallet.admin.http
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Update}
-import com.daml.network.environment.CNLedgerConnection.CommandId
+import com.daml.network.environment.SpliceLedgerConnection.CommandId
 import com.daml.network.environment.CommandPriority
 import com.daml.network.environment.ledger.api.DedupConfig
 import com.daml.network.util.{Contract, DisclosedContracts}

@@ -1,11 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subscriptionsCodegen
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.leaderbased.TerminatedSubscriptionTrigger
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
@@ -14,18 +14,15 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.Assertion
 
-class Ans4SvsIntegrationTest
-    extends CNNodeIntegrationTest
-    with WalletTestUtil
-    with TriggerTestUtil {
+class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
 
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://ans-dir-url.com"
   private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
 
   // TODO(#11927): incorporate this test into AnsIntegrationTest

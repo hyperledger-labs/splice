@@ -18,10 +18,7 @@ import com.daml.network.codegen.java.splice.amuletrules.TransferOutput
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.console.{ValidatorAppBackendReference, *}
 import com.daml.network.http.v0.definitions as d0
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
@@ -39,16 +36,16 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.control.NonFatal
 
-trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
-  this: CommonCNNodeAppInstanceReferences =>
+trait WalletTestUtil extends TestCommon with AnsTestUtil {
+  this: CommonAppInstanceReferences =>
 
   val exactly = (x: BigDecimal) => (x, x)
 
-  def walletAmuletPrice = CNNodeUtil.damlDecimal(0.005)
+  def walletAmuletPrice = SpliceUtil.damlDecimal(0.005)
   def walletUsdToAmulet(usd: BigDecimal) = usd / walletAmuletPrice
   def walletAmuletToUsd(cc: BigDecimal) = cc * walletAmuletPrice
 
-  lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(CNNodeUtil.defaultHoldingFee.rate)
+  lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(SpliceUtil.defaultHoldingFee.rate)
 
   /** @param expectedAmountRanges : lower and upper bounds for amulets sorted by their initial amount in ascending order. */
   def checkWallet(
@@ -203,7 +200,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   def onboardAliceAndBob()(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): (PartyId, PartyId) = {
     val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -264,7 +261,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectAcceptedAppPaymentRequest(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       signatories: Seq[PartyId],
       acceptedPayment: Contract[
@@ -272,7 +269,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
         paymentCodegen.AcceptedAppPayment,
       ],
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc =
@@ -293,12 +290,12 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Rejects an accepted app payment request. */
   def rejectAcceptedAppPaymentRequest(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
@@ -316,7 +313,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Collects an accepted subscription payment request without doing anything useful in return. */
   def collectAcceptedSubscriptionRequest(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       sender: PartyId,
@@ -325,7 +322,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
         subsCodegen.SubscriptionInitialPayment,
       ],
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val now = env.environment.clock.now
     val tc =
@@ -347,12 +344,12 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   def rejectAcceptedSubscriptionRequest(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
@@ -372,13 +369,13 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectSubscriptionPayment(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       senderParty: PartyId,
       payment: Contract[subsCodegen.SubscriptionPayment.ContractId, subsCodegen.SubscriptionPayment],
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now, Some(payment.payload.round))
@@ -397,12 +394,12 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   def rejectSubscriptionPayment(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
@@ -422,7 +419,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Expires a subscription that has not been paid in time. */
   def expireUnpaidSubscription(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       actor: PartyId,
       subscriptionIdleState: subsCodegen.SubscriptionIdleState.ContractId,
@@ -439,7 +436,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       disclosedContracts = Seq.empty,
     )
   }
-  protected def expectedDsoAns(implicit env: CNNodeTestConsoleEnvironment): String = {
+  protected def expectedDsoAns(implicit env: SpliceTestConsoleEnvironment): String = {
     expectedAns(dsoParty, DsoAnsResolver.dsoAnsName)
   }
 
@@ -451,7 +448,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       entryUrl: String = "https://ans-dir-url.com",
       entryDescription: String = "Sample CNS Entry Description",
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     requestAnsEntry(
       ansExternalApp,
@@ -470,7 +467,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   private def waitForAnsEntry(name: String)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     eventuallySucceeds(40.seconds) {
       sv1ScanBackend.lookupEntryByName(name)
@@ -512,14 +509,14 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
     )
 
   def createPaymentRequest(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
       description: String = "description",
-  )(implicit env: CNNodeTestConsoleEnvironment): (
+  )(implicit env: SpliceTestConsoleEnvironment): (
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {
@@ -552,7 +549,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   def createSelfPaymentRequest(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: BigDecimal = defaultPaymentAmount.amount,
@@ -560,7 +557,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
       description: String = "description",
-  )(implicit env: CNNodeTestConsoleEnvironment): (
+  )(implicit env: SpliceTestConsoleEnvironment): (
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {
@@ -601,7 +598,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       amount: paymentCodegen.PaymentAmount,
       description: String,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val subscription = new subsCodegen.SubscriptionData(
       userParty.toProtoPrimitive,
@@ -625,7 +622,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       amount: paymentCodegen.PaymentAmount,
       description: String,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     createSubscriptionData(
       userParty,
@@ -640,7 +637,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Note: all of the sender, receiver, and provider parties must be on the same participant */
   protected def createSubscriptionRequest(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       receiverParty: PartyId,
@@ -651,7 +648,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       description: String = "description",
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val (subscription, payData) =
       createSubscriptionData(
@@ -680,7 +677,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   protected def createSelfSubscriptionRequest(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
@@ -689,7 +686,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       domainId: Option[DomainId] = None,
       description: String = "description",
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val (subscription, payData) =
       createSelfSubscriptionData(userParty, paymentInterval, paymentDuration, amount, description)
@@ -710,7 +707,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   protected def createSelfSubscription(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
@@ -719,7 +716,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       domainId: Option[DomainId] = None,
       description: String = "description",
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val (subscriptionData, payData) =
       createSelfSubscriptionData(userParty, paymentInterval, paymentDuration, amount, description)
@@ -759,11 +756,11 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   protected def requestAnsEntry(
-      participantClientWithAdminToken: CNParticipantClientReference,
+      participantClientWithAdminToken: ParticipantClientReference,
       entryName: String,
       userId: String,
       userParty: PartyId,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val entryUrl = "https://ans-dir-url.com"
     val entryDescription = "Sample CNS Entry Description"
     val ansRules = sv1ScanBackend.getAnsRules()
@@ -792,7 +789,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   protected def grantFeaturedAppRight(wallet: WalletAppClientReference)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
@@ -812,7 +809,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   }
 
   protected def cancelFeaturedAppRight(wallet: WalletAppClientReference)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
@@ -829,12 +826,12 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Directly executes the AmuletRules_Mint choice. Note that the receiver must be hosted on the same participant as the DSO. */
   def mintAmulet(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
@@ -857,12 +854,12 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Directly executes the AmuletRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the DSO. */
   def tapAmulet(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
@@ -885,7 +882,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /** Directly creates a new amulet. Note that the receiver must be hosted on the same participant as the DSO. */
   def createAmulet(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       owner: PartyId,
       amount: BigDecimal = BigDecimal(10),
@@ -893,7 +890,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       holdingFee: BigDecimal = BigDecimal(0.01),
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): amuletCodegen.Amulet.ContractId = {
     val amulet =
       new amuletCodegen.Amulet(
@@ -918,13 +915,13 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   /* Directly archives the given amulet. */
   def archiveAmulet(
-      participantClient: CNParticipantClientReference,
+      participantClient: ParticipantClientReference,
       userId: String,
       owner: PartyId,
       amulet: amuletCodegen.Amulet.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
@@ -950,7 +947,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       ],
       featured: Boolean,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) =
     // use eventually so that round advancement has some time to propagate to scan
     eventually() {
@@ -1012,7 +1009,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       entryName: String,
       entryUrl: String = "https://ans-dir-url.com",
       entryDescription: String = "Sample CNS Entry Description",
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val ansRules = sv1ScanBackend.getAnsRules()
 
     val cmd = ansRules.contractId.exerciseAnsRules_RequestEntry(
@@ -1038,7 +1035,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       entryName: String,
       entryUrl: String = "https://ans-dir-url.com",
       entryDescription: String = "Sample CNS Entry Description",
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     // for paying the ans entry initial payment.
     refs.wallet.tap(5.0)
 
@@ -1111,7 +1108,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
       expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
+  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
     val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
     val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
@@ -1137,7 +1134,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       scan: ScanAppBackendReference,
       expiredDuration: Duration,
       ledgerTime: CantonTimestamp,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): Unit =
+  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment): Unit =
     clue(s"Locking $amount amulets for $userParty") {
       val amulet = amulets.find(_.effectiveAmount >= amount).value
       val amuletRules = scan.getAmuletRules()

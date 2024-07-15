@@ -7,8 +7,8 @@ import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpRespon
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.environment.CNNodeStatus
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.SpliceStatus
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as externalHttp
 import com.daml.network.http.v0.external.common_admin.CommonAdminClient
@@ -44,7 +44,7 @@ object HttpAdminAppClient {
     override type Client = PrefixedCommonAdminClient
 
     override def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -69,7 +69,7 @@ object HttpAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case externalHttp.GetHealthStatusResponse.OK(response) =>
-      CNNodeStatus.fromHttpNodeStatus(deserialize)(response)
+      SpliceStatus.fromHttpNodeStatus(deserialize)(response)
     }
   }
 
@@ -79,7 +79,7 @@ object HttpAdminAppClient {
       extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo](basePath) {
 
     override def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -88,7 +88,7 @@ object HttpAdminAppClient {
         httpClient.withOverrideParameters(
           // Getting the version of an app is done on startup.
           // If there's no response within 5s, we assume the app to be down.
-          CNHttpClient.HttpRequestParameters(requestTimeout = NonNegativeDuration.ofSeconds(5))
+          HttpClient.HttpRequestParameters(requestTimeout = NonNegativeDuration.ofSeconds(5))
         ),
         ec,
         mat,

@@ -5,7 +5,7 @@ package com.daml.network.validator.admin
 
 import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.{
-  CNLedgerConnection,
+  SpliceLedgerConnection,
   CommandPriority,
   ParticipantAdminConnection,
 }
@@ -24,7 +24,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import io.grpc.Status
 
 import java.io.{
@@ -40,7 +40,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AppManagerService(
     validatorParty: PartyId,
-    ledgerConnection: CNLedgerConnection,
+    ledgerConnection: SpliceLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     store: AppManagerStore,
 )(implicit ec: ExecutionContext) {
@@ -126,7 +126,7 @@ class AppManagerService(
       appUrl: AppManagerStore.AppUrl
   )(implicit
       tc: TraceContext,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       mat: Materializer,
   ): Future[Unit] = {
     for {

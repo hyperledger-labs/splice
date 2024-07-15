@@ -24,7 +24,7 @@ import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequi
 }
 import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionInitialPayment
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.AnsUtil
@@ -39,7 +39,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AnsSubscriptionInitialPaymentTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -218,7 +218,7 @@ class AnsSubscriptionInitialPaymentTrigger(
             update = cmd,
           )
           .withDedup(
-            commandId = CNLedgerConnection.CommandId(
+            commandId = SpliceLedgerConnection.CommandId(
               "com.daml.network.sv.createAnsCollectInitialEntryPaymentConfirmation",
               Seq(svParty, dsoParty),
               paymentCid.contractId,
@@ -275,7 +275,7 @@ class AnsSubscriptionInitialPaymentTrigger(
             update = cmd,
           )
           .withDedup(
-            commandId = CNLedgerConnection.CommandId(
+            commandId = SpliceLedgerConnection.CommandId(
               "com.daml.network.sv.createAnsRejectInitialEntryPaymentConfirmation",
               Seq(svParty, dsoParty),
               paymentCid.contractId,

@@ -3,7 +3,7 @@ package com.daml.network.unit.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Bytes
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.store.db.{AcsJdbcTypes, CNPostgresTest}
+import com.daml.network.store.db.{AcsJdbcTypes, SplicePostgresTest}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.offset.Offset
@@ -16,7 +16,11 @@ import slick.jdbc.{JdbcProfile, PostgresProfile}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
-class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest with CNPostgresTest {
+class AcsJdbcTypesTest
+    extends AsyncWordSpec
+    with AcsJdbcTypes
+    with BaseTest
+    with SplicePostgresTest {
 
   override val profile: JdbcProfile = PostgresProfile
 

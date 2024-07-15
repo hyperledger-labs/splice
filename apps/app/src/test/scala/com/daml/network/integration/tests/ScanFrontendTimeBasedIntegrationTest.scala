@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.*
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -25,8 +25,8 @@ class ScanFrontendTimeBasedIntegrationTest
   val amuletPrice = 2
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
       .addConfigTransforms((_, config) =>
@@ -188,15 +188,15 @@ class ScanFrontendTimeBasedIntegrationTest
           "Check the initial amulet config matches the defaults",
           _ => {
             find(id("base-transfer-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultCreateFee.fee.doubleValue()} USD"
+              s"${SpliceUtil.defaultCreateFee.fee.doubleValue()} USD"
             )
 
             find(id("holding-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultHoldingFee.rate} USD/Round"
+              s"${SpliceUtil.defaultHoldingFee.rate} USD/Round"
             )
 
             find(id("lock-holder-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultLockHolderFee.fee.doubleValue()} USD"
+              s"${SpliceUtil.defaultLockHolderFee.fee.doubleValue()} USD"
             )
 
             find(id("round-tick-duration")).value.text should matchText {
@@ -207,7 +207,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
             findAll(className("transfer-fee-row")).toList
               .map(_.text)
-              .zip(CNNodeUtil.defaultTransferFee.steps.asScala.toList)
+              .zip(SpliceUtil.defaultTransferFee.steps.asScala.toList)
               .foreach({
                 case (txFeeRow, defaultStep) => {
                   txFeeRow should include(defaultStep._1.setScale(0).toString)
@@ -347,7 +347,7 @@ class ScanFrontendTimeBasedIntegrationTest
         .decentralizedSynchronizer
         .fees
       val trafficAmount = synchronizerFeesConfig.minTopupAmount
-      val (_, trafficCostCc) = CNNodeUtil.synchronizerFees(
+      val (_, trafficCostCc) = SpliceUtil.synchronizerFees(
         trafficAmount,
         synchronizerFeesConfig.extraTrafficPrice,
         amuletPrice,

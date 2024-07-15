@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingRequest,
 }
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
@@ -256,7 +256,7 @@ object HttpSvAppClient {
       ] {
 
     override def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

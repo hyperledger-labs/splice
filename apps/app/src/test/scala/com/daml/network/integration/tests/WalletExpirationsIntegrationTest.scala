@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.leaderbased.{
   AdvanceOpenMiningRoundTrigger,
@@ -26,7 +26,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletExpirationsIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with SplitwellTestUtil
     with TriggerTestUtil {
@@ -34,8 +34,8 @@ class WalletExpirationsIntegrationTest
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
@@ -49,7 +49,7 @@ class WalletExpirationsIntegrationTest
       )
       // Very short round ticks
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )

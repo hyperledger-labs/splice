@@ -14,7 +14,7 @@ import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -54,7 +54,7 @@ abstract class BaseAppConnection(
       headers: List[HttpHeader] = List.empty[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -147,7 +147,7 @@ abstract class HttpAppConnection(
     tc: TraceContext,
     mat: Materializer,
     templateDecoder: TemplateJsonDecoder,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
 ) extends BaseAppConnection(loggerFactory)
     with RetryProvider.Has
     with FlagCloseableAsync
@@ -159,10 +159,10 @@ abstract class HttpAppConnection(
   implicit private val versionInfoPretty: Pretty[HttpAdminAppClient.VersionInfo] =
     Pretty.adHocPrettyInstance
 
-  def getStatus(): Future[NodeStatus[CNNodeStatus]] =
+  def getStatus(): Future[NodeStatus[SpliceStatus]] =
     runHttpCmd(
       config.url,
-      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](basePath, CNNodeStatus.fromHttp),
+      HttpAdminAppClient.GetHealthStatus[SpliceStatus](basePath, SpliceStatus.fromHttp),
     )
 
   // Fails the future if the node is not active for easy use in waitUntil

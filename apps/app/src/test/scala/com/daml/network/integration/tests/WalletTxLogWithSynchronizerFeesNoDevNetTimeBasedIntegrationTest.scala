@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SvTestUtil, SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SynchronizerFeesTestUtil
@@ -19,12 +19,12 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
 
   private val amuletPrice = BigDecimal(1.25).setScale(10)
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
+      .addConfigTransform((_, config) => ConfigTransforms.noDevNet(config))
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
       .addConfigTransforms((_, config) =>

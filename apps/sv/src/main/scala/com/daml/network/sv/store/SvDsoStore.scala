@@ -57,7 +57,7 @@ import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the DSO party. */
 trait SvDsoStore
-    extends CNNodeAppStore
+    extends AppStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore {
@@ -1129,7 +1129,7 @@ object SvDsoStore {
       mkFilter(splice.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
-          amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload).number),
+          amuletRoundOfExpiry = Some(SpliceUtil.amuletExpiresAt(contract.payload).number),
         )
       },
       mkFilter(splice.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) { contract =>
@@ -1142,7 +1142,7 @@ object SvDsoStore {
         contract =>
           DsoAcsStoreRowData(
             contract,
-            amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload.amulet).number),
+            amuletRoundOfExpiry = Some(SpliceUtil.amuletExpiresAt(contract.payload.amulet).number),
           )
       },
       mkFilter(splice.amulet.AppRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>

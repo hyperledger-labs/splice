@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ExpireAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

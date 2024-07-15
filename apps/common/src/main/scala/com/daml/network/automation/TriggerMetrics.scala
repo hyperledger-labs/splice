@@ -3,7 +3,7 @@
 
 package com.daml.network.automation
 
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.daml.metrics.api.{MetricDoc, MetricName}
 import com.daml.metrics.api.MetricDoc.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.MetricHandle.{Timer, Meter}
@@ -12,7 +12,7 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 class TriggerMetrics(
     metricsFactory: CantonLabeledMetricsFactory
 ) {
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "trigger"
+  val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "trigger"
 
   @MetricDoc.Tag(
     summary = "How long it takes to complete one trigger task",

@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.{BuildInfo, CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.network.environment.{BuildInfo, SpliceConsoleEnvironment, SpliceStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import com.daml.network.sv.admin.api.client.commands.{
@@ -37,9 +37,9 @@ import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 
 abstract class SvAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/sv"
   override protected val instanceType = "SV Client"
@@ -248,7 +248,7 @@ abstract class SvAppReference(
 }
 
 final case class SvAppClientReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
     val config: SvAppClientConfig,
     override val token: Option[String] = None,
@@ -264,11 +264,11 @@ final case class SvAppClientReference(
   * app.
   */
 class SvAppBackendReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
 )(implicit actorSystem: ActorSystem)
     extends SvAppReference(consoleEnvironment, name)
-    with CNNodeAppBackendReference
+    with AppBackendReference
     with BaseInspection[SvApp] {
 
   override def runningNode: Option[SvAppBootstrap] =
@@ -381,13 +381,13 @@ class SvAppBackendReference(
     }
 
   @Help.Summary("Get the sequencer node status")
-  def sequencerNodeStatus(): NodeStatus[CNNodeStatus] =
+  def sequencerNodeStatus(): NodeStatus[SpliceStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetSequencerNodeStatus())
     }
 
   @Help.Summary("Get the mediator node status")
-  def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
+  def mediatorNodeStatus(): NodeStatus[SpliceStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
     }
@@ -406,7 +406,7 @@ class SvAppBackendReference(
 
   /** Remote participant this sv app is configured to interact with. */
   lazy val participantClient =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.participantClient.getParticipantClientConfig(),
@@ -414,7 +414,7 @@ class SvAppBackendReference(
 
   /** Remote participant this sv app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,

@@ -1,24 +1,24 @@
 package com.daml.network.integration.tests
 
 import better.files.File
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.useSelfSignedTokensForLedgerApiAuth
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
+class BootstrapTest extends IntegrationTest with HasConsoleScriptRunner {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       // we want a network in the same state that we would get when running `start-backends-for-local-frontend-testing.sh`
       .fromResources(
         Seq("minimal-topology.conf"),
@@ -26,12 +26,12 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
+        ConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
       // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as
       // possible during the validator setup and other txs do not get throttled for want of traffic.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.reducePollingInterval(config))
+      .addConfigTransform((_, config) => ConfigTransforms.reducePollingInterval(config))
 
   "Bootstrap script should pass" in { implicit env =>
     // the script logs errors when a ANS name check fails but then recovers from this

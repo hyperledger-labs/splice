@@ -5,7 +5,7 @@ package com.daml.network.sv.onboarding.joining
 
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
 import com.daml.network.sv.config.SvOnboardingConfig
@@ -31,7 +31,7 @@ class JoiningNodeDsoPartyHosting(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends NamedLogging {

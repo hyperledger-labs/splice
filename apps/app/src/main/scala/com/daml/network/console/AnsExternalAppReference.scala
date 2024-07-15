@@ -3,7 +3,7 @@
 
 package com.daml.network.console
 
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.digitalasset.canton.console.Help
 import com.daml.network.auth.AuthUtil
@@ -11,9 +11,9 @@ import com.daml.network.validator.admin.api.client.commands.HttpAnsAppClient
 import com.daml.network.validator.config.AnsAppExternalClientConfig
 
 abstract class AnsExternalAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = ""
   override protected val instanceType = "ANS user"
@@ -38,7 +38,7 @@ abstract class AnsExternalAppReference(
 }
 
 final class AnsExternalAppClientReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
     val config: AnsAppExternalClientConfig,
 ) extends AnsExternalAppReference(consoleEnvironment, name) {

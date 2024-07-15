@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.DsoRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
@@ -26,7 +26,7 @@ class SvOnboardingAddlIntegrationTest
   override def environmentDefinition =
     super.environmentDefinition
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           if (name == "sv3") {
             config.copy(
               approvedSvIdentities = config.approvedSvIdentities.filter(

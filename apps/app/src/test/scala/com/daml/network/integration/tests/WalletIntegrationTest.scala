@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.util.CNNodeUtil
+import com.daml.network.util.SpliceUtil
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
@@ -11,8 +11,8 @@ import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
@@ -28,12 +28,12 @@ import scala.concurrent.Future
 import scala.util.Try
 
 class WalletIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         config.copy(pekkoConfig =
@@ -78,7 +78,7 @@ class WalletIntegrationTest
         .filterJava(amuletCodegen.Amulet.COMPANION)(aliceParty, _ => true)
         .loneElement
       // Unit test that expiry does the right thing
-      CNNodeUtil.amuletExpiresAt(amulet.data) shouldBe new Round(Long.MaxValue)
+      SpliceUtil.amuletExpiresAt(amulet.data) shouldBe new Round(Long.MaxValue)
       // Test that the USD/CC conversions get us to the max Decimal value ignoring decimal points
       amulet.data.amount.initialAmount.setScale(0, java.math.RoundingMode.DOWN) shouldBe Numeric
         .maxValue(decimalScale)

@@ -26,7 +26,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_SetConfig,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 import com.daml.network.util.Codec
 
@@ -586,7 +586,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
   }
 
-  private def getAmuletPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
+  private def getAmuletPriceVoteMap()(implicit env: SpliceTestConsoleEnvironment) =
     sv1Backend
       .listAmuletPriceVotes()
       .groupBy(_.payload.sv)

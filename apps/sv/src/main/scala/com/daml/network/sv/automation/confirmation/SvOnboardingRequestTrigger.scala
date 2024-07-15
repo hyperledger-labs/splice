@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_ConfirmSvOnboarding,
 }
 import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingRequest
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -37,7 +37,7 @@ class SvOnboardingRequestTrigger(
     dsoStore: SvDsoStore,
     svStore: SvSvStore,
     config: SvAppBackendConfig,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -196,7 +196,7 @@ class SvOnboardingRequestTrigger(
               update = cmd,
             )
             .withDedup(
-              commandId = CNLedgerConnection.CommandId(
+              commandId = SpliceLedgerConnection.CommandId(
                 "com.daml.network.sv.svOnboardingConfirmSvOnboardingConfirmation",
                 Seq(svParty, dsoParty),
                 party.toProtoPrimitive,

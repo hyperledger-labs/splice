@@ -9,11 +9,11 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.{BaseLedgerConnection, CNNodeEnvironmentImpl}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.{BaseLedgerConnection, EnvironmentImpl}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -28,11 +28,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.util.{Random, Try}
 
-class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed

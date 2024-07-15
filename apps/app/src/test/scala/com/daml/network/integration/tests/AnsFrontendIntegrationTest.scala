@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
 
 import org.openqa.selenium.support.ui.ExpectedConditions
@@ -12,7 +12,7 @@ class AnsFrontendIntegrationTest
     with FrontendLoginUtil {
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
   "A CNS UI" should {

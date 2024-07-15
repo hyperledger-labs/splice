@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.GetDsoInfoResponse
 import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
@@ -24,7 +24,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.util.{AmuletConfigSchedule, CNNodeUtil, Contract, ContractWithState}
+import com.daml.network.util.{AmuletConfigSchedule, SpliceUtil, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -36,9 +36,9 @@ import java.time.Instant
   * app reference.
   */
 abstract class ScanAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/scan"
 
@@ -64,9 +64,9 @@ abstract class ScanAppReference(
     val openRounds = openAndIssuingRounds._1
     val latestOpenMiningRound = specificRound match {
       case Some(specifiedRound) =>
-        CNNodeUtil.selectSpecificOpenMiningRound(now, openRounds, specifiedRound)
+        SpliceUtil.selectSpecificOpenMiningRound(now, openRounds, specifiedRound)
       case None =>
-        CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+        SpliceUtil.selectLatestOpenMiningRound(now, openRounds)
     }
     val amuletRules = getAmuletRules()
     TransferContextWithInstances(amuletRules, latestOpenMiningRound, openRounds)
@@ -80,7 +80,7 @@ abstract class ScanAppReference(
   ): ContractWithState[OpenMiningRound.ContractId, OpenMiningRound] = {
 
     val (openRounds, _) = getOpenAndIssuingMiningRounds()
-    CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+    SpliceUtil.selectLatestOpenMiningRound(now, openRounds)
   }
 
   @Help.Summary(
@@ -343,42 +343,42 @@ abstract class ScanAppReference(
 }
 
 final class ScanAppBackendReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
 )(implicit actorSystem: ActorSystem)
-    extends ScanAppReference(cnNodeConsoleEnvironment, name)
-    with CNNodeAppBackendReference
+    extends ScanAppReference(spliceConsoleEnvironment, name)
+    with AppBackendReference
     with BaseInspection[ScanApp] {
 
   override def runningNode: Option[ScanAppBootstrap] =
-    cnNodeConsoleEnvironment.environment.scans.getRunning(name)
+    spliceConsoleEnvironment.environment.scans.getRunning(name)
 
   override def startingNode: Option[ScanAppBootstrap] =
-    cnNodeConsoleEnvironment.environment.scans.getStarting(name)
+    spliceConsoleEnvironment.environment.scans.getStarting(name)
 
   override protected val instanceType = "Scan Backend"
 
   override def httpClientConfig =
     NetworkAppClientConfig(s"http://127.0.0.1:${config.clientAdminApi.port}")
 
-  val nodes = cnNodeConsoleEnvironment.environment.scans
+  val nodes = spliceConsoleEnvironment.environment.scans
 
   @Help.Summary("Return local scan app config")
   override def config: ScanAppBackendConfig =
-    cnNodeConsoleEnvironment.environment.config.scansByString(name)
+    spliceConsoleEnvironment.environment.config.scansByString(name)
 
   /** Remote participant this scan app is configured to interact with. */
   lazy val participantClient =
-    new CNParticipantClientReference(
-      cnNodeConsoleEnvironment,
+    new ParticipantClientReference(
+      spliceConsoleEnvironment,
       s"remote participant for `$name``",
       config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =
-    new CNParticipantClientReference(
-      cnNodeConsoleEnvironment,
+    new ParticipantClientReference(
+      spliceConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,
     )
@@ -395,14 +395,14 @@ final class ScanAppBackendReference(
   }
 }
 
-/** Remote reference to a scan app in the style of CNParticipantClientReference, i.e.,
+/** Remote reference to a scan app in the style of ParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class ScanAppClientReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
     val config: ScanAppClientConfig,
-) extends ScanAppReference(cnNodeConsoleEnvironment, name) {
+) extends ScanAppReference(spliceConsoleEnvironment, name) {
 
   override def httpClientConfig = config.adminApi
 

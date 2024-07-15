@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests.connectivity
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -14,20 +14,20 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
-class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class WalletAppConnectivityIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
           // we want fine-grained control when we send a AmuletOperation from the wallet & query the scan app
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
+          ConfigTransforms.updateAllAutomationConfigs(
             _.focus(_.enableAutomaticRewardsCollectionAndAmuletMerging).replace(false)
           )(config),
         (_, config) =>
-          CNNodeConfigTransforms.updateAllScanAppConfigs_(
+          ConfigTransforms.updateAllScanAppConfigs_(
             // This avoids the values being cached for so long that we never try to fetch the AmuletRules
             _.copy(miningRoundsCacheTimeToLiveOverride =
               Some(NonNegativeFiniteDuration.ofSeconds(5))

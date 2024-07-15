@@ -7,9 +7,9 @@ import org.apache.pekko.stream.Materializer
 import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractTypeCompanion, DamlRecord}
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
+import com.daml.network.store.{AppStore, MultiDomainAcsStore}
 import com.daml.network.util.{Contract, AssignedContract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -23,8 +23,8 @@ import UnassignTrigger.GetTargetDomain
 
 class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
-    store: CNNodeAppStore,
-    connection: CNLedgerConnection,
+    store: AppStore,
+    connection: SpliceLedgerConnection,
     targetDomain: GetTargetDomain,
     partyId: PartyId,
     companion: C,

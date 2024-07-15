@@ -1,32 +1,22 @@
 package com.daml.network.integration.tests
 
 import better.files.File
-import com.daml.network.config.{
-  CNNodeConfig,
-  CNNodeConfigTransforms,
-  ParticipantBootstrapDumpConfig,
-}
-import com.daml.network.config.CNNodeConfigTransforms.{
+import com.daml.network.config.{SpliceConfig, ConfigTransforms, ParticipantBootstrapDumpConfig}
+import com.daml.network.config.ConfigTransforms.{
   ensureNovelDamlNames,
   selfSignedTokenAuthSourceTransform,
   updateAllScanAppConfigs,
   updateAllSvAppConfigs,
   updateAllValidatorConfigs,
 }
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.util.ProcessTestUtil
 import monocle.macros.syntax.lens.*
 
 import java.nio.file.Path
-import scala.util.Using
 
-abstract class ParticipantIdentitiesImportTestBase
-    extends CNNodeIntegrationTest
-    with ProcessTestUtil {
+abstract class ParticipantIdentitiesImportTestBase extends IntegrationTest with ProcessTestUtil {
 
   val svNodePath: File = testResourcesPath / "local-sv-node"
   val validatorNodePath: File = testResourcesPath / "local-validator-node"
@@ -43,8 +33,8 @@ abstract class ParticipantIdentitiesImportTestBase
   def sv1ParticipantDumpFilename: Path
   def aliceParticipantDumpFilename: Path
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
         // Config that runs against long-running Canton; sv1 defined here
@@ -57,7 +47,7 @@ abstract class ParticipantIdentitiesImportTestBase
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
+        ConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms(
         (_, config) => ensureNovelDamlNames()(config),
@@ -86,37 +76,11 @@ abstract class ParticipantIdentitiesImportTestBase
       .withAllocatedUsers()
       .withManualStart
 
-  def usingStandaloneCantonWithNewCn[T](action: => T)(implicit
-      env: CNNodeTestConsoleEnvironment
-  ) =
-    Using.resource(startStandaloneCanton()) { _ => action }
-
-  private def startStandaloneCanton()(implicit env: CNNodeTestConsoleEnvironment) = {
-    startCanton(
-      Seq(
-        svParticipantPath / "canton.conf",
-        svDomainPath / "canton.conf",
-        validatorParticipantPath / "canton.conf",
-      ),
-      Seq(
-        // avoid creating new identities
-        "canton.participants.sv_participant.init.auto-init=false",
-        "canton.participants.validator_participant.init.auto-init=false",
-        // adjust user ids to account for the suffixing done by ensureNovelDamlNames
-        "canton.participants.sv_participant.ledger-api.user-management-service." +
-          s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
-        "canton.participants.validator_participant.ledger-api.user-management-service." +
-          s"additional-admin-user-id=${aliceValidatorLocalBackend.config.ledgerApiUser}",
-      ),
-      "participant-export-import",
-    )
-  }
-
   // TODO(tech-debt) Consider removing this method in favor of making `useSelfSignedTokensForLedgerApiAuth` take an `ignore` parameter
   private def useSelfSignedTokensForLongRunningLedgerApiAuth(
       secret: String,
-      config: CNNodeConfig,
-  ): CNNodeConfig = {
+      config: SpliceConfig,
+  ): SpliceConfig = {
     val enableAuth =
       selfSignedTokenAuthSourceTransform(config.parameters.clock, secret)
     val transforms = Seq(

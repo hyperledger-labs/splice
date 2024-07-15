@@ -3,7 +3,7 @@
 
 package com.daml.network.migration
 
-import com.daml.network.environment.{BaseLedgerConnection, CNLedgerConnection, RetryFor}
+import com.daml.network.environment.{BaseLedgerConnection, SpliceLedgerConnection, RetryFor}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -23,7 +23,7 @@ final case class DomainMigrationInfo(
 
 object DomainMigrationInfo {
   def saveToUserMetadata(
-      connection: CNLedgerConnection,
+      connection: SpliceLedgerConnection,
       user: String,
       info: DomainMigrationInfo,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =

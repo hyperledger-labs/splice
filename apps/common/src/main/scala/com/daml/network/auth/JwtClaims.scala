@@ -5,15 +5,15 @@ package com.daml.network.auth
 
 import com.auth0.jwt.interfaces.DecodedJWT
 
-case class CnClaims(
+case class SpliceClaims(
     daml_user: Option[String]
 )
 
 object JwtClaims {
-  val CNClaimKey = "https://canton-network"
+  private[this] val ClaimKey = "https://canton-network"
 
-  def getCnClaims(token: DecodedJWT): Option[CnClaims] = Option(
-    token.getClaim(CNClaimKey).as(classOf[CnClaims])
+  private[this] def getClaims(token: DecodedJWT): Option[SpliceClaims] = Option(
+    token.getClaim(ClaimKey).as(classOf[SpliceClaims])
   )
 
   /** Support two ways of specifying Daml user IDs in JWT tokens:
@@ -26,6 +26,6 @@ object JwtClaims {
     * @return Either the Daml user ID as a String, or None if neither claim is set
     */
   def getLedgerApiUser(token: DecodedJWT): Option[String] = Option(
-    getCnClaims(token).flatMap(_.daml_user).getOrElse(token.getSubject)
+    getClaims(token).flatMap(_.daml_user).getOrElse(token.getSubject)
   )
 }

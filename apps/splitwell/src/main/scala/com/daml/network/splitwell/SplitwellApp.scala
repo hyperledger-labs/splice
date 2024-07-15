@@ -11,11 +11,11 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  CNNode,
+  SpliceLedgerClient,
+  SpliceLedgerConnection,
+  Node,
   DarResource,
   DarResources,
   ParticipantAdminConnection,
@@ -54,7 +54,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SplitwellApp(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
-    val amuletAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedSpliceAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -67,7 +67,7 @@ class SplitwellApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CNNode[SplitwellApp.State](
+) extends Node[SplitwellApp.State](
       config.providerUser,
       config.participantClient,
       amuletAppParameters,
@@ -82,7 +82,7 @@ class SplitwellApp(
   override def packages: Seq[DarResource] = super.packages ++ DarResources.splitwell.all
 
   override def initialize(
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
       partyId: PartyId,
   )(implicit traceContext: TraceContext): Future[SplitwellApp.State] = for {
     scanConnection <- appInitStep(s"Get scan connection") {
@@ -203,7 +203,7 @@ class SplitwellApp(
             )
             .withDomainId(domain)
             .withDedup(
-              CNLedgerConnection.CommandId(
+              SpliceLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createSplitwellRules",
                 Seq(automation.store.key.providerParty),
                 domain.toProtoPrimitive,

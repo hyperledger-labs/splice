@@ -3,8 +3,8 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.concurrent.Threading
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.{
   DisclosedContracts,
   SplitwellTestUtil,
@@ -17,7 +17,7 @@ import com.digitalasset.canton.HasExecutionContext
 // This test just exists to trigger an OwnerExpireLock exercise
 // to test the scan tx log script as we don't have automation that triggers this atm.
 class ScanTxLogOwnerExpireLockIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -25,8 +25,8 @@ class ScanTxLogOwnerExpireLockIntegrationTest
     with TriggerTestUtil
     with SvTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 

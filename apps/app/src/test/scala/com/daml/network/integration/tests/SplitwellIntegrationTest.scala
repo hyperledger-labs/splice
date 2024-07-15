@@ -3,11 +3,11 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.splitwell.automation.AcceptedAppPaymentRequestsTrigger
 import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
@@ -17,7 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 class SplitwellIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with SplitwellTestUtil
     with WalletTestUtil
     with TriggerTestUtil {
@@ -25,8 +25,8 @@ class SplitwellIntegrationTest
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)

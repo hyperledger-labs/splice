@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.parallel.*
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
 import com.daml.network.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
@@ -22,14 +22,11 @@ import com.digitalasset.canton.util.FutureInstances.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
-class DistributedDomainIntegrationTest
-    extends CNNodeIntegrationTest
-    with SvTestUtil
-    with WalletTestUtil {
+class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .withManualStart

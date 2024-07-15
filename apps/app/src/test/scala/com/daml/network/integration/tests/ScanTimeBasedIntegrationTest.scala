@@ -1,32 +1,32 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.WalletAppClientReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.automation.ScanAggregationTrigger
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.*
-import com.daml.network.util.CNNodeUtil.defaultAnsConfig
+import com.daml.network.util.SpliceUtil.defaultAnsConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
@@ -60,19 +60,19 @@ class ScanTimeBasedIntegrationTest
         sv1ScanBackend.getAmuletConfigForRound(3)
       }
       cfg.amuletCreateFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultCreateFee.fee divide walletAmuletPrice setScale 10
+        SpliceUtil.defaultCreateFee.fee divide walletAmuletPrice setScale 10
       )
       cfg.holdingFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultHoldingFee.rate divide walletAmuletPrice setScale 10
+        SpliceUtil.defaultHoldingFee.rate divide walletAmuletPrice setScale 10
       )
       cfg.lockHolderFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultLockHolderFee.fee divide walletAmuletPrice setScale 10
+        SpliceUtil.defaultLockHolderFee.fee divide walletAmuletPrice setScale 10
       )
       cfg.transferFee.initial.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultTransferFee.initialRate.setScale(10)
+        SpliceUtil.defaultTransferFee.initialRate.setScale(10)
       )
       cfg.transferFee.steps shouldBe (
-        CNNodeUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
+        SpliceUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
           HttpScanAppClient.RateStep(
             step._1 divide walletAmuletPrice,
             step._2,

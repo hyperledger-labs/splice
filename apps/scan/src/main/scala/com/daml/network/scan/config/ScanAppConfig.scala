@@ -5,11 +5,11 @@ package com.daml.network.scan.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNDbConfig,
-  CNNodeBackendConfig,
-  CNNodeParametersConfig,
-  CNParticipantClientConfig,
-  HttpCNNodeClientConfig,
+  SpliceDbConfig,
+  SpliceBackendConfig,
+  SpliceParametersConfig,
+  ParticipantClientConfig,
+  HttpClientConfig,
   NetworkAppClientConfig,
 }
 import com.digitalasset.canton.config.*
@@ -26,9 +26,9 @@ final case class ScanSynchronizerConfig(
   */
 case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CNDbConfig,
+    override val storage: SpliceDbConfig,
     svUser: String,
-    override val participantClient: CNParticipantClientConfig,
+    override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: ClientConfig,
     // Map from domain id prefix to sequencer/mediator config
     // This is for the Poc from #13301
@@ -40,10 +40,10 @@ case class ScanAppBackendConfig(
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
-) extends CNNodeBackendConfig
+) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
@@ -61,7 +61,7 @@ case class ScanAppClientConfig(
       * if its AmuletRules cache is outdated and the client never notices and rehydrates it.
       */
     amuletRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-) extends HttpCNNodeClientConfig
+) extends HttpClientConfig
     with BaseScanAppConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

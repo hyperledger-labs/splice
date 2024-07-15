@@ -8,7 +8,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.BaseAppConnection
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.json_api_public as v0
 import com.daml.network.validator.config.AppManagerConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -23,7 +23,7 @@ class HttpJsonApiPublicHandler(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     mat: Materializer,
 ) extends v0.JsonApiPublicHandler[Unit]
     with Spanning

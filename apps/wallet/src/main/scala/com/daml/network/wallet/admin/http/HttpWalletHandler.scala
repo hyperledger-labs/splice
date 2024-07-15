@@ -27,7 +27,7 @@ import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
-import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
+import com.daml.network.util.{SpliceUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
@@ -573,7 +573,7 @@ class HttpWalletHandler(
         "Tap",
         for {
           (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
-          openRound = CNNodeUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
+          openRound = SpliceUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
           result <- exerciseWalletAmuletAction(
             new amuletoperation.CO_Tap(
               amount.divide(openRound.payload.amuletPrice, JRM.CEILING)
@@ -654,8 +654,8 @@ class HttpWalletHandler(
     d0.AmuletPosition(
       amulet.toHttp,
       round,
-      Codec.encode(CNNodeUtil.holdingFee(amulet.payload, round)),
-      Codec.encode(CNNodeUtil.currentAmount(amulet.payload, round)),
+      Codec.encode(SpliceUtil.holdingFee(amulet.payload, round)),
+      Codec.encode(SpliceUtil.currentAmount(amulet.payload, round)),
     )
   }
 
@@ -666,8 +666,8 @@ class HttpWalletHandler(
     d0.AmuletPosition(
       lockedAmulet.toHttp,
       round,
-      Codec.encode(CNNodeUtil.holdingFee(lockedAmulet.payload.amulet, round)),
-      Codec.encode(CNNodeUtil.currentAmount(lockedAmulet.payload.amulet, round)),
+      Codec.encode(SpliceUtil.holdingFee(lockedAmulet.payload.amulet, round)),
+      Codec.encode(SpliceUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
   private[this] def getUserTreasury(user: String)(implicit

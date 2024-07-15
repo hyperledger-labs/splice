@@ -11,8 +11,8 @@ import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.CNNodeEnvironment
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.SpliceEnvironment
+import com.daml.network.http.HttpClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
 import com.digitalasset.canton.console.{
@@ -32,7 +32,7 @@ import scala.util.control.NonFatal
 /** HTTP version of Canton’s GrpcAdminCommandRunner
   */
 class ConsoleHttpCommandRunner(
-    environment: CNNodeEnvironment,
+    environment: SpliceEnvironment,
     timeouts: ProcessingTimeout,
     commandTimeouts: ConsoleCommandTimeout,
 )(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
@@ -67,13 +67,13 @@ class ConsoleHttpCommandRunner(
       val commandTimeout = commandTimeouts.bounded
 
       def buildHttpClient(
-          outerRequestParameters: CNHttpClient.HttpRequestParameters
-      ): CNHttpClient = new CNHttpClient {
-        override val requestParameters: CNHttpClient.HttpRequestParameters = outerRequestParameters
+          outerRequestParameters: HttpClient.HttpRequestParameters
+      ): HttpClient = new HttpClient {
+        override val requestParameters: HttpClient.HttpRequestParameters = outerRequestParameters
 
         override def withOverrideParameters(
-            newParameters: CNHttpClient.HttpRequestParameters
-        ): CNHttpClient = buildHttpClient(newParameters)
+            newParameters: HttpClient.HttpRequestParameters
+        ): HttpClient = buildHttpClient(newParameters)
 
         override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
           val host = request.uri.authority.host.address()
@@ -106,8 +106,8 @@ class ConsoleHttpCommandRunner(
         }
       }
 
-      implicit val httpClient: CNHttpClient =
-        buildHttpClient(CNHttpClient.HttpRequestParameters(commandTimeouts.requestTimeout))
+      implicit val httpClient: HttpClient =
+        buildHttpClient(HttpClient.HttpRequestParameters(commandTimeouts.requestTimeout))
 
       val url = clientConfig.url
       try {

@@ -153,6 +153,10 @@ api_files=(
   '*.proto'
 )
 
+app_scala_files=(
+  'apps/**/*.scala'
+)
+
 canton_files=(
   'canton/**'
 )
@@ -632,6 +636,45 @@ function subcmd_cc_module_splice() {
     ""
 }
 
+subcommand_whitelist[cn_splice]='Rename: CN to Splice, or remove'
+
+function subcmd_cn_splice {
+  assert_clean_working_dir
+
+  local GSR_ARGS="-i ${app_scala_files[*]}"
+
+  run_and_commit_rename "remove: CN" \
+    "'\bCN(LedgerApiClientConfig|ParticipantClientConfig|Thresholds|ThresholdsTest|ParticipantClientReference|Node|NodeBase|NodeBootstrap|NodeBootstrapBase|HttpClient|HttpClientLedgerApiClientConfig|ParticipantClientConfig)\b///\\1'" \
+    "'\b(Multi)Cn(ProcessResource)\b///\\1\\2'" \
+    "'\b(resetAll)Cn(AppTables)\b///\\1\\2'" \
+    "" "$GSR_ARGS"
+  run_and_commit_rename "remove: CNNode" \
+    "'\b(?:CN|cn)Node(ConfigTransforms|ConfigTransform|AppReference|AppBackendReference|EnvironmentImpl|EnvironmentDefinition|IntegrationTest|IntegrationTestWithSharedEnvironment|TestCommon|AppStore|TxLogAppStore|AppStoreWithIngestion|LedgerApiClientConfigReader|LedgerApiClientConfigWriter|ParticipantClientConfigReader|ParticipantClientConfigWriter)\b///\\1'" \
+    "'\b(Grpc)CNNode(ClientConfig)\b///\\1\\2'" \
+    "'\b(Http)CNNode(ClientConfig)\b///\\1\\2'" \
+    "'\b(Http)CNNode(AppReference)\b///\\1\\2'" \
+    "'\b(Db)CNNode(AppStore)\b///\\1\\2'" \
+    "'\b(Db)CNNode(TxLogAppStore)\b///\\1\\2'" \
+    "'\b(Common)CNNode(AppInstanceReferences)\b///\\1\\2'" \
+    "" "$GSR_ARGS"
+  run_and_commit_rename "rename: CNNode to Splice" \
+    "'\bCNNode(App|AppAutomationService|BackendConfig|Config|ConfigException|ConsoleEnvironment|Environment|EnvironmentFactory|HealthDumpGenerator|IntegrationTest|Metrics|MetricsFactory|ParametersConfig|Status|Status2|TestConsoleEnvironment|Tests|Util|UtilTest)\b///Splice\\1'" \
+    "'\bcnNode(AppParametersReader|AppParametersWriter|ConfigReader|ConfigWriter|ConsoleEnvironment|ParametersConfig)\b///splice\\1'" \
+    "'\b(Base)CNNode(Metrics)\b///\\1Splice\\2'" \
+    "'\b(Isolated)CNNode(Environments)\b///\\1Splice\\2'" \
+    "'\b(Shared)CNNode(AppParameters)\b///\\1Splice\\2'" \
+    "'\b(Shared)CNNode(Environment)\b///\\1Splice\\2'" \
+    "'\b(all)CNNode(s)\b///\\1Splice\\2'" \
+    "'\b(mergeLocal)CNNode(Instances)\b///\\1Splice\\2'" \
+    "'\b(mergeRemote)CNNode(Instances)\b///\\1Splice\\2'" \
+    "" "$GSR_ARGS"
+  run_and_commit_rename "rename: CN to Splice" \
+    "'\b(?:CN|Cn)(DbConfig|DbTest|LedgerClient|LedgerConnection|LedgerSubscription|Metrics|PostgresTest|Claims)\b///Splice\\1'" \
+    "'\bcn(DbConfigReader|DbConfigWriter|LedgerConnection)\b///splice\\1'" \
+    "'\b(getBundled|startBundled|stopBundled|withBundled|usingStandaloneCantonWithNew)(?:CN|Cn|cn)\b///\\1Splice'" \
+    "'\b(postgres)CN(DbConfigReader|DbConfigWriter)\b///\\1Splice\\2'" \
+    "" "$GSR_ARGS"
+}
 
 subcommand_whitelist[cn_module_splice]='Rename: CN Module prefix to Splice'
 function subcmd_cn_module_splice() {

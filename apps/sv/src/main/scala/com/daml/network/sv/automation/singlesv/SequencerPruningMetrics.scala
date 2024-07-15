@@ -6,12 +6,12 @@ package com.daml.network.sv.automation.singlesv
 import com.daml.metrics.api.MetricDoc.MetricQualification.{Debug, Latency}
 import com.daml.metrics.api.MetricHandle.{Gauge, Timer}
 import com.daml.metrics.api.{MetricsContext, MetricDoc, MetricName}
-import com.daml.network.environment.CNMetrics
+import com.daml.network.environment.SpliceMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 class SequencerPruningMetrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
 
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sequencer_pruning"
+  val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sequencer_pruning"
 
   @MetricDoc.Tag(
     summary = "How long it takes to complete a single sequencer pruning request",

@@ -10,7 +10,7 @@ import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, app_manager_admin as v0}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.store.AppManagerStore
@@ -41,7 +41,7 @@ class HttpAppManagerAdminHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     mat: Materializer,
 ) extends v0.AppManagerAdminHandler[TracedUser]
     with Spanning

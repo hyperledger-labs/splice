@@ -5,7 +5,7 @@ package com.daml.network.sv.automation.singlesv.membership.onboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.automation.singlesv.membership.onboarding.SequencerOnboarding.SequencerToOnboard
 import com.daml.network.sv.automation.singlesv.membership.{
@@ -57,7 +57,7 @@ class SequencerOnboarding(
             .filterNot(sequencerDomainState.mapping.active.contains)
             .map(SequencerToOnboard(dsoRules.domain, _))
         val thresholdToSet =
-          CNThresholds.sequencerConnectionsSizeThreshold(configuredSequencers.size)
+          Thresholds.sequencerConnectionsSizeThreshold(configuredSequencers.size)
 
         if (sequencersToAdd.nonEmpty) {
           logger.info {

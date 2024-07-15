@@ -6,13 +6,13 @@ package com.daml.network.sv.automation
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
-  CNNodeAppAutomationService,
+  SpliceAppAutomationService,
   TransferFollowTrigger,
 }
 import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
@@ -51,7 +51,7 @@ class SvDsoAutomationService(
     config: SvAppBackendConfig,
     svStore: SvSvStore,
     dsoStore: SvDsoStore,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
@@ -62,9 +62,9 @@ class SvDsoAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       config.automation,
       clock,
       domainTimeSync,
@@ -427,7 +427,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
   // defined because some triggers are registered later by
   // registerPostOnboardingTriggers
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
-    CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
+    SpliceAppAutomationService.expectedTriggerClasses ++ Seq(
       aTrigger[SummarizingMiningRoundTrigger],
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],

@@ -6,9 +6,9 @@ import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.history.AmuletCreate
 import com.daml.network.http.v0.definitions as d0
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.*
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
 import com.daml.network.wallet.store.TxLogEntry
@@ -19,13 +19,13 @@ import com.digitalasset.canton.topology.PartyId
 import java.time.Duration
 
 class WalletTransferOfferStatusIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
@@ -35,7 +35,7 @@ class WalletTransferOfferStatusIntegrationTest
     val transferOfferAmount = BigDecimal(10.0)
 
     def createTransferOffer(senderParty: PartyId, receiverParty: PartyId)(implicit
-        env: CNNodeTests.CNNodeTestConsoleEnvironment
+        env: SpliceTests.SpliceTestConsoleEnvironment
     ) = {
       val (offerCid, _) = actAndCheck(
         "Alice creates transfer offer",
@@ -73,7 +73,7 @@ class WalletTransferOfferStatusIntegrationTest
     }
 
     def getRootFromTxId(txId: String, parties: Set[PartyId])(implicit
-        env: CNNodeTests.CNNodeTestConsoleEnvironment
+        env: SpliceTests.SpliceTestConsoleEnvironment
     ): (TransactionTree, TreeEvent) = {
       val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
         .by_id(parties, txId)

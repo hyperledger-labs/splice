@@ -6,7 +6,11 @@ package com.daml.network.automation
 import org.apache.pekko.stream.Materializer
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
+import com.daml.network.environment.{
+  SpliceLedgerConnection,
+  SpliceLedgerSubscription,
+  RetryProvider,
+}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -24,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class UpdateIngestionService(
     ingestionTargetName: String,
     ingestionSink: MultiDomainAcsStore.IngestionSink,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     config: AutomationConfig,
     backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
@@ -43,7 +47,7 @@ class UpdateIngestionService(
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CNLedgerSubscription[?]] =
+  ): Future[SpliceLedgerSubscription[?]] =
     for {
       lastIngestedOffset <- ingestionSink.initialize()
       subscribeFrom <- lastIngestedOffset match {
@@ -76,7 +80,7 @@ class UpdateIngestionService(
           logger.debug(s"Resuming ingestion from offset: $offset")
           Future.successful(MultiDomainAcsStore.toParticipantOffset(offset))
       }
-    } yield new CNLedgerSubscription(
+    } yield new SpliceLedgerSubscription(
       source = connection.updates(subscribeFrom, filter),
       map = process,
       retryProvider = retryProvider,

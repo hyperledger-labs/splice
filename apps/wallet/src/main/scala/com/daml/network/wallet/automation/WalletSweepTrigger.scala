@@ -13,10 +13,10 @@ import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.splice.fees.SteppedRate
 import com.daml.network.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.AmuletConfigSchedule
-import com.daml.network.util.CNNodeUtil.{ccToDollars, dollarsToCC}
+import com.daml.network.util.SpliceUtil.{ccToDollars, dollarsToCC}
 import com.daml.network.wallet.config.WalletSweepConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -35,7 +35,7 @@ import scala.jdk.CollectionConverters.*
 class WalletSweepTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
 )(implicit

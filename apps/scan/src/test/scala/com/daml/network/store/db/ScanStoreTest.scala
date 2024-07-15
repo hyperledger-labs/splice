@@ -38,7 +38,7 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
-import com.daml.network.util.CNNodeUtil.damlDecimal
+import com.daml.network.util.SpliceUtil.damlDecimal
 import com.daml.network.util.{
   Contract,
   ContractWithState,
@@ -1514,7 +1514,7 @@ trait AmuletTransferUtil { self: StoreTest =>
 class DbScanStoreTest
     extends ScanStoreTest
     with HasActorSystem
-    with CNPostgresTest
+    with SplicePostgresTest
     with AcsJdbcTypes
     with AcsTables {
 
@@ -1565,7 +1565,7 @@ class DbScanStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {
-      _ <- resetAllCnAppTables(storage)
+      _ <- resetAllAppTables(storage)
     } yield ()
 
   "getTopValidatorLicenses" should {

@@ -5,7 +5,7 @@ package com.daml.network.validator.admin.http
 
 import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{BaseLedgerConnection, CNLedgerConnection, RetryFor}
+import com.daml.network.environment.{BaseLedgerConnection, SpliceLedgerConnection, RetryFor}
 import com.daml.network.http.v0.{definitions, app_manager as v0}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
@@ -22,7 +22,7 @@ import scala.util.{Failure, Success}
 
 class HttpAppManagerHandler(
     config: AppManagerConfig,
-    ledgerConnection: CNLedgerConnection,
+    ledgerConnection: SpliceLedgerConnection,
     store: AppManagerStore,
     oauth2Manager: OAuth2Manager,
     protected val loggerFactory: NamedLoggerFactory,

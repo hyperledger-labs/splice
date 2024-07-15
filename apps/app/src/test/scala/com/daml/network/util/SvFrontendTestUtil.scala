@@ -1,13 +1,13 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import org.openqa.selenium.By
 import org.scalatest.Assertion
 import scala.concurrent.duration.DurationInt
 
-trait SvFrontendTestUtil extends CNNodeTestCommon {
-  this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
+trait SvFrontendTestUtil extends TestCommon {
+  this: CommonAppInstanceReferences & FrontendTestCommon =>
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType

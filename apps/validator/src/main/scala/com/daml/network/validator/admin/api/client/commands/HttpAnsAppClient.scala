@@ -9,7 +9,7 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.ans as codegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionRequest
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.ans as externalHttp
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
@@ -23,7 +23,7 @@ object HttpAnsAppClient {
     override type Client = externalHttp.AnsClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

@@ -18,7 +18,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import java.time.Instant
 
-trait DsoRulesStore extends CNNodeAppStore {
+trait DsoRulesStore extends AppStore {
 
   def lookupDsoRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[

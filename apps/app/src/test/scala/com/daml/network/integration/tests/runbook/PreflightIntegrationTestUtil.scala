@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests.runbook
 
 import com.daml.network.util.{Auth0Util, K8sUtil}
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.duration.*
 
-trait PreflightIntegrationTestUtil extends CNNodeTestCommon {
+trait PreflightIntegrationTestUtil extends TestCommon {
 
   // Give more time to the checks in cluster preflights on devnet only, to account for slower domains
   private def preflightTimeUntilSuccess: FiniteDuration = {

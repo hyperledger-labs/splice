@@ -9,7 +9,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class OffboardUserPartyTrigger(
     override protected val context: TriggerContext,
     walletManager: UserWalletManager,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,

@@ -10,7 +10,7 @@ import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
 import com.daml.network.auth.*
-import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
@@ -34,7 +34,7 @@ import com.daml.network.scan.admin.api.client.{
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer, ParticipantPartyMigrator}
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{
   AmuletConfigSchedule,
@@ -91,7 +91,7 @@ import scala.util.{Failure, Success}
 class ValidatorApp(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
-    val amuletAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedSpliceAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -104,7 +104,7 @@ class ValidatorApp(
     esf: ExecutionSequencerFactory,
     ec: ExecutionContextExecutor,
     tracer: Tracer,
-) extends CNNode[ValidatorApp.State](
+) extends Node[ValidatorApp.State](
       config.ledgerApiUser,
       config.participantClient,
       amuletAppParameters,
@@ -144,7 +144,7 @@ class ValidatorApp(
 
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
   )(implicit traceContext: TraceContext) =
     for {
       _ <- config.appManager.traverse_ { appManagerConfig =>
@@ -325,7 +325,7 @@ class ValidatorApp(
       name: String,
       instance: AppInstance,
       validatorParty: PartyId,
-      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+      storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       participantAdminConnection: ParticipantAdminConnection,
       domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
@@ -510,7 +510,7 @@ class ValidatorApp(
   }
 
   override def initialize(
-      ledgerClient: CNLedgerClient,
+      ledgerClient: SpliceLedgerClient,
       validatorParty: PartyId,
   )(implicit traceContext: TraceContext): Future[ValidatorApp.State] =
     for {

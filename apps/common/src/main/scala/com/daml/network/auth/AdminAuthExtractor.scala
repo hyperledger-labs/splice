@@ -8,7 +8,7 @@ import org.apache.pekko.http.scaladsl.server.Directive1
 import org.apache.pekko.http.scaladsl.server.Directives.{complete, onComplete, provide}
 import org.apache.pekko.util.ByteString
 import com.daml.network.auth.{AuthExtractor, SignatureVerifier}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.http.v0.definitions.ErrorResponse
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -24,7 +24,7 @@ object AdminAuthExtractor {
   def apply(
       verifier: SignatureVerifier,
       adminParty: PartyId,
-      ledgerConnection: CNLedgerConnection,
+      ledgerConnection: SpliceLedgerConnection,
       loggerFactory: NamedLoggerFactory,
       realm: String,
   )(implicit traceContext: TraceContext): String => Directive1[AuthExtractor.TracedUser] = {
@@ -44,7 +44,7 @@ object AdminAuthExtractor {
 final class AdminAuthExtractor(
     verifier: SignatureVerifier,
     adminParty: PartyId,
-    ledgerConnection: CNLedgerConnection,
+    ledgerConnection: SpliceLedgerConnection,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
 )(implicit

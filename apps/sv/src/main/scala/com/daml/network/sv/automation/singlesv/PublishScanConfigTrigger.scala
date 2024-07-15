@@ -13,8 +13,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
-import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.SpliceLedgerConnection
+import com.daml.network.http.HttpClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvScanConfig
@@ -38,13 +38,13 @@ import scala.util.{Failure, Success}
 class PublishScanConfigTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     scanConfig: SvScanConfig,
     upgradesConfig: UpgradesConfig,
 )(implicit
     override val ec: ExecutionContextExecutor,
     override val tracer: Tracer,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[

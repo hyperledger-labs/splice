@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.splice.cometbft.{
   SequencingKeyConfig,
 }
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.store.DsoRulesStore
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
@@ -75,7 +75,7 @@ trait SynchronizerNodeConfigClient {
       rulesAndState: DsoRulesStore.DsoRulesWithSvNodeState,
       newSvNodeConfig: SynchronizerNodeConfig,
       store: SvDsoStore,
-      connection: CNLedgerConnection,
+      connection: SpliceLedgerConnection,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,

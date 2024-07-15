@@ -4,7 +4,7 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext, TriggerEnabledSynchronization}
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.validator.domain.DomainConnector
@@ -98,9 +98,9 @@ class ReconcileSequencerConnectionsTrigger(
               conf.copy(
                 sequencerConnections = SequencerConnections.tryMany(
                   nonEmptyConnections.forgetNE,
-                  CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                  Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
                   submissionRequestAmplification = SubmissionRequestAmplification(
-                    CNThresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
+                    Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                     patience,
                   ),
                 )

@@ -1,6 +1,6 @@
 # DB migrations
 
-This document goes over how to apply changes to the database schema and/or the [stores themselves](/apps/common/src/main/scala/com/daml/network/store/CNNodeAppStore.scala).
+This document goes over how to apply changes to the database schema and/or the [stores themselves](/apps/common/src/main/scala/com/daml/network/store/AppStore.scala).
 
 ## Required knowledge
 

@@ -13,7 +13,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.store.MiningRoundsStore.OpenMiningRoundContract
@@ -31,7 +31,7 @@ import scala.math.Ordering.Implicits.*
 class ReceiveSvRewardCouponTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    cnLedgerConnection: CNLedgerConnection,
+    spliceLedgerConnection: SpliceLedgerConnection,
     extraBeneficiaries: Seq[BeneficiaryConfig],
 )(implicit
     override val ec: ExecutionContext,
@@ -104,7 +104,7 @@ class ReceiveSvRewardCouponTrigger(
     }
     val weightDistribution =
       SvUtil.weightDistributionForSv(svRewardWeight, extraBeneficiaries, svParty)(logger, tc)
-    cnLedgerConnection
+    spliceLedgerConnection
       .submit(
         actAs = Seq(svParty),
         readAs = Seq(dsoParty),

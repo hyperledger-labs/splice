@@ -1,9 +1,9 @@
 package com.daml.network.integration.plugins
 
 import cats.implicits.catsSyntaxOptionId
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.config.{SpliceConfig, ConfigTransforms}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.sv.cometbft.{CometBftConnectionConfig, CometBftContainer}
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -21,25 +21,25 @@ import scala.collection.concurrent.TrieMap
 class CometBftNetworkPlugin(
     identifier: String,
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] {
+) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment] {
 
   private val runningContainers = new TrieMap[CometBftConnectionConfig, CometBftContainer]()
   private val networks = new TrieMap[CometBftConnectionConfig, Network]()
-  override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
+  override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
     val network = Network.newNetwork()
 
     /** SV1 is the validator so it must always be started first
       */
     val sv1Node: CometBftConnectionConfig = startNewCometBftContainer("sv1", network)
     networks.put(sv1Node, network)
-    CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+    ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
       val container = if (name == "sv1") sv1Node else startNewCometBftContainer(name, network)
       config.focus(_.cometBftConfig).modify(_.map(_.focus(_.connectionUri).replace(container.uri)))
     }(config)
 
   }
 
-  override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
+  override def afterEnvironmentDestroyed(config: SpliceConfig): Unit = {
     val containerConnectionKeys = config.svApps.values
       .flatMap(svApp => svApp.cometBftConfig.map(_.connectionUri))
       .map(CometBftConnectionConfig)

@@ -2,12 +2,12 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
 import com.daml.network.codegen.java.splice.wallet.payment.AcceptedAppPayment
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.{
   Contract,
-  CNNodeUtil,
+  SpliceUtil,
   FrontendLoginUtil,
   WalletFrontendTestUtil,
   WalletTestUtil,
@@ -23,11 +23,11 @@ class WalletPaymentFrontendIntegrationTest
 
   private val amuletPrice = 2
   private val tolerance = 0.005
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)
@@ -461,7 +461,7 @@ class WalletPaymentFrontendIntegrationTest
   }
 
   private def confirmPayment()(implicit
-      env: CNNodeTestConsoleEnvironment,
+      env: SpliceTestConsoleEnvironment,
       webDriverType: WebDriverType,
   ): Contract[AcceptedAppPayment.ContractId, AcceptedAppPayment] = {
     actAndCheck(
@@ -587,7 +587,7 @@ class WalletPaymentFrontendIntegrationTest
       receiverPartyId: PartyId,
       expectedEntryName: String,
       balanceChangeForSender: BigDecimal,
-  )(implicit driver: WebDriverType, env: CNNodeTestConsoleEnvironment) = {
+  )(implicit driver: WebDriverType, env: SpliceTestConsoleEnvironment) = {
     inside(findAll(className("tx-row")).toList) { case paymentTx :: lockTx :: _ =>
       matchTransaction(lockTx)(
         amuletPrice,

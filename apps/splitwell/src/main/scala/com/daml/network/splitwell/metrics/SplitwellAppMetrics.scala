@@ -3,7 +3,7 @@
 
 package com.daml.network.splitwell.metrics
 
-import com.daml.network.BaseCNNodeMetrics
+import com.daml.network.BaseSpliceMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 /** Modelled after [[com.digitalasset.canton.domain.metrics.DomainMetrics]].
@@ -12,4 +12,4 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
   */
 class SplitwellAppMetrics(
     metricsFactory: CantonLabeledMetricsFactory
-) extends BaseCNNodeMetrics("splitwell", metricsFactory) {}
+) extends BaseSpliceMetrics("splitwell", metricsFactory) {}

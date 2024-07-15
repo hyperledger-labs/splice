@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.sv.automation.leaderbased.{ExpiredAmuletTrigger, ExpiredLockedAmuletTrigger}
 import com.daml.network.util.{SplitwellTestUtil, SvTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{
@@ -15,7 +15,7 @@ import com.digitalasset.canton.HasExecutionContext
 import java.time.Duration
 
 class WalletTxLogTimeBasedIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -25,14 +25,14 @@ class WalletTxLogTimeBasedIntegrationTest
 
   private val amuletPrice = BigDecimal(1.25).setScale(10)
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
   }
 
   "A wallet" should {

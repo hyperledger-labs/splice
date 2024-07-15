@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.environment.{
-  CNLedgerConnection,
+  SpliceLedgerConnection,
   CommandPriority,
   ParticipantAdminConnection,
 }
@@ -49,7 +49,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class TopupMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: ValidatorStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     validatorTopupConfig: ValidatorTopupConfig,
     grpcDeadline: Option[NonNegativeFiniteDuration],
@@ -229,7 +229,7 @@ class TopupMemberTrafficTrigger(
               deadline = grpcDeadline,
             )
             .withDedup(
-              CNLedgerConnection.CommandId(
+              SpliceLedgerConnection.CommandId(
                 "com.daml.network.validator.automation.TopupMemberTrafficTrigger.getOrCreateValidatorTopupState",
                 Seq(validator),
                 activeSynchronizerId.toProtoPrimitive,

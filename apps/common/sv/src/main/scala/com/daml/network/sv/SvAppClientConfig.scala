@@ -3,10 +3,10 @@
 
 package com.daml.network.sv
 
-import com.daml.network.config.{HttpCNNodeClientConfig, NetworkAppClientConfig}
+import com.daml.network.config.{HttpClientConfig, NetworkAppClientConfig}
 
 case class SvAppClientConfig(
     adminApi: NetworkAppClientConfig
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

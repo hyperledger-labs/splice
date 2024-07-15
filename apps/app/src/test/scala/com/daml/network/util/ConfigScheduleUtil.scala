@@ -14,21 +14,18 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
   CRARC_RemoveFutureAmuletConfigSchedule,
 }
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.integration.tests.CNNodeTests
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
-import com.daml.network.util.CNNodeUtil.defaultAmuletConfig
+import com.daml.network.integration.tests.SpliceTests
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
+import com.daml.network.util.SpliceUtil.defaultAmuletConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
 
 import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
 
-trait ConfigScheduleUtil extends CNNodeTestCommon {
+trait ConfigScheduleUtil extends TestCommon {
 
   /** Helper function to create AmuletConfig's in tests for amulet config changes. Uses the `currentSchedule` as a reference
     * to fill in the id of the activeSynchronizer.
@@ -37,10 +34,10 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       currentSchedule: Schedule[Instant, AmuletConfig[USD]],
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
-      holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
+      holdingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
   )(implicit
-      env: CNNodeTests.CNNodeTestConsoleEnvironment
+      env: SpliceTests.SpliceTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
     val activeSynchronizerId =
       AmuletConfigSchedule(currentSchedule)
@@ -68,7 +65,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   def createConfigSchedule(
       currentSchedule: Schedule[Instant, AmuletConfig[USD]],
       newSchedules: (Duration, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD])*
-  )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, AmuletConfig[USD]] = {
+  )(implicit env: SpliceTestConsoleEnvironment): Schedule[Instant, AmuletConfig[USD]] = {
     val configSchedule = {
       new splice.schedule.Schedule(
         mkUpdatedAmuletConfig(currentSchedule, defaultTickDuration),
@@ -87,7 +84,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   }
 
   def setFutureConfigSchedule(configSchedule: Schedule[Instant, AmuletConfig[USD]])(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     // clean all futureValues
     sv1Backend
@@ -118,7 +115,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   }
 
   def votingFlow(action: ActionRequiringConfirmation)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val dsoRules = sv1Backend.getDsoInfo().dsoRules
     val sv1Party = sv1Backend.getDsoInfo().svParty
@@ -152,7 +149,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
           sv match {
             case sv: SvAppBackendReference =>
               if (
-                sv.is_running && sv.name != "sv1" && voteCount < CNThresholds
+                sv.is_running && sv.name != "sv1" && voteCount < Thresholds
                   .requiredNumVotes(dsoRules)
               ) {
                 eventually() {

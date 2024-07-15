@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.ParticipantId
@@ -12,11 +12,11 @@ import scala.jdk.CollectionConverters.*
 class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
+        ConfigTransforms.updateAllSvAppConfigs((name, c) =>
           if (name == "sv4") {
             c.copy(
               onboarding = Some(conf.svApps(InstanceName.tryCreate("sv3")).onboarding.value)

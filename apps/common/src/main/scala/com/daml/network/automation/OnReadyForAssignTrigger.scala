@@ -7,14 +7,14 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.network.environment.ledger.api.ReassignmentEvent
-import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
+import com.daml.network.store.{AppStore, MultiDomainAcsStore}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class OnReadyForAssignTrigger(
-    store: CNNodeAppStore
+    store: AppStore
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

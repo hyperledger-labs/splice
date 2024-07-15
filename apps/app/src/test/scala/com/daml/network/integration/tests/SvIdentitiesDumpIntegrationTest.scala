@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.BackupDumpConfig
-import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms.updateAllSvAppConfigs
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.integration.tests.SvIdentitiesDumpIntegrationTest.testDumpOutputDir
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -20,11 +20,11 @@ import com.google.protobuf.ByteString
 
 import java.nio.file.{Path, Paths}
 
-class SvIdentitiesDumpIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
+class SvIdentitiesDumpIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, conf) =>
         updateAllSvAppConfigs((_, svConf) =>

@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
-import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTest
+import com.daml.network.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.HasExecutionContext
@@ -12,13 +12,13 @@ import org.slf4j.event.Level
 import java.time.Duration
 
 class TimeBasedTreasuryIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
@@ -29,7 +29,7 @@ class TimeBasedTreasuryIntegrationTest
       .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
@@ -105,7 +105,7 @@ class TimeBasedTreasuryIntegrationTest
         Some(3),
         (99, 100),
         (9, 10),
-        exactly(CNNodeUtil.defaultHoldingFee.rate),
+        exactly(SpliceUtil.defaultHoldingFee.rate),
       )
   }
 

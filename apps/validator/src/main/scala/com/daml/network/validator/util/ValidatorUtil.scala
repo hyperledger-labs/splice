@@ -6,15 +6,15 @@ package com.daml.network.validator.util
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.{
   BaseLedgerConnection,
-  CNLedgerConnection,
+  SpliceLedgerConnection,
   CommandPriority,
   ParticipantAdminConnection,
   RetryProvider,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
-import com.daml.network.util.CNNodeUtil
+import com.daml.network.util.SpliceUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
 import com.digitalasset.canton.logging.TracedLogger
@@ -31,7 +31,7 @@ private[validator] object ValidatorUtil {
       endUserParty: PartyId,
       endUserName: String,
       dsoParty: PartyId,
-      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+      storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -63,7 +63,7 @@ private[validator] object ValidatorUtil {
                 priority,
               )
               .withDedup(
-                commandId = CNLedgerConnection
+                commandId = SpliceLedgerConnection
                   .CommandId(
                     "com.daml.network.validator.installWalletForUser",
                     Seq(validatorServiceParty),
@@ -85,7 +85,7 @@ private[validator] object ValidatorUtil {
   def onboard(
       endUserName: String,
       knownParty: Option[PartyId],
-      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+      storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       getAmuletRulesDomain: ScanConnection.GetAmuletRulesDomain,
       participantAdminConnection: ParticipantAdminConnection,
@@ -127,7 +127,7 @@ private[validator] object ValidatorUtil {
         priority = priority,
       )
       // Create validator right contract so validator can collect validator rewards
-      _ <- CNNodeUtil.createValidatorRight(
+      _ <- SpliceUtil.createValidatorRight(
         user = userPartyId,
         validator = store.key.validatorParty,
         dso = store.key.dsoParty,
@@ -144,7 +144,7 @@ private[validator] object ValidatorUtil {
 
   def offboard(
       endUserName: String,
-      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+      storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       validatorWalletUserName: Option[String],
       retryProvider: RetryProvider,

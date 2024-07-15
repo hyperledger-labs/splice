@@ -26,7 +26,7 @@ import scala.concurrent.ExecutionContext
 
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
@@ -104,7 +104,7 @@ class UserWalletService(
   /** The connection to use when submitting commands based on reads from the WalletStore.
     * The submission will wait for the store to ingest the effect of the command before completing the future.
     */
-  val connection: CNLedgerConnection = automation.connection
+  val connection: SpliceLedgerConnection = automation.connection
 
   override def isHealthy: Boolean =
     automation.isHealthy && treasury.isHealthy

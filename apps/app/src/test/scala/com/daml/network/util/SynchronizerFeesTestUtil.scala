@@ -15,10 +15,7 @@ import com.daml.network.codegen.java.splice.wallet.install.{
 import com.daml.network.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.ValidatorAppBackendReference
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.AmuletPosition
 import com.daml.network.wallet.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.data.CantonTimestamp
@@ -30,8 +27,8 @@ import java.util.Optional
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
-  this: CommonCNNodeAppInstanceReferences =>
+trait SynchronizerFeesTestUtil extends TestCommon {
+  this: CommonAppInstanceReferences =>
 
   private def listValidatorContracts[
       TC <: javaapi.data.codegen.Contract[TCid, T],
@@ -53,7 +50,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
   def getTotalPurchasedTraffic(
       memberId: Member,
       domainId: DomainId,
-  )(implicit env: CNNodeTestConsoleEnvironment): Long = {
+  )(implicit env: SpliceTestConsoleEnvironment): Long = {
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(MemberTraffic.COMPANION)(
         sv1Backend.getDsoInfo().dsoParty,
@@ -67,7 +64,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
       validatorApp: ValidatorAppBackendReference,
       memberId: Member,
       domainId: DomainId,
-  )(implicit env: CNNodeTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
+  )(implicit env: SpliceTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
     inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
       case Seq(topupState) => topupState.id
       case Seq() =>
@@ -104,7 +101,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
       trafficAmount: Long,
       ts: CantonTimestamp,
       inputAmulets: Seq[AmuletPosition] = Seq(),
-  )(implicit env: CNNodeTestConsoleEnvironment): AmuletOperationOutcome = {
+  )(implicit env: SpliceTestConsoleEnvironment): AmuletOperationOutcome = {
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val domainId =
@@ -175,7 +172,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
       trafficAmount: Long,
       trackingId: String,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): BuyTrafficRequest.ContractId = {
     val now = env.environment.clock.now
     val domainId =
@@ -214,7 +211,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
   }
 
   def getTopupParameters(validatorApp: ValidatorAppBackendReference, ts: CantonTimestamp)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
       validatorApp.config.domains.global.buyExtraTraffic.targetThroughput,
@@ -225,13 +222,13 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
   }
 
   def computeSynchronizerFees(trafficAmount: Long)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
     val ts = env.environment.clock.now
     val extraTrafficPrice =
       sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees.extraTrafficPrice
     val amuletPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.amuletPrice
-    CNNodeUtil.synchronizerFees(trafficAmount, extraTrafficPrice, amuletPrice)
+    SpliceUtil.synchronizerFees(trafficAmount, extraTrafficPrice, amuletPrice)
   }
 
   def getTrafficState(
@@ -250,7 +247,7 @@ trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
     getTrafficState(validatorApp, domainId).extraTrafficLimit.fold(0L)(_.value)
   }
 
-  def activeSynchronizerId(implicit env: CNNodeTestConsoleEnvironment) =
+  def activeSynchronizerId(implicit env: SpliceTestConsoleEnvironment) =
     DomainId.tryFromString(
       sv1ScanBackend
         .getAmuletConfigAsOf(env.environment.clock.now)

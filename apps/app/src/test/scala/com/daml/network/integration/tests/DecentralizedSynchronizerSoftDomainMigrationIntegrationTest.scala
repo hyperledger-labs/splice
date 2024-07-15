@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.splice.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.config.CNNodeConfigTransforms.{
+import com.daml.network.config.ConfigTransforms.{
   ConfigurableApp,
   updateAllAutomationConfigs,
   updateAllValidatorConfigs,
@@ -559,7 +559,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     }
 
     clue("create DSO-signed ANS contracts of various kinds") {
-      import com.daml.network.util.CNNodeUtil.defaultAnsConfig
+      import com.daml.network.util.SpliceUtil.defaultAnsConfig
 
       val dso = dsoParty.toProtoPrimitive
 

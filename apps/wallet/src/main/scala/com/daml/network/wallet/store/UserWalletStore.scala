@@ -25,7 +25,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.store.{CNNodeAppStore, Limit, PageLimit}
+import com.daml.network.store.{AppStore, Limit, PageLimit}
 import com.daml.network.util.*
 import com.daml.network.wallet.store.UserWalletStore.*
 import com.daml.network.wallet.store.db.DbUserWalletStore
@@ -43,7 +43,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends CNNodeAppStore with NamedLogging {
+trait UserWalletStore extends AppStore with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -146,7 +146,7 @@ trait UserWalletStore extends CNNodeAppStore with NamedLogging {
     implicit traceContext => {
       def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
         now.toInstant.isAfter(
-          state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
+          state.nextPaymentDueAt.minus(SpliceUtil.relTimeToDuration(state.payData.paymentDuration))
         )
 
       for {
@@ -193,7 +193,7 @@ trait UserWalletStore extends CNNodeAppStore with NamedLogging {
   } yield amulets
     .map(c =>
       (
-        CNNodeUtil
+        SpliceUtil
           .currentAmount(c.payload, submittingRound),
         c,
       )
@@ -220,11 +220,11 @@ trait UserWalletStore extends CNNodeAppStore with NamedLogging {
   } yield {
     val holdingFees =
       amulets.view
-        .map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, asOfRound)))
+        .map(c => BigDecimal(SpliceUtil.holdingFee(c.payload, asOfRound)))
         .sum
     val totalAmount =
       amulets.view
-        .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, asOfRound)))
+        .map(c => BigDecimal(SpliceUtil.currentAmount(c.payload, asOfRound)))
         .sum
     (totalAmount, holdingFees)
   }
@@ -237,7 +237,7 @@ trait UserWalletStore extends CNNodeAppStore with NamedLogging {
     )
   } yield {
     val totalAmount = lockedAmulets.view
-      .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.amulet, asOfRound)))
+      .map(c => BigDecimal(SpliceUtil.currentAmount(c.payload.amulet, asOfRound)))
       .sum
     totalAmount
   }

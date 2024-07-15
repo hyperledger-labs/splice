@@ -12,7 +12,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
+import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.{AssignedContract, ContractWithState, DisclosedContracts}
 import com.daml.network.validator.store.ValidatorStore
@@ -35,7 +35,7 @@ class ReceiveFaucetCouponTrigger(
     validatorStore: ValidatorStore,
     userWalletManager: UserWalletManager,
     validatorTopupConfig: ValidatorTopupConfig,
-    cnLedgerConnection: CNLedgerConnection,
+    spliceLedgerConnection: SpliceLedgerConnection,
     clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
@@ -105,7 +105,7 @@ class ReceiveFaucetCouponTrigger(
           clock,
         )
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
-      outcome <- cnLedgerConnection
+      outcome <- spliceLedgerConnection
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),

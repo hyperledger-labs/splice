@@ -1,17 +1,17 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.console.ValidatorAppBackendReference
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{BalanceChangeTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 
 class WalletTxLogAcsIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -19,8 +19,8 @@ class WalletTxLogAcsIntegrationTest
 
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
@@ -29,7 +29,7 @@ class WalletTxLogAcsIntegrationTest
       // and interfering with the tests in this suite.
       .withTrafficTopupsDisabled
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .withManualStart
   }
 
@@ -47,7 +47,7 @@ class WalletTxLogAcsIntegrationTest
           .map(_.data)
 
       clue("Start all DSO apps except the DSO validator node") {
-        val localToStart = env.mergeLocalCNNodeInstances(
+        val localToStart = env.mergeLocalSpliceInstances(
           env.svs.local,
           env.scans.local,
         )

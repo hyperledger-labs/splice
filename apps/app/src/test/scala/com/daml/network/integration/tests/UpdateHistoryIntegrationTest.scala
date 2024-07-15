@@ -2,10 +2,10 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.console.CNParticipantClientReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.console.ParticipantClientReference
+import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.environment.ledger.api.{
   LedgerClient,
@@ -13,10 +13,10 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -40,7 +40,7 @@ import org.scalatest.Assertion
 import scala.concurrent.duration.*
 
 class UpdateHistoryIntegrationTest
-    extends CNNodeIntegrationTest
+    extends IntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with SplitwellTestUtil
@@ -51,8 +51,8 @@ class UpdateHistoryIntegrationTest
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
@@ -64,7 +64,7 @@ class UpdateHistoryIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
@@ -222,7 +222,7 @@ class UpdateHistoryIntegrationTest
   }
 
   private def compareHistory(
-      participant: CNParticipantClientReference,
+      participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
       ledgerBegin: ParticipantOffset,
   ): Assertion = {

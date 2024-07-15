@@ -4,9 +4,9 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.store.Limit
 import com.daml.network.sv.config.InitialAnsConfig
 import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
@@ -31,7 +31,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTxLogIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -53,17 +53,17 @@ class WalletTxLogIntegrationTest
   private def usdAsTappedAmulet(usd: Double) =
     BigDecimal(BigDecimal(usd).bigDecimal.divide(amuletPrice.bigDecimal, 10, RoundingMode.CEILING))
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .addConfigTransform((_, config) =>
         // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
-        CNNodeConfigTransforms
+        ConfigTransforms
           .updateAllSvAppFoundCollectiveConfigs_(
             _.copy(
               initialAnsConfig = InitialAnsConfig(

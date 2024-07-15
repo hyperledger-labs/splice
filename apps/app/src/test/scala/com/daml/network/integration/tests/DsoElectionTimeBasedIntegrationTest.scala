@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestWithEarlyClosingTrigger
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.logging.SuppressionRule

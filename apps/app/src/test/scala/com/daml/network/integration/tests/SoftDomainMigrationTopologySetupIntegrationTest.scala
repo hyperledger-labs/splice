@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.scan.config.ScanSynchronizerConfig
 import com.daml.network.sv.LocalSynchronizerNode
 import com.digitalasset.canton.DomainAlias
@@ -13,10 +13,10 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class SoftDomainMigrationTopologySetupIntegrationTest extends CNNodeIntegrationTest {
+class SoftDomainMigrationTopologySetupIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       .fromResources(
         Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),
         this.getClass.getSimpleName,
@@ -26,19 +26,19 @@ class SoftDomainMigrationTopologySetupIntegrationTest extends CNNodeIntegrationT
       .withTrafficTopupsEnabled
       .addConfigTransformsToFront(
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllSvAppConfigs_ { conf =>
+          ConfigTransforms.updateAllSvAppConfigs_ { conf =>
             val synchronizerConfig = conf.localSynchronizerNode.value
             conf.copy(
               synchronizerNodes = Map(
                 "global-domain" -> synchronizerConfig,
-                "global-domain-new" -> CNNodeConfigTransforms
+                "global-domain-new" -> ConfigTransforms
                   .setSvSynchronizerConfigPortsPrefix(28, synchronizerConfig),
               ),
               supportsSoftDomainMigrationPoc = true,
             )
           }(conf),
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllScanAppConfigs { (name, scanConf) =>
+          ConfigTransforms.updateAllScanAppConfigs { (name, scanConf) =>
             val svConf = conf.svApps(InstanceName.tryCreate(name.stripSuffix("Scan")))
             scanConf.copy(
               synchronizers = svConf.synchronizerNodes.view

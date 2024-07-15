@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.splice.round.SummarizingMiningRound
 import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
@@ -37,7 +37,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -116,7 +116,7 @@ class SummarizingMiningRoundTrigger(
               update = cmd,
             )
             .withDedup(
-              commandId = CNLedgerConnection.CommandId(
+              commandId = SpliceLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
                 Seq(svParty, dsoParty),
                 task.summarizingRound.contractId.contractId,

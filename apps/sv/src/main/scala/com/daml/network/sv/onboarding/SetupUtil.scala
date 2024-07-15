@@ -5,7 +5,7 @@ package com.daml.network.sv.onboarding
 
 import com.daml.network.environment.{
   BaseLedgerConnection,
-  CNLedgerConnection,
+  SpliceLedgerConnection,
   ParticipantAdminConnection,
   RetryFor,
 }
@@ -39,7 +39,7 @@ private[onboarding] object SetupUtil {
   }
 
   def ensureDsoPartyMetadataAnnotation(
-      connection: CNLedgerConnection,
+      connection: SpliceLedgerConnection,
       config: SvAppBackendConfig,
       dsoParty: PartyId,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
@@ -51,7 +51,7 @@ private[onboarding] object SetupUtil {
     )
 
   def grantSvUserRightReadAsDso(
-      connection: CNLedgerConnection,
+      connection: SpliceLedgerConnection,
       user: String,
       dso: PartyId,
   ): Future[Unit] = {

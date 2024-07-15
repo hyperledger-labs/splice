@@ -5,7 +5,7 @@ package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
@@ -18,7 +18,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorHandler(
-    storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+    storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
     getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,

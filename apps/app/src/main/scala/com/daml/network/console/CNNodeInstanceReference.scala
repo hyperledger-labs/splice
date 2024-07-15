@@ -8,8 +8,8 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.{CNNodeBackendConfig, NetworkAppClientConfig}
-import com.daml.network.environment.{CNNodeBase, CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.network.config.{SpliceBackendConfig, NetworkAppClientConfig}
+import com.daml.network.environment.{NodeBase, SpliceConsoleEnvironment, SpliceStatus}
 import com.daml.network.util.HasHealth
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -42,12 +42,12 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 /** Copy of Canton ParticipantReference */
-trait CNNodeAppReference extends InstanceReference {
+trait AppReference extends InstanceReference {
 
   override val name: String
 
-  override implicit val consoleEnvironment: ConsoleEnvironment = cnNodeConsoleEnvironment
-  implicit val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment
+  override implicit val consoleEnvironment: ConsoleEnvironment = spliceConsoleEnvironment
+  implicit val spliceConsoleEnvironment: SpliceConsoleEnvironment
 
   override def executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
@@ -81,7 +81,7 @@ trait CNNodeAppReference extends InstanceReference {
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
-      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded,
+      timeout: NonNegativeDuration = spliceConsoleEnvironment.commandTimeouts.bounded,
       maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds),
   ): Unit =
     try {
@@ -95,7 +95,7 @@ trait CNNodeAppReference extends InstanceReference {
     }
 }
 
-trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
+trait HttpAppReference extends AppReference with HttpCommandRunner {
 
   def basePath: String
 
@@ -120,7 +120,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   override protected[network] def httpCommand[Result](
       httpCommand: HttpCommand[_, Result]
   ): ConsoleCommandResult[Result] =
-    cnNodeConsoleEnvironment.httpCommandRunner.runCommand(
+    spliceConsoleEnvironment.httpCommandRunner.runCommand(
       name,
       httpCommand,
       headers,
@@ -129,13 +129,13 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
 
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")
-  def httpHealth: NodeStatus[CNNodeStatus] = {
+  def httpHealth: NodeStatus[SpliceStatus] = {
     consoleEnvironment.run {
       // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
       ConsoleCommandResult.fromEither(
         Right(
           httpCommand(
-            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](basePath, CNNodeStatus.fromHttp)
+            HttpAdminAppClient.GetHealthStatus[SpliceStatus](basePath, SpliceStatus.fromHttp)
           ).toEither.fold(err => NodeStatus.Failure(err), success => success)
         )
       )
@@ -191,8 +191,8 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
     }
 }
 
-trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReference {
-  override def config: CNNodeBackendConfig
+trait AppBackendReference extends AppReference with LocalInstanceReference {
+  override def config: SpliceBackendConfig
 
   @Help.Summary("Start node and wait for initialization to complete")
   def startSync(): Unit = {
@@ -203,7 +203,7 @@ trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceRef
   @Help.Summary(
     "Returns the state of this app. May only be called while the app is running."
   )
-  protected def _appState[S <: AutoCloseable & HasHealth, NB <: CNNodeBase[S]](implicit
+  protected def _appState[S <: AutoCloseable & HasHealth, NB <: NodeBase[S]](implicit
       tag: ClassTag[NB]
   ): S = {
     (for {
@@ -233,8 +233,8 @@ trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceRef
 /** Subclass of participantClient that takes the config as an argument
   * instead of relying on remoteParticipantsByName.
   */
-class CNParticipantClientReference(
-    consoleEnvironment: CNNodeConsoleEnvironment,
+class ParticipantClientReference(
+    consoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,
 ) extends RemoteParticipantReference(consoleEnvironment, name) {

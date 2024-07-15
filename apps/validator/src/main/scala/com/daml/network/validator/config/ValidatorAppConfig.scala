@@ -154,7 +154,7 @@ final case class MigrateValidatorPartyConfig(
 
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CNDbConfig,
+    override val storage: SpliceDbConfig,
     ledgerApiUser: String,
     // If not set the ledgerApiUser name is used.
     // This can be used to give a nicer name to the validator party.
@@ -167,7 +167,7 @@ case class ValidatorAppBackendConfig(
     validatorWalletUser: Option[String],
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
-    participantClient: CNParticipantClientConfig,
+    participantClient: ParticipantClientConfig,
     scanClient: BftScanClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorSynchronizerConfig,
@@ -185,7 +185,7 @@ case class ValidatorAppBackendConfig(
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
-    parameters: CNNodeParametersConfig = CNNodeParametersConfig(),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(),
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
@@ -204,7 +204,7 @@ case class ValidatorAppBackendConfig(
     // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
-) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
+) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
 
@@ -214,20 +214,20 @@ case class ValidatorAppBackendConfig(
 
 case class ValidatorAppClientConfig(
     adminApi: NetworkAppClientConfig
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
 case class AppManagerAppClientConfig(
     adminApi: NetworkAppClientConfig,
     ledgerApiUser: String,
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
 case class AnsAppExternalClientConfig(
     adminApi: NetworkAppClientConfig,
     ledgerApiUser: String,
-) extends HttpCNNodeClientConfig {
+) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

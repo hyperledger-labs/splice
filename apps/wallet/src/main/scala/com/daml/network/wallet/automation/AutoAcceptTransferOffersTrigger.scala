@@ -10,7 +10,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority}
+import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{AssignedContract, Codec}
 import com.daml.network.wallet.config.AutoAcceptTransfersConfig
@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AutoAcceptTransferOffersTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     autoAcceptTransfers: AutoAcceptTransfersConfig,
     scanConnection: ScanConnection,
     validatorTopupConfigO: Option[ValidatorTopupConfig],

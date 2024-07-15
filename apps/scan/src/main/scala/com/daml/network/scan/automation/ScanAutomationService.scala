@@ -4,9 +4,9 @@
 package com.daml.network.scan.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.{AutomationServiceCompanion, CNNodeAppAutomationService}
+import com.daml.network.automation.{AutomationServiceCompanion, SpliceAppAutomationService}
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,7 +19,7 @@ import scala.concurrent.ExecutionContextExecutor
 class ScanAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
@@ -29,7 +29,7 @@ class ScanAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       automationConfig,
       clock,
       // scan only does reads so no need to block anything.

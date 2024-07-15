@@ -18,7 +18,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.definitions
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
-import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore}
+import com.daml.network.store.{AppStore, Limit, MultiDomainAcsStore}
 import com.daml.network.util.*
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
@@ -33,7 +33,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends WalletStore with CNNodeAppStore {
+trait ValidatorStore extends WalletStore with AppStore {
   import ValidatorStore.templatesMovedByMyAutomation
 
   /** The key identifying the parties considered by this store. */

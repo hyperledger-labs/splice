@@ -1,9 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestCommon,
-  CNNodeTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
@@ -12,7 +9,7 @@ import com.daml.network.codegen.java.splice.wallet.payment.{
   ReceiverAmuletAmount,
 }
 import com.daml.network.console.{
-  CNParticipantClientReference,
+  ParticipantClientReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
@@ -21,12 +18,12 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
-trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
+trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil {
   protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
   protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
   protected def connectSplitwellUpgradeDomain(
-      participant: CNParticipantClientReference
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+      participant: ParticipantClientReference
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val upgradeConfig =
       splitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
 
@@ -39,7 +36,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
     participant.domains.connect(splitwellUpgradeAlias, url)
   }
 
-  protected def disconnectSplitwellUpgradeDomain(participant: CNParticipantClientReference) =
+  protected def disconnectSplitwellUpgradeDomain(participant: ParticipantClientReference) =
     participant.domains.disconnect(splitwellUpgradeAlias)
 
   protected def createSplitwellInstalls(splitwell: SplitwellAppClientReference, party: PartyId) = {
@@ -56,7 +53,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
   }
 
   def initSplitwellTest()(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = clue("setup splitwell users and contracts") {
 
     val group = "group1"
@@ -133,7 +130,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       receiver: PartyId,
       amount: BigDecimal,
       key: HttpSplitwellAppClient.GroupKey,
-  )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId =
+  )(implicit env: SpliceTestConsoleEnvironment): AcceptedAppPayment.ContractId =
     splitwellTransfer(
       senderSplitwell,
       senderWallet,
@@ -151,7 +148,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       senderWallet: WalletAppClientReference,
       key: HttpSplitwellAppClient.GroupKey,
       receiverAmounts: Seq[ReceiverAmuletAmount],
-  )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
+  )(implicit env: SpliceTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
     senderSplitwell.initiateTransfer(key, receiverAmounts)
     val request = eventually()(getSingleRequestOnDecentralizedSynchronizer(senderWallet))
     senderWallet.acceptAppPaymentRequest(request.contractId)
@@ -159,7 +156,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
 
   protected def getSingleRequestOnDecentralizedSynchronizer(
       walletClient: WalletAppClientReference
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val request = walletClient
       .listAppPaymentRequests()
       .loneElement

@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.{CNNodeConfigTransforms, CNParticipantClientConfig}
+import com.daml.network.config.{ConfigTransforms, ParticipantClientConfig}
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
@@ -21,7 +21,7 @@ class SequencerPruningIntegrationTest
   override def environmentDefinition =
     super.environmentDefinition
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs { (_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
           config.copy(
             localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
               synchronizerNode.copy(
@@ -46,7 +46,7 @@ class SequencerPruningIntegrationTest
                 .validatorApps(InstanceName.tryCreate("bobValidator"))
               bobValidatorConfig
                 .copy(
-                  participantClient = CNParticipantClientConfig(
+                  participantClient = ParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(5902)),
                     bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =

@@ -889,7 +889,7 @@ see the results of adding log statements without needing to run `sbt bundle`.
 
 All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu.
 
-If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CNNodeApp -c <conf-files>`, however,
+If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.SpliceApp -c <conf-files>`, however,
 this doesn't give you a debugger.
 
 ### Testing Auth0 Auth Flows Locally

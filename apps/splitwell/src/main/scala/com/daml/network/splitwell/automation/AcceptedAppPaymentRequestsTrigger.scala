@@ -12,7 +12,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.{DisclosedContracts, AssignedContract}
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AcceptedAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     scanConnection: ScanConnection,
 )(implicit
     ec: ExecutionContext,

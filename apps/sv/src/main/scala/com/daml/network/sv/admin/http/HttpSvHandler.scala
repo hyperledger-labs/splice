@@ -9,11 +9,11 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
-import com.daml.network.config.CNThresholds
+import com.daml.network.config.Thresholds
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.http.v0.{definitions, sv as v0}
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
@@ -43,8 +43,8 @@ import scala.jdk.OptionConverters.*
 
 class HttpSvHandler(
     svUserName: String,
-    svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+    svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
+    dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     isDevNet: Boolean,
     config: SvAppBackendConfig,
     clock: Clock,
@@ -299,7 +299,7 @@ class HttpSvHandler(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         dsoPartyId = dsoParty.toProtoPrimitive,
-        votingThreshold = CNThresholds.requiredNumVotes(dsoRules),
+        votingThreshold = Thresholds.requiredNumVotes(dsoRules),
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.contract.toHttp,
@@ -625,7 +625,7 @@ class HttpSvHandler(
       name = candidateName,
       contractId = Codec.encodeContractId(svOnboardingRequest.contractId),
       confirmedBy = confirmedBy,
-      requiredNumConfirmations = CNThresholds.requiredNumVotes(dsoRules),
+      requiredNumConfirmations = Thresholds.requiredNumVotes(dsoRules),
     )
   }
 
@@ -733,7 +733,7 @@ class HttpSvHandler(
                 dsoStoreWithIngestion.connection
                   .submit(actAs = Seq(svParty), readAs = Seq(dsoParty), cmd)
                   .withDedup(
-                    commandId = CNLedgerConnection.CommandId(
+                    commandId = SpliceLedgerConnection.CommandId(
                       "com.daml.network.sv.startSvOnboarding",
                       Seq(svParty),
                       s"$token",

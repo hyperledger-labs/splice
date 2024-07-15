@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerConnection, RetryProvider}
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.AssignedContract
 import com.daml.network.sv.automation.LeaderBasedAutomationService
@@ -36,7 +36,7 @@ class RestartLeaderBasedAutomationTrigger(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     clock: Clock,
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,

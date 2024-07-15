@@ -3,7 +3,7 @@
 
 package com.daml.network.scan.admin.http
 
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.environment.{
   MediatorAdminConnection,
   ParticipantAdminConnection,
@@ -39,7 +39,7 @@ class HttpScanSoftDomainMigrationPocHandler(
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
     protected val loggerFactory: NamedLoggerFactory,
-    amuletAppParameters: SharedCNNodeAppParameters,
+    amuletAppParameters: SharedSpliceAppParameters,
     metrics: ScanAppMetrics,
     synchronizers: Map[String, ScanSynchronizerConfig],
     retryProvider: RetryProvider,

@@ -14,10 +14,10 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{
-  CNNodeAppStoreWithIngestion,
+  AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
@@ -37,7 +37,7 @@ import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapT
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
-import com.daml.network.util.CNNodeUtil.{defaultAmuletConfig, defaultAnsConfig}
+import com.daml.network.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -86,7 +86,7 @@ class FoundingNodeInitializer(
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
-    override protected val ledgerClient: CNLedgerClient,
+    override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
@@ -96,7 +96,7 @@ class FoundingNodeInitializer(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
@@ -454,7 +454,7 @@ class FoundingNodeInitializer(
     * across setup methods.
     */
   private class WithDsoStore(
-      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       domainId: DomainId,
   ) {
 
@@ -579,7 +579,7 @@ class FoundingNodeInitializer(
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
-                      commandId = CNLedgerConnection
+                      commandId = SpliceLedgerConnection
                         .CommandId("com.daml.network.dso.executeDsoBootstrap", Seq()),
                       deduplicationOffset = offset,
                     )

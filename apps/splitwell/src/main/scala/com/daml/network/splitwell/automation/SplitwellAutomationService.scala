@@ -9,7 +9,7 @@ import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
-  CNNodeAppAutomationService,
+  SpliceAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
 }
@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{
-  CNLedgerClient,
+  SpliceLedgerClient,
   DarResource,
   DarResources,
   PackageIdResolver,
@@ -38,7 +38,7 @@ class SplitwellAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     store: SplitwellStore,
-    ledgerClient: CNLedgerClient,
+    ledgerClient: SpliceLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -46,7 +46,7 @@ class SplitwellAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CNNodeAppAutomationService(
+) extends SpliceAppAutomationService(
       automationConfig,
       clock,
       // splitwell does not have an admin connection to query the domain time and params,

@@ -5,7 +5,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.splice
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.SvUtil
@@ -92,7 +92,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
               update = cmd,
             )
             .withDedup(
-              commandId = CNLedgerConnection.CommandId(
+              commandId = SpliceLedgerConnection.CommandId(
                 "com.daml.network.sv.requestElection",
                 Seq(store.key.svParty, store.key.dsoParty),
                 svTaskContext.epoch.toString,
@@ -188,7 +188,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
 object SvTaskBasedTrigger {
   case class Context(
       dsoStore: SvDsoStore,
-      connection: CNLedgerConnection,
+      connection: SpliceLedgerConnection,
       leader: PartyId,
       epoch: Long,
   )

@@ -6,10 +6,10 @@ package com.daml.network.validator.store
 import org.apache.pekko.http.scaladsl.model.Uri
 import cats.syntax.either.*
 import com.daml.network.codegen.java.splice.appmanager.store as codegen
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
+import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
 import com.daml.network.util.PrettyInstances.*
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 final class AppManagerStore(
     getAmuletRulesDomain: GetAmuletRulesDomain,
-    storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+    storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -53,7 +53,7 @@ final class AppManagerStore(
       show"app release for ${release.provider} in version ${release.release.version}",
       store
         .lookupAppRelease(release.provider, release.release.version),
-      CNLedgerConnection.CommandId(
+      SpliceLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeAppRelease",
         Seq(validator, release.provider),
         release.release.version,
@@ -77,7 +77,7 @@ final class AppManagerStore(
       show"app configuration for ${configuration.provider} in version ${configuration.configuration.version}",
       store
         .lookupAppConfiguration(configuration.provider, configuration.configuration.version),
-      CNLedgerConnection.CommandId(
+      SpliceLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeAppConfiguration",
         Seq(validator, configuration.provider),
         configuration.configuration.version.toString,
@@ -98,7 +98,7 @@ final class AppManagerStore(
     idempotentCreate(
       show"registered app ${registered.provider}",
       store.lookupRegisteredApp(registered.provider),
-      CNLedgerConnection.CommandId(
+      SpliceLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeRegisteredApp",
         Seq(validator, registered.provider),
       ),
@@ -113,7 +113,7 @@ final class AppManagerStore(
     idempotentCreate(
       show"installed app ${installed.provider}",
       store.lookupInstalledApp(installed.provider),
-      CNLedgerConnection.CommandId(
+      SpliceLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeInstalledApp",
         Seq(validator, installed.provider),
       ),
@@ -134,7 +134,7 @@ final class AppManagerStore(
         releaseConfiguration.provider,
         configHash,
       ),
-      CNLedgerConnection.CommandId(
+      SpliceLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeApprovedReleaseConfiguration",
         Seq(validator, releaseConfiguration.provider),
         configHash.toHexString,
@@ -152,7 +152,7 @@ final class AppManagerStore(
   private def idempotentCreate[TCid, T <: com.daml.ledger.javaapi.data.Template](
       name: String,
       lookup: => Future[QueryResult[Option[ContractWithState[TCid, T]]]],
-      commandId: CNLedgerConnection.CommandId,
+      commandId: SpliceLedgerConnection.CommandId,
       payload: T,
       priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[Unit] =

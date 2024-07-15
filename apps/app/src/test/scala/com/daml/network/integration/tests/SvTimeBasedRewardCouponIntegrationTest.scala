@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.BaseLedgerConnection
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.store.Limit
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
+import com.daml.network.util.SpliceUtil.defaultIssuanceCurve
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.TransferTxLogEntry
@@ -23,13 +23,13 @@ import monocle.macros.syntax.lens.*
 import scala.math.Ordering.Implicits.*
 
 class SvTimeBasedRewardCouponIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => {
         config
@@ -38,7 +38,7 @@ class SvTimeBasedRewardCouponIntegrationTest
             // sv4 gives part of its reward to alice
             val newConfig = if (name.unwrap == "sv4") {
               val aliceParticipant =
-                CNNodeConfigTransforms
+                ConfigTransforms
                   .getParticipantIds(config.parameters.clock)("alice_validator_user")
               val aliceLedgerApiUser =
                 config.validatorApps(InstanceName.tryCreate("aliceValidator")).ledgerApiUser

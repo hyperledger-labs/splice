@@ -8,7 +8,7 @@ import cats.syntax.foldable.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.sv.onboarding.DsoPartyHosting
 import com.daml.network.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
 import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
@@ -24,8 +24,8 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class DsoPartyMigration(
-    svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
+    svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
+    dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     dsoPartyHosting: DsoPartyHosting,

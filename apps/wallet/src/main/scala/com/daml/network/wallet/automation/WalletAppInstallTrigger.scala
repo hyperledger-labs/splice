@@ -10,7 +10,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.wallet.install as installCodegen
-import com.daml.network.environment.{CNLedgerConnection, RetryFor}
+import com.daml.network.environment.{SpliceLedgerConnection, RetryFor}
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class WalletAppInstallTrigger(
     override protected val context: TriggerContext,
     walletManager: UserWalletManager,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

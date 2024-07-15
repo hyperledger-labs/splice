@@ -7,7 +7,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
+import com.daml.network.store.{AppStore, MultiDomainAcsStore}
 import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -20,7 +20,7 @@ import MultiDomainAcsStore.ContractState
   * can get called multiple times for the same contract as it gets transferred betweend domains.
   */
 abstract class OnAssignedContractTrigger[C, TCid <: ContractId[_], T](
-    store: CNNodeAppStore,
+    store: AppStore,
     companion: C,
 )(implicit
     ec: ExecutionContext,

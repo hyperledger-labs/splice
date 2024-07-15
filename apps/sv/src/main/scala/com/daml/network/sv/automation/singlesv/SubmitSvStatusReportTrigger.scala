@@ -6,7 +6,7 @@ package com.daml.network.sv.automation.singlesv
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatus
 import com.daml.network.environment.{
-  CNLedgerConnection,
+  SpliceLedgerConnection,
   MediatorAdminConnection,
   ParticipantAdminConnection,
 }
@@ -25,7 +25,7 @@ class SubmitSvStatusReportTrigger(
     svAppConfig: SvAppBackendConfig,
     baseContext: TriggerContext,
     store: SvDsoStore,
-    ledgerApiConnection: CNLedgerConnection,
+    ledgerApiConnection: SpliceLedgerConnection,
     cometBft: Option[CometBftNode],
     mediatorAdminConnection: Option[MediatorAdminConnection],
     participantAdminConnection: ParticipantAdminConnection,

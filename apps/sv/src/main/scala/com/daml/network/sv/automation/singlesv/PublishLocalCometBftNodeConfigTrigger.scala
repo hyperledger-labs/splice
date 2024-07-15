@@ -12,7 +12,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
 import com.daml.network.sv.store.SvDsoStore
@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class PublishLocalCometBftNodeConfigTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
     cometBftNode: CometBftNode,
 )(implicit
     override val ec: ExecutionContext,

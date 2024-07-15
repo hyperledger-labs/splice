@@ -2,14 +2,14 @@ package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
-import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
+import com.daml.network.config.ConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
 import com.daml.network.environment.RetryFor
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -20,7 +20,7 @@ import scala.jdk.OptionConverters.*
 
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition =
+  override def environmentDefinition: EnvironmentDefinition =
     super.environmentDefinition
       .addConfigTransforms((_, config) =>
         updateAllSvAppConfigs_ { c =>

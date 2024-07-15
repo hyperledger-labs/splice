@@ -3,9 +3,9 @@ package com.daml.network.integration.tests
 import cats.syntax.traverse.*
 import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import com.daml.network.http.v0.definitions as d0
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
+import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 import com.daml.network.wallet.automation.{
@@ -23,14 +23,14 @@ import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters.*
 
 class WalletBuyTrafficRequestIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil
     with SynchronizerFeesTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
@@ -301,7 +301,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
   private def ensureOnLedgerStateInSyncWithSequencerState(
       validatorApp: ValidatorAppBackendReference
-  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
     clue(
       s"Ensuring the on-ledger traffic state for ${validatorApp.participantClient.id} is in sync with the sequencer state"
     ) {
@@ -355,7 +355,7 @@ class WalletBuyTrafficRequestIntegrationTest
   // that we effectively give back to the member at the beginning of this test. See ReconcileSequencerLimitWithMemberTrafficTrigger for details.
   private def getTrafficLimitOffset(
       memberId: Member
-  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
     sv1Backend
       .getDsoInfo()
       .dsoRules
@@ -374,7 +374,7 @@ class WalletBuyTrafficRequestIntegrationTest
       domainId: Option[DomainId] = None,
       trackingId: Option[String] = None,
       expiresAt: Option[CantonTimestamp] = None,
-  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
     val now = env.environment.clock.now
 
     def completeBuyTrafficRequestTrigger = buyerValidator
@@ -419,7 +419,7 @@ class WalletBuyTrafficRequestIntegrationTest
       domainId: Option[DomainId] = None,
       trackingId: Option[String] = None,
       expiresAt: Option[CantonTimestamp] = None,
-  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
     val now = env.environment.clock.now
     val tid = trackingId.getOrElse(defaultTrackingId)
     assertThrowsAndLogsCommandFailures(
@@ -444,7 +444,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
   private val defaultTrackingId = "myTrackingId"
 
-  private def minTopupAmount(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) =
+  private def minTopupAmount(implicit env: SpliceTests.SpliceTestConsoleEnvironment) =
     sv1ScanBackend
       .getAmuletConfigAsOf(env.environment.clock.now)
       .decentralizedSynchronizer

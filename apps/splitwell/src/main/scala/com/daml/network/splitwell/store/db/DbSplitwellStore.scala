@@ -13,7 +13,7 @@ import com.daml.network.splitwell.config.SplitwellSynchronizerConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.{LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbAppStore}
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -42,7 +42,7 @@ class DbSplitwellStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore(
+) extends DbAppStore(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
       // Any change in the store descriptor will lead to previously deployed applications

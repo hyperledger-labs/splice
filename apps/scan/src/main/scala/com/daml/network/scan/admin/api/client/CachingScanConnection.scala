@@ -6,7 +6,7 @@ package com.daml.network.scan.admin.api.client
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.environment.CNLedgerClient
+import com.daml.network.environment.SpliceLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.{
   CachedAnsRules,
   CachedAmuletRules,
@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait CachingScanConnection extends ScanConnection {
 
-  protected val amuletLedgerClient: CNLedgerClient
+  protected val amuletLedgerClient: SpliceLedgerClient
   protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration
 
   private val amuletRulesCache: AtomicReference[Option[CachedAmuletRules]] =

@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.util.SvTestUtil
 
@@ -12,11 +12,11 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 /** Integration test that onboards an SV then starts a clone without the onboarding config.
   */
-class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
+class SvOnboardingConfigIntegrationTest extends IntegrationTest with SvTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .fromResources(
         Seq("simple-topology.conf", "include/svs/sv2-onboarded.conf"),
         this.getClass.getSimpleName,

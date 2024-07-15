@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.sv.store.SvSvStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ExpireValidatorOnboardingTrigger(
     override protected val context: TriggerContext,
     store: SvSvStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

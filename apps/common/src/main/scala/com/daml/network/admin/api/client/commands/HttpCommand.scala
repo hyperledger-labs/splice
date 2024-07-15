@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import io.circe.parser.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,7 +28,7 @@ trait HttpCommand[Res, Result] {
   type Client
 
   def createClient(host: String)(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -57,7 +57,7 @@ trait HttpCommand[Res, Result] {
       type Client = self.Client
 
       override def createClient(host: String)(implicit
-          httpClient: CNHttpClient,
+          httpClient: HttpClient,
           tc: TraceContext,
           ec: ExecutionContext,
           mat: Materializer,
@@ -84,7 +84,7 @@ trait HttpCommand[Res, Result] {
 
 object HttpClientBuilder {
   def apply()(implicit
-      httpClient: CNHttpClient,
+      httpClient: HttpClient,
       ec: ExecutionContext,
       mat: Materializer,
   ) =
@@ -92,7 +92,7 @@ object HttpClientBuilder {
 }
 
 final class HttpClientBuilder()(implicit
-    httpClient: CNHttpClient,
+    httpClient: HttpClient,
     ec: ExecutionContext,
     mat: Materializer,
 ) {

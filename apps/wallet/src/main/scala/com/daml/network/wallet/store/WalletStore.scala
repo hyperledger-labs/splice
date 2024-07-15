@@ -5,7 +5,7 @@ package com.daml.network.wallet.store
 
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.install as installCodegen
-import com.daml.network.store.CNNodeAppStore
+import com.daml.network.store.AppStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.topology.PartyId
@@ -16,7 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
   */
-trait WalletStore extends CNNodeAppStore {
+trait WalletStore extends AppStore {
 
   protected implicit val ec: ExecutionContext
 

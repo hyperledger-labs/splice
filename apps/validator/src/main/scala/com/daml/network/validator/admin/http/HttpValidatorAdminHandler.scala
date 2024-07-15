@@ -8,7 +8,7 @@ import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.store.ValidatorStore
@@ -24,7 +24,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorAdminHandler(
-    storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+    storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
     validatorWalletUserName: Option[String],

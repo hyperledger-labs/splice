@@ -4,7 +4,7 @@
 package com.daml.network.sv.http
 
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.CNHttpClient
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.sv as http
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.stream.Materializer
@@ -17,7 +17,7 @@ object SvHttpClient {
     override type Client = http.SvClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,

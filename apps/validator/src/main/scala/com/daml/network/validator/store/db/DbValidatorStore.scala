@@ -18,7 +18,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbAppStore}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.validator.store.ValidatorStore
@@ -44,7 +44,7 @@ class DbValidatorStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore(
+) extends DbAppStore(
       storage = storage,
       acsTableName = ValidatorTables.acsTableName,
       // Any change in the store descriptor will lead to previously deployed applications

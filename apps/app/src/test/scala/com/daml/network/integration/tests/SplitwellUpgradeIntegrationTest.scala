@@ -3,15 +3,15 @@ package com.daml.network.integration.tests
 import cats.syntax.either.*
 import com.daml.network.codegen.java.splice.{splitwell as splitwellCodegen}
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.console.SplitwellAppClientReference
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
-import CNNodeTests.BracketSynchronous.*
+import SpliceTests.BracketSynchronous.*
 import com.daml.network.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
@@ -22,7 +22,7 @@ import org.slf4j.event.Level
 import scala.util.Try
 
 class SplitwellUpgradeIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with MultiDomainTestUtil
     with SplitwellTestUtil
     with WalletTestUtil {
@@ -30,10 +30,10 @@ class SplitwellUpgradeIntegrationTest
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
+      .addConfigTransform((_, config) => ConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)

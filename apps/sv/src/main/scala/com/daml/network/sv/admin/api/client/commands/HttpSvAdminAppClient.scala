@@ -19,8 +19,8 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.CNNodeStatus
-import com.daml.network.http.CNHttpClient
+import com.daml.network.environment.SpliceStatus
+import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
   TriggerDomainMigrationDumpRequest,
@@ -50,7 +50,7 @@ object HttpSvAdminAppClient {
     override type Client = http.SvAdminClient
 
     def createClient(host: String)(implicit
-        httpClient: CNHttpClient,
+        httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
@@ -383,7 +383,7 @@ object HttpSvAdminAppClient {
   case class GetSequencerNodeStatus()
       extends BaseCommand[
         http.GetSequencerNodeStatusResponse,
-        NodeStatus[CNNodeStatus],
+        NodeStatus[SpliceStatus],
       ] {
 
     override def submitRequest(
@@ -398,16 +398,16 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[
       http.GetSequencerNodeStatusResponse,
-      Either[String, NodeStatus[CNNodeStatus]],
+      Either[String, NodeStatus[SpliceStatus]],
     ] = { case http.GetSequencerNodeStatusResponse.OK(response) =>
-      CNNodeStatus.fromHttpNodeStatus(CNNodeStatus.fromHttp)(response)
+      SpliceStatus.fromHttpNodeStatus(SpliceStatus.fromHttp)(response)
     }
   }
 
   case class GetMediatorNodeStatus()
       extends BaseCommand[
         http.GetMediatorNodeStatusResponse,
-        NodeStatus[CNNodeStatus],
+        NodeStatus[SpliceStatus],
       ] {
 
     override def submitRequest(
@@ -422,9 +422,9 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[
       http.GetMediatorNodeStatusResponse,
-      Either[String, NodeStatus[CNNodeStatus]],
+      Either[String, NodeStatus[SpliceStatus]],
     ] = { case http.GetMediatorNodeStatusResponse.OK(response) =>
-      CNNodeStatus.fromHttpNodeStatus(CNNodeStatus.fromHttp)(response)
+      SpliceStatus.fromHttpNodeStatus(SpliceStatus.fromHttp)(response)
     }
   }
 

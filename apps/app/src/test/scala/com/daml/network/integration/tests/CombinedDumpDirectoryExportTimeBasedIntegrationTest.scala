@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
 }
 import java.nio.file.{Files, Path, Paths}
 
-final class CombinedDumpDirectoryExportIntegrationTest extends CNNodeIntegrationTest {
+final class CombinedDumpDirectoryExportIntegrationTest extends IntegrationTest {
 
   private val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
 
@@ -16,7 +16,7 @@ final class CombinedDumpDirectoryExportIntegrationTest extends CNNodeIntegration
   // we write out participant identities dumps manually
   // because it give us more convenient control over file name and storage location
   def writeParticipantDump(nodeName: String, content: String)(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val now = env.environment.clock.now
     val filename = s"${nodeName}_participant_dump_${now}.json"

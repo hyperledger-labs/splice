@@ -12,13 +12,13 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
-  CNNodeTestConsoleEnvironment,
+import com.daml.network.config.ConfigTransforms
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.integration.EnvironmentDefinition
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.confirmation.AnsSubscriptionInitialPaymentTrigger
 import com.daml.network.sv.automation.leaderbased.{
@@ -38,7 +38,7 @@ import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class WalletManualRoundsIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with SplitwellTestUtil
     with TriggerTestUtil {
@@ -48,8 +48,8 @@ class WalletManualRoundsIntegrationTest
   private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
+      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
@@ -70,7 +70,7 @@ class WalletManualRoundsIntegrationTest
       )
       // Very short round ticks
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
@@ -386,7 +386,7 @@ class WalletManualRoundsIntegrationTest
 
   private def lookupAnsContextCid(
       subscriptionRequestCid: SubscriptionRequest.ContractId
-  )(implicit env: CNNodeTestConsoleEnvironment): Option[AnsEntryContext.ContractId] =
+  )(implicit env: SpliceTestConsoleEnvironment): Option[AnsEntryContext.ContractId] =
     aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(AnsEntryContext.COMPANION)(dsoParty)
       .find(_.data.reference == subscriptionRequestCid)
@@ -394,7 +394,7 @@ class WalletManualRoundsIntegrationTest
 
   private def lookupAnsAcceptInitialPaymentConfirmation(
       ansContextCid: AnsEntryContext.ContractId
-  )(implicit env: CNNodeTestConsoleEnvironment): Option[Confirmation.ContractId] = {
+  )(implicit env: SpliceTestConsoleEnvironment): Option[Confirmation.ContractId] = {
     val svParty = sv1Backend.getDsoInfo().svParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(Confirmation.COMPANION)(dsoParty)
@@ -412,7 +412,7 @@ class WalletManualRoundsIntegrationTest
       initialPayment: Contract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment],
       transferContext: AppTransferContext,
   )(implicit
-      env: CNNodeTestConsoleEnvironment
+      env: SpliceTestConsoleEnvironment
   ) = {
     val svParty = sv1Backend.getDsoInfo().svParty
     val ansRules = sv1ScanBackend.getAnsRules()

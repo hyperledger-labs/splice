@@ -2,9 +2,9 @@ package com.daml.network.integration.tests
 
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
 import cats.syntax.either.*
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.http.v0.definitions.{AppConfiguration, ReleaseConfiguration, Timespan}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
 
 import java.io.File
@@ -30,10 +30,10 @@ class AppManagerFrontendIntegrationTest
   )
 
   override def environmentDefinition =
-    CNNodeEnvironmentDefinition
+    EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config)
+        ConfigTransforms.disableSplitwellUserDomainConnections(config)
       )
       .withoutInitialManagerApps
 

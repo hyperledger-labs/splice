@@ -6,7 +6,7 @@ package com.daml.network.store
 import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricDoc.MetricQualification.Traffic
 import com.daml.metrics.api.MetricHandle.Gauge
-import com.daml.network.environment.{CNMetrics, RetryProvider, TopologyAdminConnection}
+import com.daml.network.environment.{SpliceMetrics, RetryProvider, TopologyAdminConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
@@ -141,7 +141,7 @@ object DomainParamsStore {
 
   class Metrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
 
-    val prefix: MetricName = CNMetrics.MetricsPrefix :+ "domain_params_store"
+    val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "domain_params_store"
 
     @MetricDoc.Tag(
       summary = "DynamicDomainParameters.confirmationRequestsMaxRate",

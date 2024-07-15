@@ -11,8 +11,8 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.dsorules.ElectionRequest
-import com.daml.network.config.CNThresholds
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.config.Thresholds
+import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
@@ -27,7 +27,7 @@ import scala.jdk.CollectionConverters.*
 class ElectionRequestTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    connection: CNLedgerConnection,
+    connection: SpliceLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -48,7 +48,7 @@ class ElectionRequestTrigger(
       currentLeader = dsoRules.payload.dsoDelegate
       self = store.key.svParty.toProtoPrimitive
 
-      requiredNumRequests = CNThresholds.requiredNumVotes(dsoRules)
+      requiredNumRequests = Thresholds.requiredNumVotes(dsoRules)
       requestCids <- store.listElectionRequests(dsoRules).map(_.map(_.contractId))
       taskOutcome <-
         if (requestCids.size >= requiredNumRequests) {

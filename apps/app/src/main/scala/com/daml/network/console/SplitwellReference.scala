@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.console.LedgerApiExtensions.*
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.{SplitwellApp, SplitwellAppBootstrap}
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
@@ -33,9 +33,9 @@ import scala.jdk.CollectionConverters.*
 /** Splitwell app reference. Defines the console commands that can be run against either a client or backend splitwell reference.
   */
 abstract class SplitwellAppReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     override val name: String,
-) extends HttpCNNodeAppReference {
+) extends HttpAppReference {
 
   override def basePath = "/api/splitwell"
   // We go through BaseLedgerApiAdministration here rather than creating a
@@ -47,7 +47,7 @@ abstract class SplitwellAppReference(
 
   lazy val scanClient =
     new ScanAppClientReference(
-      cnNodeConsoleEnvironment,
+      spliceConsoleEnvironment,
       s"scan client for `$name``",
       scanClientConfig,
     )
@@ -72,11 +72,11 @@ abstract class SplitwellAppReference(
 }
 
 final class SplitwellAppClientReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
     val config: SplitwellAppClientConfig, // adding this explicitly for easier overriding
 )(implicit actorSystem: ActorSystem)
-    extends SplitwellAppReference(cnNodeConsoleEnvironment, name) {
+    extends SplitwellAppReference(spliceConsoleEnvironment, name) {
   private val acceptDuration = new RelTime(
     60_000_000
   )
@@ -465,11 +465,11 @@ final class SplitwellAppClientReference(
 }
 
 final class SplitwellAppBackendReference(
-    override val consoleEnvironment: CNNodeConsoleEnvironment,
+    override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
 )(implicit actorSystem: ActorSystem)
     extends SplitwellAppReference(consoleEnvironment, name)
-    with CNNodeAppBackendReference
+    with AppBackendReference
     with BaseInspection[SplitwellApp] {
 
   override def runningNode: Option[SplitwellAppBootstrap] =
@@ -506,7 +506,7 @@ final class SplitwellAppBackendReference(
 
   /** Remote participant this splitwell app is configured to interact with. */
   lazy val participantClient =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.participantClient.getParticipantClientConfig(),
@@ -514,7 +514,7 @@ final class SplitwellAppBackendReference(
 
   /** Remote participant this splitwell app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =
-    new CNParticipantClientReference(
+    new ParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,

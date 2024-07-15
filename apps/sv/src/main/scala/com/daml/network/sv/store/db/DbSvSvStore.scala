@@ -8,7 +8,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbAppStore}
 import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
@@ -32,7 +32,7 @@ class DbSvSvStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore(
+) extends DbAppStore(
       storage,
       DbSvSvStore.tableName,
       // Any change in the store descriptor will lead to previously deployed applications

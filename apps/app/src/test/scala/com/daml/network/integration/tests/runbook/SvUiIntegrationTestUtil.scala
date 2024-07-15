@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.DsoInfo
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.*
 
-trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
+trait SvUiIntegrationTestUtil extends TestCommon {
 
   this: FrontendTestCommon =>
 
