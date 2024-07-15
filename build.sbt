@@ -1126,7 +1126,7 @@ import sbtassembly.AssemblyPlugin.autoImport.assembly
 /** Generate a release bundle. Simplified versions of Canton's release bundling (see Canton's code base / issue #147) */
 lazy val bundleTask = {
   bundle := {
-    val license = Seq("-c", "LICENSE.txt")
+    val license = Seq("-c", "LICENSE")
     val log = streams.value.log
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")

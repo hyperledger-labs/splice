@@ -60,8 +60,8 @@ $$(prefix)/helm-build: $$(prefix)/values.yaml $$(prefix)/Chart.yaml $$(prefix)/L
 $$(prefix)/helm-clean:
 	rm -vf $$(@D)/values.yaml $$(@D)/Chart.yaml $$(@D)/LICENSE
 
-$$(prefix)/LICENSE: LICENSE.txt
-	cp LICENSE.txt $$(@D)/LICENSE
+$$(prefix)/LICENSE: LICENSE
+	cp LICENSE $$(@D)/LICENSE
 
 endef # end DEFINE_PHONY_CHART_RULES
 

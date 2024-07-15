@@ -34,7 +34,7 @@ consumption and are intended to stay backwards compatible across
 releases. At this point, there might be some cases where backwards
 compatibility is broken as we are still in early stages of
 development. Any breaking changes in ``external`` APIs will be
-documented in the :ref:`release notes <release_notes>`.
+documented in the release notes.
 
 Endpoints in the files named ``APP-internal`` do not have any backwards compatibility guarantees.
 

@@ -54,7 +54,7 @@ object Headers {
     headerMappings := headerMappings.value ++ Map(
       HeaderFileType.scala -> scalaCommentStyle,
       HeaderFileType("daml") -> dashCommentStyle,
-      HeaderFileType("rst") -> dotCommentStyle,
+      HeaderFileType("rst", Some(firstLinePattern(":.*:"))) -> dotCommentStyle,
     ),
   )
 
