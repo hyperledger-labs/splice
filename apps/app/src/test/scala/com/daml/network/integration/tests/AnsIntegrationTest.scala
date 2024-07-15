@@ -31,7 +31,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 import org.slf4j.event.Level
 
-import java.time.{Instant, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
@@ -110,22 +110,20 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       entry.name shouldBe testEntryName
     }
 
-    "archive expired CNS entries" in { implicit env =>
-      setTriggersWithin[Assertion](
-        triggersToPauseAtStart = Seq(),
-        triggersToResumeAtStart = Seq(leaderExpiredAnsEntryTrigger),
-      ) {
+    "register an entry despite there is an expired CNS entry with the same name" in {
+      implicit env =>
+        clue("no user entries is created") {
+          val userEntries = sv1ScanBackend
+            .listEntries("", 25)
+            .filter(entry =>
+              !entry.name.endsWith(
+                DsoAnsResolver.svAnsNameSuffix
+              ) && entry.name != DsoAnsResolver.dsoAnsName
+            )
+          userEntries shouldBe empty
+        }
+
         clue("Creating a CNS entry that expires immediately") {
-          clue("no user entries is created") {
-            val userEntries = sv1ScanBackend
-              .listEntries("", 25)
-              .filter(entry =>
-                !entry.name.endsWith(
-                  DsoAnsResolver.svAnsNameSuffix
-                ) && entry.name != DsoAnsResolver.dsoAnsName
-              )
-            userEntries shouldBe empty
-          }
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               actAs = Seq(dsoParty),
@@ -139,16 +137,34 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
               ).create.commands.asScala.toSeq,
               optTimeout = None,
             )
-          eventually()(
-            lookupEntryByName(testEntryName) should not be empty
-          )
+          clue("Created entry is expired") {
+            eventually() {
+              inside(lookupEntryByName(testEntryName)) { case Some(expired) =>
+                inside(expired.expiresAt) { case Some(expiresAt) =>
+                  expiresAt should be < OffsetDateTime.now
+                }
+              }
+              assertThrowsAndLogsCommandFailures(
+                sv1ScanBackend.lookupEntryByName(testEntryName),
+                _.message should include(s"Entry with name $testEntryName not found"),
+              )
+            }
+          }
+
         }
-        clue("Waiting for the backend to expire the entry...") {
-          eventually()(
-            lookupEntryByName(testEntryName) shouldBe empty
-          )
+
+        clue("new entry with the same name can be registered by another user") {
+          val aliceStaticRefs =
+            StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+          val aliceRefs = setupUser(aliceStaticRefs)
+
+          requestAndPayForEntry(aliceRefs, testEntryName)
+          eventually() {
+            val entry = sv1ScanBackend.lookupEntryByName(testEntryName)
+            entry.name shouldBe testEntryName
+            entry.user shouldBe aliceRefs.userParty.toProtoPrimitive
+          }
         }
-      }
     }
 
     "reject invalid entry names" in { implicit env =>
