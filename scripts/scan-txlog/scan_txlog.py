@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-
-
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 import aiohttp
 import asyncio
 import colorlog
+import csv
 from dataclasses import dataclass
 from decimal import *
 from datetime import datetime
@@ -15,7 +14,7 @@ import json
 import logging
 import pprint
 import textwrap
-from typing import Optional
+from typing import Optional, TextIO
 import sys
 import argparse
 import os
@@ -23,14 +22,17 @@ import time
 
 cli_handler = colorlog.StreamHandler()
 cli_handler.setFormatter(
-    colorlog.ColoredFormatter("%(log_color)s%(levelname)s:%(name)s:%(message)s",
-                              log_colors={
-		                          'DEBUG':    'cyan',
-		                          'INFO':     'green',
-		                          'WARNING':  'yellow',
-		                          'ERROR':    'red',
-		                          'CRITICAL': 'red,bg_white',
-	                          }))
+    colorlog.ColoredFormatter(
+        "%(log_color)s%(levelname)s:%(name)s:%(message)s",
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red,bg_white",
+        },
+    )
+)
 file_handler = logging.FileHandler("log/scan_txlog.log")
 file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
 
@@ -50,11 +52,55 @@ def _default_logger(name, loglevel):
 
     return logger
 
+
 # Global logger, always accessible
-LOG=_default_logger("global", "INFO")
+LOG = _default_logger("global", "INFO")
+
 
 def _party_enabled(args, p):
-    return not args.party or args.party==p
+    return not args.party or args.party == p
+
+
+class CSVReport:
+    csv_writer: Optional[csv.DictWriter]
+
+    def __init__(self, report_stream):
+        fieldnames = [
+            "row_type",
+            "update_id",
+            "record_time",
+            "provider",
+            "sender",
+            "input_reward_cc_total",
+            "input_amulet_cc_total",
+            "holding_fees_total",
+            "tx_fees_total",
+            "source",
+            "round",
+            "owner",
+            "initial_amount_cc",
+            "effective_amount_cc",
+            "currency",
+            "lock_holders",
+            "cc_burnt",
+            "traffic_bytes_bought",
+            "traffic_member_id",
+            "computed_balance",
+            "scan_balance",
+        ]
+
+        if report_stream:
+            self.csv_writer = csv.DictWriter(report_stream, fieldnames)
+            self.csv_writer.writeheader()
+        else:
+            self.csv_writer = None
+
+    def report_line(self, row_type, line_info):
+        if not self.csv_writer:
+            return
+
+        self.csv_writer.writerow({**line_info, "row_type": row_type})
+
 
 @dataclass
 class TemplateId:
@@ -997,6 +1043,7 @@ class Event:
                 json["consuming"],
             )
 
+
 @dataclass
 class TransactionTree:
     root_event_ids: list
@@ -1041,7 +1088,7 @@ class TransactionTree:
             datetime.fromisoformat(json["record_time"]),
             json["update_id"],
             json["workflow_id"],
-            json["synchronizer_id"]
+            json["synchronizer_id"],
         )
 
     def is_acs_import(self):
@@ -1074,9 +1121,11 @@ class TransactionTree:
         }
         return AcsDiff(non_transient_created_events, non_transient_archived_events)
 
+
 def get_transaction_id(transaction):
     hash_length = 12
     return f"{transaction.update_id[0:hash_length]}..."
+
 
 class AcsDiff:
     def __init__(self, created_events, archived_events):
@@ -1087,15 +1136,40 @@ class AcsDiff:
 @dataclass
 class TransferSummary:
     effective_inputs: list
-    outputs: list
+    all_outputs: list
     fees: list
 
     def is_valid(self):
-        return sum(self.effective_inputs) == sum(self.outputs) + sum(self.fees)
+        return sum(self.effective_inputs) == sum(
+            [o.initial_amount for o in self.all_outputs]
+        ) + sum(self.fees)
+
+    def get_locked_total(self):
+        return sum([o.initial_amount for o in self.all_outputs if o.is_locked()])
+
+    def get_unlocked_total(self):
+        return sum([o.initial_amount for o in self.all_outputs if not o.is_locked()])
+
+    def get_fees_total(self):
+        return sum(self.fees)
 
     def get_error(self, event_type):
         if not self.is_valid():
-            return f"Inputs and outputs of {event_type} do not match up, expected: {sum(self.effective_inputs)} == {sum(self.outputs)} + {sum(self.fees)}"
+            return f"Inputs and outputs of {event_type} do not match up, expected: {sum(self.effective_inputs)} == {sum([o.initial_amount for o in self.all_outputs])} + {sum(self.fees)}"
+
+    def get_all_owners(self):
+        return [o.owner for o in self.all_outputs]
+
+    def get_all_lock_holders(self):
+        return sum([o.lock_holders for o in self.all_outputs], [])
+
+
+@dataclass
+class TransferInput:
+    source: str
+    initial_amount: Optional[DamlDecimal]
+    effective_amount: DamlDecimal
+    round: int
 
 
 class TransferInputs:
@@ -1123,26 +1197,35 @@ class TransferInputs:
     def summarize_reward_type(self, header, rewards_by_round, get_issuance, get_amount):
         output = []
         effective_inputs = []
+        all_inputs = []
+        total_cc = DamlDecimal(0)
         if rewards_by_round:
-            output += [header]
+            output += [f"{header}:"]
             for round_number, rewards in rewards_by_round.items():
                 issuing = get_issuance(
                     self.issuing_mining_rounds_by_round[round_number]
                 )
-                total_cc = DamlDecimal(0)
+                round_total_cc = DamlDecimal(0)
                 total_amount = DamlDecimal(0)
                 for reward in rewards:
                     amount = get_amount(reward.payload)
                     total_amount += amount
-                    total_cc += amount * issuing
-                effective_inputs += [total_cc]
-                # Note: total_cc is not necessarily exactly total_amount * issuing due to
+                    round_total_cc += amount * issuing
+
+                all_inputs += [
+                    TransferInput(header, None, round_total_cc, round_number)
+                ]
+
+                effective_inputs += [round_total_cc]
+                total_cc += round_total_cc
+                # Note: round_total_cc is not necessarily exactly total_amount * issuing due to
                 # (a + b) * z not being equal to a * z + b * z in DamlDecimal.
                 # Displaying individual rewards is way too noisy though so we accept this.
                 output += [
-                    f"  recorded in round {round_number}: -{total_cc} = -{total_amount} @ {issuing}"
+                    f"  recorded in round {round_number}: -{round_total_cc} = -{total_amount} @ {issuing}"
                 ]
-        return (output, effective_inputs)
+
+        return (output, effective_inputs, total_cc, all_inputs)
 
     def summary(self):
         output = []
@@ -1156,53 +1239,75 @@ class TransferInputs:
                 else:
                     unfeatured_app_rewards.setdefault(round_number, []).append(reward)
 
-        (unfeatured_outputs, unfeatured_inputs) = self.summarize_reward_type(
-            "unfeatured_app_activity_records",
-            unfeatured_app_rewards,
-            lambda r: r.get_issuing_mining_round_issuance_per_unfeatured_app_reward(),
-            lambda r: r.get_app_reward_amount(),
+        (unfeatured_outputs, unfeatured_inputs, unfeatured_total_cc, all_unfeatured) = (
+            self.summarize_reward_type(
+                "unfeatured_app_activity_record",
+                unfeatured_app_rewards,
+                lambda r: r.get_issuing_mining_round_issuance_per_unfeatured_app_reward(),
+                lambda r: r.get_app_reward_amount(),
+            )
         )
         output += unfeatured_outputs
         effective_inputs += unfeatured_inputs
 
-        (featured_outputs, featured_inputs) = self.summarize_reward_type(
-            "featured_app_activity_records",
-            featured_app_rewards,
-            lambda r: r.get_issuing_mining_round_issuance_per_featured_app_reward(),
-            lambda r: r.get_app_reward_amount(),
+        (featured_outputs, featured_inputs, featured_total_cc, all_featured) = (
+            self.summarize_reward_type(
+                "featured_app_activity_record",
+                featured_app_rewards,
+                lambda r: r.get_issuing_mining_round_issuance_per_featured_app_reward(),
+                lambda r: r.get_app_reward_amount(),
+            )
         )
         output += featured_outputs
         effective_inputs += featured_inputs
 
-        (validator_outputs, validator_inputs) = self.summarize_reward_type(
-            "validator_activity_records",
-            self.validator_rewards,
-            lambda r: r.get_issuing_mining_round_issuance_per_validator_reward(),
-            lambda r: r.get_validator_reward_amount(),
+        (validator_outputs, validator_inputs, validator_total_cc, all_validator) = (
+            self.summarize_reward_type(
+                "validator_activity_record",
+                self.validator_rewards,
+                lambda r: r.get_issuing_mining_round_issuance_per_validator_reward(),
+                lambda r: r.get_validator_reward_amount(),
+            )
         )
         output += validator_outputs
         effective_inputs += validator_inputs
 
-        (validator_faucet_outputs, validator_faucet_inputs) = (
-            self.summarize_reward_type(
-                "validator_faucet_activity_records",
-                self.validator_faucets,
-                lambda r: r.get_issuing_mining_round_issuance_per_validator_faucet(),
-                lambda r: DamlDecimal(1),  # faucets always have value 1
-            )
+        (
+            validator_faucet_outputs,
+            validator_faucet_inputs,
+            validator_faucet_total_cc,
+            all_validator_faucet,
+        ) = self.summarize_reward_type(
+            "validator_faucet_activity_record",
+            self.validator_faucets,
+            lambda r: r.get_issuing_mining_round_issuance_per_validator_faucet(),
+            lambda r: DamlDecimal(1),  # faucets always have value 1
         )
         output += validator_faucet_outputs
         effective_inputs += validator_faucet_inputs
 
-        (sv_outputs, sv_inputs) = self.summarize_reward_type(
-            "sv_activity_records",
-            self.sv_rewards,
-            lambda r: r.get_issuing_mining_round_issuance_per_sv_reward(),
-            lambda r: r.get_sv_reward_coupon_weight(),
+        (sv_outputs, sv_inputs, sv_total_cc, all_sv_activity) = (
+            self.summarize_reward_type(
+                "sv_activity_record",
+                self.sv_rewards,
+                lambda r: r.get_issuing_mining_round_issuance_per_sv_reward(),
+                lambda r: r.get_sv_reward_coupon_weight(),
+            )
         )
         output += sv_outputs
         effective_inputs += sv_inputs
 
+        reward_total_cc = (
+            unfeatured_total_cc
+            + featured_total_cc
+            + validator_total_cc
+            + validator_faucet_total_cc
+            + sv_total_cc
+        )
+
+        initial_amulet_total_cc = DamlDecimal(0)
+        amulet_total_cc = DamlDecimal(0)
+        all_amulet = []
         if self.amulets:
             output += ["amulets:"]
             for amulet in self.amulets:
@@ -1216,10 +1321,35 @@ class TransferInputs:
                     DamlDecimal(0),
                 )
                 effective_inputs += [effective_amount]
+
+                initial_amulet_total_cc += initial_amount
+                amulet_total_cc += effective_amount
+                all_amulet += [
+                    TransferInput(
+                        "amulet", initial_amount, effective_amount, round_number
+                    )
+                ]
                 output += [
                     f"  created in round {round_number}: -{effective_amount} = -({initial_amount} - {rate_per_round} * {round_diff})"
                 ]
-        return ("\n".join(output), effective_inputs)
+
+        all_inputs = (
+            all_unfeatured
+            + all_featured
+            + all_validator
+            + all_validator_faucet
+            + all_sv_activity
+            + all_amulet
+        )
+
+        return (
+            "\n".join(output),
+            effective_inputs,
+            reward_total_cc,
+            initial_amulet_total_cc,
+            amulet_total_cc,
+            all_inputs,
+        )
 
 
 @dataclass
@@ -1320,24 +1450,34 @@ class PerPartyState:
         return "\n".join(lines)
 
 
+@dataclass
+class TransferOutput:
+    initial_amount: DamlDecimal
+    owner: str
+    lock_holders: list
+
+    def is_locked(self):
+        return len(self.lock_holders) > 0
+
+
 # The state at a given record time
 class State:
     args: dict
     active_contracts: dict[str, CreatedEvent]
     record_time: datetime
     synchronizer_id: Optional[str]
+    csv_report: CSVReport
+    for_round: Optional[int]
 
     def __init__(
-        self,
-        args,
-        active_contracts,
-        record_time,
-        synchronizer_id
+        self, args, active_contracts, record_time, synchronizer_id, csv_report
     ):
         self.args = args
         self.active_contracts = active_contracts
         self.record_time = record_time
         self.synchronizer_id = synchronizer_id
+        self.csv_report = csv_report
+        self.for_round = None
 
     def clone(self):
         return State(
@@ -1345,10 +1485,16 @@ class State:
             self.active_contracts.copy(),
             self.record_time,
             self.synchronizer_id,
+            self.csv_report,
         )
 
+    def clone_for_round(self, for_round):
+        s = self.clone()
+        s.for_round = for_round
+        return s
+
     @classmethod
-    def from_json(cls, args, json):
+    def from_json(cls, args, json, csv_report):
         return cls(
             args,
             {
@@ -1357,6 +1503,7 @@ class State:
             },
             datetime.fromisoformat(json["record_time"]),
             json["synchronizer_id"],
+            csv_report,
         )
 
     def to_json(self):
@@ -1370,27 +1517,50 @@ class State:
         }
 
     def _txinfo(self, transaction, operation, message, parties=None):
-        if parties and len([p for p in parties if _party_enabled(self.args, p)]) == 0:
+        if self.for_round and not self.args.verbose:
             return
 
-        msg = message.split('\n', 1)
+        if parties and len([p for p in parties if _party_enabled(self.args, p)]) == 0:
+            return False
 
-        LOG.info(f'{transaction.record_time} {get_transaction_id(transaction)} ({operation}) - {msg[0]}')
+        msg = message.split("\n", 1)
+
+        round_flag = f":r{self.for_round}" if self.for_round else ""
+        LOG.info(
+            f"{transaction.record_time} {get_transaction_id(transaction)} ({operation}{round_flag}) - {msg[0]}"
+        )
 
         if len(msg) > 1 and not self.args.hide_details:
-            LOG.info(textwrap.indent(msg[1], '    '))
+            LOG.info(textwrap.indent(msg[1], "    "))
+
+        return True
+
+    def _report_line(self, transaction, line_type, line_info, parties=None):
+        if self.for_round:
+            return
+
+        written = self._txinfo(
+            transaction, f"ReportLine{line_type}", str(line_info), parties=parties
+        )
+
+        if written:
+            self.csv_report.report_line(line_type, line_info)
 
     def _fail(self, transaction, message, cause=None, recoverable=True):
         if not self.args.stop_on_error and recoverable:
-            message = f'{message} (will attempt to recover from acs_diff and restart)'
+            message = f"{message} (will attempt to recover from acs_diff and restart)"
 
         LOG.error(message)
 
         if not recoverable:
-            raise Exception(f'Unrecoveable error, stopping export (error: {message})') from cause
+            raise Exception(
+                f"Unrecoveable error, stopping export (error: {message})"
+            ) from cause
 
         if self.args.stop_on_error:
-            raise Exception(f'--stop-on-error set, stopping export (error: {message})') from cause
+            raise Exception(
+                f"--stop-on-error set, stopping export (error: {message})"
+            ) from cause
 
     def summary(self):
         amulets = self.list_contracts(TemplateQualifiedNames.amulet)
@@ -1435,12 +1605,16 @@ class State:
         per_party_states = {}
         for amulet in amulets.values():
             owner = amulet.payload.get_amulet_owner()
-            per_party_states.setdefault(owner, PerPartyState(self.args, open_mining_round_numbers))
+            per_party_states.setdefault(
+                owner, PerPartyState(self.args, open_mining_round_numbers)
+            )
             per_party_states[owner].amulets += [amulet]
         for locked_amulet in locked_amulets.values():
             amulet = locked_amulet.payload.get_locked_amulet_amulet()
             owner = amulet.get_amulet_owner()
-            per_party_states.setdefault(owner, PerPartyState(self.args, open_mining_round_numbers))
+            per_party_states.setdefault(
+                owner, PerPartyState(self.args, open_mining_round_numbers)
+            )
             per_party_states[owner].locked_amulets += [locked_amulet]
         for app_reward in app_rewards.values():
             provider = app_reward.payload.get_app_reward_provider()
@@ -1465,7 +1639,9 @@ class State:
                 ] += amount
         for validator_reward in validator_rewards.values():
             user = validator_reward.payload.get_validator_reward_user()
-            per_party_states.setdefault(user, PerPartyState(self.args, open_mining_round_numbers))
+            per_party_states.setdefault(
+                user, PerPartyState(self.args, open_mining_round_numbers)
+            )
             round_number = validator_reward.payload.get_validator_reward_round()
             amount = validator_reward.payload.get_validator_reward_amount()
             per_party_states[user].validator_reward_coupons.setdefault(
@@ -1501,7 +1677,8 @@ class State:
             ]
             + [
                 f"    {party}:\n{textwrap.indent(str(state), '      ')}"
-                for party, state in sorted(per_party_states.items()) if _party_enabled(self.args, party)
+                for party, state in sorted(per_party_states.items())
+                if _party_enabled(self.args, party)
             ]
         )
 
@@ -1536,22 +1713,6 @@ class State:
             if open_round.payload.get_open_mining_round_round() == round_number
         )
 
-    def _fail(self, transaction, message, cause=None, recoverable=True):
-        if not self.args.stop_on_error and recoverable:
-            message = f"{message} (will attempt to recover from acs_diff and restart)"
-
-        LOG.error(message)
-
-        if not recoverable:
-            raise Exception(
-                f"Unrecoveable error, stopping export (error: {message})"
-            ) from cause
-
-        if self.args.stop_on_error:
-            raise Exception(
-                f"--stop-on-error set, stopping export (error: {message})"
-            ) from cause
-
     def _check_synchronizer_id(self, transaction):
         sid = transaction.synchronizer_id
 
@@ -1585,7 +1746,8 @@ class State:
                 cause=e,
             )
 
-        # This is a sanity check to make sure the code does not forget tracking an ACS change.
+        # This is a sanity check to make sure the code does not
+        # forget tracking an ACS change.
         acs_diff = transaction.acs_diff()
 
         created = self.active_contracts.keys() - previous_state.active_contracts.keys()
@@ -1666,9 +1828,12 @@ class State:
             beneficiary = coupon.payload.get_sv_reward_coupon_beneficiary()
             weight = coupon.payload.get_sv_reward_coupon_weight()
 
-            self._txinfo(transaction, "SvActivityRecord",
-                         f"Sv activity recorded in round {round_number} for SV {sv} to beneficiary {beneficiary} with weight {weight}",
-                         parties=[sv])
+            self._txinfo(
+                transaction,
+                "SvActivityRecord",
+                f"Sv activity recorded in round {round_number} for SV {sv} to beneficiary {beneficiary} with weight {weight}",
+                parties=[sv],
+            )
 
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -1682,9 +1847,12 @@ class State:
         round_number = coupon.payload.get_validator_faucet_round()
         validator = coupon.payload.get_validator_faucet_validator()
 
-        self._txinfo(transaction, "ValidatorLivenessActivityRecord",
-                     f"Validator liveness activity recorded in round {round_number} for validator {validator}",
-                     parties=[validator])
+        self._txinfo(
+            transaction,
+            "ValidatorLivenessActivityRecord",
+            f"Validator liveness activity recorded in round {round_number} for validator {validator}",
+            parties=[validator],
+        )
 
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -1764,12 +1932,9 @@ class State:
         assert len(declared_outputs) == len(output_fees)
         assert event.template_id.qualified_name == TemplateQualifiedNames.amulet_rules
         assert event.choice_name == "AmuletRules_Transfer"
-        locked_output_amounts = []
-        unlocked_output_amounts = []
+        outputs = []
         fee_amounts = []
         output_descriptions = []
-        owners = []
-        all_lock_holders = []
         amulet_price = open_round.payload.get_open_mining_round_amulet_price()
         transfer_config_usd = open_round.payload.get_open_mining_transfer_config()
         transfer_config_cc = transfer_config_usd.scale(DamlDecimal(1) / amulet_price)
@@ -1783,9 +1948,9 @@ class State:
                 case "TransferResultLockedAmulet":
                     amulet = output_event.payload.get_locked_amulet_amulet()
                     owner = amulet.get_amulet_owner()
-                    owners += [ owner ]
-                    initial_amount = amulet.get_amulet_amount().get_expiring_amount_initial_amount()
-                    locked_output_amounts += [initial_amount]
+                    initial_amount = (
+                        amulet.get_amulet_amount().get_expiring_amount_initial_amount()
+                    )
                     lock = output_event.payload.get_locked_amulet_time_lock()
                     expires_at = lock.get_time_lock_expires_at()
                     lock_holders = lock.get_time_lock_holders()
@@ -1795,9 +1960,9 @@ class State:
                 case "TransferResultAmulet":
                     amulet = output_event.payload
                     owner = amulet.get_amulet_owner()
-                    owners += [ owner ]
-                    initial_amount = amulet.get_amulet_amount().get_expiring_amount_initial_amount()
-                    unlocked_output_amounts += [initial_amount]
+                    initial_amount = (
+                        amulet.get_amulet_amount().get_expiring_amount_initial_amount()
+                    )
                     output_descriptions += [
                         f"amulet with amount {initial_amount} owned by {owner}"
                     ]
@@ -1805,6 +1970,15 @@ class State:
                     lock_holders = []
                 case tag:
                     self._fail(transaction, f"Unexpected transfer output: {tag}")
+
+            outputs += [
+                TransferOutput(
+                    initial_amount=initial_amount,
+                    owner=owner,
+                    lock_holders=lock_holders,
+                )
+            ]
+
             fee_amounts += [output_fee]
             receiver_fee = receiver_fee_ratio * output_fee
             sender_fee = output_fee - receiver_fee
@@ -1815,11 +1989,13 @@ class State:
                     declared_output_amount, event.template_id.package_id
                 )
             )
-            all_lock_holders += lock_holders
             locking_fee = len(lock_holders) * transfer_config_cc.lock_holder_fee
             create_fee = transfer_config_cc.create_fee
             if output_fee != create_fee + transfer_fee + locking_fee:
-                self._fail(transaction, f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}")
+                self._fail(
+                    transaction,
+                    f"Fees don't add up, expected: {output_fee} = {create_fee} + {transfer_fee} + {locking_fee}",
+                )
             output_descriptions += ["  fees:"]
             output_descriptions += [f"    total: {output_fee}"]
             output_descriptions += [f"      base_transfer_fee: {create_fee}"]
@@ -1837,10 +2013,12 @@ class State:
             )
             self.active_contracts[sender_change_amulet_cid] = sender_change
             output_descriptions += [f"sender_change with amount {amount}"]
-            unlocked_output_amounts += [amount]
+            outputs += [
+                TransferOutput(initial_amount=amount, owner=sender, lock_holders=[])
+            ]
         output_descriptions += [f"sender_change_fee: {sender_change_fee}"]
         fee_amounts += [sender_change_fee]
-        return ("\n".join(output_descriptions), locked_output_amounts, unlocked_output_amounts, fee_amounts, owners, all_lock_holders)
+        return ("\n".join(output_descriptions), outputs, fee_amounts)
 
     def handle_transfer_rewards(self, transaction, child_event_ids):
         validator_reward_coupons = []
@@ -1861,21 +2039,33 @@ class State:
 
     def handle_transfer(self, transaction, event, description="Transfer"):
         arg = event.exercise_argument.get_amulet_rules_transfer_transfer()
+
         sender = arg.get_transfer_sender()
         provider = arg.get_transfer_provider()
         inputs = arg.get_transfer_inputs()
         outputs = arg.get_transfer_outputs()
+
         declared_outputs = [
             (x.get_transfer_output_amount(), x.get_transfer_output_receiver_fee_ratio())
             for x in outputs
         ]
+
         res = event.exercise_result
         round_number = res.get_transfer_result_round()
         round_contract = self.get_open_mining_round_by_round_number(round_number)
 
-        transfer_inputs = self.handle_transfer_inputs(transaction, sender, round_number, inputs)
+        transfer_inputs = self.handle_transfer_inputs(
+            transaction, sender, round_number, inputs
+        )
 
-        (inputs_description, effective_inputs) = transfer_inputs.summary()
+        (
+            inputs_description,
+            effective_inputs,
+            reward_cc_input,
+            initial_amulet_cc_input,
+            amulet_cc_input,
+            all_inputs,
+        ) = transfer_inputs.summary()
         output_amulets_cids = res.get_transfer_result_created_amulets()
         output_fees = res.get_transfer_result_output_fees()
         sender_change_amulet_cid = res.get_transfer_result_sender_change_amulet()
@@ -1884,23 +2074,20 @@ class State:
             transaction, event.child_event_ids
         )
 
-        (outputs_description, locked_output_amounts, unlocked_output_amounts, fee_amounts, owners, all_lock_holders) = (
-            self.handle_transfer_outputs(
-                transaction,
-                event,
-                sender,
-                round_contract,
-                declared_outputs,
-                output_amulets_cids,
-                output_fees,
-                sender_change_amulet_cid,
-                sender_change_fee,
-            )
+        (outputs_description, all_outputs, fee_amounts) = self.handle_transfer_outputs(
+            transaction,
+            event,
+            sender,
+            round_contract,
+            declared_outputs,
+            output_amulets_cids,
+            output_fees,
+            sender_change_amulet_cid,
+            sender_change_fee,
         )
-        output_amounts = locked_output_amounts + unlocked_output_amounts
         summary = TransferSummary(
             effective_inputs,
-            output_amounts,
+            all_outputs,
             fee_amounts,
         )
         if transfer_error := summary.get_error("transfer"):
@@ -1921,24 +2108,90 @@ class State:
                 f"{prefix} for {provider} with amount {amount}"
             ]
 
-        self._txinfo(transaction, description,
-                     textwrap.dedent(
-                         f"""\
+        interested_parties = (
+            [sender, provider]
+            + summary.get_all_owners()
+            + summary.get_all_lock_holders()
+        )
+
+        self._txinfo(
+            transaction,
+            description,
+            textwrap.dedent(
+                f"""\
                          sender: {sender}
                          provider: {provider}
                          round: {round_number}
                          inputs:\n"""
-                     )
-                     + textwrap.indent(str(inputs_description), "    ")
-                     + "\n  outputs:\n"
-                     + textwrap.indent(outputs_description, "    ")
-                     + (
-                         "\n  activity_records:\n"
-                         + textwrap.indent("\n".join(activity_record_descriptions), "    ")
-                         if activity_record_descriptions
-                         else ""
-                     ),
-                     parties=[sender, provider] + owners + all_lock_holders)
+            )
+            + textwrap.indent(str(inputs_description), "    ")
+            + "\noutputs:\n"
+            + textwrap.indent(outputs_description, "    ")
+            + (
+                "\n  activity_records:\n"
+                + textwrap.indent("\n".join(activity_record_descriptions), "    ")
+                if activity_record_descriptions
+                else ""
+            ),
+            parties=interested_parties,
+        )
+
+        self._report_line(
+            transaction,
+            "TX",
+            {
+                "update_id": transaction.update_id,
+                "record_time": transaction.record_time,
+                "provider": provider,
+                "sender": sender,
+                "input_reward_cc_total": reward_cc_input,
+                "input_amulet_cc_total": amulet_cc_input,
+                "holding_fees_total": initial_amulet_cc_input - amulet_cc_input,
+                "tx_fees_total": summary.get_fees_total(),
+            },
+            parties=interested_parties,
+        )
+
+        for i in all_inputs:
+            self._report_line(
+                transaction,
+                "TXI",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "source": i.source,
+                    "round": i.round,
+                    "initial_amount_cc": i.initial_amount if i.initial_amount else "",
+                    "effective_amount_cc": i.effective_amount,
+                    "holding_fees_total": (
+                        (i.initial_amount - i.effective_amount)
+                        if i.initial_amount
+                        else DamlDecimal(0)
+                    ),
+                    "currency": "CC"
+                },
+                parties=interested_parties,
+            )
+
+        for o in all_outputs:
+            self._report_line(
+                transaction,
+                "TXO",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "owner": o.owner,
+                    "currency": " CC",
+                    "round": round_number,
+                    "initial_amount_cc": o.initial_amount,
+                    "lock_holders": ";".join(o.lock_holders),
+                },
+                parties=interested_parties,
+            )
 
         return HandleTransactionResult.for_open_round(round_number)
 
@@ -1953,9 +2206,12 @@ class State:
         )
         self.active_contracts[cid] = amulet
 
-        self._txinfo(transaction, "Tap",
-                     f"{owner} tapped {amount} in round {round_number}",
-                     parties=[owner])
+        self._txinfo(
+            transaction,
+            "Tap",
+            f"{owner} tapped {amount} in round {round_number}",
+            parties=[owner],
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_mint(self, transaction, event):
@@ -1968,23 +2224,36 @@ class State:
             amulet.payload.get_amulet_amount().get_expiring_amount_created_at()
         )
         self.active_contracts[cid] = amulet
-        self._txinfo(transaction, "Mint",
-                     f"{owner} minted {amount} in round {round_number}",
-                     parties=[owner])
+        self._txinfo(
+            transaction,
+            "Mint",
+            f"{owner} minted {amount} in round {round_number}",
+            parties=[owner],
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_buy_member_traffic(self, transaction, event):
         arg = event.exercise_argument
         inputs = arg.get_buy_member_traffic_inputs()
         provider = arg.get_buy_member_traffic_provider()
+        sender = provider  # True by construction
         member_id = arg.get_buy_member_traffic_member_id()
         synchronizer_id = arg.get_buy_member_traffic_synchronizer_id()
         migration_id = arg.get_buy_member_traffic_migration_id()
         traffic_amount = arg.get_buy_member_traffic_traffic_amount()
         res = event.exercise_result
         round_number = res.get_buy_member_traffic_result_round()
-        transfer_inputs = self.handle_transfer_inputs(transaction, provider, round_number, inputs)
-        (inputs_description, effective_inputs) = transfer_inputs.summary()
+        transfer_inputs = self.handle_transfer_inputs(
+            transaction, provider, round_number, inputs
+        )
+        (
+            inputs_description,
+            effective_inputs,
+            reward_cc_input,
+            initial_amulet_cc_input,
+            amulet_cc_input,
+            all_inputs,
+        ) = transfer_inputs.summary()
         amulet_paid = res.get_buy_member_traffic_result_amulet_paid()
         sender_change_cid = res.get_buy_member_traffic_result_sender_change_amulet()
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
@@ -2004,40 +2273,121 @@ class State:
             transfer_summary.get_transfer_summary_sender_change_amount()
         )
         sender_change_fee = transfer_summary.get_transfer_summary_sender_change_fee()
+        all_outputs = [
+            TransferOutput(
+                initial_amount=sender_change_amount, owner=sender, lock_holders=[]
+            )
+        ]
         summary = TransferSummary(
             effective_inputs,
-            [sender_change_amount],
+            all_outputs,
             [sender_change_fee, amulet_paid],
         )
         if transfer_error := summary.get_error("buy_traffic"):
-            self._fail(transaction, f'Buy Traffic Error: {transfer_error}')
+            self._fail(transaction, f"Buy Traffic Error: {transfer_error}")
 
-        self._txinfo(transaction, "BuyTraffic",
-                     textwrap.dedent(
-                         f"""\
+        interested_parties = [member_id, provider]
+
+        self._txinfo(
+            transaction,
+            "BuyTraffic",
+            textwrap.dedent(
+                f"""\
                      round: {round_number}
                      provider: {provider}
                      member_id: {member_id}
                      synchronizer_id: {synchronizer_id}
                      migration_id: {migration_id}
                      inputs:\n"""
-                     )
-                     + textwrap.indent(str(inputs_description), "    ")
-                     + "\n"
-                     + textwrap.indent(
-                         textwrap.dedent(
-                             f"""\
+            )
+            + textwrap.indent(str(inputs_description), "    ")
+            + "\n"
+            + textwrap.indent(
+                textwrap.dedent(
+                    f"""\
                      traffic_amount_bytes: {traffic_amount}
                      burnt_as_part_of_purchase: {amulet_paid}
                      validator_activity_record for {provider} with amount {validator_reward_amount}
                      outputs:
                        sender_change_amount: {sender_change_amount}
                          fee: {sender_change_fee}"""
-                         ),
-                         "  ",
-                     ),
-                     parties=[member_id, provider]
+                ),
+                "  ",
+            ),
+            parties=interested_parties,
         )
+
+        self._report_line(
+            transaction,
+            "TX",
+            {
+                "update_id": transaction.update_id,
+                "record_time": transaction.record_time,
+                "provider": provider,
+                "sender": sender,
+                "input_reward_cc_total": reward_cc_input,
+                "input_amulet_cc_total": amulet_cc_input,
+                "holding_fees_total": initial_amulet_cc_input - amulet_cc_input,
+                "tx_fees_total": summary.get_fees_total(),
+            },
+            parties=interested_parties,
+        )
+
+        for i in all_inputs:
+            self._report_line(
+                transaction,
+                "TXI",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "source": i.source,
+                    "round": i.round,
+                    "initial_amount_cc": i.initial_amount if i.initial_amount else "",
+                    "effective_amount_cc": i.effective_amount,
+                    "holding_fees_total": (
+                        (i.initial_amount - i.effective_amount)
+                        if i.initial_amount
+                        else DamlDecimal(0)
+                    ),
+                    "currency": " CC"
+                },
+                parties=interested_parties,
+            )
+
+        for o in all_outputs:
+            self._report_line(
+                transaction,
+                "TXO",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "owner": o.owner,
+                    "currency": "CC",
+                    "round": round_number,
+                    "initial_amount_cc": o.initial_amount,
+                    "lock_holders": ";".join(o.lock_holders),
+                },
+                parties=interested_parties,
+            )
+
+        self._report_line(
+            transaction,
+            "TXBW",
+            {
+                "update_id": transaction.update_id,
+                "record_time": transaction.record_time,
+                "provider": provider,
+                "cc_burnt": amulet_paid,
+                "traffic_bytes_bought": traffic_amount,
+                "traffic_member_id": member_id,
+            },
+            parties=interested_parties,
+        )
+
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_locked_amulet_unlock(self, transaction, event, log_prefix="Unlock"):
@@ -2049,9 +2399,12 @@ class State:
         del self.active_contracts[event.contract_id]
         self.active_contracts[amulet_cid] = amulet
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
-        self._txinfo(transaction, log_prefix,
-                     f"Amulet {formatted_amulet} was unlocked",
-                     parties=[owner])
+        self._txinfo(
+            transaction,
+            log_prefix,
+            f"Amulet {formatted_amulet} was unlocked",
+            parties=[owner],
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_locked_owner_expire_lock(self, transaction, event):
@@ -2064,8 +2417,11 @@ class State:
         del self.active_contracts[event.contract_id]
         self.active_contracts[amulet_cid] = amulet
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
-        self._txinfo(transaction, "ExpireUnlock",
-                     f"Amulet {formatted_amulet} was unlocked because lock expired")
+        self._txinfo(
+            transaction,
+            "ExpireUnlock",
+            f"Amulet {formatted_amulet} was unlocked because lock expired",
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_dso_rules_amulet_expire(self, transaction, event):
@@ -2077,8 +2433,11 @@ class State:
         )
         formatted_amulet = self.format_amulet(contract_id, amulet)
         round_number = expire_summary.get_amulet_expire_summary_round()
-        self._txinfo(transaction, "Dso_AmuletExpire",
-                     f"Amulet {formatted_amulet} expired in round {round_number}")
+        self._txinfo(
+            transaction,
+            "Dso_AmuletExpire",
+            f"Amulet {formatted_amulet} expired in round {round_number}",
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def format_amulet(self, contract_id, amulet):
@@ -2098,8 +2457,11 @@ class State:
         )
         round_number = expire_summary.get_amulet_expire_summary_round()
         formatted_locked_amulet = self.format_locked_amulet(contract_id, lockedAmulet)
-        self._txinfo(transaction, "Dso_LockedAmuletExpire",
-                     f"Locked Amulet {formatted_locked_amulet} expired in round {round_number}")
+        self._txinfo(
+            transaction,
+            "Dso_LockedAmuletExpire",
+            f"Locked Amulet {formatted_locked_amulet} expired in round {round_number}",
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def format_locked_amulet(self, contract_id, lockedAmulet):
@@ -2169,8 +2531,11 @@ class State:
                 self._fail(transaction, f"Unexpected event type: {event}")
         new_round = latest_round_number + 1
         if not self.args.hide_round_events:
-            self._txinfo(transaction, "AdvanceOpenMiningRounds",
-                         f"Advanced OpenMiningRound, latest open mining round is now {new_round}")
+            self._txinfo(
+                transaction,
+                "AdvanceOpenMiningRounds",
+                f"Advanced OpenMiningRound, latest open mining round is now {new_round}",
+            )
         return HandleTransactionResult.new_open_round(new_round).merge(
             HandleTransactionResult.for_open_round(summarizing_round)
         )
@@ -2181,8 +2546,11 @@ class State:
         round_number = issuing_round.payload.get_issuing_mining_round_round()
         del self.active_contracts[issuing_cid]
         if not self.args.hide_round_events:
-            self._txinfo(transaction, "CloseIssuingMiningRound",
-                         f"Issuing mining round {round_number} is closed")
+            self._txinfo(
+                transaction,
+                "CloseIssuingMiningRound",
+                f"Issuing mining round {round_number} is closed",
+            )
         return HandleTransactionResult.new_closed_round(round_number)
 
     def handle_entry_collect_payment(self, transaction, event, renewal):
@@ -2240,14 +2608,17 @@ class State:
             firstline = f"RenewAnsEntry: ANS entry {name} renewed for {user}"
         else:
             firstline = f"CreateAnsEntry: ANS entry {name} created for {user}"
-        self._txinfo(transaction, firstline,
-                     textwrap.dedent(
-                         f"""\
+        self._txinfo(
+            transaction,
+            firstline,
+            textwrap.dedent(
+                f"""\
                          round: {round_number}
                          burnt_locked_amulet: -{amount.get_expiring_amount_initial_amount()} created in round {round_number}
                          validator_activity_record for {sender} with amount {validator_reward_coupons[0].payload.get_validator_reward_amount()}"""
-                     ),
-                     parties=[user])
+            ),
+            parties=[user],
+        )
         return HandleTransactionResult.for_open_round(round_number)
 
     def handle_execute_confirmed_action(self, transaction, event):
@@ -2283,8 +2654,11 @@ class State:
                             issuing_mining_round
                         )
                         if not self.args.hide_round_events:
-                            self._txinfo(transaction, "StartIssuingMiningRound",
-                                         f"Mining round {round_number} moved to issuing phase")
+                            self._txinfo(
+                                transaction,
+                                "StartIssuingMiningRound",
+                                f"Mining round {round_number} moved to issuing phase",
+                            )
                         return HandleTransactionResult.for_open_round(round_number)
                     case _:
                         return HandleTransactionResult.empty()
@@ -2384,17 +2758,25 @@ class State:
                             sv_reward_coupon.payload.get_sv_reward_coupon_beneficiary()
                         )
                         weight = sv_reward_coupon.payload.get_sv_reward_coupon_weight()
-                        if _party_enabled(self.args, sv) or _party_enabled(self.args, beneficiary):
+                        if _party_enabled(self.args, sv) or _party_enabled(
+                            self.args, beneficiary
+                        ):
                             rewards_lines += [
                                 f"  sv_activity_record: sv: {sv}, beneficiary: {beneficiary}, weight: {weight}"
                             ]
                         del self.active_contracts[cid]
                     case choice:
-                        self._fail(transaction, f"Unexpected exercise as part of activity record expiry: {event}")
+                        self._fail(
+                            transaction,
+                            f"Unexpected exercise as part of activity record expiry: {event}",
+                        )
         if len(rewards_lines):
             expired_activity_rewards = "\n".join(rewards_lines)
-            self._txinfo(transaction, "ExpireActivityRecords",
-                         f"Expired activity records for round {round}:\n{expired_activity_rewards}")
+            self._txinfo(
+                transaction,
+                "ExpireActivityRecords",
+                f"Expired activity records for round {round}:\n{expired_activity_rewards}",
+            )
         # Not returning a round means we don't print a summary afterward but that's fine.
         return HandleTransactionResult.empty()
 
@@ -2408,9 +2790,12 @@ class State:
                 self.active_contracts[event.contract_id] = event
                 entry_user = event.payload.get_ans_entry_context_user()
                 entry_name = event.payload.get_ans_entry_context_name()
-        self._txinfo(transaction, "AnsEntryRequest",
-                     f"Party {entry_user} requested CNS entry {entry_name}",
-                     parties=[entry_user])
+        self._txinfo(
+            transaction,
+            "AnsEntryRequest",
+            f"Party {entry_user} requested CNS entry {entry_name}",
+            parties=[entry_user],
+        )
         return HandleTransactionResult.for_open_round(0)
 
     def handle_subscription_lock_amulet(
@@ -2463,9 +2848,12 @@ class State:
         )
         user = ans_entry_context.payload.get_ans_entry_context_user()
         name = ans_entry_context.payload.get_ans_entry_context_name()
-        self._txinfo(transaction, "AnsCancelSubscription",
-                     f"Subscription cancelled by user {user} for entry {name}",
-                     parties=[user])
+        self._txinfo(
+            transaction,
+            "AnsCancelSubscription",
+            f"Subscription cancelled by user {user} for entry {name}",
+            parties=[user],
+        )
         # Not associated with any round so just return an empty result
         return HandleTransactionResult.empty()
 
@@ -2478,9 +2866,12 @@ class State:
         user = ans_entry_context.payload.get_ans_entry_context_user()
         name = ans_entry_context.payload.get_ans_entry_context_name()
         del self.active_contracts[ans_entry_context_cid]
-        self._txinfo(transaction, "AnsTerminateSubscription",
-                     f"Subscription terminated for user {user} and entry {name}",
-                     parties=[user])
+        self._txinfo(
+            transaction,
+            "AnsTerminateSubscription",
+            f"Subscription terminated for user {user} and entry {name}",
+            parties=[user],
+        )
         # Not associated with any round so just return an empty result
         return HandleTransactionResult.empty()
 
@@ -2497,9 +2888,12 @@ class State:
         name = ans_entry_context.payload.get_ans_entry_context_name()
         del self.active_contracts[ans_entry_context_cid]
         del self.active_contracts[subscriptionIdleStateCid]
-        self._txinfo(transaction, "AnsExpireSubscription",
-                     f"Subscription expired for user {user} and entry {name}",
-                     parties=[user])
+        self._txinfo(
+            transaction,
+            "AnsExpireSubscription",
+            f"Subscription expired for user {user} and entry {name}",
+            parties=[user],
+        )
         # Not associated with any round so just return an empty result
         return HandleTransactionResult.empty()
 
@@ -2693,14 +3087,14 @@ class AppState:
     pagination_key: Optional[PaginationKey]
 
     @classmethod
-    def empty(cls, args):
-        state = State(args, {}, None, None)
+    def empty(cls, args, csv_report):
+        state = State(args, {}, None, None, csv_report)
         return cls(state, {}, None)
 
     @classmethod
-    def from_json(cls, args, data):
+    def from_json(cls, args, data, csv_report):
         return cls(
-            State.from_json(args, data["state"]),
+            State.from_json(args, data["state"], csv_report),
             {
                 int(round_number): State.from_json(args, round_data)
                 for round_number, round_data in data["per_round_states"].items()
@@ -2721,26 +3115,26 @@ class AppState:
         }
 
     @classmethod
-    def create_or_restore_from_cache(cls, args):
+    def create_or_restore_from_cache(cls, args, csv_report):
         if args.cache_file_path is None:
             LOG.info(f"Caching disabled, creating new app state")
-            return AppState.empty(args)
+            return AppState.empty(args, csv_report)
 
         if args.rebuild_cache:
             LOG.info(f"Rebuilding cache, creating new app state")
-            return AppState.empty(args)
+            return AppState.empty(args, csv_report)
 
         if not os.path.exists(args.cache_file_path):
             LOG.info(
                 f"File {args.cache_file_path} does not exist, creating new app state"
             )
-            return AppState.empty(args)
+            return AppState.empty(args, csv_report)
 
         try:
             with open(args.cache_file_path, "r") as file:
                 data = json.load(file)
                 LOG.info(f"Restoring app state from {args.cache_file_path}")
-                return AppState.from_json(args, data)
+                return AppState.from_json(args, data, csv_report)
 
         except Exception as e:
             LOG.error(f"Could not read app state from {args.cache_file_path}: {e}")
@@ -2831,7 +3225,12 @@ def _parse_cli_args():
         action="store_true",
         help="Suppress display the state summaries logged after each transaction.",
     )
+    parser.add_argument(
+        "--report-output",
+        help="The name of a file to which a CSV report stream should be written. (Specific report structure a work in progress)",
+    )
     return parser.parse_args()
+
 
 def _log_uncaught_exceptions():
     # Set up exception handling (write unhandled exceptions to log)
@@ -2840,17 +3239,18 @@ def _log_uncaught_exceptions():
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
 
-        LOG.error(
-            "Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback)
-        )
+        LOG.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = handle_exception
 
 
-async def _check_scan_balance_assertions(scan_client, previous_state, transaction, app_state, result):
-
+async def _check_scan_balance_assertions(
+    scan_client, transaction, previous_state, app_state, result
+):
     for round_number in result.new_open_rounds:
-        app_state.per_round_states[round_number] = previous_state.clone()
+        app_state.per_round_states[round_number] = previous_state.clone_for_round(
+            round_number
+        )
 
     if result.for_open_round != None:
         for (
@@ -2862,13 +3262,12 @@ async def _check_scan_balance_assertions(scan_client, previous_state, transactio
 
     if result.new_closed_round:
         closed_round = result.new_closed_round
-        LOG.info(
-            f"Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}"
-        )
+        msg = f"Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}"
+        LOG.info(msg)
         round_state = app_state.per_round_states[closed_round]
         del app_state.per_round_states[closed_round]
         balances = round_state.balance_end_of_round()
-        lines = [f"effective balances for closed round: {closed_round}"]
+        lines = [msg, f"effective balances for closed round: {closed_round}"]
         matches = True
         scan_party_balances = await scan_client.party_balances(
             closed_round, balances.keys()
@@ -2877,12 +3276,24 @@ async def _check_scan_balance_assertions(scan_client, previous_state, transactio
             if not _party_enabled(app_state.state.args, party):
                 continue
 
-            computed_balance = balance.effective_for_round(
-                closed_round
-            )
+            computed_balance = balance.effective_for_round(closed_round)
             scan_balance = scan_party_balances[party]
             matches_for_party = scan_balance == computed_balance
             matches &= matches_for_party
+
+            app_state.state._report_line(
+                transaction,
+                "BALANCE",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "round": closed_round,
+                    "owner": party,
+                    "computed_balance": computed_balance,
+                    "scan_balance": scan_balance,
+                },
+            )
+
             lines += [
                 f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
             ]
@@ -2896,12 +3307,9 @@ async def _check_scan_balance_assertions(scan_client, previous_state, transactio
 async def _process_transaction(args, app_state, scan_client, transaction):
 
     if transaction.is_acs_import():
-        # We need to skip ACS imports for hard domain migrations since
-        # those contracts have already been processed on the old
-        # migration id.  Note that this also ignores the ACS import of
-        # non-founding SVs atm. This would be correct once we do
-        # backfilling of history but until then this script can only
-        # run against the founding SV.
+        # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
+        # Note that this also ignores the ACS import of non-founding SVs atm. This would be correct once we do backfilling of history
+        # but until then this script can only run against the founding SV.
         LOG.debug(
             f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
         )
@@ -2916,7 +3324,8 @@ async def _process_transaction(args, app_state, scan_client, transaction):
 
     if args.scan_balance_assertions:
         await _check_scan_balance_assertions(
-            scan_client, previous_state, transaction, app_state, result)
+            scan_client, transaction, previous_state, app_state, result
+        )
 
 
 async def main():
@@ -2926,33 +3335,51 @@ async def main():
     LOG.setLevel(args.loglevel.upper())
     _log_uncaught_exceptions()
 
-    LOG.info(f"Starting scan_txlog with arguments: {args}")
-    app_state = AppState.create_or_restore_from_cache(args)
+    LOG.debug(f"Starting scan_txlog with arguments: {args}")
 
-    begin_t = time.time()
-    tx_count=0
-    async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(session, args.scan_url, args.page_size)
-        while True:
-            batch = await scan_client.updates(app_state.pagination_key)
-            LOG.debug(f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}")
+    report_stream = None
+    try:
+        if args.report_output:
+            report_stream = open(args.report_output, "w", buffering=1)
 
-            for transaction_json in batch:
-                transaction = TransactionTree.parse(transaction_json)
-                await _process_transaction(args, app_state, scan_client, transaction)
-                tx_count=tx_count+1
+        app_state = AppState.create_or_restore_from_cache(
+            args, CSVReport(report_stream)
+        )
 
-            if len(batch) >= 1:
-                last = batch[-1]
-                app_state.pagination_key = PaginationKey(
-                    last["migration_id"], last["record_time"]
+        begin_t = time.time()
+        tx_count = 0
+
+        async with aiohttp.ClientSession() as session:
+            scan_client = ScanClient(session, args.scan_url, args.page_size)
+            while True:
+                batch = await scan_client.updates(app_state.pagination_key)
+                LOG.debug(
+                    f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
                 )
-                app_state.save_to_cache(args)
-            if len(batch) < scan_client.page_size:
-                LOG.debug(f"Reached end of stream at {app_state.pagination_key}")
-                break
-    duration = time.time() - begin_t
-    LOG.info(f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)")
+
+                for transaction_json in batch:
+                    transaction = TransactionTree.parse(transaction_json)
+                    await _process_transaction(
+                        args, app_state, scan_client, transaction
+                    )
+                    tx_count = tx_count + 1
+
+                if len(batch) >= 1:
+                    last = batch[-1]
+                    app_state.pagination_key = PaginationKey(
+                        last["migration_id"], last["record_time"]
+                    )
+                    app_state.save_to_cache(args)
+                if len(batch) < scan_client.page_size:
+                    LOG.debug(f"Reached end of stream at {app_state.pagination_key}")
+                    break
+        duration = time.time() - begin_t
+        LOG.info(
+            f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)"
+        )
+    finally:
+        if report_stream:
+            report_stream.close()
 
 
 if __name__ == "__main__":
