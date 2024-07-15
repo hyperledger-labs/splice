@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* CometBft
+
+  * The default cometbft persistent volume size was bumped from 1250Gi to 2500Gi.
+
 * SV app
 
   * Add automation to automatically call the Daml choice that prunes ``futureValue`` added in 0.1.15
