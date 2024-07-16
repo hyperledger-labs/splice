@@ -95,7 +95,8 @@ export function installCometBftNode(
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
             : `${CLUSTER_BASENAME}-${migrationId}`,
-        chainIdSuffix: stableCometBftChainId ? '0' : '',
+        chainIdSuffix:
+          config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || (stableCometBftChainId ? '0' : ''),
       },
       metrics: {
         enable: true,

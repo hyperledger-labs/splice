@@ -417,7 +417,7 @@
         },
         "genesis": {
           "chainId": "main-0",
-          "chainIdSuffix": "0"
+          "chainIdSuffix": "2"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
