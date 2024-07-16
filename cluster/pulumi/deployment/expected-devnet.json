@@ -733,7 +733,7 @@
       },
       "spec": {
         "backend": "gs://da-cn-pulumi-dev-stacks",
-        "continueResyncOnCommitMatch": true,
+        "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
           "ARTIFACTORY_PASSWORD": {
@@ -835,7 +835,6 @@
           }
         },
         "refresh": false,
-        "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-runbook/sv-runbook.dev",
         "useLocalStackOnly": true
@@ -857,7 +856,7 @@
       },
       "spec": {
         "backend": "gs://da-cn-pulumi-dev-stacks",
-        "continueResyncOnCommitMatch": true,
+        "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
           "ARTIFACTORY_PASSWORD": {
@@ -959,7 +958,6 @@
           }
         },
         "refresh": false,
-        "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/validator-runbook/validator-runbook.dev",
         "useLocalStackOnly": true
