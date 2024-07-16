@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.dsorules.*
@@ -11,6 +14,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
+import com.daml.network.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
@@ -52,6 +56,7 @@ class SvOffboardingIntegrationTest
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withResumedTrigger[SvOffboardingMediatorTrigger]
             .withResumedTrigger[SvOffboardingSequencerTrigger]
+            .withPausedTrigger[LocalSequencerConnectionsTrigger]
         )(config)
       )
       .withManualStart
