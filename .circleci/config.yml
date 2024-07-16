@@ -3683,12 +3683,12 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
-            
+
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
-            
+
             if [[ << parameters.is_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
             else
@@ -3731,6 +3731,7 @@ jobs:
           cmd: |
             cncluster activate
             cncluster ci_pdown_sv
+          cmd_retry_count: 3
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -3765,6 +3766,7 @@ jobs:
           cmd: |
             cncluster activate
             cncluster ci_pdown_validator
+          cmd_retry_count: 3
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
