@@ -1,4 +1,4 @@
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.config.{SpliceConfig, ConfigTransforms}
 import com.digitalasset.canton.config.CantonCommunityConfig
 
 import java.nio.file.Paths
@@ -10,17 +10,17 @@ object TransformConfig extends App {
 
   mode match {
     case "useSelfSignedTokensForLedgerApiAuth" =>
-      val inputConfig = CNNodeConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
+      val inputConfig = SpliceConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
       val outputConfig =
-        CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
+        ConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
       // Deliberately leaking secrets to file
-      CNNodeConfig.writeToFile(outputConfig, outputFileName, confidential = false)
+      SpliceConfig.writeToFile(outputConfig, outputFileName, confidential = false)
     case "integrationTestDefaults" =>
       val testId = args(3)
-      val inputConfig = CNNodeConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
+      val inputConfig = SpliceConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
       val outputConfig =
-        CNNodeConfigTransforms.defaults(Some(testId)).foldLeft(inputConfig)((c, t) => t(c))
-      CNNodeConfig.writeToFile(outputConfig, outputFileName, confidential = false)
+        ConfigTransforms.defaults(Some(testId)).foldLeft(inputConfig)((c, t) => t(c))
+      SpliceConfig.writeToFile(outputConfig, outputFileName, confidential = false)
     case _ =>
       println(s"Unknown mode '$mode'")
       sys.exit(-1)
