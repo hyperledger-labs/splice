@@ -52,7 +52,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name="cometbft" AND textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'")
 -- sequencer down
 -(resource.labels.namespace_name=~"validator.*|splitwell" AND resource.labels.container_name=~".*participant" AND jsonPayload.message=~".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
--resource.labels.container_name=~".*pg-.*-e"
+-(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
 -UnknownHostException
 -"Late processing (or clock skew) of batch"
 -UnresolvedAddressException
