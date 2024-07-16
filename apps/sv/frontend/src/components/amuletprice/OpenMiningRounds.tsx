@@ -42,7 +42,7 @@ const OpenMiningRounds: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Round</TableCell>
-              <TableCell>Canton Coin Price</TableCell>
+              <TableCell>{config.spliceInstanceNames.amuletName} Price</TableCell>
               <TableCell>Opens At</TableCell>
               <TableCell>Target Closes At</TableCell>
             </TableRow>

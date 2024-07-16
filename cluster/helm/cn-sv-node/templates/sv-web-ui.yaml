@@ -38,6 +38,16 @@ spec:
               value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
             - name: CN_APP_SV_UI_CLUSTER
               value: {{ .Values.clusterUrl | quote }}
+            - name: CN_APP_SV_UI_NETWORK_NAME
+              value: {{ .Values.spliceInstanceNames.networkName | quote }}
+            - name: CN_APP_SV_UI_AMULET_NAME
+              value: {{ .Values.spliceInstanceNames.amuletName | quote }}
+            - name: CN_APP_SV_UI_AMULET_NAME_ACRONYM
+              value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
+            - name: CN_APP_SV_UI_NAME_SERVICE_NAME
+              value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
+            - name: CN_APP_SV_UI_NAME_SERVICE_NAME_ACRONYM
+              value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
           image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Chart.AppVersion }}"
           imagePullPolicy: Always
           name: sv-web-ui

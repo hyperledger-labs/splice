@@ -10,6 +10,13 @@ window.splice_config = {
   services: {
     sv: {
       url: "https://" + window.location.hostname + "/api/sv",
-    }
+    },
+  },
+  spliceInstanceNames: {
+    networkName: "${CN_APP_SV_UI_NETWORK_NAME}",
+    amuletName: "${CN_APP_SV_UI_AMULET_NAME}",
+    amuletNameAcronym: "${CN_APP_SV_UI_AMULET_NAME_ACRONYM}",
+    nameServiceName: "${CN_APP_SV_UI_NAME_SERVICE_NAME}",
+    nameServiceNameAcronym: "${CN_APP_SV_UI_NAME_SERVICE_NAME_ACRONYM}",
   },
 };

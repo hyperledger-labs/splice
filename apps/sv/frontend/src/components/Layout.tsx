@@ -8,6 +8,8 @@ import { Box, Button, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 
+import { config } from '../utils';
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -23,7 +25,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
           navLinks={[
             { name: 'Information', path: 'dso' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
-            { name: 'Canton Coin Price', path: 'cc-price' },
+            { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'cc-price' },
             { name: 'Leader Election', path: 'leader' },
             { name: 'Governance', path: 'votes' },
           ]}

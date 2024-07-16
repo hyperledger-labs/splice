@@ -16,4 +16,12 @@ window.splice_config = {
       url: 'http://localhost:5014/api/sv',
     },
   },
+
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
 };

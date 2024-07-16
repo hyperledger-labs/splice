@@ -76,10 +76,11 @@ const DesiredAmuletPrice: React.FC = () => {
     });
 
   const isInvalidPrice = BigNumber(curPriceText).lte(0.0);
+  const amuletName = config.spliceInstanceNames.amuletName;
   return (
     <>
       <Typography mt={6} variant="h4">
-        {'Your Desired Canton Coin Price'}
+        {`Your Desired ${amuletName} Price`}
       </Typography>
       {enableEdit ? (
         updateDesiredAmuletPriceMutation.isLoading ? (
@@ -142,7 +143,7 @@ const DesiredAmuletPrice: React.FC = () => {
       )}
 
       <Typography mt={6} variant="h4">
-        Desired Canton Coin Prices of Other Super Validators
+        Desired {amuletName} Prices of Other Super Validators
       </Typography>
       <TableContainer>
         <Table style={{ tableLayout: 'fixed' }} className="sv-amulet-price-table">
@@ -150,7 +151,7 @@ const DesiredAmuletPrice: React.FC = () => {
             <TableRow>
               <TableCell>Super Validator</TableCell>
               <TableCell>Super Validator Party ID</TableCell>
-              <TableCell>Desired Canton Coin Price</TableCell>
+              <TableCell>Desired {amuletName} Price</TableCell>
               <TableCell>Last Updated At</TableCell>
             </TableRow>
           </TableHead>

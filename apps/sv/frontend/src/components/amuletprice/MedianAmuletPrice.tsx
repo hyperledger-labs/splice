@@ -8,9 +8,11 @@ import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { useAmuletPriceVotes } from '../../hooks/useAmuletPriceVotes';
+import { config } from '../../utils/config';
 
 const MedianAmuletPrice: React.FC = () => {
   const amuletPriceVotesQuery = useAmuletPriceVotes();
+  const amuletName = config.spliceInstanceNames.amuletName;
 
   const median = (votedPrices: BigNumber[]) => {
     if (votedPrices && votedPrices.length > 0) {
@@ -50,13 +52,13 @@ const MedianAmuletPrice: React.FC = () => {
   return (
     <Stack mt={4} spacing={2} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">
-        Canton Coin Price for Next Open Mining Round
+        {amuletName} Price for Next Open Mining Round
       </Typography>
       <Typography id="median-amulet-price-usd" variant="h2">
         {medianAmuletPrice && <AmountDisplay amount={medianAmuletPrice} currency="USDUnit" />}
       </Typography>
       <Typography variant="caption">
-        Median of amulet prices voted by all Super Validators
+        Median of {amuletName} prices voted by all Super Validators
       </Typography>
     </Stack>
   );

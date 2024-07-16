@@ -27,6 +27,12 @@ migration:
 
 failOnAppVersionMismatch: true
 
+spliceInstanceNames:
+  networkName: "Canton Network"
+  amuletName: "Canton Coin"
+  amuletNameAcronym: "CC"
+  nameServiceName: "Canton Name Service"
+  nameServiceNameAcronym: "CNS"
 # k8s affinity for all deployed pods (optional)
 # affinity:
 
@@ -35,4 +41,3 @@ failOnAppVersionMismatch: true
 
 # k8s tolerations for all deployed pods (optional)
 # tolerations:
-
