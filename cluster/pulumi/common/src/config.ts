@@ -15,7 +15,11 @@ class CnConfig {
         'CN_PULUMI_LOAD_ENV_CONFIG_FILE'
       )
     ) {
-      const result = expand(dotenvConfig({ path: `${process.env.REPO_ROOT}/.envrc.vars` }));
+      const result = expand(
+        dotenvConfig({
+          path: [`${process.env.REPO_ROOT}/.envrc.vars`, `${process.env.REPO_ROOT}/.envrc.vars.da`],
+        })
+      );
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
       }
