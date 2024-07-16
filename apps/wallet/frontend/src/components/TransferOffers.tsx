@@ -17,6 +17,7 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { WalletTransferOffer } from '../models/models';
+import { config } from '../utils/config';
 import { convertCurrency } from '../utils/currencyConversion';
 import BftAnsEntry from './BftAnsEntry';
 
@@ -127,7 +128,8 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
                 amount={offer.convertedCurrency.amount}
                 currency={offer.convertedCurrency.currency}
               />{' '}
-              @ {offer.convertedCurrency.amuletPriceToShow.toString()} CC/USD
+              @ {offer.convertedCurrency.amuletPriceToShow.toString()}{' '}
+              {config.spliceInstanceNames.amuletNameAcronym}/USD
             </>
           </Typography>
         </Stack>

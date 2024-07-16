@@ -13,15 +13,17 @@ type RateDisplayProps = {
 
 const RateDisplay: React.FC<RateDisplayProps> = props => {
   var { base, quote, amuletPrice } = props;
+  //TODO(#13480): remove this fallback once we have a proper config in all apps
+  var amuletAcronym = window.splice_config.spliceInstanceNames?.amuletNameAcronym || 'CC';
   var amount, rate;
   switch (true) {
     case base === 'AmuletUnit' && quote === 'USDUnit':
       amount = BigNumber(1).div(amuletPrice);
-      rate = 'CC/USD';
+      rate = `${amuletAcronym}/USD`;
       break;
     case base === 'USDUnit' && quote === 'AmuletUnit':
       amount = amuletPrice;
-      rate = 'USD/CC';
+      rate = `USD/${amuletAcronym}`;
       break;
     default:
       throw Error(`Rate not properly defined.: base: ${base}, quote: ${quote}`);

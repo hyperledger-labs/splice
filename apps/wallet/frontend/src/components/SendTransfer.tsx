@@ -24,6 +24,7 @@ import {
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
+import { config } from '../utils/config';
 import BftAnsField from './BftAnsField';
 
 const SendTransfer: React.FC = () => {
@@ -104,7 +105,11 @@ const SendTransfer: React.FC = () => {
                   type="text"
                   value={ccAmountText}
                   onChange={onCCAmountChange}
-                  endAdornment={<InputAdornment position="end">CC</InputAdornment>}
+                  endAdornment={
+                    <InputAdornment position="end">
+                      {config.spliceInstanceNames.amuletNameAcronym}
+                    </InputAdornment>
+                  }
                   aria-describedby="outlined-amount-cc-helper-text"
                   error={BigNumber(ccAmountText).lte(0.0)}
                   inputProps={{

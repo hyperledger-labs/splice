@@ -8,6 +8,5 @@ declare global {
   interface Window {
     splice_config: Config;
   }
-  type Currency = 'CC' | 'USD';
   type Conversion = 'CCtoUSD' | 'USDtoCC';
 }

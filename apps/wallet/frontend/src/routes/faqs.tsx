@@ -22,7 +22,7 @@ export const Faqs: React.FC = () => {
           <Typography variant="body1">
             More complete FAQs are coming soon. In the meantime, please visit the official{' '}
             <Link href={config.clusterUrl} target="_blank">
-              Canton Network documentation
+              {config.spliceInstanceNames.networkName} documentation
             </Link>{' '}
             for more information.
           </Typography>

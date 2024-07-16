@@ -1,6 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigReader, authSchema, testAuthSchema, serviceSchema } from 'common-frontend';
+import {
+  ConfigReader,
+  authSchema,
+  testAuthSchema,
+  serviceSchema,
+  spliceInstanceNamesSchema,
+} from 'common-frontend';
 import { z } from 'zod';
 
 type WalletServicesConfig = {
@@ -12,6 +18,7 @@ type WalletConfig = {
   testAuth?: z.infer<typeof testAuthSchema>;
   services: WalletServicesConfig;
   clusterUrl: string;
+  spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
 };
 
 const reader = new ConfigReader(
@@ -22,6 +29,7 @@ const reader = new ConfigReader(
       validator: serviceSchema,
     }),
     clusterUrl: z.string().url(),
+    spliceInstanceNames: spliceInstanceNamesSchema,
   })
 );
 

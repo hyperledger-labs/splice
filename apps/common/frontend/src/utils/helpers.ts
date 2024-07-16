@@ -31,13 +31,11 @@ export function sameAssignedContracts<T>(
   );
 }
 
-export type Currency = 'CC' | 'USD';
-
-// TODO(#11375): inject this via a config instead of hardcoding... and please no more string matching
-export const unitStringToCurrency = (unit: string): Currency => {
+export const unitStringToCurrency = (unit: string): string => {
   switch (unit) {
     case 'AMULETUNIT':
-      return 'CC';
+      //TODO(#13480): remove this fallback once we have a proper config in all apps
+      return window.splice_config.spliceInstanceNames?.amuletNameAcronym || 'CC';
     case 'USDUNIT':
       return 'USD';
     case 'EXTUNIT':
@@ -48,6 +46,6 @@ export const unitStringToCurrency = (unit: string): Currency => {
   }
 };
 
-export const unitToCurrency = (unit: Unit): Currency => {
+export const unitToCurrency = (unit: Unit): string => {
   return unitStringToCurrency(unit.toUpperCase());
 };

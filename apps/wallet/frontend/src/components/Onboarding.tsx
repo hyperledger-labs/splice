@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button, Grid, Typography } from '@mui/material';
 
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
+import { config } from '../utils/config';
 
 const Onboarding: React.FC = () => {
   const validatorService = useValidatorClient();
@@ -32,7 +33,7 @@ const Onboarding: React.FC = () => {
       justifyContent="center"
     >
       <Typography variant="h4" sx={{ marginBottom: '15px' }}>
-        Welcome to the Canton Network wallet application!
+        Welcome to the {config.spliceInstanceNames.networkName} wallet application!
       </Typography>
       <Typography variant="h6" sx={{ marginBottom: '15px' }}>
         Your Daml user name is '{userId}'.

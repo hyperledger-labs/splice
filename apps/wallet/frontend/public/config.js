@@ -28,5 +28,12 @@ window.splice_config = {
     },
   },
   clusterUrl: `https://TARGET_HOSTNAME`,
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
   // END_WALLET_CLUSTER_BACKEND_CONFIG
 };

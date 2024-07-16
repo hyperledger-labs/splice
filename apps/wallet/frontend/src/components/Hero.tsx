@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 
 import { useBalance } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
+import { config } from '../utils/config';
 
 const Hero: React.FC = () => {
   const balanceQuery = useBalance();
@@ -38,7 +39,8 @@ const Hero: React.FC = () => {
               />
             </Typography>
             <Typography variant="caption">
-              Reflects unlocked amulet, rewards earned and holding fees
+              Reflects unlocked {config.spliceInstanceNames.amuletName}, rewards earned and holding
+              fees
             </Typography>
           </Box>
         )}

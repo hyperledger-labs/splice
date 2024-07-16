@@ -25,6 +25,13 @@ const config = {
     },
   },
   clusterUrl: `https://TARGET_HOSTNAME`,
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
 };
 
 export { config };
