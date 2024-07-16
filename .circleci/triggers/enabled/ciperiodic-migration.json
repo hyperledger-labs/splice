@@ -1,11 +1,11 @@
 {
     "name" : "CIPeriodic Migration Test",
-    "description" : "Tests a synchronizer migration with version upgrade from 0.1.13 to the version on main; TODO(#11659) don't the hardcode version like that",
+    "description" : "Tests a synchronizer migration with version upgrade from 0.1.15 to the version on main; TODO(#11659) update that version automatically",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
       "run-job": "deploy-ciperiodic-migration",
-      "base-version": "f007333ab77603e38119e3ecc2516679cb04bcf2"
+      "base-version": "release-line-0.1.15"
     },
     "timetable" : {
       "per-hour" : 1,
