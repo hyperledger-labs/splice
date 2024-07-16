@@ -52,7 +52,7 @@ spec:
             httpGet:
               path: /health
               port: rpc
-            initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 600 }}
+            initialDelaySeconds: {{ $.Values.livenessProbeInitialDelaySeconds | default 600 }}
           readinessProbe:
             httpGet:
               path: /health
