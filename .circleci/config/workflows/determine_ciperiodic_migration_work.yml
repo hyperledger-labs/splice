@@ -1,0 +1,7 @@
+workflow:
+  determine_ciperiodic_migration_work:
+    when:
+      equal: [ determine-ciperiodic-migration-work, << pipeline.parameters.run-job >> ]
+    jobs:
+      - launch_ciperiodic_migration_workflow:
+          <<: *main-branch-only
