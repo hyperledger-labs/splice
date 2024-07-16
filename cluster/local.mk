@@ -1,6 +1,7 @@
 include cluster/images/local.mk
 include cluster/helm/local.mk
-include cluster/pulumi/local.mk
+# The `-` prefix silently ignores a missing pulumi local.mk, which for now is not part of the Splice dump
+-include cluster/pulumi/local.mk
 
 #########
 # Toplevel targets

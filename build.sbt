@@ -995,8 +995,8 @@ lazy val pulumi =
 lazy val `load-tester` =
   project
     .in(file("load-tester"))
-    .disablePlugins(sbt.plugins.JvmPlugin, sbt.plugins.IvyPlugin)
     .settings(
+      Headers.TsHeaderSettings,
       npmRootDir := baseDirectory.value,
       npmFix := {
         val log = streams.value.log

@@ -52,6 +52,7 @@ copy_dir "network-health"
 copy_dir "docs/src/app_dev"
 copy_dir "docs/src/_static"
 cp "${REPO_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
+copy_dir "load-tester"
 
 # Build code / configs
 # Note that we are not currently copying LICENSE because the internal repo still has the
@@ -75,8 +76,8 @@ copy_file "build.sbt"
 # so we just copy the relevant files and subdirectories from `project` individually
 copy_dir "project/ignore-patterns"
 for f in project/*; do
-  if [ -f "project/$f" ]; then
-    copy_file "project/$f"
+  if [ -f "${REPO_ROOT}/$f" ]; then
+    copy_file "$f"
   fi
 done
 copy_dir "docs/api-templates"
@@ -85,3 +86,8 @@ copy_file "docs/.gitignore"
 copy_file "docs/src/conf.py"
 copy_file "docs/livepreview.sh"
 copy_file "daml.yaml"
+copy_file "Makefile"
+copy_file "cluster/local.mk"
+copy_file "build-tools/overwrite-if-changed"
+copy_file "scripts/canton-logback.xml"
+copy_file "build-tools/version-tag-subst"
