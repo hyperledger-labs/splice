@@ -309,7 +309,9 @@ class SvReonboardingIntegrationTest
             eventually() {
               sv.listVoteRequests() should have size 1
             }
-            sv.castVote(voteRequestCid, true, "url", "description")
+            eventuallySucceeds() {
+              sv.castVote(voteRequestCid, true, "url", "description")
+            }
           }
 
           eventually() {
