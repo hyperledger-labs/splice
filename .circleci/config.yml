@@ -877,6 +877,10 @@ commands:
               n=0
               until [ $n -gt $MAX_RETRY ]
               do
+                  if [ $n -gt 0 ]; then
+                    sleep << parameters.cmd_retry_wait >>
+                    << parameters.cmd_before_retry >>
+                  fi
                   cmd_wrapper() {
                     # We write the cmd to a separate file. That way `set -e` statements in the cmd will take effect
                     # despite us using this in a tested context below where they would usually be disabled.
@@ -898,8 +902,6 @@ commands:
                     exit 1
                   fi
                   n=$[$n+1]
-                  sleep << parameters.cmd_retry_wait >>
-                  << parameters.cmd_before_retry >>
               done
 
               if [ $n -gt $MAX_RETRY ]; then
