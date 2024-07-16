@@ -3848,7 +3848,7 @@
               }
             ],
             "comparison": "COMPARISON_GT",
-            "duration": "300s",
+            "duration": "60s",
             "filter": "resource.type=\"global\" AND metric.type = \"logging.googleapis.com/user/log_gke_cluster_update_test\"",
             "trigger": {
               "count": 1

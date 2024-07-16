@@ -191,7 +191,7 @@ protoPayload.metadata.operationType=~"(UPDATE_CLUSTER|UPGRADE_MASTER)"`,
           ],
           comparison: 'COMPARISON_GT',
           //retest period
-          duration: '300s',
+          duration: '60s',
           filter: pulumi.interpolate`resource.type="global" AND metric.type = "logging.googleapis.com/user/${logGkeClusterUpdate.name}"`,
           trigger: {
             count: 1,
