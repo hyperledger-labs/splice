@@ -5,6 +5,7 @@ import {
   ConfigReader,
   testAuthSchema,
   serviceSchema,
+  spliceInstanceNamesSchema,
   useAppManagerConfig,
   appManagerAuthConfig,
   walletSchema,
@@ -15,6 +16,7 @@ const reader = new ConfigReader(
   z.object({
     auth: authSchema.optional(),
     testAuth: testAuthSchema.optional(),
+    spliceInstanceNames: spliceInstanceNamesSchema,
     services: z.object({
       wallet: walletSchema.optional(),
       scan: serviceSchema,
@@ -34,6 +36,7 @@ type SplitwellServicesConfig = {
 type SplitwellConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
+  spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
   services: SplitwellServicesConfig;
   appManager: boolean;
 };
@@ -66,6 +69,7 @@ export const useConfig = (): SplitwellConfig => {
   return {
     auth: authConfig,
     testAuth: staticConfig.testAuth,
+    spliceInstanceNames: staticConfig.spliceInstanceNames,
     services: {
       wallet: walletConfig,
       scan: staticConfig.services.scan,

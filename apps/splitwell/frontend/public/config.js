@@ -15,6 +15,13 @@ window.splice_config = {
   //     token_audience: 'https://canton.network.global',
   //     token_scope: 'daml_ledger_api',
   //   },
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
   services: {
     wallet: {
       uiUrl: 'http://wallet.localhost:3000',

@@ -177,24 +177,24 @@ describe('alice can', () => {
     expect(balanceUpdatesList.length).toBe(3);
 
     await expect(
-      within(balanceUpdatesList[0]).findByText('alice.unverified.cns')
+      within(balanceUpdatesList[0]).findByText('alice.unverified.tns')
     ).resolves.toBeDefined();
     await expect(
-      within(balanceUpdatesList[0]).findByText('paid 30.0 CC for expenses')
-    ).resolves.toBeDefined();
-
-    await expect(
-      within(balanceUpdatesList[1]).findByText('bob.unverified.cns')
-    ).resolves.toBeDefined();
-    await expect(
-      within(balanceUpdatesList[1]).findByText('sent 40.0 CC to')
+      within(balanceUpdatesList[0]).findByText('paid 30.0 TLM for expenses')
     ).resolves.toBeDefined();
 
     await expect(
-      within(balanceUpdatesList[2]).findByText('alice.unverified.cns')
+      within(balanceUpdatesList[1]).findByText('bob.unverified.tns')
     ).resolves.toBeDefined();
     await expect(
-      within(balanceUpdatesList[2]).findByText('paid 15.0 CC for dinner')
+      within(balanceUpdatesList[1]).findByText('sent 40.0 TLM to')
+    ).resolves.toBeDefined();
+
+    await expect(
+      within(balanceUpdatesList[2]).findByText('alice.unverified.tns')
+    ).resolves.toBeDefined();
+    await expect(
+      within(balanceUpdatesList[2]).findByText('paid 15.0 TLM for dinner')
     ).resolves.toBeDefined();
   });
 });

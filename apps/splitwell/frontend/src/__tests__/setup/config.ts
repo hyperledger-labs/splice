@@ -18,6 +18,13 @@ const config = {
   //     token_audience: 'https://canton.network.global',
   //     token_scope: 'daml_ledger_api',
   //   },
+  spliceInstanceNames: {
+    networkName: 'Ecilps',
+    amuletName: 'Teluma',
+    amuletNameAcronym: 'TLM',
+    nameServiceName: 'Teluma Name Service',
+    nameServiceNameAcronym: 'TNS',
+  },
   services: {
     wallet: {
       uiUrl: 'http://wallet.localhost:3000',

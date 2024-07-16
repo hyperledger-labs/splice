@@ -23,7 +23,7 @@ const Root: React.FC = () => {
         <AppBar position="static" sx={{ marginBottom: 5 }}>
           <Toolbar>
             <Typography variant="h6" sx={{ flexGrow: 1 }} id="app-title">
-              CN Splitwell
+              Splitwell
               {primaryPartyId && (
                 <div id="logged-in-user" data-selenium-text={primaryPartyId}>
                   <AnsEntryComponent partyId={primaryPartyId} />

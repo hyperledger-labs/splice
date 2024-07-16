@@ -263,6 +263,7 @@ interface BalanceUpdatesProps {
 
 const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
   const balanceUpdates = useBalanceUpdates(group, party);
+  const amuletAcronym = useConfig().spliceInstanceNames.amuletNameAcronym;
 
   const Update: React.FC<{ update: Contract<BalanceUpdate> }> = ({ update }) => {
     if (update.payload.update.tag === 'ExternalPayment') {
@@ -271,7 +272,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
         <ListItem className="balance-updates-list-item">
           <AnsEntryComponent className="sender" partyId={value.payer} />
           <span className="description">
-            paid {value.amount} {'CC for '} {value.description}
+            paid {value.amount} {amuletAcronym} {'for'} {value.description}
           </span>
         </ListItem>
       );
@@ -281,7 +282,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
         <ListItem className="balance-updates-list-item">
           <AnsEntryComponent className="sender" partyId={value.sender} />
           <span className="description">
-            sent {value.amount} {'CC to '}
+            sent {value.amount} {amuletAcronym} {'to '}
           </span>
           <AnsEntryComponent className="receiver" partyId={value.receiver} />
         </ListItem>

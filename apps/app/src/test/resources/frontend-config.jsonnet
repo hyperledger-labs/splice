@@ -100,16 +100,6 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
   },
 };
 
-local spliceInstanceNames() = {
-  spliceInstanceNames: {
-    networkName: 'Canton Network',
-    amuletName: 'Canton Coin',
-    amuletNameAcronym: 'CC',
-    nameServiceName: 'Canton Name Service',
-    nameServiceNameAcronym: 'CNS',
-  }
-};
-
 local services(node, clusterProtocol, clusterAddress, port) =
   if (std.objectHas(validatorNodes(clusterProtocol, clusterAddress, port), node)) then
     { services: validatorNodes(clusterProtocol, clusterAddress, port)[node] }
@@ -129,5 +119,6 @@ function(
   app,
   clusterProtocol,
   clusterAddress,
+  spliceInstanceNames,
   port,
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames() + clusterUrl(app)
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames + clusterUrl(app)

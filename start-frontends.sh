@@ -27,9 +27,7 @@ function start_frontend() {
   local user=$3
   local node_name=$4
   local test_auth=$5
-  local algorithm="${6:-rs-256}"
-  local cluster_protocol="${7:-'http'}"
-  local cluster_address="${8:-'localhost'}"
+  local use_cn_namings="${6:-1}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -42,14 +40,38 @@ function start_frontend() {
   local config_file
   config_file=$(mktemp)
 
+  local splice_instance_names="{
+  spliceInstanceNames: {
+    networkName: 'Ecilps',
+    amuletName: 'Teluma',
+    amuletNameAcronym: 'TLM',
+    nameServiceName: 'Teluma Name Service',
+    nameServiceNameAcronym: 'TNS',
+  }
+}"
+
+  # TODO(#13480): remove the prod config after making all tests work in all UIs
+  if [ "$use_cn_namings" == "1" ]; then
+    splice_instance_names="{
+    spliceInstanceNames: {
+      networkName: 'Canton Network',
+      amuletName: 'Canton Coin',
+      amuletNameAcronym: 'CC',
+      nameServiceName: 'Canton Name Service',
+      nameServiceNameAcronym: 'CNS',
+    }
+  }"
+  fi
+
   jsonnet \
-    --tla-str clusterProtocol="$cluster_protocol" \
-    --tla-str clusterAddress="$cluster_address" \
-    --tla-str authAlgorithm="$algorithm" \
+    --tla-str clusterProtocol="http" \
+    --tla-str clusterAddress="localhost" \
+    --tla-str authAlgorithm="rs-256" \
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
     --tla-str app="$app" \
     --tla-str port="$port" \
+    --tla-code spliceInstanceNames="$splice_instance_names" \
     "$REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
     > "$config_file"
 
@@ -172,27 +194,27 @@ function start_local_frontends() {
     validator_for_bob="alice"
   fi
 
-  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
+  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address> <use_cn_namings>
 
   # Wallet
-  start_frontend   wallet    3000 alice   "alice"              $enable_test_auth
-  start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth
-  start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
+  start_frontend   wallet    3000 alice   "alice"              $enable_test_auth 1
+  start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth 1
+  start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth 1
 
   # ANS
-  start_frontend   ans       3100 alice   "alice"              $enable_test_auth
+  start_frontend   ans       3100 alice   "alice"              $enable_test_auth 1
 
   # SV
-  start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth
+  start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth 1
 
   if [ $two_svs -eq 1 ]; then
-    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth 1
   fi
 
   if [ $four_svs -eq 1 ]; then
-    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
-    start_frontend sv 3213 sv3 "sv3" $enable_test_auth
-    start_frontend sv 3214 sv4 "sv4" $enable_test_auth
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth 1
+    start_frontend sv 3213 sv3 "sv3" $enable_test_auth 1
+    start_frontend sv 3214 sv4 "sv4" $enable_test_auth 1
   fi
 
   # Scan
@@ -200,17 +222,17 @@ function start_local_frontends() {
 
   # Splitwell
   if [ $app_manager -eq 1 ]; then
-      start_frontend   splitwell 3420 splitwell "splitwell"        $enable_test_auth
+      start_frontend   splitwell 3420 splitwell "splitwell"        $enable_test_auth 0
   else
-      start_frontend   splitwell 3400 alice   "alice"              $enable_test_auth
-      start_frontend   splitwell 3401 bob     $validator_for_bob   $enable_test_auth
-      start_frontend   splitwell 3402 charlie "alice"              $enable_test_auth
+      start_frontend   splitwell 3400 alice   "alice"              $enable_test_auth 0
+      start_frontend   splitwell 3401 bob     $validator_for_bob   $enable_test_auth 0
+      start_frontend   splitwell 3402 charlie "alice"              $enable_test_auth 0
   fi
 
   # App manager
   if [ $app_manager -eq 1 ]; then
-    start_frontend   app-manager 3500 alice     "alice"              $enable_test_auth
-    start_frontend   app-manager 3520 splitwell "splitwell"          $enable_test_auth
+    start_frontend   app-manager 3500 alice     "alice"              $enable_test_auth 1
+    start_frontend   app-manager 3520 splitwell "splitwell"          $enable_test_auth 1
   fi
 
 }
