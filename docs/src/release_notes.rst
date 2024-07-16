@@ -49,12 +49,23 @@ Upcoming
     walletPayments     0.1.4
     ================== =======
 
+* Deployment
+
+  Added an ``livenessProbeInitialDelaySeconds`` parameter to all helm charts.
+
 * Sequencer
 
   * Improve performance of sequencer startup and querying the
     sequencer onboarding snapshot when onboarding new SVs. This adds a
     new index to the sequencer database so can take a while depending
     on the size of the DB.
+
+    Note: If you encounter issues with the migration taking too long and k8s killing your pod,
+    bump the ``livenessProbeInitialDelaySeconds`` parameter in the sequencer helm
+    chart.
+
+    We have also seen some issues with istio cancelling the database connection before the migration can finish (on much larger scale clusters than what we expect to have on dev/test/mainnet).
+    In that case, consider disabling the istio proxy through ``annotations: traffic.sidecar.istio.io/excludeOutboundPorts: "YOURDATABASEPORT"`` on the sequencer deployment.
 
 0.1.15
 ------

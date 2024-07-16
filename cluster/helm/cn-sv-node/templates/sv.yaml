@@ -266,7 +266,7 @@ spec:
             httpGet:
               path: /api/sv/livez
               port: 5014
-            initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 300 }}
+            initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 60 }}
             periodSeconds: 60
             failureThreshold: 5
             timeoutSeconds: 10

@@ -106,7 +106,7 @@ spec:
             grpc:
               port: 5061
               service: liveness
-            initialDelaySeconds: 60
+            initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 600 }}
             periodSeconds: 60
             failureThreshold: 5
             timeoutSeconds: 10

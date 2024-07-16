@@ -78,7 +78,7 @@ spec:
           httpGet:
             path: /api/scan/livez
             port: 5012
-          initialDelaySeconds: 60
+          initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 60 }}
           periodSeconds: 60
           failureThreshold: 5
           timeoutSeconds: 10
