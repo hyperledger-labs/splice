@@ -6,10 +6,12 @@ package com.daml.network.console
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.util.ContractWithState
 import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.validator.admin.api.client.commands.{
   HttpAppManagerAdminAppClient,
@@ -269,7 +271,13 @@ abstract class ValidatorAppReference(
         )
       }
     }
-
+    def getAnsRules(): ContractWithState[AnsRules.ContractId, AnsRules] = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.GetAnsRules
+        )
+      }
+    }
   }
 }
 

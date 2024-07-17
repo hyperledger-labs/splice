@@ -5,7 +5,7 @@ import useActivity from './useActivity';
 import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
 import useDsoInfo from './useDsoInfo';
 import useGetAmuletRules from './useGetAmuletRules';
-import useGetAnsRules from './useGetAnsRules';
+import useGetAnsRules, { useGetAnsRulesFromResponse } from './useGetAnsRules';
 import useGetDsoPartyId from './useGetDsoPartyId';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
@@ -33,6 +33,7 @@ export {
   useAmuletPriceFromOpenRounds,
   useGetAmuletRules,
   useGetAnsRules,
+  useGetAnsRulesFromResponse,
   useGetRoundOfLatestData,
   useGetDsoPartyId,
   useGetTopValidatorsByValidatorRewards,

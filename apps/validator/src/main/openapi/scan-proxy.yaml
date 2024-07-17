@@ -124,6 +124,24 @@ paths:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByNameResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/scan-proxy/ans-rules:
+    post:
+      tags: [scan-proxy]
+      x-jvm-package: scanproxy
+      operationId: "getAnsRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesResponse"
 
 components:
   schemas:

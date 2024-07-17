@@ -4,6 +4,7 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
+import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.{definitions, scanproxy as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -144,6 +145,25 @@ class HttpScanProxyHandler(
         entries <- scanConnection.listAnsEntries(namePrefix, pageSize)
       } yield {
         respond.OK(definitions.ListEntriesResponse(entries.toVector))
+      }
+    }
+  }
+  def getAnsRules(
+      respond: v0.ScanproxyResource.GetAnsRulesResponse.type
+  )(
+      body: com.daml.network.http.v0.definitions.GetAnsRulesRequest
+  )(tUser: TracedUser): Future[v0.ScanproxyResource.GetAnsRulesResponse] = {
+    implicit val TracedUser(_, traceContext) = tUser
+    withSpan(s"$workflowId.getAnsRules") { implicit traceContext => _ =>
+      for {
+        response <- scanConnection.getAnsRules()
+        maybeDomainId = response.state.fold(dId => Some(dId.toProtoPrimitive), None)
+        maybeCachedContract = MaybeCachedContractWithState(
+          Some(response.contract.toHttp),
+          maybeDomainId,
+        )
+      } yield {
+        respond.OK(definitions.GetAnsRulesResponse(ansRulesUpdate = maybeCachedContract))
       }
     }
   }

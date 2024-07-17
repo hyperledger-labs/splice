@@ -17,11 +17,6 @@ const config = {
   //   token_audience: 'https://validator.example.com/api',
   // },
   services: {
-    scan: {
-      // URL of scan backend.
-      // Edit this to the cluster you're trying to connect on.
-      url: 'https://scan.sv-2.TARGET_HOSTNAME/api/scan',
-    },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
       uiUrl: 'http://wallet.localhost:3000',

@@ -4,7 +4,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { ListAnsEntriesResponse } from 'ans-external-openapi';
 import { PollingStrategy } from 'common-frontend-utils';
 
-import { useExternalAnsClient } from '../../context/ValidatorServiceContext';
+import { useExternalAnsClient } from '../../context/AnsServiceContext';
 
 const useEntriesWithPayData = (): UseQueryResult<ListAnsEntriesResponse> => {
   const refetchInterval = PollingStrategy.FIXED;

@@ -6,7 +6,7 @@ import { CreateAnsEntryRequest } from 'ans-external-openapi';
 import { SubscriptionRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
-import { useExternalAnsClient } from '../../context/ValidatorServiceContext';
+import { useExternalAnsClient } from '../../context/AnsServiceContext';
 import { toFullEntryName } from '../../utils';
 
 interface RequestEntryArgs {

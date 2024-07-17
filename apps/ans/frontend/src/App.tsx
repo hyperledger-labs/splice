@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, theme, UserProvider, ErrorRouterPage } from 'common-frontend';
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
-import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
   createBrowserRouter,
@@ -15,7 +14,8 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
-import { ExternalAnsClientProvider } from './context/ValidatorServiceContext';
+import { ExternalAnsClientProvider } from './context/AnsServiceContext';
+import { ValidatorScanProxyClientProvider } from './context/ValidatorScanProxyContext';
 import { WalletClientProvider } from './context/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
@@ -38,11 +38,11 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
           <WalletClientProvider url={config.services.validator.url}>
-            <ScanClientProvider url={config.services.scan.url}>
+            <ValidatorScanProxyClientProvider validatorUrl={config.services.validator.url}>
               <ExternalAnsClientProvider url={config.services.validator.url}>
                 {children}
               </ExternalAnsClientProvider>
-            </ScanClientProvider>
+            </ValidatorScanProxyClientProvider>
           </WalletClientProvider>
         </UserProvider>
       </QueryClientProvider>

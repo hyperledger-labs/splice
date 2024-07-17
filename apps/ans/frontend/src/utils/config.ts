@@ -15,7 +15,6 @@ const walletSchema = z.object({
 
 type AnsServicesConfig = {
   wallet: z.infer<typeof walletSchema>;
-  scan: z.infer<typeof serviceSchema>;
   validator: z.infer<typeof serviceSchema>;
 };
 
@@ -34,7 +33,6 @@ const reader = new ConfigReader(
       wallet: z.object({
         uiUrl: z.string().url(),
       }),
-      scan: serviceSchema,
       validator: serviceSchema,
     }),
     spliceInstanceNames: spliceInstanceNamesSchema,

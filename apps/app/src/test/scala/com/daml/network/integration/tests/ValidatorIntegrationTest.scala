@@ -68,6 +68,15 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
     // the party is available via the scan proxy
     aliceValidatorBackend.scanProxy.getDsoParty() shouldBe dsoParty
+
+    // the ans rules are available via the scan proxy
+    aliceValidatorBackend.scanProxy
+      .getAnsRules()
+      .toAssignedContract
+      .value
+      .contract
+      .payload
+      .dso shouldBe dsoParty.toProtoPrimitive
   }
 
   "validator apps connect to all DSO sequencers" in { implicit env =>

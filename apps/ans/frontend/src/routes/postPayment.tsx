@@ -1,13 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { Loading } from 'common-frontend';
-import { useLookupAnsEntryByName } from 'common-frontend/scan-api';
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
+import { useLookupAnsEntryByName } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 

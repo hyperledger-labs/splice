@@ -6,7 +6,6 @@ import {
   IntervalDisplay,
   SubscriptionButton,
 } from 'common-frontend';
-import { useGetAnsRules, useLookupAnsEntryByName } from 'common-frontend/scan-api';
 import React, { useState } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 
@@ -14,7 +13,7 @@ import { CheckCircleOutline, ErrorOutline } from '@mui/icons-material';
 import { Box, Button, Stack, Typography, styled } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
-import { useRequestEntry } from '../hooks';
+import { useRequestEntry, useLookupAnsEntryByName, useGetAnsRules } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 

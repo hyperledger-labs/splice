@@ -8,10 +8,6 @@ window.splice_config = {
     token_audience: "${CN_APP_CNS_UI_AUTH_AUDIENCE}",
   },
   services: {
-    scan: {
-      // URL of the scan backend.
-      url: `https://scan.sv-2.${cluster}/api/scan`,
-    },
     validator: {
       url: "https://" + window.location.hostname + "/api/validator",
     },

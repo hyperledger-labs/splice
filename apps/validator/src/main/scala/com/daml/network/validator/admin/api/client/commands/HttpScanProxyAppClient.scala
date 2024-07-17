@@ -5,13 +5,14 @@ package com.daml.network.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.http.HttpClient
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import com.daml.network.http.v0.scanproxy as scanProxy
+import com.daml.network.http.v0.{definitions, scanproxy as scanProxy}
 import com.daml.network.http.v0.scanproxy.{GetDsoPartyIdResponse, ScanproxyClient}
-import com.daml.network.util.TemplateJsonDecoder
+import com.daml.network.util.{ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,4 +45,30 @@ object HttpScanProxyAppClient {
     }
   }
 
+  case object GetAnsRules
+      extends ScanProxyBaseCommand[
+        scanProxy.GetAnsRulesResponse,
+        ContractWithState[AnsRules.ContractId, AnsRules],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], scanProxy.GetAnsRulesResponse] = {
+      client.getAnsRules(
+        definitions.GetAnsRulesRequest(None, None),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case scanProxy.GetAnsRulesResponse.OK(response) =>
+        for {
+          ansRules <- ContractWithState.handleMaybeCached(AnsRules.COMPANION)(
+            None,
+            response.ansRulesUpdate,
+          )
+        } yield ansRules
+    }
+  }
 }
