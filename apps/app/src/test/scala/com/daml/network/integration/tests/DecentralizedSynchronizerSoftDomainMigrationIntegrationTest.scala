@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.splice.{
   dsorules,
   svonboarding as so,
   validatoronboarding as vo,
-  wallet as cnw,
+  wallet as spw,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
@@ -482,8 +482,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       )
 
       val appPaymentRequestCid =
-        createSampleAndEnsurePresence(cnw.payment.AppPaymentRequest.COMPANION)(
-          new cnw.payment.AppPaymentRequest(
+        createSampleAndEnsurePresence(spw.payment.AppPaymentRequest.COMPANION)(
+          new spw.payment.AppPaymentRequest(
             sv1WalletUser.toProtoPrimitive,
             java.util.List.of(),
             provider.toProtoPrimitive,
@@ -493,8 +493,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
           )
         )
 
-      createSampleAndEnsurePresence(cnw.payment.AcceptedAppPayment.COMPANION)(
-        new cnw.payment.AcceptedAppPayment(
+      createSampleAndEnsurePresence(spw.payment.AcceptedAppPayment.COMPANION)(
+        new spw.payment.AcceptedAppPayment(
           sv1WalletUser.toProtoPrimitive,
           java.util.List.of,
           provider.toProtoPrimitive,
@@ -506,9 +506,9 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       )
 
       val dummyPaymentAmount =
-        new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Unit.AMULETUNIT)
+        new spw.payment.PaymentAmount(dummyDecimal, spw.payment.Unit.AMULETUNIT)
 
-      val dummySubscriptionData = new cnw.subscriptions.SubscriptionData(
+      val dummySubscriptionData = new spw.subscriptions.SubscriptionData(
         sv1WalletUser.toProtoPrimitive,
         dso,
         provider.toProtoPrimitive,
@@ -517,10 +517,10 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       )
 
       val subscriptionRequestCid =
-        createSampleAndEnsurePresence(cnw.subscriptions.SubscriptionRequest.COMPANION)(
-          new cnw.subscriptions.SubscriptionRequest(
+        createSampleAndEnsurePresence(spw.subscriptions.SubscriptionRequest.COMPANION)(
+          new spw.subscriptions.SubscriptionRequest(
             dummySubscriptionData,
-            new cnw.subscriptions.SubscriptionPayData(
+            new spw.subscriptions.SubscriptionPayData(
               dummyPaymentAmount,
               dummyDistantRelTime,
               dummyDistantRelTime,
@@ -528,12 +528,12 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
           )
         )
 
-      createSampleAndEnsurePresence(cnw.subscriptions.Subscription.COMPANION)(
-        new cnw.subscriptions.Subscription(dummySubscriptionData, subscriptionRequestCid)
+      createSampleAndEnsurePresence(spw.subscriptions.Subscription.COMPANION)(
+        new spw.subscriptions.Subscription(dummySubscriptionData, subscriptionRequestCid)
       )
 
-      createSampleAndEnsurePresence(cnw.transferoffer.TransferOffer.COMPANION)(
-        new cnw.transferoffer.TransferOffer(
+      createSampleAndEnsurePresence(spw.transferoffer.TransferOffer.COMPANION)(
+        new spw.transferoffer.TransferOffer(
           dso,
           sv1WalletUser.toProtoPrimitive,
           dso,
@@ -544,8 +544,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         )
       )
 
-      createSampleAndEnsurePresence(cnw.transferoffer.AcceptedTransferOffer.COMPANION)(
-        new cnw.transferoffer.AcceptedTransferOffer(
+      createSampleAndEnsurePresence(spw.transferoffer.AcceptedTransferOffer.COMPANION)(
+        new spw.transferoffer.AcceptedTransferOffer(
           dso,
           sv1WalletUser.toProtoPrimitive,
           dso,
@@ -665,7 +665,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       allContractsMigrated(
         SvDsoStore.amuletRulesFollowers
           filterNot Set(
-            cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
+            spw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             splice.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
           )
           map (c(_)): _*
@@ -696,9 +696,9 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       allContractsMigrated(
         templatesMovedByUserWalletAutomation
           filterNot Set( // TODO (#8386) remove filtering
-            cnw.subscriptions.SubscriptionInitialPayment.COMPANION,
-            cnw.subscriptions.SubscriptionIdleState.COMPANION,
-            cnw.subscriptions.SubscriptionPayment.COMPANION,
+            spw.subscriptions.SubscriptionInitialPayment.COMPANION,
+            spw.subscriptions.SubscriptionIdleState.COMPANION,
+            spw.subscriptions.SubscriptionPayment.COMPANION,
           )
           map (c(_, sv1WalletUser)): _*
       )

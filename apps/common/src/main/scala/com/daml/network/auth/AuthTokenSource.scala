@@ -35,7 +35,7 @@ object AuthToken {
     for {
       decoded <- JwtDecoder.decode(Jwt(accessToken)).toOption
       json <- Try(decoded.payload.parseJson).toOption
-      // Note: CN only uses audience-based tokens (i.e., the standard JWT format).
+      // Note: Splice only uses audience-based tokens (i.e., the standard JWT format).
       // AuthServiceJWTCodec.readPayload() guesses the token format, but only works if audience-based tokens
       // use the default ledger API audience prefix.
       payload <- Try(AuthServiceJWTCodec.readAudienceBasedToken(json)).toOption

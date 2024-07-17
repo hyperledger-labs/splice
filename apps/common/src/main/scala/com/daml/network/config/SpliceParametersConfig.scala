@@ -10,7 +10,7 @@ final case class SpliceParametersConfig(
     caching: CachingConfigs = CachingConfigs(),
 ) extends LocalNodeParametersConfig {
   override val useNewTrafficControl: Boolean =
-    false // irrelevant for CN, as this is an impl. config for Canton nodes only
+    false // irrelevant for Splice, as this is an impl. config for Canton nodes only
 
   override def useUnifiedSequencer: Boolean = false
 

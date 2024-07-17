@@ -30,8 +30,8 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
 abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
-/** This class aggregates binary-level configuration options that are shared between each CN app instance.
-  * For example, the [[TracingConfig]] is configured once for all CN apps that are started by a CN binary as part of the
+/** This class aggregates binary-level configuration options that are shared between each Splice app instance.
+  * For example, the [[TracingConfig]] is configured once for all Splice apps that are started by a Splice binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].
   * To avoid having to pass the configuration options for all apps (as implemented in [[com.daml.network.config.SpliceConfig]])
   * to a single app, a [[SharedSpliceAppParameters]] class instance is constructed and passed to each app during bootstrapping.
@@ -64,7 +64,7 @@ case class SharedSpliceAppParameters(
 ) extends CantonNodeParameters {
   override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
   override val useNewTrafficControl: Boolean =
-    false // irrelevant for CN, as this is an impl. config for Canton nodes only
+    false // irrelevant for Splice, as this is an impl. config for Canton nodes only
   override val exitOnFatalFailures: Boolean = true
 
   override def useUnifiedSequencer: Boolean = false

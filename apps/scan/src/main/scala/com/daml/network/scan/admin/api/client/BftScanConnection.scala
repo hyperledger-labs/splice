@@ -490,7 +490,7 @@ object BftScanConnection {
   }
 
   def apply(
-      cnLedgerClient: SpliceLedgerClient,
+      spliceLedgerClient: SpliceLedgerClient,
       config: BftScanClientConfig,
       upgradesConfig: UpgradesConfig,
       clock: Clock,
@@ -511,7 +511,7 @@ object BftScanConnection {
         connectionF
           .map(conn =>
             new BftScanConnection(
-              cnLedgerClient,
+              spliceLedgerClient,
               amuletRulesCacheTimeToLive,
               new TrustSingle(conn, retryProvider, loggerFactory),
               clock,
@@ -540,7 +540,7 @@ object BftScanConnection {
               )
             }
           bftConnection = new BftScanConnection(
-            cnLedgerClient,
+            spliceLedgerClient,
             amuletRulesCacheTimeToLive,
             bft,
             clock,

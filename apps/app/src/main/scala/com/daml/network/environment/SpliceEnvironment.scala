@@ -38,7 +38,7 @@ trait SpliceEnvironment extends Environment {
   override type Config = SpliceConfig
   override type Console = SpliceConsoleEnvironment
 
-  val cnNodeMetrics =
+  private val metrics =
     SpliceMetricsFactory.forConfig(
       configuredOpenTelemetry.openTelemetry.getMeterProvider,
       testingConfig.metricsFactoryType,
@@ -54,7 +54,7 @@ trait SpliceEnvironment extends Environment {
       validatorConfig,
       config.tryValidatorAppParametersByString(name),
       createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forValidator(name),
+      metrics.forValidator(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -86,7 +86,7 @@ trait SpliceEnvironment extends Environment {
       svConfig,
       config.trySvAppParametersByString(name),
       createClock(Some(SvAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forSv(name),
+      metrics.forSv(name),
       testingConfig,
       appLoggerFactory,
       futureSupervisor,
@@ -118,7 +118,7 @@ trait SpliceEnvironment extends Environment {
       scanConfig,
       config.tryScanAppParametersByString(name),
       createClock(Some(ScanAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forScan(name),
+      metrics.forScan(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -150,7 +150,7 @@ trait SpliceEnvironment extends Environment {
       splitwellConfig,
       config.trySplitwellAppParametersByString(name),
       createClock(Some(SplitwellAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forSplitwell(name),
+      metrics.forSplitwell(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,

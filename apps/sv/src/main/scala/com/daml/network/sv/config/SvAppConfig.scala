@@ -125,7 +125,6 @@ final case class SynchronizerFeesConfig(
     baseRateBurstAmount: NonNegativeLong = NonNegativeLong.tryCreate(400_000L),
     baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(20),
     // charge 4 per 10,000, i.e., 0.04% of write cost for every read.
-    // See https://digitalasset.atlassian.net/wiki/spaces/CN/pages/3305570314/Lab+Log+-+Read+Scaling+Factor+Tuning
     readVsWriteScalingFactor: PositiveNumeric[Int] = PositiveNumeric.tryCreate(4),
 )
 

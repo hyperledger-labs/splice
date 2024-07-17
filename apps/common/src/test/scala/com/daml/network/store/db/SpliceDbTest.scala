@@ -45,7 +45,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
       storage: DbStorage
   )(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.jdbcProfile.api.*
-    logger.info("Resetting all CN app database tables")
+    logger.info("Resetting all Splice app database tables")
     for {
       _ <- storage.update(
         sql"""TRUNCATE
@@ -78,7 +78,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   private var dbLockSocket: Option[ServerSocket] = None
 
-  // Note: all app stores in CN use the same `store_descriptors` table.
+  // Note: all app stores in Splice use the same `store_descriptors` table.
   // Since test are running in parallel, we manually synchronize the tests to avoid conflicts.
   // Since tests might be running in different JVM instances, we are using a socket for synchronization.
   override def beforeAll(): Unit = {

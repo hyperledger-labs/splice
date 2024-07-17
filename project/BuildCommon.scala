@@ -14,7 +14,7 @@ import wartremover.WartRemover
 import wartremover.WartRemover.autoImport.*
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import DamlPlugin.autoImport.*
-import Wartremover.cnWarts
+import Wartremover.spliceWarts
 import protocbridge.ProtocRunner
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
@@ -73,7 +73,7 @@ object BuildCommon {
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
 
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
-    sharedSettings ++ cantonWarts ++ cnWarts ++ unusedImportsSetting ++ Headers.ApacheDAHeaderSettings ++
+    sharedSettings ++ cantonWarts ++ spliceWarts ++ unusedImportsSetting ++ Headers.ApacheDAHeaderSettings ++
       Seq(
         Compile / PB.deleteTargetDirectory := false,
         // ^^ do not let protocGenerate delete the entire target directory, otherwise the different apps

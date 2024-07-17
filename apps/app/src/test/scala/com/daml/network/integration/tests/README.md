@@ -1,10 +1,10 @@
 # Integration tests
 
-Integration tests are the backbone of our testing strategy for the Canton Network.
+Integration tests are the backbone of our testing strategy for Splice.
 This folder contains all such tests.
 
 In the following, we describe non-obvious aspects of (some of) our integration tests,
-as well as common pitfalls when developing and debugging integration tests for the Canton Network.
+as well as common pitfalls when developing and debugging integration tests for Splice.
 For more general documentation about testing and running tests please consult the [main README](/README.md#testing).
 
 ## Wait for updates
@@ -36,7 +36,7 @@ If you want to retry a check on failures that are different from `TestFailedExce
 
 ## Ensure that test failures print helpful messages
 
-- Use `collection should have size(<expected-size>)`, as that prints the collection and its size on a failure instead
+- Use `collection should have size <expected-size>`, as that prints the collection and its size on a failure instead
   of just printing `0 not equal to 1`, which is shown if you use `collection.size shouldBe <expected-size>`
 - Use `inside(complexStructure) { <assertions on fields/properties of complexStructure> }` to ensure `complexStructure` is
   printed in addition to the assertion failure on any of the checks on the fields of that structure.
@@ -51,8 +51,8 @@ one running with regular wall-clock time, and one running with a `simclock` that
 To use `canton-simtime` instead of `canton`, a test needs to use an appropriate environment definition such as (truncated):
 
 ```
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    CNNodeEnvironmentDefinition
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 ```
 
@@ -80,7 +80,7 @@ This can, for example, cause contracts with expiration times to expire and get a
 Starting up our [test topology](apps/app/src/test/resources/simple-topology.conf) is time-intensive.
 Whenever a test suite affords it (which should be most of the time),
 we therefore want to do this only once for the whole test suite.
-This is realized by defining test classes as `extends CNNodeIntegrationTestWithSharedEnvironment` / `extends FrontendIntegrationTestWithSharedEnvironment(...)`.
+This is realized by defining test classes as `extends IntegrationTestWithSharedEnvironment` / `extends FrontendIntegrationTestWithSharedEnvironment(...)`.
 Use tests with a shared environment whenever it's possible!
 It prevents our CI waiting times from exploding.
 

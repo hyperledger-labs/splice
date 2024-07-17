@@ -43,7 +43,7 @@ trait NodeBootstrap[+N <: CantonNode]
   def start(): EitherT[Future, String, Unit]
 
   /** This function assumes that all configured remote Canton participants are already initialized
-    * and connected to at least one domain. This is necessary because the initialization of some CN apps needs to
+    * and connected to at least one domain. This is necessary because the initialization of some Splice apps needs to
     * interact with a Ledger API, e.g., to allocate a party or user.
     */
   def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit]

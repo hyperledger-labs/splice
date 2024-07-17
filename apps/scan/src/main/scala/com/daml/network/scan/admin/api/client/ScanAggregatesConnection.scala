@@ -23,7 +23,7 @@ import com.daml.network.scan.store.db.ScanAggregator.*
 
 object ScanAggregatesConnection {
   def apply(
-      cnLedgerClient: SpliceLedgerClient,
+      spliceLedgerClient: SpliceLedgerClient,
       config: BftScanConnection.BftScanClientConfig,
       upgradesConfig: UpgradesConfig,
       clock: Clock,
@@ -36,7 +36,14 @@ object ScanAggregatesConnection {
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanAggregatesConnection] = {
-    BftScanConnection(cnLedgerClient, config, upgradesConfig, clock, retryProvider, loggerFactory)
+    BftScanConnection(
+      spliceLedgerClient,
+      config,
+      upgradesConfig,
+      clock,
+      retryProvider,
+      loggerFactory,
+    )
       .map(bft => new ScanAggregatesConnection(bft, retryProvider, loggerFactory))
   }
 }

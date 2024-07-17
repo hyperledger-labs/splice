@@ -76,7 +76,7 @@ class AppUpgradeIntegrationTest
         }))
     })
 
-  "A set of CN apps" should {
+  "A set of Splice apps" should {
     "be upgradeable" in { implicit env =>
       {
 
@@ -519,13 +519,13 @@ object AppUpgradeIntegrationTest {
 
     def getBundledSplice(version: String) = {
       val dir = getDir(bundleDir(version))
-      val bundledCn = dir.resolve("bin/cn-node")
-      if (!bundledCn.toFile.exists()) {
+      val bundledSplice = dir.resolve("bin/cn-node")
+      if (!bundledSplice.toFile.exists()) {
         throw new RuntimeException(
-          s"Bundled CN artifacts for version ${version} not found, did you run build-tools/prep-app-upgrade-test ?"
+          s"Bundled Splice artifacts for version ${version} not found, did you run build-tools/prep-app-upgrade-test ?"
         )
       }
-      bundledCn
+      bundledSplice
     }
   }
 

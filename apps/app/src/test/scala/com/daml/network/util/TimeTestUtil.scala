@@ -93,7 +93,7 @@ trait TimeTestUtil extends TestCommon {
       amulet: HttpWalletAppClient.AmuletPosition,
       outputs: Seq[splice.amuletrules.TransferOutput],
       now: CantonTimestamp,
-  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     val amuletRules = sv1ScanBackend.getAmuletRules()
     val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
     val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)

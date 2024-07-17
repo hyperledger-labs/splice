@@ -18,7 +18,7 @@ class AnsAuth0FrontendIntegrationTest
   override def environmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransform((_, cnNodeConfig) =>
+      .addConfigTransform((_, c) =>
         updateAllValidatorConfigs_(conf =>
           conf
             .focus(_.auth)
@@ -28,7 +28,7 @@ class AnsAuth0FrontendIntegrationTest
                 new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"),
               )
             )
-        )(cnNodeConfig)
+        )(c)
       )
 
   "A CNS UI" should {

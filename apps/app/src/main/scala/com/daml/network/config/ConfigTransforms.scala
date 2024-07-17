@@ -641,8 +641,8 @@ object ConfigTransforms {
       .focus(_.mediator)
       .modify(portTransform(bump, _))
 
-  /** Auth-enabled CN apps use self-signed tokens with the given secret for their ledger API connections.
-    * Other CN apps use canton admin tokens for their ledger API connections.
+  /** Auth-enabled Splice apps use self-signed tokens with the given secret for their ledger API connections.
+    * Other Splice apps use canton admin tokens for their ledger API connections.
     */
   def useSelfSignedTokensForLedgerApiAuth(secret: String): ConfigTransform = { config =>
     updateAllLedgerApiClientConfigs(

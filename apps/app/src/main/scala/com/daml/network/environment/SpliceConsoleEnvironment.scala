@@ -63,7 +63,7 @@ class SpliceConsoleEnvironment(
     remotes.flatten
 
   override lazy val nodes = NodeReferences(
-    // this override ensures that config options like manualStart also work for CN apps
+    // this override ensures that config options like manualStart also work for Splice apps
     amuletNodes.local,
     amuletNodes.remote,
   )

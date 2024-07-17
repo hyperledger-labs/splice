@@ -321,7 +321,7 @@ class ScanFrontendTimeBasedIntegrationTest
             val shownRounds = findAll(className("open-mining-round-row")).toList
             shownRounds should have size openRounds.size.toLong
             forEvery(shownRounds zip openRounds) { case (shownRound, openRound) =>
-              def rt(cn: String) = shownRound.childElement(className(cn)).text
+              def rt(n: String) = shownRound.childElement(className(n)).text
               rt("round-number") should matchText(openRound.round.number.toString)
               rt("round-opens-at") should matchText(fmtTime(openRound.opensAt))
               rt("round-target-closes-at") should matchText(fmtTime(openRound.targetClosesAt))

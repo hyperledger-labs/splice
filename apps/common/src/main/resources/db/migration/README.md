@@ -7,7 +7,7 @@ This document goes over how to apply changes to the database schema and/or the [
 - [Flyway](https://documentation.red-gate.com/fd/quickstart-how-flyway-works-184127223.html)
 - [SQL (specifically, PostgreSQL's dialect)](https://www.postgresql.org/docs/current/sql-createtable.html)
 
-## Flyway usage in CN apps
+## Flyway usage in Splice apps
 
 - Once a Flyway migration script is included in a released version (more precisely, once you can't rule out that it's applied in _any_ production deployment),
   the script must never be modified again. This includes modifying comments - the checksum of the file content must forever remain constant.

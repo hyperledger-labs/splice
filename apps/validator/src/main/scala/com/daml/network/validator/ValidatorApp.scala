@@ -420,7 +420,7 @@ class ValidatorApp(
       RetryFor.WaitingOnInitDependency,
       "version_check",
       "version checked via scan",
-      // we checkVersionCompatibility on every CN app connection
+      // we checkVersionCompatibility on every Splice app connection
       scanClientConfig match {
         case BftScanClientConfig.TrustSingle(url, _) =>
           val config = ScanAppClientConfig(NetworkAppClientConfig(url))

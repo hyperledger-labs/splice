@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Common schemas for CN API definitions
+  title: Common schemas for Splice API definitions
   version: 0.0.1
 paths: {}
 components:

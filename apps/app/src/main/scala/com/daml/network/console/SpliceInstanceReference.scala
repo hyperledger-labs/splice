@@ -70,13 +70,13 @@ trait AppReference extends InstanceReference {
   // clear_cache exists to invalidate topology caches which we don't have in our apps.
   override def clear_cache(): Unit = ()
 
-  // Doesn't make sense for CN
+  // Doesn't make sense for Splice
   override def topology: TopologyAdministrationGroup = ???
 
-  // Doesn't make sense for CN
+  // Doesn't make sense for Splice
   override def parties: PartiesAdministrationGroupX = ???
 
-  // Doesn't make sense for CN
+  // Doesn't make sense for Splice
   override def id: NodeIdentity = ???
 
   @Help.Summary("Wait until initialization has completed")

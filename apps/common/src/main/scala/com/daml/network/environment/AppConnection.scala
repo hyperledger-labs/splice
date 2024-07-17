@@ -134,7 +134,7 @@ abstract class AppConnection(
 
 }
 
-/** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
+/** Base class for connecting and calling the HTTP/Admin API exposed by a Splice App.
   */
 abstract class HttpAppConnection(
     config: NetworkAppClientConfig,

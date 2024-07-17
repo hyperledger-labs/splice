@@ -1108,8 +1108,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
       expiredDuration: Duration,
-  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
-    val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
+  )(implicit env: SpliceTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
+    val expiredAt = env.environment.clock.now.add(expiredDuration)
     val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
     new TransferOutput(
@@ -1134,7 +1134,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       scan: ScanAppBackendReference,
       expiredDuration: Duration,
       ledgerTime: CantonTimestamp,
-  )(implicit cnNodeEnv: SpliceTestConsoleEnvironment): Unit =
+  )(implicit env: SpliceTestConsoleEnvironment): Unit =
     clue(s"Locking $amount amulets for $userParty") {
       val amulet = amulets.find(_.effectiveAmount >= amount).value
       val amuletRules = scan.getAmuletRules()

@@ -44,7 +44,7 @@ lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
 
-lazy val `cn-wartremover-extension` = Wartremover.`cn-wartremover-extension`
+lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
 inThisBuild(
   List(
@@ -104,7 +104,7 @@ lazy val root: Project = (project in file("."))
     pulumi,
     `load-tester`,
     tools,
-    `cn-wartremover-extension`,
+    `splice-wartremover-extension`,
     docs,
   )
   .settings(
@@ -404,7 +404,7 @@ lazy val `apps-common` =
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
-      `cn-wartremover-extension` % "compile->compile;test->test",
+      `splice-wartremover-extension` % "compile->compile;test->test",
       // We include all DARs here to make sure they are available as resources.
       `splice-app-manager-daml`,
       `splice-app-manager-daml`,

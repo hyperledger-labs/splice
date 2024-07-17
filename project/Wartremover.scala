@@ -8,10 +8,10 @@ import wartremover.WartRemover.autoImport._
 
 object Wartremover {
 
-  lazy val `cn-wartremover-extension` = {
+  lazy val `splice-wartremover-extension` = {
     import CantonDependencies.*
     sbt.Project
-      .apply("cn-wartremover-extension", file("build-tools/wart-remover-extension"))
+      .apply("splice-wartremover-extension", file("build-tools/wart-remover-extension"))
       .settings(
         disableTests,
         sharedSettings,
@@ -25,10 +25,10 @@ object Wartremover {
     if (sys.env.contains("CI")) Seq(Wart.custom("com.daml.network.wart.Println"))
     else Seq()
 
-  lazy val cnWarts = Seq(
+  lazy val spliceWarts = Seq(
     wartremoverErrors ++= extraWartRemoverErrors,
     wartremover.WartRemover.dependsOnLocalProjectWarts(
-      `cn-wartremover-extension`
+      `splice-wartremover-extension`
     ),
   ).flatMap(_.settings)
 }
