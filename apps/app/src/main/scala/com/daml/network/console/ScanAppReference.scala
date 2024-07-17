@@ -184,13 +184,13 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
-  @Help.Summary("Get the total balance of Canton Coin in the network")
+  @Help.Summary("Get the total balance of Amulet in the network")
   def getTotalAmuletBalance(asOfEndOfRound: Long): BigDecimal =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTotalAmuletBalance(asOfEndOfRound))
     }
 
-  @Help.Summary("Get the Canton Coin config parameters for a given round")
+  @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long
   ): HttpScanAppClient.AmuletConfig =

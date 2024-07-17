@@ -81,10 +81,10 @@ object ConfigTransforms {
           validatorLedgerApiUser = s"${c.validatorLedgerApiUser}-$suffix",
           svPartyHint = c.svPartyHint.map(sv => s"$sv-$suffix"),
           onboarding = c.onboarding match {
-            case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
+            case Some(foundDso: SvOnboardingConfig.FoundDso) =>
               Some(
-                foundCollective.copy(
-                  dsoPartyHint = s"${foundCollective.dsoPartyHint}-$suffix"
+                foundDso.copy(
+                  dsoPartyHint = s"${foundDso.dsoPartyHint}-$suffix"
                 )
               )
             case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
@@ -93,7 +93,7 @@ object ConfigTransforms {
           },
         )
       ),
-      updateAllSvAppFoundCollectiveConfigs_(c =>
+      updateAllSvAppFoundDsoConfigs_(c =>
         c.copy(
           dsoPartyHint = s"${c.dsoPartyHint}-$suffix"
         )
@@ -222,7 +222,7 @@ object ConfigTransforms {
   def setAmuletPrice(price: BigDecimal): ConfigTransform =
     config =>
       Seq(
-        updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialAmuletPrice).replace(price)),
+        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialAmuletPrice).replace(price)),
         updateAllSvAppConfigs_(c => c.focus(_.initialAmuletPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
 
@@ -298,14 +298,14 @@ object ConfigTransforms {
   ): ConfigTransform =
     updateAllSvAppConfigs((_, config) => update(config))
 
-  def updateAllSvAppFoundCollectiveConfigs_(
-      update: SvOnboardingConfig.FoundCollective => SvOnboardingConfig.FoundCollective
+  def updateAllSvAppFoundDsoConfigs_(
+      update: Endo[SvOnboardingConfig.FoundDso]
   ): ConfigTransform =
     updateAllSvAppConfigs_(c =>
       c.focus(_.onboarding)
         .modify {
-          case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
-            Some(update(foundCollective))
+          case Some(foundDso: SvOnboardingConfig.FoundDso) =>
+            Some(update(foundDso))
           case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
           case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
           case None => None
@@ -313,7 +313,7 @@ object ConfigTransforms {
     )
 
   def noDevNet: ConfigTransform =
-    updateAllSvAppFoundCollectiveConfigs_(_.focus(_.isDevNet).replace(false))
+    updateAllSvAppFoundDsoConfigs_(_.focus(_.isDevNet).replace(false))
 
   def updateAllValidatorConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig

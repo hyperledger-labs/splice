@@ -145,7 +145,7 @@ export class Dso extends pulumi.ComponentResource {
       runningMigration
         ? { type: 'domain-migration' }
         : {
-            type: 'found-collective',
+            type: 'found-dso',
             foundingSvRewardWeightBps,
             roundZeroDuration: config.optionalEnv('ROUND_ZERO_DURATION'),
           },

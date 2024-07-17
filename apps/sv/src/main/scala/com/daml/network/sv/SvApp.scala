@@ -298,9 +298,9 @@ class SvApp(
         dsoAutomation,
       ) <-
       // We branch here on the type of onboarding config, as bootstrapping
-      // a fresh collective is fundamentally different from joining an existing collective
+      // a fresh dso is fundamentally different from joining an existing dso
       config.onboarding match {
-        case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
+        case Some(foundingConfig: SvOnboardingConfig.FoundDso) =>
           for {
             signer <- CometBftRequestSigner.getOrGenerateSigner(
               "cometbft-governance-keys",
@@ -316,7 +316,7 @@ class SvApp(
                 retryProvider,
               )
             )
-            res <- appInitStep("FoundingNodeInitializer founding collective") {
+            res <- appInitStep("FoundingNodeInitializer founding Dso") {
               val initializer = new FoundingNodeInitializer(
                 localSynchronizerNode.getOrElse(
                   sys.error("Founding node must always specify a domain config")
@@ -336,7 +336,7 @@ class SvApp(
                 retryProvider,
                 loggerFactory,
               )
-              initializer.bootstrapCollective()
+              initializer.bootstrapDso()
             }
           } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
@@ -349,9 +349,9 @@ class SvApp(
             cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
               new CometBftNode(client, signer, config, loggerFactory, retryProvider)
             )
-            res <- appInitStep("JoiningNodeInitializer joining collective with key") {
+            res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
               val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
-              initializer.joinCollectiveAndOnboardNodes()
+              initializer.joinDsoAndOnboardNodes()
             }
           } yield res
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
@@ -390,7 +390,7 @@ class SvApp(
             )
             res <- {
               val initializer = newJoiningNodeInitializer(None, cometBftNode)
-              initializer.joinCollectiveAndOnboardNodes()
+              initializer.joinDsoAndOnboardNodes()
             }
           } yield res
       }

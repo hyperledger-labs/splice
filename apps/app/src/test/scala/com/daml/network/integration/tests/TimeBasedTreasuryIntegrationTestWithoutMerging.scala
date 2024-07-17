@@ -38,7 +38,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
         ConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
+          .updateAllSvAppFoundDsoConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
       )
   }
 

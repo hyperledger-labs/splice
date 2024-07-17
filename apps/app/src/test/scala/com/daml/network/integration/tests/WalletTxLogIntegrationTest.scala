@@ -64,7 +64,7 @@ class WalletTxLogIntegrationTest
       .addConfigTransform((_, config) =>
         // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
         ConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(
+          .updateAllSvAppFoundDsoConfigs_(
             _.copy(
               initialAnsConfig = InitialAnsConfig(
                 renewalDuration = NonNegativeFiniteDuration.ofDays(30),
@@ -309,7 +309,7 @@ class WalletTxLogIntegrationTest
       )
     }
 
-    "handle mixed currency payment requests" in { implicit env =>
+    "handle mixed unit payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()

@@ -9,27 +9,27 @@ import org.scalatest.wordspec.AnyWordSpecLike
 class ThresholdsTest extends AnyWordSpecLike with BaseTest {
 
   "thresholds" should {
-    "return expected DSO consortium thresholds" in {
-      forAll(Table(("consortium members", "threshold"), (1, 1), (2, 2), (3, 2), (4, 3))) {
-        (consortiumMembers: Int, threshold: Int) =>
-          Thresholds.decentralizedNamespaceThreshold(consortiumMembers) shouldBe PositiveInt
+    "return expected DSO thresholds" in {
+      forAll(Table(("SVs", "threshold"), (1, 1), (2, 2), (3, 2), (4, 3))) {
+        (svs: Int, threshold: Int) =>
+          Thresholds.decentralizedNamespaceThreshold(svs) shouldBe PositiveInt
             .tryCreate(
               threshold
             )
       }
     }
 
-    "return expected f based DSO consortium thresholds" in {
-      forAll(Table(("consortium members", "threshold"), (1, 1), (2, 1), (3, 1), (4, 2))) {
-        (consortiumMembers: Int, threshold: Int) =>
-          Thresholds.sequencerConnectionsSizeThreshold(consortiumMembers) shouldBe PositiveInt
+    "return expected f based DSO thresholds" in {
+      forAll(Table(("SVs", "threshold"), (1, 1), (2, 1), (3, 1), (4, 2))) {
+        (svs: Int, threshold: Int) =>
+          Thresholds.sequencerConnectionsSizeThreshold(svs) shouldBe PositiveInt
             .tryCreate(
               threshold
             )
       }
     }
 
-    "return expected f based minimum DSO consortium thresholds" in {
+    "return expected f based minimum DSO thresholds" in {
       forAll(
         Table(
           ("mapping specific size", "threshold"),

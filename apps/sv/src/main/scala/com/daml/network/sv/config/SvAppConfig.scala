@@ -70,7 +70,7 @@ object SvBootstrapDumpConfig {
 }
 
 object SvOnboardingConfig {
-  case class FoundCollective(
+  case class FoundDso(
       name: String,
       founderSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
@@ -214,7 +214,7 @@ case class SvAppBackendConfig(
     }
     .orElse {
       onboarding match {
-        case Some(founder: SvOnboardingConfig.FoundCollective) if founder.name == name =>
+        case Some(founder: SvOnboardingConfig.FoundDso) if founder.name == name =>
           Some(founder.founderSvRewardWeightBps)
         case _ => None
       }

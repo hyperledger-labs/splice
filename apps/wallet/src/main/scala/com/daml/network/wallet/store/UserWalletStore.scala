@@ -423,7 +423,7 @@ object UserWalletStore {
       expiresAt: Instant,
       entryName: String,
       amount: java.math.BigDecimal,
-      currency: walletCodegen.Unit,
+      unit: walletCodegen.Unit,
       paymentInterval: RelTime,
       paymentDuration: RelTime,
   )

@@ -280,7 +280,7 @@ case class EnvironmentDefinition(
       .withTrafficTopupsDisabled
       .addConfigTransform((_, conf) =>
         ConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(
+          .updateAllSvAppFoundDsoConfigs_(
             _.focus(_.initialSynchronizerFeesConfig.baseRateBurstAmount)
               .replace(NonNegativeLong.tryCreate(2_000_000L))
           )(conf)

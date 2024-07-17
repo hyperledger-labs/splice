@@ -1103,7 +1103,7 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The DSO mints amulet for the cases where the collective rules allow for that.
+            The DSO mints amulet for the cases where the DSO rules allow for that.
           $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |
@@ -1455,7 +1455,7 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The DSO mints amulet for the cases where the collective rules allow for that.
+            The DSO mints amulet for the cases where the DSO rules allow for that.
           $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |

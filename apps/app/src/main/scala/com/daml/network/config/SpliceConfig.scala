@@ -434,9 +434,8 @@ object SpliceConfig {
       deriveReader[InitialAnsConfig]
     implicit val domainFeesConfigReader: ConfigReader[SynchronizerFeesConfig] =
       deriveReader[SynchronizerFeesConfig]
-    implicit val svOnboardingFoundCollectiveReader
-        : ConfigReader[SvOnboardingConfig.FoundCollective] =
-      deriveReader[SvOnboardingConfig.FoundCollective]
+    implicit val svOnboardingFoundDsoReader: ConfigReader[SvOnboardingConfig.FoundDso] =
+      deriveReader[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
       deriveReader[SvOnboardingConfig.JoinWithKey]
     implicit val svOnboardingDomainMigrationReader
@@ -494,7 +493,7 @@ object SpliceConfig {
         // the founding node must alway configure one to bootstrap the domain.
         val foundingNodeHasSynchronizerConfig = conf.onboarding.fold(true) {
           _ match {
-            case _: SvOnboardingConfig.FoundCollective => conf.localSynchronizerNode.isDefined
+            case _: SvOnboardingConfig.FoundDso => conf.localSynchronizerNode.isDefined
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
           }
@@ -698,9 +697,8 @@ object SpliceConfig {
       deriveWriter[InitialAnsConfig]
     implicit val domainFeesConfigWriter: ConfigWriter[SynchronizerFeesConfig] =
       deriveWriter[SynchronizerFeesConfig]
-    implicit val svOnboardingFoundCollectiveWriter
-        : ConfigWriter[SvOnboardingConfig.FoundCollective] =
-      deriveWriter[SvOnboardingConfig.FoundCollective]
+    implicit val svOnboardingFoundDsoWriter: ConfigWriter[SvOnboardingConfig.FoundDso] =
+      deriveWriter[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
       deriveWriter[SvOnboardingConfig.JoinWithKey]
     implicit val svOnboardingDomainMigrationWriter

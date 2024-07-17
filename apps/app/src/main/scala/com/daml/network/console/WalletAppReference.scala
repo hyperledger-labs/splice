@@ -49,7 +49,7 @@ abstract class WalletAppReference(
   }
 
   @Help.Summary(
-    "Credits an amount of Canton coin corresponding to the requested USD amount to the wallet's user"
+    "Credits an amount of Amulet corresponding to the requested USD amount to the wallet's user"
   )
   @Help.Description(
     "This function will only be available in the devnet. It allows creating amulets for testing purposes." +

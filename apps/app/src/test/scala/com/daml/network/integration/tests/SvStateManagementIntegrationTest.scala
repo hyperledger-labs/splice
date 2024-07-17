@@ -184,7 +184,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       }.toMap
 
     clue("initially only sv1 and sv2 have set the AmuletPriceVote") {
-      // sv1 because it's the DSO founder and sv2 because we configured it to do so
+      // sv1 because it initialized the DSO and sv2 because we configured it to do so
       eventually() {
         getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),

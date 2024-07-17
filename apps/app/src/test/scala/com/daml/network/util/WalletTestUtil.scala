@@ -488,23 +488,23 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
 
   def paymentAmount(
       amount: BigDecimal,
-      currency: paymentCodegen.Unit,
+      unit: paymentCodegen.Unit,
   ) =
     new paymentCodegen.PaymentAmount(
       amount.bigDecimal,
-      currency,
+      unit,
     )
 
   def receiverAmount(
       receiverParty: PartyId,
       amount: BigDecimal,
-      currency: paymentCodegen.Unit,
+      unit: paymentCodegen.Unit,
   ) =
     new paymentCodegen.ReceiverAmount(
       receiverParty.toProtoPrimitive,
       new paymentCodegen.PaymentAmount(
         amount.bigDecimal,
-        currency,
+        unit,
       ),
     )
 
@@ -553,7 +553,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       userId: String,
       userParty: PartyId,
       amount: BigDecimal = defaultPaymentAmount.amount,
-      currency: paymentCodegen.Unit = defaultPaymentAmount.unit,
+      unit: paymentCodegen.Unit = defaultPaymentAmount.unit,
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
       description: String = "description",
@@ -562,7 +562,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       paymentCodegen.AppPaymentRequest,
   ) = {
     val receiverAmounts = Seq(
-      receiverAmount(userParty, amount, currency)
+      receiverAmount(userParty, amount, unit)
     )
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(

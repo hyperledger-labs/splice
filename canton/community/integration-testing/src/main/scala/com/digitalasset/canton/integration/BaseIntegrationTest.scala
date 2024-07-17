@@ -57,12 +57,12 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
 
   override protected def withFixture(test: OneArgTest): Outcome = {
     val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    val integrationTestPackageCoin = "com.daml.network.integration.tests"
+    val integrationTestPackageSplice = "com.daml.network.integration.tests"
     getClass.getName should (startWith(
       integrationTestPackage
     ) or startWith(
-      integrationTestPackageCoin
-    )) withClue s"\nAll integration tests must be located in $integrationTestPackage or a subpackage thereof."
+      integrationTestPackageSplice
+    )) withClue s"\nAll integration tests must be located in $integrationTestPackage, $integrationTestPackageSplice or a subpackage thereof."
 
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }

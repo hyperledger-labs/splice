@@ -328,7 +328,7 @@ class DbUserWalletStore(
         expiresAt = entry.payload.expiresAt,
         entryName = entry.payload.name,
         amount = subPayData.paymentAmount.amount,
-        currency = subPayData.paymentAmount.unit,
+        unit = subPayData.paymentAmount.unit,
         paymentInterval = subPayData.paymentInterval,
         paymentDuration = subPayData.paymentDuration,
       )

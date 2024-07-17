@@ -56,7 +56,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       .addConfigTransform((_, config) =>
         // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
         ConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(
+          .updateAllSvAppFoundDsoConfigs_(
             _.copy(
               initialAnsConfig = InitialAnsConfig(
                 renewalDuration = NonNegativeFiniteDuration.ofSeconds(10),

@@ -59,11 +59,11 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       .text should matchText(s"$balanceUSD USD")
   }
 
-  def parseAmountText(str: String, currency: String) = {
+  def parseAmountText(str: String, unit: String) = {
     try {
       BigDecimal(
         str
-          .replace(currency, "")
+          .replace(unit, "")
           .trim
           .replace(",", "")
       )
@@ -89,14 +89,14 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .childElement(className("tx-row-cell-balance-change"))
           .childElement(className("tx-amount-cc"))
           .text,
-        currency = "CC",
+        unit = "CC",
       ),
       usdAmount = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-balance-change"))
           .childElement(className("tx-amount-usd"))
           .text,
-        currency = "USD",
+        unit = "USD",
       ),
       rate = transactionRow.childElement(className("tx-amount-rate")).text,
       appRewardsUsed = parseAmountText(
@@ -105,7 +105,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .findChildElement(className("tx-reward-app-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
-        currency = "CC",
+        unit = "CC",
       ),
       validatorRewardsUsed = parseAmountText(
         transactionRow
@@ -113,7 +113,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .findChildElement(className("tx-reward-validator-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
-        currency = "CC",
+        unit = "CC",
       ),
       svRewardsUsed = parseAmountText(
         transactionRow
@@ -121,7 +121,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .findChildElement(className("tx-reward-sv-cc"))
           .map(_.text)
           .getOrElse("0 CC"),
-        currency = "CC",
+        unit = "CC",
       ),
     )
   }
@@ -215,7 +215,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
             transactionRow
               .childElement(className("tx-amount-cc"))
               .text,
-            currency = "CC",
+            unit = "CC",
           )
         )
       } else None

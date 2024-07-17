@@ -40,7 +40,7 @@ const AnsEntries: React.FC = () => {
                 <TableCell className="entries-table-name">{entry.name}</TableCell>
                 <TableCell className="entries-table-amount">{entry.amount}</TableCell>
                 <TableCell className="entries-table-currency">
-                  {unitStringToCurrency(entry.currency)}
+                  {unitStringToCurrency(entry.unit)}
                 </TableCell>
                 <TableCell className="entries-table-expires-at">
                   <DateDisplay datetime={new Date(Number(entry.expiresAt))} />

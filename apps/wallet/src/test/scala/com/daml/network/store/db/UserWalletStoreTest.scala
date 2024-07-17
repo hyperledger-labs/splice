@@ -899,7 +899,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
               expiresAt = ansEntry1.payload.expiresAt,
               entryName = ansEntry1.payload.name,
               amount = state1.payload.payData.paymentAmount.amount,
-              currency = state1.payload.payData.paymentAmount.unit,
+              unit = state1.payload.payData.paymentAmount.unit,
               paymentInterval = state1.payload.payData.paymentInterval,
               paymentDuration = state1.payload.payData.paymentDuration,
             )
@@ -943,7 +943,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       sender: PartyId,
       receiver: PartyId,
       amount: Double,
-      currency: paymentCodegen.Unit,
+      unit: paymentCodegen.Unit,
       expiresAt: CantonTimestamp,
       trackingId: String = UUID.randomUUID().toString,
       contractId: transferOffersCodegen.TransferOffer.ContractId =
@@ -954,8 +954,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
-      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
-      s"Payment from $sender to $receiver for $amount $currency, expiring at $expiresAt",
+      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), unit),
+      s"Payment from $sender to $receiver for $amount $unit, expiring at $expiresAt",
       expiresAt.toInstant,
       trackingId,
     )
@@ -970,7 +970,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       sender: PartyId,
       receiver: PartyId,
       amount: Double,
-      currency: paymentCodegen.Unit,
+      unit: paymentCodegen.Unit,
       expiresAt: CantonTimestamp,
       trackingId: String = UUID.randomUUID().toString,
       cid: String = nextCid(),
@@ -980,7 +980,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
-      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
+      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), unit),
       expiresAt.toInstant,
       trackingId,
     )
@@ -1022,7 +1022,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       sender: PartyId,
       provider: PartyId,
       amount: Double,
-      currency: paymentCodegen.Unit,
+      unit: paymentCodegen.Unit,
       expiresAt: CantonTimestamp,
       description: String,
   ) = {
@@ -1032,7 +1032,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       java.util.List.of(
         new paymentCodegen.ReceiverAmount(
           provider.toProtoPrimitive,
-          new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
+          new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), unit),
         )
       ),
       provider.toProtoPrimitive,
@@ -1155,12 +1155,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
   private def subscriptionPayData(
       amount: Double = 10.0,
-      currency: paymentCodegen.Unit = paymentCodegen.Unit.AMULETUNIT,
+      unit: paymentCodegen.Unit = paymentCodegen.Unit.AMULETUNIT,
       paymentIntervalSeconds: Long = 60L,
       paymentDurationSeconds: Long = 1L,
   ): subsCodegen.SubscriptionPayData = {
     new subsCodegen.SubscriptionPayData(
-      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount).setScale(10), currency),
+      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount).setScale(10), unit),
       new RelTime(paymentIntervalSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
       new RelTime(paymentDurationSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
     )

@@ -64,7 +64,7 @@ class UpdateHistoryIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )

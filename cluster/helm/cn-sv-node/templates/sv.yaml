@@ -59,7 +59,7 @@ spec:
                   name: "cn-app-sv-key"
                   optional: false
             {{- else }}
-              {{- if eq .Values.onboardingType "found-collective" }}
+              {{- if eq .Values.onboardingType "found-dso" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
               {{- end }}

@@ -15,7 +15,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
         this.getClass.getSimpleName
       ) // no need to spin up 4 SVs to see whether automation works
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(roundZeroDuration = Some(NonNegativeFiniteDuration.ofHours(24)))
         )(config)
       )

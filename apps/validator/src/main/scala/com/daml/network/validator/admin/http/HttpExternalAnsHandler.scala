@@ -100,7 +100,7 @@ class HttpExternalAnsHandler(
                     contractId = e.contractId.toString(),
                     name = e.entryName,
                     amount = e.amount.toString(),
-                    currency = e.currency.toString(),
+                    unit = e.unit.toString(),
                     expiresAt = e.expiresAt.toEpochMilli().toString(),
                     paymentInterval = e.paymentInterval.microseconds.toString(),
                     paymentDuration = e.paymentDuration.microseconds.toString(),

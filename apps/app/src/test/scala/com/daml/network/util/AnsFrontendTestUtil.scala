@@ -39,7 +39,7 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
       ansUiLogin: () => Unit,
       expectedName: String,
       expectedAmount: String,
-      expectedCurrency: String,
+      expectedUnit: String,
       expectedInterval: String,
   )(implicit
       webDriver: WebDriverType
@@ -78,13 +78,13 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
 
         val name = row.childElement(className("entries-table-name")).text
         val amount = row.childElement(className("entries-table-amount")).text
-        val currency = row.childElement(className("entries-table-currency")).text
+        val denomination = row.childElement(className("entries-table-currency")).text
         val interval = row.childElement(className("entries-table-payment-interval")).text
         val expiresAt = row.childElement(className("entries-table-expires-at")).text
 
         name should be(expectedName)
         amount should be(expectedAmount)
-        currency should be(expectedCurrency)
+        denomination should be(expectedUnit)
         interval should be(expectedInterval)
 
         val expiryAfter = timeBeforeAllocate.minusMinutes(1).plusDays(90)

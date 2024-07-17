@@ -80,7 +80,7 @@ import scala.jdk.CollectionConverters.*
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
     localSynchronizerNode: LocalSynchronizerNode,
-    foundingConfig: SvOnboardingConfig.FoundCollective,
+    foundingConfig: SvOnboardingConfig.FoundDso,
     requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -103,7 +103,7 @@ class FoundingNodeInitializer(
     tracer: Tracer,
 ) extends NodeInitializerUtil {
 
-  def bootstrapCollective()(implicit
+  def bootstrapDso()(implicit
       tc: TraceContext
   ): Future[
     (
@@ -229,7 +229,7 @@ class FoundingNodeInitializer(
         "bootstrap_dso_rules",
         show"the DsoRules and AmuletRules are bootstrapped",
         dsoStore.lookupDsoRules().map(_.isDefined), {
-          withDsoStore.foundCollective()
+          withDsoStore.foundDso()
         },
         logger,
       )
@@ -243,7 +243,7 @@ class FoundingNodeInitializer(
       _ = dsoAutomation.registerPostOnboardingTriggers()
       _ = dsoAutomation.registerPostSequencerInitTriggers()
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore, domainId)
-      // The previous foundCollective step will set the domain node config if DsoRules is not yet bootstrapped.
+      // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
       // for example if the founding SV node restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
@@ -469,8 +469,10 @@ class FoundingNodeInitializer(
       logger = logger,
     )
 
-    /** The one and only entry-point: found a fresh collective, given a properly allocated DSO party */
-    def foundCollective()(implicit
+    /** The one and only entry-point: found a fresh DSO, given a properly
+      * allocated DSO party
+      */
+    def foundDso()(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
@@ -599,7 +601,7 @@ class FoundingNodeInitializer(
                 } else {
                   sys.error(
                     "AmuletRules and DsoRules already exist but party tasked with founding the DSO isn't member." +
-                      "Is more than one SV app configured to `found-collective`?" +
+                      "Is more than one SV app configured to `found-dso`?" +
                       show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
                 }

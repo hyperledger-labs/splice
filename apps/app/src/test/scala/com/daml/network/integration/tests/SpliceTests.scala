@@ -313,8 +313,8 @@ object SpliceTests extends LazyLogging {
 
     def defaultTickDuration(implicit env: SpliceTestConsoleEnvironment): NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
-        case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
-          foundCollective.initialTickDuration.asJava
+        case Some(foundDso: SvOnboardingConfig.FoundDso) =>
+          foundDso.initialTickDuration.asJava
         case Some(_: SvOnboardingConfig.JoinWithKey) |
             Some(_: SvOnboardingConfig.DomainMigration) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1.")
@@ -327,8 +327,8 @@ object SpliceTests extends LazyLogging {
         env: SpliceTestConsoleEnvironment
     ): SynchronizerFeesConfig =
       sv1Backend.config.onboarding match {
-        case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
-          foundCollective.initialSynchronizerFeesConfig
+        case Some(foundDso: SvOnboardingConfig.FoundDso) =>
+          foundDso.initialSynchronizerFeesConfig
         case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
             None =>
           fail("Failed to retrieve defaultSynchronizerFeesConfig from sv1.")

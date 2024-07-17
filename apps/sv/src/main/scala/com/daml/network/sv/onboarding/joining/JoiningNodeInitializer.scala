@@ -98,7 +98,7 @@ class JoiningNodeInitializer(
     )
   )
 
-  def joinCollectiveAndOnboardNodes(): Future[
+  def joinDsoAndOnboardNodes(): Future[
     (
         DomainId,
         DsoPartyHosting,
