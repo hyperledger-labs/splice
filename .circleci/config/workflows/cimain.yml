@@ -38,7 +38,6 @@ workflow:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - wait_for_previous_pipeline
             - artifacts_push

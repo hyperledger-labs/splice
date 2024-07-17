@@ -82,7 +82,6 @@
             - slack-context
           cluster: "user-selected-scratchnet"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - artifacts_push
             - set_scratchnet
@@ -167,7 +166,6 @@
             - slack-context
           cluster: "user-selected-scratchnet"
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           requires:
             - preflight_check_core
@@ -204,7 +202,6 @@
             - slack-context
           cluster: "user-selected-scratchnet"
           migration_id: 1
-          parallelism: 1
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
@@ -376,7 +373,6 @@
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
-          parallelism: 1
           requires:
             - artifacts_push
             - set_scratchnet
@@ -540,7 +536,6 @@
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
           migration_id: 1
-          parallelism: 1
           requires:
             - test_DR
       - deploy_sv_runbook:

@@ -12,7 +12,6 @@ env: &env
   USER: circleci
 
 non_devnet_preflight_params: &non_devnet_preflight_params
-  parallelism: 1
   test_names_file: "test-full-class-names-core-preflight-non-devnet.log"
 
 parameters:

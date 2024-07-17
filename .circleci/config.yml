@@ -17,7 +17,6 @@ env: &env
   USER: circleci
 
 non_devnet_preflight_params: &non_devnet_preflight_params
-  parallelism: 1
   test_names_file: "test-full-class-names-core-preflight-non-devnet.log"
 
 parameters:
@@ -3210,9 +3209,6 @@ jobs:
       test_names_file:
         type: string
         default: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
-      parallelism:
-        type: integer
-        default: 3
       wait_for_sv:
         type: boolean
         default: true
@@ -3240,7 +3236,7 @@ jobs:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
+    parallelism: 1
     steps:
       - run:
           # CircleCI does not allow a job to only contain a when (because when false, there's no steps)
@@ -4534,7 +4530,6 @@ workflows:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -4678,7 +4673,6 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false
@@ -5013,7 +5007,6 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           test_names_file: "test-full-class-names-offboard-sv-runbook-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           requires:
             - deploy_sv_runbook
@@ -5049,7 +5042,6 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           test_names_file: "test-full-class-names-re-onboard-sv-runbook-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           requires:
             - redeploy_sv_runbook
@@ -5124,7 +5116,6 @@ workflows:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - reset_cluster
       - deploy_sv_runbook:
@@ -5206,7 +5197,6 @@ workflows:
           cluster: "ciupgrade"
           run: << pipeline.parameters.run-partial-upgrade >>
           wait_for_sv: false
-          parallelism: 1
           requires:
             - deploy_partial_upgrade
       - preflight_sv_check:
@@ -5258,7 +5248,6 @@ workflows:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - deploy_final_upgrade
       - preflight_check:
@@ -5272,7 +5261,6 @@ workflows:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - preflight_check_final_upgrade
       # the deployment of both SV runbook and validator runbook should be finished
@@ -5316,7 +5304,6 @@ workflows:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - wait_for_daml_upgrade
             - upgrade_sv_runbook_after_daml_upgrade
@@ -5513,7 +5500,6 @@ workflows:
             - slack-context
           cluster: "user-selected-scratchnet"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - artifacts_push
             - set_scratchnet
@@ -5598,7 +5584,6 @@ workflows:
             - slack-context
           cluster: "user-selected-scratchnet"
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           requires:
             - preflight_check_core
@@ -5635,7 +5620,6 @@ workflows:
             - slack-context
           cluster: "user-selected-scratchnet"
           migration_id: 1
-          parallelism: 1
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
@@ -5807,7 +5791,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
-          parallelism: 1
           requires:
             - artifacts_push
             - set_scratchnet
@@ -5971,7 +5954,6 @@ workflows:
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
           migration_id: 1
-          parallelism: 1
           requires:
             - test_DR
       - deploy_sv_runbook:

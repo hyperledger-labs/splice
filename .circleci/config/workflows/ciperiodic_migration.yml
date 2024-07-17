@@ -65,7 +65,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
           wait_for_sv: false
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false

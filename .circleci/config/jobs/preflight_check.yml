@@ -9,9 +9,6 @@ jobs:
       test_names_file:
         type: string
         default: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
-      parallelism:
-        type: integer
-        default: 3
       wait_for_sv:
         type: boolean
         default: true
@@ -39,7 +36,7 @@ jobs:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
+    parallelism: 1
     steps:
       - run:
           # CircleCI does not allow a job to only contain a when (because when false, there's no steps)

@@ -47,7 +47,6 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - reset_cluster
       - deploy_sv_runbook:
@@ -129,7 +128,6 @@ workflow:
           cluster: "ciupgrade"
           run: << pipeline.parameters.run-partial-upgrade >>
           wait_for_sv: false
-          parallelism: 1
           requires:
             - deploy_partial_upgrade
       - preflight_sv_check:
@@ -181,7 +179,6 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - deploy_final_upgrade
       - preflight_check:
@@ -195,7 +192,6 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - preflight_check_final_upgrade
       # the deployment of both SV runbook and validator runbook should be finished
@@ -239,7 +235,6 @@ workflow:
             - slack-context
           cluster: "ciupgrade"
           wait_for_sv: false
-          parallelism: 1
           requires:
             - wait_for_daml_upgrade
             - upgrade_sv_runbook_after_daml_upgrade
