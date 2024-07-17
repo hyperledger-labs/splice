@@ -134,8 +134,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   );
   const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '59.0.0';
-  const prometheusStackCrdVersion = '0.74.0';
+  const stackVersion = '61.3.2';
+  const prometheusStackCrdVersion = '0.75.1';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
 
   const prometheusStack = new k8s.helm.v3.Release(
