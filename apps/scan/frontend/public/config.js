@@ -8,4 +8,11 @@ window.splice_config = {
       url: 'https://scan.sv-2.TARGET_HOSTNAME/api/scan',
     },
   },
+  spliceInstanceNames: {
+    networkName: 'Canton Network',
+    amuletName: 'Canton Coin',
+    amuletNameAcronym: 'CC',
+    nameServiceName: 'Canton Name Service',
+    nameServiceNameAcronym: 'CNS',
+  },
 };

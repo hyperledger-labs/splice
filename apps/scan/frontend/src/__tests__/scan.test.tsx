@@ -4,10 +4,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { test, expect } from 'vitest';
 
 import App from '../App';
+import { config } from './setup/config';
 
 test('home screen shows up', async () => {
   render(<App />);
-  const a = await screen.findByText('Canton Coin Scan');
+  const amuletName = config.spliceInstanceNames.amuletName;
+  const a = await screen.findByText(`${amuletName} Scan`);
   expect(a).toBeDefined();
 });
 

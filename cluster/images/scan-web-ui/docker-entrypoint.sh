@@ -6,7 +6,7 @@ set -eou pipefail
 
 echo "Generating config.js file..."
 # shellcheck disable=SC2016
-envsubst '$CN_APP_CNS_UI_CLUSTER' < /tmpl/config.js.tmpl > /usr/share/nginx/html/config.js
+envsubst '$CN_APP_CNS_UI_CLUSTER,$CN_APP_SCAN_UI_NETWORK_NAME,$CN_APP_SCAN_UI_AMULET_NAME,$CN_APP_SCAN_UI_AMULET_NAME_ACRONYM,$CN_APP_SCAN_UI_NAME_SERVICE_NAME,$CN_APP_SCAN_UI_NAME_SERVICE_NAME_ACRONYM' < /tmpl/config.js.tmpl > /usr/share/nginx/html/config.js
 
 echo "Starting nginx"
 exec /docker-entrypoint.sh nginx -g 'daemon off;'

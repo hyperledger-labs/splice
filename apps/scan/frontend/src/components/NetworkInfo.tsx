@@ -23,6 +23,9 @@ import {
 import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/module';
 import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
+import { config } from '../utils/config';
+
+const amuletName = config.spliceInstanceNames.amuletName;
 const NetworkInfo: React.FC = () => {
   const getAmuletRulesQuery = useGetAmuletRules();
   const openRoundsQuery = useOpenRounds();
@@ -72,6 +75,12 @@ const NetworkInfo: React.FC = () => {
       );
   }
 
+  const configDescription = `The ${amuletName} configuration details below are voted on by the Super Validators, and may be updated over time.`;
+  const feesDescription =
+    `Fees burn ${amuletName}. Fees encourage active use of ${amuletName} and maintain positive pressure on the value of ${amuletName} by constraining the total supply over time.` +
+    `The Super Validators mint ${amuletName} via smart contracts triggered by a consensus vote of 2/3 of the Super Validators.` +
+    `Super Validators and Validators burn ${amuletName} to pay fees. Minting and burning takes place in fixed time cycles called rounds.`;
+
   switch (getAmuletRulesQuery.status) {
     case 'loading':
       return <Loading />;
@@ -82,25 +91,15 @@ const NetworkInfo: React.FC = () => {
         <Card>
           <CardContent>
             <Stack spacing={4}>
-              <Typography variant="h3">Current Canton Coin Configuration</Typography>
-              <Typography variant="body1">
-                The amulet configuration details below are voted on by the Super Validators, and may
-                be updated over time.
-              </Typography>
+              <Typography variant="h3">{`Current ${amuletName} Configuration`}</Typography>
+              <Typography variant="body1">{configDescription}</Typography>
               <Stack spacing={1}>
                 <Typography variant="h3">Open Rounds</Typography>
                 {openRoundsDisplay}
               </Stack>
               <Stack spacing={1}>
                 <Typography variant="h3">Fees</Typography>
-                <Typography variant="body1">
-                  Fees burn Canton Coin. Fees encourage active use of Canton Coin and maintain
-                  positive pressure on the value of Canton Coin by constraining the total supply
-                  over time. The Super Validators mint Canton Coin via smart contracts triggered by
-                  a consensus vote of 2/3 of the Super Validators. Super Validators and Validators
-                  burn Canton Coin to pay fees. Minting and burning takes place in fixed time cycles
-                  called rounds.
-                </Typography>
+                <Typography variant="body1">{feesDescription}</Typography>
               </Stack>
               <FeesTable
                 amuletConfig={
@@ -174,12 +173,12 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
           <FeeTableRow
             name="Holding Fee"
             value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} USD/Round`}
-            description="A fixed fee for maintaining each active amulet record, charged per round."
+            description={`A fixed fee for maintaining each active ${amuletName} record, charged per round.`}
           />
           <FeeTableRow
             name="Lock Holder Fee"
             value={`${BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)} USD`}
-            description="A fixed fee for extra lock holders on amulet records."
+            description={`A fixed fee for extra lock holders on ${amuletName} records.`}
           />
         </TableBody>
       </Table>
@@ -256,10 +255,8 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
         <Typography variant="body1" fontWeight="bold" textTransform="uppercase">
           Transfer Fee
         </Typography>
-        <Typography variant="caption">
-          A proportional fee charged for the value created by locking and/or transferring a
-          particular amount of amulet. The rates are specified in tranches.
-        </Typography>
+        <Typography variant="caption">{`A proportional fee charged for the value created by locking and/or transferring a
+          particular amount of ${amuletName}. The rates are specified in tranches.`}</Typography>
       </TableCell>
       <TableCell align="right">
         <TableContainer>

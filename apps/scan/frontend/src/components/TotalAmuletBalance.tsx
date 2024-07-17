@@ -4,6 +4,7 @@ import BigNumber from 'bignumber.js';
 import { ErrorDisplay, Loading } from 'common-frontend';
 import { useAmuletPrice, useTotalAmuletBalance } from 'common-frontend/scan-api';
 
+import { config } from '../utils/config';
 import AmountSummary from './AmountSummary';
 
 export const TotalAmuletBalance: React.FC = () => {
@@ -12,6 +13,7 @@ export const TotalAmuletBalance: React.FC = () => {
 
   const isLoading = totalAmuletBalanceQuery.isLoading || amuletPriceQuery.isLoading;
   const isError = totalAmuletBalanceQuery.isError || amuletPriceQuery.isError;
+  const title = `Total ${config.spliceInstanceNames.amuletName} Balance`;
 
   return isLoading ? (
     <Loading />
@@ -19,7 +21,7 @@ export const TotalAmuletBalance: React.FC = () => {
     <ErrorDisplay message={'Could not retrieve total amulet balance or amulet price'} />
   ) : (
     <AmountSummary
-      title="Total Canton Coin Balance"
+      title={title}
       amount={new BigNumber(totalAmuletBalanceQuery.data.total_balance)}
       idCC="total-amulet-balance-cc"
       idUSD="total-amulet-balance-usd"

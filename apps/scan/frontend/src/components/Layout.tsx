@@ -6,6 +6,8 @@ import { Header } from 'common-frontend';
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
 
+import { config } from '../utils/config';
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -15,7 +17,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
         <Header
-          title="Canton Coin Scan"
+          title={config.spliceInstanceNames.amuletName + ' Scan'}
           navLinks={[
             { name: 'Coin Issuance', path: '/' },
             { name: 'Network Info', path: '/dso' },

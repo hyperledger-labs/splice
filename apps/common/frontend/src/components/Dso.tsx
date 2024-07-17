@@ -257,7 +257,11 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
         <Tabs value={value} onChange={handleChange} aria-label="json tabs">
           <Tab label="General" {...tabProps('general')} />
           <Tab label="DSO Info" {...tabProps('dso-info')} />
-          <Tab label="Canton Coin Info" {...tabProps('cc-info')} />
+          {/* TODO(#13480): remove this fallback once we have a proper config in all apps */}
+          <Tab
+            label={`${window.splice_config.spliceInstanceNames?.amuletName || 'Canton Coin'} Info`}
+            {...tabProps('cc-info')}
+          />
           {cometBftDebugTab && <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />}
           {sequencerStatusQuery && mediatorStatusQuery && (
             <Tab label="Domain Node Status" {...tabProps('canton-domain-status')} />

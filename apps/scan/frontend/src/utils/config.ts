@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigReader, serviceSchema } from 'common-frontend';
+import { ConfigReader, serviceSchema, spliceInstanceNamesSchema } from 'common-frontend';
 import { z } from 'zod';
 
 type ScanServicesConfig = {
@@ -9,6 +9,7 @@ type ScanServicesConfig = {
 
 type ScanConfig = {
   services: ScanServicesConfig;
+  spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
 };
 
 const reader = new ConfigReader(
@@ -16,6 +17,7 @@ const reader = new ConfigReader(
     services: z.object({
       scan: serviceSchema,
     }),
+    spliceInstanceNames: spliceInstanceNamesSchema,
   })
 );
 
