@@ -128,7 +128,9 @@ export function installCometBftNode(
               `${CLUSTER_HOSTNAME}`.startsWith('scratch') && !isDevNet
                 ? 'test'
                 : cometBftValues.genesis.chainId,
-            chainIdSuffix: stableCometBftChainId ? cometBftValues.genesis.chainIdSuffix : '',
+            chainIdSuffix:
+              config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') ||
+              (stableCometBftChainId ? cometBftValues.genesis.chainIdSuffix : ''),
           },
           stateSync: {
             ...cometBftValues.stateSync,

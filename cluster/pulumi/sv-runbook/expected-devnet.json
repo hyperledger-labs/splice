@@ -395,7 +395,7 @@
         },
         "genesis": {
           "chainId": "dev-0",
-          "chainIdSuffix": "0"
+          "chainIdSuffix": "1"
         },
         "istioVirtualService": {
           "enabled": true,
