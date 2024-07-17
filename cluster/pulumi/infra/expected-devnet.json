@@ -1949,7 +1949,7 @@
     "id": "",
     "inputs": {
       "description": "Logs with ClusterUpdate events",
-      "filter": "\nresource.labels.cluster_name=\"cn-devnet\"\nresource.type=\"gke_cluster\"\nprotoPayload.metadata.operationType=~\"(UPDATE_CLUSTER|UPGRADE_MASTER)\"",
+      "filter": "\nresource.labels.cluster_name=\"cn-devnet\"\nresource.type=~\"(gke_cluster|gke_nodepool)\"\nprotoPayload.metadata.operationType=~\"(UPDATE_CLUSTER|UPGRADE_MASTER|UPGRADE_NODES)\"",
       "labelExtractors": {
         "cluster": "EXTRACT(resource.labels.cluster_name)"
       },

@@ -148,8 +148,8 @@ export function installMaintenanceUpdateAlerts(
     description: 'Logs with ClusterUpdate events',
     filter: `
 resource.labels.cluster_name="${CLUSTER_NAME}"
-resource.type="gke_cluster"
-protoPayload.metadata.operationType=~"(UPDATE_CLUSTER|UPGRADE_MASTER)"`,
+resource.type=~"(gke_cluster|gke_nodepool)"
+protoPayload.metadata.operationType=~"(UPDATE_CLUSTER|UPGRADE_MASTER|UPGRADE_NODES)"`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
     },
