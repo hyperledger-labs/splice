@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 include cluster/images/local.mk
 include cluster/helm/local.mk
 # The `-` prefix silently ignores a missing pulumi local.mk, which for now is not part of the Splice dump

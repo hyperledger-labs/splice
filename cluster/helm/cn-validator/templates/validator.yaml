@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 {{- $validatorAppLabel := "validator-app" }}
 {{- $requiresMigrationPvc := and (not .Values.svValidator) (.Values.migration.attachPvc) }}
 apiVersion: apps/v1

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # FROM https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/Dockerfile
 # used to control he underlyign pulumi version
 ARG pulumi_version

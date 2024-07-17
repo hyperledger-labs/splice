@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import de.heikoseeberger.sbtheader.FileType.firstLinePattern
 import sbt.Keys.*
 import sbt.*
@@ -51,11 +54,7 @@ object Headers {
 
       damlSources ++ rstSources
     },
-    headerMappings := headerMappings.value ++ Map(
-      HeaderFileType.scala -> scalaCommentStyle,
-      HeaderFileType("daml") -> dashCommentStyle,
-      HeaderFileType("rst", Some(firstLinePattern(":.*:"))) -> dotCommentStyle,
-    ),
+    headerMappings := allHeaderMappings,
   )
 
   private def firstLinePattern(firstLinePattern: String) =
@@ -78,11 +77,7 @@ object Headers {
           ((Compile / baseDirectory).value ** "daml.js" ** "*") ---
           ((Compile / baseDirectory).value ** "lib" ** "*")
       ).get,
-    headerMappings := headerMappings.value ++ Map(
-      HeaderFileType("tsx") -> tsCommentStyle,
-      HeaderFileType("ts") -> tsCommentStyle,
-      HeaderFileType("js") -> tsCommentStyle,
-    ),
+    headerMappings := allHeaderMappings,
     headerEmptyLine := false,
   )
 
@@ -109,12 +104,34 @@ object Headers {
           ((Compile / baseDirectory).value ** "cmd-*.sh")
       ).get
 
-      pySources ++ shSources
+      val sbtScalaSources = (
+        (Compile / baseDirectory).value / "project" ** "*.scala"
+      ).get
+
+      val mkSources = (
+        (Compile / baseDirectory).value ** "*.mk"
+      ).get
+
+      val helmSources = (
+        (Compile / baseDirectory).value / "cluster" / "helm" ** "*.yaml"
+      ).get
+
+      pySources ++ shSources ++ sbtScalaSources ++ mkSources ++ helmSources
     },
-    headerMappings := Map(
-      HeaderFileType.sh -> hashCommentStyle,
-      HeaderFileType("py", Some(firstLinePattern("#!.*"))) -> hashCommentStyle,
-    ),
+    headerMappings := allHeaderMappings,
+  )
+
+  lazy val allHeaderMappings = Map(
+    HeaderFileType.scala -> scalaCommentStyle,
+    HeaderFileType.sh -> hashCommentStyle,
+    HeaderFileType("py", Some(firstLinePattern("#!.*"))) -> hashCommentStyle,
+    HeaderFileType("daml") -> dashCommentStyle,
+    HeaderFileType("rst", Some(firstLinePattern(":.*:"))) -> dotCommentStyle,
+    HeaderFileType("tsx") -> tsCommentStyle,
+    HeaderFileType("ts") -> tsCommentStyle,
+    HeaderFileType("js") -> tsCommentStyle,
+    HeaderFileType("mk") -> hashCommentStyle,
+    HeaderFileType("yaml") -> hashCommentStyle,
   )
 
   lazy val scalaCommentStyle = HeaderCommentStyle(
@@ -161,11 +178,13 @@ object Headers {
             else { "\n" }
           case pattern(_, "") => ""
           case pattern(_, comment) =>
-            if (headerEmptyLine) { "\n" }
-            else { "" } + "\n" + comment.trim
+            (if (headerEmptyLine) { "\n" }
+             else { "" }) +
+              "\n" + comment.trim
           case nonCopyright =>
-            if (headerEmptyLine) { "\n" }
-            else { "" } + "\n" + nonCopyright.trim
+            (if (headerEmptyLine) { "\n" }
+             else { "" }) +
+              "\n" + nonCopyright.trim
         })
         .getOrElse("")
       text.linesIterator.map(prependWithLinePrefix).mkString("\n") + existingCommentIfNotCopyright

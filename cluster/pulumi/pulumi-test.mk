@@ -1,6 +1,10 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # When running locally, we want to run dump-config without any local environment variables,
 # so we use env -i to unload everything except PATH, HOME and the envs required for our code to load the cluster config directly.
 # In CI we load the env variables for the cluster directly, thus ensuring that the code loaded configuration and the env loaded config is always the same.
+
 .PHONY: $(dir)/test-devnet.json
 $(dir)/test-devnet.json: $(dir $(dir)).build
 	set -o pipefail \
