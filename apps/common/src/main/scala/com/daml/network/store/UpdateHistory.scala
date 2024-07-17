@@ -717,6 +717,13 @@ final class UpdateHistory(
     }
   }
 
+  // TODO (#13511): implement or remove placeholder
+  def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
+    queryCreateEvents((1L to 100L).toSeq).map { result =>
+      result.values.flatten.map(_.toCreatedEvent).toSeq
+    }
+  }
+
   private def queryCreateEvents(
       transactionRowIds: Seq[Long]
   )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromCreateEvents]]] = {
@@ -919,26 +926,6 @@ final class UpdateHistory(
       update.offset.getOffset
   }
 
-  private def tid(packageName: String, moduleName: String, entityName: String) =
-    new Identifier(packageName, moduleName, entityName)
-
-  private def tid(
-      packageNameOpt: Option[String],
-      moduleNameOpt: Option[String],
-      entityNameOpt: Option[String],
-  ): Option[Identifier] = for {
-    packageName <- packageNameOpt
-    moduleName <- moduleNameOpt
-    entityName <- entityNameOpt
-  } yield new Identifier(packageName, moduleName, entityName)
-
-  // Some fields were not stored initially in UpdateHistory tables, but were added to the schema before MainNet launch.
-  // Missing values for such fields should only exist in databases for clusters that were started before MainNet launch.
-  // We don't care much about these missing values and they are non-optional in the Java API classes,
-  // so we read them back as an arbitrary value.
-  private def missingString: String = ""
-  private def missingStringSeq: Seq[String] = Seq.empty
-
   private def decodeTransaction(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
@@ -946,27 +933,7 @@ final class UpdateHistory(
   ): LedgerClient.GetTreeUpdatesResponse = {
 
     val createEventsById = createRows
-      .map(row =>
-        row.eventId -> new CreatedEvent(
-          /*witnessParties = */ java.util.Collections.emptyList(),
-          /*eventId = */ row.eventId,
-          /*templateId = */ tid(
-            row.templatePackageId,
-            row.templateModuleName,
-            row.templateEntityName,
-          ),
-          /* packageName = */ row.packageName,
-          /*contractId = */ row.contractId,
-          /*arguments = */ ProtobufCodec.deserializeValue(row.createArguments).asRecord().get(),
-          /*createdEventBlob = */ ByteString.EMPTY,
-          /*interfaceViews = */ java.util.Collections.emptyMap(),
-          /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-          /*contractKey = */ row.contractKey.map(ProtobufCodec.deserializeValue).toJava,
-          /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
-          /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
-          /*createdAt = */ row.createdAt.toInstant,
-        )
-      )
+      .map(row => row.eventId -> row.toCreatedEvent)
       .toMap
     val exerciseEventsById = exerciseRows
       .map(row =>
@@ -1230,7 +1197,29 @@ object UpdateHistory {
       signatories: Option[Seq[String]],
       observers: Option[Seq[String]],
       contractKey: Option[String],
-  )
+  ) {
+    def toCreatedEvent: CreatedEvent = {
+      new CreatedEvent(
+        /*witnessParties = */ java.util.Collections.emptyList(),
+        /*eventId = */ eventId,
+        /*templateId = */ tid(
+          templatePackageId,
+          templateModuleName,
+          templateEntityName,
+        ),
+        /* packageName = */ packageName,
+        /*contractId = */ contractId,
+        /*arguments = */ ProtobufCodec.deserializeValue(createArguments).asRecord().get(),
+        /*createdEventBlob = */ ByteString.EMPTY,
+        /*interfaceViews = */ java.util.Collections.emptyMap(),
+        /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+        /*contractKey = */ contractKey.map(ProtobufCodec.deserializeValue).toJava,
+        /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
+        /*observers = */ observers.getOrElse(missingStringSeq).asJava,
+        /*createdAt = */ createdAt.toInstant,
+      )
+    }
+  }
 
   private case class SelectFromExerciseEvents(
       updateRowId: Long,
@@ -1286,4 +1275,24 @@ object UpdateHistory {
       submitter: PartyId,
       contractId: String,
   )
+
+  private def tid(packageName: String, moduleName: String, entityName: String) =
+    new Identifier(packageName, moduleName, entityName)
+
+  private def tid(
+      packageNameOpt: Option[String],
+      moduleNameOpt: Option[String],
+      entityNameOpt: Option[String],
+  ): Option[Identifier] = for {
+    packageName <- packageNameOpt
+    moduleName <- moduleNameOpt
+    entityName <- entityNameOpt
+  } yield new Identifier(packageName, moduleName, entityName)
+
+  // Some fields were not stored initially in UpdateHistory tables, but were added to the schema before MainNet launch.
+  // Missing values for such fields should only exist in databases for clusters that were started before MainNet launch.
+  // We don't care much about these missing values and they are non-optional in the Java API classes,
+  // so we read them back as an arbitrary value.
+  private def missingString: String = ""
+  private def missingStringSeq: Seq[String] = Seq.empty
 }

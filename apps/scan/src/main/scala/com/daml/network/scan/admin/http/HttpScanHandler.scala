@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.config.Thresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
-import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
+import com.daml.network.http.v0.definitions.{AcsRequest, MaybeCachedContractWithState}
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
 import com.daml.network.util.{Codec, Contract, ContractWithState}
@@ -889,6 +889,29 @@ class HttpScanHandler(
       }
     }
   }
+
+  override def getDateOfMostRecentSnapshotBefore(
+      respond: ScanResource.GetDateOfMostRecentSnapshotBeforeResponse.type
+  )(before: OffsetDateTime)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetDateOfMostRecentSnapshotBeforeResponse] = {
+    // TODO (#13509): implement
+    Future.successful(
+      ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
+        definitions.AcsSnapshotTimestampResponse(before)
+      )
+    )
+  }
+
+  override def getAcsSnapshotAt(respond: ScanResource.GetAcsSnapshotAtResponse.type)(
+      body: AcsRequest
+  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
+    // TODO (#13511): implement
+    Future.failed(
+      HttpErrorHandler.notImplemented("Getting an ACS snapshot is not yet implemented.")
+    )
+  }
+
   override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(
       extracted: com.digitalasset.canton.tracing.TraceContext
   ): Future[ScanResource.GetAggregatedRoundsResponse] = {

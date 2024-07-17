@@ -4,6 +4,7 @@
 package com.daml.network.scan.store.db
 
 import cats.implicits.*
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
@@ -52,7 +53,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
-import java.time.Instant
+import java.time.{Instant, OffsetDateTime}
 import scala.concurrent.{ExecutionContext, Future}
 
 object DbScanStore {
@@ -793,5 +794,15 @@ class DbScanStore(
           .value
       } yield row.map(assignedContractFromRow(companion)(_))
     }
+  }
+
+  // TODO (#13511): implement properly
+  override def getAcsSnapshotAt(
+      snapshotTimestamp: OffsetDateTime,
+      migrationId: Long,
+      limit: Limit,
+      after: Option[Long],
+  )(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
+    updateHistory.getCreateEvents()
   }
 }

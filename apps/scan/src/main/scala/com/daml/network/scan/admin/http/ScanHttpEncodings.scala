@@ -53,16 +53,7 @@ object ScanHttpEncodings {
     treeEvent match {
       case event: CreatedEvent =>
         definitions.TreeEvent.fromCreatedEvent(
-          definitions
-            .CreatedEvent(
-              "created_event",
-              event.getEventId,
-              event.getContractId,
-              templateIdString(event.getTemplateId),
-              event.getPackageName,
-              encodeContractPayload(event),
-              event.getCreatedAt.atOffset(ZoneOffset.UTC),
-            )
+          createdEventToHttp(event)
         )
       case event: ExercisedEvent =>
         definitions.TreeEvent.fromExercisedEvent(
@@ -83,6 +74,19 @@ object ScanHttpEncodings {
       case _ =>
         throw new IllegalStateException("Not a created or exercised event.")
     }
+  }
+
+  def createdEventToHttp(event: CreatedEvent)(implicit elc: ErrorLoggingContext) = {
+    definitions
+      .CreatedEvent(
+        "created_event",
+        event.getEventId,
+        event.getContractId,
+        templateIdString(event.getTemplateId),
+        event.getPackageName,
+        encodeContractPayload(event),
+        event.getCreatedAt.atOffset(ZoneOffset.UTC),
+      )
   }
 
   private def templateIdString(templateId: Identifier) =

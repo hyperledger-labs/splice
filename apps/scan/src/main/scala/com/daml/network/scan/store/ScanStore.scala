@@ -3,6 +3,7 @@
 
 package com.daml.network.scan.store
 
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
@@ -37,7 +38,7 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import java.time.Instant
+import java.time.{Instant, OffsetDateTime}
 
 sealed trait SortOrder
 
@@ -235,6 +236,13 @@ trait ScanStore
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
+
+  def getAcsSnapshotAt(
+      snapshotTimestamp: OffsetDateTime,
+      migrationId: Long,
+      limit: Limit,
+      after: Option[Long],
+  )(implicit tc: TraceContext): Future[Seq[CreatedEvent]]
 }
 
 object ScanStore {
