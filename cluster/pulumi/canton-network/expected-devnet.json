@@ -1582,7 +1582,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "splitwell",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -1618,14 +1618,14 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "splitwell",
@@ -1637,7 +1637,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -1652,7 +1652,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "splitwell-participant-2",
+    "name": "splitwell-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1753,9 +1753,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantHost": "participant-2",
+        "participantHost": "participant-0",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -1952,7 +1952,7 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingSecretFrom": {
@@ -1962,7 +1962,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "val_splitwell",
           "port": 5432,
@@ -2071,7 +2071,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
-      "name": "cometbft-global-domain-2",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2105,21 +2105,21 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-2",
-          "chainIdSuffix": "0"
+          "chainId": "dev-0",
+          "chainIdSuffix": "1"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26216
+          "port": 26016
         },
         "logLevel": "debug",
         "metrics": {
@@ -2132,14 +2132,14 @@
           ],
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "node": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26216",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
-          "identifier": "global-domain-2-cometbft",
-          "istioPort": 26216,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26016,
           "privateKey": "sv1-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -2151,15 +2151,15 @@
         "nodeName": "Digital-Asset-2",
         "peers": [
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -2176,7 +2176,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-1-cometbft-global-domain-2",
+    "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2224,7 +2224,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-global-domain-2",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -2234,7 +2234,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
-      "name": "global-domain-2",
+      "name": "global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2267,13 +2267,13 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_2_mediator",
+            "databaseName": "global_domain_0_mediator",
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -2282,18 +2282,18 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-2",
         "sequencer": {
           "driver": {
-            "host": "global-domain-2-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_2_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -2308,7 +2308,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-1-global-domain-2",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2356,7 +2356,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "0"
             ]
           }
         },
@@ -2487,7 +2487,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2523,7 +2523,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2531,7 +2531,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -2543,7 +2543,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -2558,7 +2558,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-1-participant-2",
+    "name": "sv-1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2662,9 +2662,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -2673,7 +2673,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-0-sequencer",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2856,21 +2856,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -2918,14 +2918,14 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
         "onboardingType": "found-collective",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -2997,7 +2997,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -3006,9 +3006,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_1",
           "port": 5432,
@@ -3032,14 +3032,7 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7",
-        "walletSweep": {
-          "Digital-Asset-2::1220b9c13e4e3eb6eeadfd5eb40c86948e548b0c5a6b891750ee3d56975c56297b47": {
-            "maxBalanceUSD": 3000,
-            "minBalanceUSD": 100,
-            "receiver": "validator_validator_service_user::122042f40ded86a5b8b5fc52c79b66b1908cf55ad871b0d403e253390e301e432201"
-          }
-        }
+        "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       },
       "version": "0.1.15"
     },
@@ -3123,7 +3116,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
-      "name": "cometbft-global-domain-2",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3157,21 +3150,21 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-2",
-          "chainIdSuffix": "0"
+          "chainId": "dev-0",
+          "chainIdSuffix": "1"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26226
+          "port": 26026
         },
         "logLevel": "info",
         "metrics": {
@@ -3184,14 +3177,14 @@
           ],
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "node": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26226",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26026",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
-          "identifier": "global-domain-2-cometbft",
-          "istioPort": 26226,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26026,
           "privateKey": "sv2-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -3203,16 +3196,17 @@
         "nodeName": "Digital-Asset-Eng-2",
         "peers": [
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
         "stateSync": {
-          "enable": false
+          "enable": true,
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "tolerations": [
           {
@@ -3224,7 +3218,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-2-cometbft-global-domain-2",
+    "name": "sv-2-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3272,7 +3266,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-global-domain-2",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -3282,7 +3276,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
-      "name": "global-domain-2",
+      "name": "global-domain-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3315,13 +3309,13 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_2_mediator",
+            "databaseName": "global_domain_0_mediator",
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -3330,18 +3324,18 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
         "sequencer": {
           "driver": {
-            "host": "global-domain-2-cometbft-cometbft-rpc.sv-2.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-2.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_2_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -3356,7 +3350,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-2-global-domain-2",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3404,7 +3398,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "0"
             ]
           }
         },
@@ -3535,7 +3529,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3571,7 +3565,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3579,7 +3573,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
@@ -3591,7 +3585,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -3606,7 +3600,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-2-participant-2",
+    "name": "sv-2-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3710,9 +3704,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_2",
           "port": 5432,
@@ -3721,7 +3715,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-0-sequencer",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3904,21 +3898,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-2-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -3941,12 +3935,12 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-2",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_2",
           "port": 5432,
@@ -4018,7 +4012,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -4027,9 +4021,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_2",
           "port": 5432,
@@ -4137,7 +4131,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
-      "name": "cometbft-global-domain-2",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4171,21 +4165,21 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-2",
-          "chainIdSuffix": "0"
+          "chainId": "dev-0",
+          "chainIdSuffix": "1"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26236
+          "port": 26036
         },
         "logLevel": "info",
         "metrics": {
@@ -4198,14 +4192,14 @@
           ],
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "node": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26236",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26036",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
-          "identifier": "global-domain-2-cometbft",
-          "istioPort": 26236,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26036,
           "privateKey": "sv3-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -4217,16 +4211,17 @@
         "nodeName": "Digital-Asset-Eng-3",
         "peers": [
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
         "stateSync": {
-          "enable": false
+          "enable": true,
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "tolerations": [
           {
@@ -4238,7 +4233,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-3-cometbft-global-domain-2",
+    "name": "sv-3-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4286,7 +4281,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-global-domain-2",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -4296,7 +4291,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
-      "name": "global-domain-2",
+      "name": "global-domain-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4329,13 +4324,13 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_2_mediator",
+            "databaseName": "global_domain_0_mediator",
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -4344,18 +4339,18 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
         "sequencer": {
           "driver": {
-            "host": "global-domain-2-cometbft-cometbft-rpc.sv-3.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-3.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_2_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -4370,7 +4365,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-3-global-domain-2",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4418,7 +4413,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "0"
             ]
           }
         },
@@ -4549,7 +4544,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4585,7 +4580,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4593,7 +4588,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
@@ -4605,7 +4600,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -4620,7 +4615,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-3-participant-2",
+    "name": "sv-3-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4724,9 +4719,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_3",
           "port": 5432,
@@ -4735,7 +4730,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-0-sequencer",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4918,21 +4913,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-3-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv-3-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -4955,12 +4950,12 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-3",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_3",
           "port": 5432,
@@ -5032,7 +5027,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -5041,9 +5036,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_3",
           "port": 5432,
@@ -5151,7 +5146,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
-      "name": "cometbft-global-domain-2",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -5185,21 +5180,21 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-2",
-          "chainIdSuffix": "0"
+          "chainId": "dev-0",
+          "chainIdSuffix": "1"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26246
+          "port": 26046
         },
         "logLevel": "info",
         "metrics": {
@@ -5212,14 +5207,14 @@
           ],
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "node": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26246",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26046",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
-          "identifier": "global-domain-2-cometbft",
-          "istioPort": 26246,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26046,
           "privateKey": "sv4-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -5231,16 +5226,17 @@
         "nodeName": "Digital-Asset-Eng-4",
         "peers": [
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
         "stateSync": {
-          "enable": false
+          "enable": true,
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "tolerations": [
           {
@@ -5252,7 +5248,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-4-cometbft-global-domain-2",
+    "name": "sv-4-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5300,7 +5296,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-global-domain-2",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -5310,7 +5306,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
-      "name": "global-domain-2",
+      "name": "global-domain-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -5343,13 +5339,13 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_2_mediator",
+            "databaseName": "global_domain_0_mediator",
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -5358,18 +5354,18 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
         "sequencer": {
           "driver": {
-            "host": "global-domain-2-cometbft-cometbft-rpc.sv-4.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-4.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_2_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -5384,7 +5380,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-4-global-domain-2",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5432,7 +5428,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "0"
             ]
           }
         },
@@ -5563,7 +5559,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -5599,7 +5595,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5607,7 +5603,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
@@ -5619,7 +5615,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -5634,7 +5630,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "sv-4-participant-2",
+    "name": "sv-4-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5738,9 +5734,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_4",
           "port": 5432,
@@ -5749,7 +5745,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-0-sequencer",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -5932,21 +5928,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-4-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv-4-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -5969,12 +5965,12 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-4",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_4",
           "port": 5432,
@@ -6046,7 +6042,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -6055,9 +6051,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 0
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_4",
           "port": 5432,
@@ -6442,7 +6438,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "2"
+            "activeMigrationId": "0"
           },
           "splitwell": true
         },
@@ -6540,7 +6536,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-2",
+      "name": "participant-0",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -6576,14 +6572,14 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 0
           }
         },
         "nodeIdentifier": "validator1",
@@ -6595,7 +6591,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -6610,7 +6606,7 @@
       },
       "version": "0.1.15"
     },
-    "name": "validator1-participant-2",
+    "name": "validator1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6827,7 +6823,7 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 0,
           "migrating": false
         },
         "onboardingSecretFrom": {
@@ -6837,7 +6833,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,

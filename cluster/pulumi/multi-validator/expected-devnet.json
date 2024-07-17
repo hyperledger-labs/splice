@@ -2420,7 +2420,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "0"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -2787,7 +2787,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "0"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3154,7 +3154,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "0"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3521,7 +3521,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "0"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3888,7 +3888,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "0"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
