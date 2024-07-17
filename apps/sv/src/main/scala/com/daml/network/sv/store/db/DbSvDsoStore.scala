@@ -1277,7 +1277,7 @@ class DbSvDsoStore(
             ++ executedCondition
             ++ requesterCondition
             ++ effectivenessCondition).toActionBuilder,
-          orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          orderLimit = sql"""order by effective_at desc limit ${sqlLimit(limit)}""",
         ),
         "listVoteRequestResults",
       )

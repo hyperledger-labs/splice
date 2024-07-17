@@ -1465,21 +1465,44 @@ class DbSvDsoStoreTest
     "list all past VoteRequestResult" in {
       for {
         store <- mkStore()
-        voteRequestContract = voteRequest(
+        voteRequestContract1 = voteRequest(
           requester = userParty(1),
           votes = (1 to 4)
             .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
         )
-        _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
-        result = mkVoteRequestResult(voteRequestContract)
+        _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
+        result1 = mkVoteRequestResult(
+          voteRequestContract1
+        )
         _ <- dummyDomain.exercise(
           contract = dsoRules(),
           interfaceId = Some(DsoRules.TEMPLATE_ID),
           choiceName = DsoRulesCloseVoteRequest.choice.name,
           mkCloseVoteRequest(
-            voteRequestContract.contractId
+            voteRequestContract1.contractId
           ),
-          result.toValue,
+          result1.toValue,
+        )(
+          store.multiDomainAcsStore
+        )
+        voteRequestContract2 = voteRequest(
+          requester = userParty(2),
+          votes = (1 to 4)
+            .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+        )
+        _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
+        result2 = mkVoteRequestResult(
+          voteRequestContract2,
+          effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
+        )
+        _ <- dummyDomain.exercise(
+          contract = dsoRules(),
+          interfaceId = Some(DsoRules.TEMPLATE_ID),
+          choiceName = DsoRulesCloseVoteRequest.choice.name,
+          mkCloseVoteRequest(
+            voteRequestContract2.contractId
+          ),
+          result2.toValue,
         )(
           store.multiDomainAcsStore
         )
@@ -1495,7 +1518,7 @@ class DbSvDsoStoreTest
           )
           .futureValue
           .toList
-          .loneElement shouldBe result
+          .loneElement shouldBe result2
         store
           .listVoteRequestResults(
             Some("SRARC_AddSv"),
@@ -1678,13 +1701,14 @@ class DbSvDsoStoreTest
   }
 
   private def mkVoteRequestResult(
-      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest]
+      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest],
+      effectiveAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
   ): DsoRules_CloseVoteRequestResult = new DsoRules_CloseVoteRequestResult(
     voteRequestContract.payload,
     Instant.now().truncatedTo(ChronoUnit.MICROS),
     util.List.of(),
     util.List.of(),
-    new VRO_Accepted(Instant.now().truncatedTo(ChronoUnit.MICROS)),
+    new VRO_Accepted(effectiveAt),
   )
 
   private def voteRequest(
