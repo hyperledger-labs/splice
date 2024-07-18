@@ -40,6 +40,7 @@ function request_onboarding_secret() {
 
 function write_validator_config() {
     local index
+    local secret
     index="$(printf %02d "$1")"
 
     local base_port=$(( 5000 + ( $1 * 100 ) ))
@@ -49,6 +50,8 @@ function write_validator_config() {
     local validator_admin_port=$(( base_port + 3 ))
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
+
+    secret="$(request_onboarding_secret)"
 
     cat <<EOF >> /app/app.conf
 canton.validator-apps.validator_backend_$index = {
@@ -115,7 +118,7 @@ canton.validator-apps.validator_backend_$index = {
 
     onboarding = {
         sv-client.admin-api.url = \${?CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS}
-        secret = "$(request_onboarding_secret)"
+        secret = "$secret"
     }
 
     domains {
