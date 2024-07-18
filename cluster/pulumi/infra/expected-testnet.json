@@ -2094,6 +2094,7 @@
               }
             },
             "externalUrl": "https://alertmanager.test.global.canton.network.digitalasset.com",
+            "logFormat": "json",
             "storage": {
               "volumeClaimTemplate": {
                 "spec": {
@@ -2534,6 +2535,7 @@
             ],
             "enableRemoteWriteReceiver": true,
             "externalUrl": "https://prometheus.test.global.canton.network.digitalasset.com",
+            "logFormat": "json",
             "podMonitorSelectorNilUsesHelmValues": false,
             "resources": {
               "requests": {
@@ -2591,6 +2593,7 @@
               }
             }
           },
+          "logFormat": "json",
           "tls": {
             "enabled": false
           },

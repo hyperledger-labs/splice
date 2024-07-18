@@ -217,6 +217,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           },
           alertmanagerSpec: {
             externalUrl: alertManagerExternalUrl,
+            logFormat: 'json',
             storage: {
               volumeClaimTemplate: {
                 spec: {
@@ -242,6 +243,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           enabled: false,
         },
         prometheusOperator: {
+          logFormat: 'json',
           admissionWebhooks: {
             enabled: false,
           },
@@ -269,6 +271,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                 cpu: '4',
               },
             },
+            logFormat: 'json',
             storageSpec: {
               volumeClaimTemplate: {
                 spec: {
