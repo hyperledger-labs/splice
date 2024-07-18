@@ -34,6 +34,7 @@ import {
   preApproveValidatorRunbook,
   clusterSmallDisk,
   daContactPoint,
+  spliceInstanceNames,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -271,6 +272,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
+    ...spliceInstanceNames,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

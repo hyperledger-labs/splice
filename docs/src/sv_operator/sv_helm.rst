@@ -626,9 +626,12 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVs. The lists of recommended values can be obtained from the `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs/>`_
+The `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs/>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
 
-Please identify the file corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
+1. ``SV_IDENTITIES_FILE``: The list of SV identities for your node to auto-approve as peer SVs. Locate and review the ``approved-sv-id-values.yaml`` file corresponding to the network to which you are connecting.
+2. ``UI_CONFIG_VALUES_FILE``: The file is located at ``configs/ui-config-values.yaml``, and is the same for all networks.
+
+These environment variables will be used below.
 
 .. _helm-install:
 
@@ -655,9 +658,9 @@ Install the SV node apps (replace ``helm install`` in these commands with ``helm
 
 .. code-block:: bash
 
-    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
-    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml --wait
-    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
+    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
 
 

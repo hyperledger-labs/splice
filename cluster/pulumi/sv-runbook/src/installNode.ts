@@ -40,6 +40,7 @@ import {
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
+  spliceInstanceNames,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -332,6 +333,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    ...spliceInstanceNames,
     extraBeneficiaries,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
@@ -391,6 +393,7 @@ async function installSvAndValidator(
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
+    ...spliceInstanceNames,
     metrics: {
       enable: true,
     },
@@ -429,6 +432,7 @@ async function installSvAndValidator(
       enable: true,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    ...spliceInstanceNames,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

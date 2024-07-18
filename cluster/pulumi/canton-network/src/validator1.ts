@@ -11,6 +11,7 @@ import {
   installAuth0UISecret,
   installCNHelmChart,
   ValidatorTopupConfig,
+  spliceInstanceNames,
 } from 'cn-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
@@ -110,9 +111,18 @@ export async function installValidator1(
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 
   if (installSplitwell) {
-    installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, defaultVersion, {
-      dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
-    });
+    installCNHelmChart(
+      xns,
+      'splitwell-web-ui',
+      'cn-splitwell-web-ui',
+      {
+        ...spliceInstanceNames,
+      },
+      defaultVersion,
+      {
+        dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+      }
+    );
   }
 
   return validator;

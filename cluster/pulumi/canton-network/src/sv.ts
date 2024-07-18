@@ -39,6 +39,7 @@ import {
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   config,
   daContactPoint,
+  spliceInstanceNames,
 } from 'cn-pulumi-common';
 import { appsAffinityAndTolerations } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
@@ -487,6 +488,7 @@ function installSvApp(
 
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
+    ...spliceInstanceNames,
     onboardingType: onboardingType(config.onboarding),
     onboardingName: config.onboardingName,
     onboardingFoundingSvRewardWeightBps:
@@ -586,6 +588,7 @@ function installScan(
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
     clusterUrl: CLUSTER_HOSTNAME,
+    ...spliceInstanceNames,
     metrics: {
       enable: true,
     },

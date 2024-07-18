@@ -51,7 +51,9 @@ Upcoming
 
 * Deployment
 
-  Added an ``livenessProbeInitialDelaySeconds`` parameter to all helm charts.
+  * Added an ``livenessProbeInitialDelaySeconds`` parameter to all helm charts.
+
+  * Helm charts that deploy a frontend (``cn-scan``, ``cn-validator``, ``cn-sv-node``, and ``cn-splitwell-web-ui``) now accept a new parameter, ``spliceInstanceNames``, to configure network-specific terminology. The correct values should be consumed from the `cn-svc-configs ui-config-values.yaml <https://github.com/DACH-NY/cn-svc-configs/blob/main/configs/ui-config-values.yaml>`_
 
 * Sequencer
 

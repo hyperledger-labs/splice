@@ -13,6 +13,7 @@ import { Outlet } from 'react-router-dom';
 
 import Onboarding from '../components/Onboarding';
 import { useIsOnboarded } from '../hooks';
+import { config } from '../utils/config';
 
 interface AuthCheckProps {
   authConfig: AuthConfig;
@@ -23,8 +24,10 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   const { isAuthenticated } = useUserState();
   const { isLoading, isError, data: isOnboarded } = useIsOnboarded();
 
+  const title = `${config.spliceInstanceNames.amuletName} Wallet`;
+
   if (!isAuthenticated) {
-    return <Login title="Canton Wallet" authConfig={authConfig} testAuthConfig={testAuthConfig} />;
+    return <Login title={title} authConfig={authConfig} testAuthConfig={testAuthConfig} />;
   }
 
   if (isLoading) {

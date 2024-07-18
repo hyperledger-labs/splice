@@ -52,8 +52,8 @@ enableWallet: true
 # tolerations:
 
 spliceInstanceNames:
-  networkName: "Canton Network"
-  amuletName: "Canton Coin"
-  amuletNameAcronym: "CC"
-  nameServiceName: "Canton Name Service"
-  nameServiceNameAcronym: "CNS"
+  networkName: "Splice"
+  amuletName: "Amulet"
+  amuletNameAcronym: "AMT"
+  nameServiceName: "Amulet Name Service"
+  nameServiceNameAcronym: "ANS"

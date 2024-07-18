@@ -731,6 +731,13 @@
           "secretName": "apps-pg-secret"
         },
         "sequencerAddress": "global-domain-0-sequencer",
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkName": "Canton Network"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -946,6 +953,13 @@
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
           "publicUrl": "https://scan.sv.global.canton.network.digitalasset.com"
+        },
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkName": "Canton Network"
         },
         "tolerations": [
           {
@@ -1319,6 +1333,13 @@
           "secretName": "apps-pg-secret"
         },
         "scanAddress": "http://scan-app.sv:5012",
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkName": "Canton Network"
+        },
         "svValidator": true,
         "tolerations": [
           {

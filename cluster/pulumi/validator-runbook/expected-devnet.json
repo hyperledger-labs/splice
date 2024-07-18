@@ -503,6 +503,13 @@
           "secretName": "postgres-secrets"
         },
         "scanAddress": "https://scan.sv-2.dev.global.canton.network.digitalasset.com",
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkName": "Canton Network"
+        },
         "svSponsorAddress": "https://sv.sv-2.dev.global.canton.network.digitalasset.com",
         "tolerations": [
           {

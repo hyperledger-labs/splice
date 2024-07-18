@@ -14,4 +14,5 @@ export * from './persistence';
 export * from './runbook-backup';
 export * from './secrets';
 export * from './cometbft';
+export * from './spliceInstanceNames';
 export * from './utils';

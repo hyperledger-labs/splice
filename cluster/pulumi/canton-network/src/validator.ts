@@ -20,6 +20,7 @@ import {
   installCNHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
+  spliceInstanceNames,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
@@ -239,6 +240,7 @@ export async function installValidatorApp(
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,
+      ...spliceInstanceNames,
     },
     defaultVersion,
     { dependsOn }

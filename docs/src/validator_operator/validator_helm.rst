@@ -382,6 +382,8 @@ If you are redeploying the validator app as part of a :ref:`synchronizer migrati
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
+Finally, download the `ui-config-values.yaml file <https://github.com/DACH-NY/cn-svc-configs/blob/main/configs/ui-config-values.yaml/>`_ from the cn-svc-configs repo. This contains some network configuration values for validator UIs. Store the path to this file in an environment variable, ``UI_CONFIG_VALUES_FILE``.
+
 .. _validator-helm-charts-install:
 
 Installing the Helm Charts
@@ -396,7 +398,7 @@ reaches a stable state prior to moving on to the next step.
     helm repo update
     helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} --wait
     helm install participant canton-network-helm/cn-participant -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml --wait
-    helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml --wait
+    helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in the new
