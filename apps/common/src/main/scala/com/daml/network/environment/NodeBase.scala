@@ -293,7 +293,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   protected def appInitStep[T](
       description: String
   )(f: => Future[T])(implicit tc: TraceContext): Future[T] =
-    withSpan("init_step")(implicit tc =>
+    withSpan(s"init $description")(implicit tc =>
       _ => {
         val startTime = Instant.now()
         logger.debug(s"$appInitMessage: $description started")(tc)
