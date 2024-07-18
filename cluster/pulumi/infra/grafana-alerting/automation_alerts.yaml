@@ -42,7 +42,7 @@ groups:
             {{- if (gt $values.failures.Value 50.0) -}}
             critical
             {{- else -}}
-            medium
+            warning
             {{- end -}}
           summary: '{{ index $values "failures" }}% fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:

@@ -60,9 +60,8 @@ groups:
         annotations:
           __dashboardUid__: 919b92a8e8041bd567af9edab12c840c
           __panelId__: "2"
+          severity: warning
           description: The PersistentVolume claimed by {{ index $labels "persistentvolumeclaim" }} in Namespace {{ index $labels "namespace" }} is running out of disk space. Currently {{ humanizePercentage (index $values "free_space").Value }} is available.
           runbook_url: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepersistentvolumefillingup
           summary: PersistentVolume is too full.
-        labels:
-          severity: warning
         isPaused: false

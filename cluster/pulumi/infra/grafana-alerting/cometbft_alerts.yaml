@@ -118,7 +118,7 @@ groups:
             {{- if (gt (index $values "invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
             critical
             {{- else -}}
-            medium
+            warning
             {{- end -}}
           summary: |-
             {{- if (gt (index $values "invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
@@ -429,6 +429,7 @@ groups:
         annotations:
           __dashboardUid__: UJyurCTWz
           __panelId__: "66"
+          severity: critical
           description: |-
             Blocks not signed: {{ index $values "current_blocks_not_signed" }}
             Latest signed block: {{ index $values "latest_signed_block" }}
@@ -526,7 +527,7 @@ groups:
           __panelId__: "68"
           description: This alert triggers when the expected maximum hourly-averaged block rate threshold is reached.
           runbook_url: ""
-          severity: medium
+          severity: warning
           summary: The expected maximum hourly-averaged block rate threshold was exceeded in {{ $labels.namespace }} with a value of {{ index $values "A" }} c/s.
         labels:
           "": ""

@@ -192,10 +192,15 @@ groups:
               reducer: mean
               refId: B
               type: reduce
+        dashboardUid: ccbb2351-2ae2-462f-ae0e-f2c893ad1028
+        panelId: 28
         noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
+          __dashboardUid__: ccbb2351-2ae2-462f-ae0e-f2c893ad1028
+          __panelId__: "28"
+          severity: warning
           description: ''
           runbook_url: ''
           summary: Transaction rate from the k6 load tester is lower than expected threshold
