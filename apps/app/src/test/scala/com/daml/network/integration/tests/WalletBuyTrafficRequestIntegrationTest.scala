@@ -44,7 +44,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
         val badTraffic = -1L
         val errorString = {
-          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests'. " +
+          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests' on 127.0.0.1:5503. " +
             s"Command failed, message: trafficAmount must be positive"
         }
         failCreatingInvalidTrafficRequest(
@@ -61,7 +61,7 @@ class WalletBuyTrafficRequestIntegrationTest
 
         val badPartyId = PartyId.tryFromProtoPrimitive("badValidator::dummy")
         val errorString = {
-          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests'. " +
+          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests' on 127.0.0.1:5503. " +
             s"Command failed, message: Could not find participant hosting $badPartyId on domain $activeSynchronizerId"
         }
         failCreatingInvalidTrafficRequest(aliceWalletClient, badPartyId, errorString)
@@ -74,7 +74,7 @@ class WalletBuyTrafficRequestIntegrationTest
         val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
         val badDomainId = DomainId.tryFromString("dummy::domain")
         val errorString = {
-          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests'. " +
+          s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests' on 127.0.0.1:5503. " +
             s"Command failed, message: Could not find participant hosting $aliceValidatorParty on domain $badDomainId"
         }
         failCreatingInvalidTrafficRequest(
@@ -434,7 +434,7 @@ class WalletBuyTrafficRequestIntegrationTest
     )
     // getTrafficRequestStatus should return 404 in this case
     val notFoundError =
-      s"HTTP 404 Not Found POST at '/api/validator/v0/wallet/buy-traffic-requests/$tid/status'. " +
+      s"HTTP 404 Not Found POST at '/api/validator/v0/wallet/buy-traffic-requests/$tid/status' on 127.0.0.1:5503. " +
         s"Command failed, message: Couldn't find buy traffic request with tracking id $tid"
     assertThrowsAndLogsCommandFailures(
       buyer.getTrafficRequestStatus(tid),

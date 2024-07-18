@@ -17,7 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 case class HttpCommandException(request: HttpRequest, status: StatusCode, message: String)
     extends Exception(
-      s"HTTP ${status} ${request.method.name} at '${request.uri.path.toString}'. Command failed, message: ${message}"
+      s"HTTP ${status} ${request.method.name} at '${request.uri.path.toString}' on ${request.uri.authority}. Command failed, message: ${message}"
     )
 
 /** Equivalent of Canton’s AdminCommand but for our
