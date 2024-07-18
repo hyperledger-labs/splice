@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
@@ -50,7 +50,7 @@ class ExpireRewardCouponsTrigger(
     expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons
   )
 
-  override def completeTaskAsLeader(
+  override def completeTaskAsDsoDelegate(
       expiredRewardsTask: ExpiredRewardCouponsBatch
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {

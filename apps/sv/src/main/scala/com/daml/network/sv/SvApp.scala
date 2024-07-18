@@ -33,7 +33,7 @@ import com.daml.network.sv.admin.http.{
   HttpSvSoftDomainMigrationPocHandler,
 }
 import com.daml.network.sv.automation.{
-  LeaderBasedAutomationService,
+  DsoDelegateBasedAutomationService,
   SvDsoAutomationService,
   SvSvAutomationService,
 }
@@ -605,7 +605,7 @@ class SvApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   protected[this] override def automationServices(st: SvApp.State) =
-    Seq(LeaderBasedAutomationService, st.svAutomation, st.dsoAutomation)
+    Seq(DsoDelegateBasedAutomationService, st.svAutomation, st.dsoAutomation)
 
   private val darFilesToBootstrapNetwork: Seq[UploadablePackage] =
     Seq(
@@ -913,7 +913,7 @@ object SvApp {
         case QueryResult(_, Some(_)) =>
           Future.successful(
             Left(
-              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive leader ${dsoRules.payload.dsoDelegate}"
+              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive delegate ${dsoRules.payload.dsoDelegate}"
             )
           )
         case QueryResult(offset, None) =>

@@ -931,6 +931,38 @@ function subcmd_remove_canton() {
   simple_rename "cantonNameService///amuletNameService" "$ignore_unrelated"
 }
 
+subcommand_whitelist[leader_dso_delegate]='Rename: leader'
+function subcmd_leader_dso_delegate() {
+  assert_clean_working_dir
+
+  local referencing_conf_files=(
+    'apps/app/src/test/resources/include/**/*.conf'
+    cluster/images/sv-app/app.conf
+  )
+  local unsafe_for_word_replacement=(
+    '**/SvDsoStoreTest.scala'
+    '**/SvFrontendIntegrationTest.scala'
+    '**/TransferFollowTrigger.scala'
+  )
+  local GSR_ARGS
+  GSR_ARGS="$(include_all "${app_scala_files[@]}")"
+
+  run_and_commit_rename "leaderbased to delegatebased" \
+    "'\bleaderbased\b///delegatebased'" \
+    "$(include_all "${referencing_conf_files[@]}") $GSR_ARGS"
+  run_and_commit_rename "leader to dsoDelegate" \
+    "'\b(completeTaskAs|voteForNew)Leader\b///\\1DsoDelegate'" \
+    "'\bLeader(BasedAutomationService)\b///DsoDelegate\\1'" \
+    "'\b(enable)Leader(ReplacementTrigger)\b///\\1DsoDelegate\\2'" \
+    "'\b(without)Leader(Replacement)\b///\\1DsoDelegate\\2'" \
+    "'\b([rR]estart)Leader(BasedAutomationTrigger)\b///\\1DsoDelegate\\2'" \
+    "'\b(enableAutomatic)Leader(Election)\b///\\1DsoDelegate\\2'" \
+    "'\bleader(BasedAutomation|ExpiredAnsEntryTrigger)\b///dsoDelegate\\1'" \
+    "$GSR_ARGS"
+  run_and_commit_rename "leader by itself to delegate" \
+    "'\bleader\b///delegate'" \
+    "$GSR_ARGS $(exclude_all "${unsafe_for_word_replacement[@]}")"
+}
 
 ### UI cleanup - ANS
 

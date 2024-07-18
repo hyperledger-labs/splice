@@ -16,7 +16,7 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
-import com.daml.network.sv.automation.leaderbased.{
+import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
@@ -551,8 +551,8 @@ class ScanIntegrationTest
     bobValidatorRewardsTrigger.resume()
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
-    def advanceTrigger = sv1Backend.leaderBasedAutomation
+    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    def advanceTrigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
     clue("Bob grants featured app and taps, transfers to alice") {

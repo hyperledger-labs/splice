@@ -21,7 +21,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.confirmation.AnsSubscriptionInitialPaymentTrigger
-import com.daml.network.sv.automation.leaderbased.{
+import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }

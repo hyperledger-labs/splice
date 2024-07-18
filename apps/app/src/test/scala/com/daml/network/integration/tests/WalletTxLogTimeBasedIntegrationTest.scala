@@ -3,7 +3,10 @@ package com.daml.network.integration.tests
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import com.daml.network.sv.automation.leaderbased.{ExpiredAmuletTrigger, ExpiredLockedAmuletTrigger}
+import com.daml.network.sv.automation.delegatebased.{
+  ExpiredAmuletTrigger,
+  ExpiredLockedAmuletTrigger,
+}
 import com.daml.network.util.{SplitwellTestUtil, SvTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -244,7 +247,7 @@ class WalletTxLogTimeBasedIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredAmuletTrigger]),
+          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
       ) {
         actAndCheck(
           "Advance 4 ticks to expire the amulet",
@@ -301,7 +304,7 @@ class WalletTxLogTimeBasedIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
+          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         actAndCheck(
           "Advance 4 ticks to expire the locked amulet",

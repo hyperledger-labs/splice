@@ -27,7 +27,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
+import com.daml.network.sv.automation.delegatebased.CloseVoteRequestTrigger
 import com.daml.network.util.Codec
 
 import java.time.Instant
@@ -549,7 +549,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       }
     }
     clue("Pausing vote request expiration automation") {
-      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
+      sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
     }
     actAndCheck(
       "SV2 creates a vote request for removing SV1", {
@@ -576,7 +576,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       },
     )
     clue("Resuming vote request expiration automation") {
-      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+      sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
     }
     clue("Eventually the vote request expires and gets archived") {
       eventually() {

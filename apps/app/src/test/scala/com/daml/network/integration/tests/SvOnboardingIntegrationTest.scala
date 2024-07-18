@@ -100,9 +100,9 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   }
 
-  "Non-leader SVs can onboard new validators" in { implicit env =>
+  "Non-delegate SVs can onboard new validators" in { implicit env =>
     initDso()
-    val sv = sv4Backend // not a leader
+    val sv = sv4Backend // not a delegate
     val svParty = sv.getDsoInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
     val secret = actAndCheck(

@@ -9,7 +9,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
+import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.daml.network.util.*
 import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.digitalasset.canton.concurrent.Threading
@@ -56,8 +56,8 @@ class AutomationControlIntegrationTest
         .max
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
-    def trigger = sv1Backend.leaderBasedAutomation
+    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    def trigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
     // Note: this is just to illustrate that nothing is happening while the automation is paused.

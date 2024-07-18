@@ -20,7 +20,7 @@ import com.daml.network.integration.tests.SpliceTests.{
 }
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
+import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTest}
@@ -77,8 +77,8 @@ class UpdateHistoryIntegrationTest
     val transferAmount = com.daml.lf.data.Numeric.assertFromString("11." + "1".repeat(10))
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
-    def advanceRoundsTrigger = sv1Backend.leaderBasedAutomation
+    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    def advanceRoundsTrigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
     val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()

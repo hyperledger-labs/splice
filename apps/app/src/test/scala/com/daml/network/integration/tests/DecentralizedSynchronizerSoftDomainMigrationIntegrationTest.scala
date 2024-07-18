@@ -411,8 +411,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       )
     }
 
-    def protectAppRewardCoupons = sv1Backend.leaderBasedAutomation
-      .trigger[com.daml.network.sv.automation.leaderbased.ExpireRewardCouponsTrigger]
+    def protectAppRewardCoupons = sv1Backend.dsoDelegateBasedAutomation
+      .trigger[com.daml.network.sv.automation.delegatebased.ExpireRewardCouponsTrigger]
 
     val subscriptionRequestCid = clue("create user wallet contracts of various kinds") {
       val dso = dsoParty.toProtoPrimitive

@@ -132,10 +132,10 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withoutLeaderReplacement: EnvironmentDefinition =
+  def withoutDsoDelegateReplacement: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableLeaderReplacementTrigger).replace(false)
+        _.focus(_.enableDsoDelegateReplacementTrigger).replace(false)
       )(config)
     )
 

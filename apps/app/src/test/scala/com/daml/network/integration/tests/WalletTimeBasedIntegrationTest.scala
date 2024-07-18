@@ -9,7 +9,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.leaderbased.{
+import com.daml.network.sv.automation.delegatebased.{
   AnsSubscriptionRenewalPaymentTrigger,
   ExpiredLockedAmuletTrigger,
 }
@@ -100,7 +100,7 @@ class WalletTimeBasedIntegrationTest
         cancelAllSubscriptions(aliceWalletClient),
       ) {
         val ansSubscriptionRenewalPaymentTrigger =
-          sv1Backend.leaderBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger]
+          sv1Backend.dsoDelegateBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger]
         setTriggersWithin(
           triggersToPauseAtStart = Seq(ansSubscriptionRenewalPaymentTrigger),
           triggersToResumeAtStart = Seq.empty,
@@ -205,7 +205,7 @@ class WalletTimeBasedIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
+          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
           eventually()(aliceWalletClient.list().lockedAmulets shouldBe empty)

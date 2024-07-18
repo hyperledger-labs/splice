@@ -301,7 +301,7 @@ class SvOnboardingAddlIntegrationTest
       val newLeader = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
       val newRanking: Vector[String] = Seq(newLeader, currentLeader).toVector
 
-      // note that the new leader has to vote for himself to prove readiness
+      // note that the new delegate has to vote for himself to prove readiness
       actAndCheck(
         "sv2 creates a new election request for epoch 1", {
           sv2Backend
@@ -331,7 +331,7 @@ class SvOnboardingAddlIntegrationTest
               .createElectionRequest(sv3, newRanking.appended(sv3))
           },
         )(
-          "the epoch increased and sv2 is the new leader",
+          "the epoch increased and sv2 is the new delegate",
           _ => {
             sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 1
             sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate shouldBe newLeader

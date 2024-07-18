@@ -185,7 +185,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     clue("The four SV apps are all SVs and there are no other SVs") {
       sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet() should equal(svParties.toSet.asJava)
     }
-    clue("The founding SV app (sv1) is the first leader") {
+    clue("The founding SV app (sv1) is the first delegate") {
       sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate should equal(
         dsoRules.svParty.toProtoPrimitive
       )

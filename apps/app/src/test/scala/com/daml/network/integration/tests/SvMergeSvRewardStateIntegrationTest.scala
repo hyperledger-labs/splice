@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
-import com.daml.network.sv.automation.leaderbased.MergeSvRewardStateContractsTrigger
+import com.daml.network.sv.automation.delegatebased.MergeSvRewardStateContractsTrigger
 import com.daml.network.util.TriggerTestUtil
 
 import scala.jdk.CollectionConverters.*
@@ -37,7 +37,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
     }
     setTriggersWithin(
       triggersToPauseAtStart =
-        Seq(sv1Backend.leaderBasedAutomation.trigger[MergeSvRewardStateContractsTrigger]),
+        Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger]),
       triggersToResumeAtStart = Seq.empty,
     ) {
       actAndCheck(
@@ -56,7 +56,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       )
       loggerFactory.assertLogs(
         {
-          sv1Backend.leaderBasedAutomation.trigger[MergeSvRewardStateContractsTrigger].resume()
+          sv1Backend.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger].resume()
           clue("Trigger merges SvRewardState contracts") {
             eventually() {
               val newRewardStates = getRewardStates()

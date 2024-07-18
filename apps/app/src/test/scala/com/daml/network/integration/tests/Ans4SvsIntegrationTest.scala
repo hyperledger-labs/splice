@@ -7,7 +7,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.leaderbased.TerminatedSubscriptionTrigger
+import com.daml.network.sv.automation.delegatebased.TerminatedSubscriptionTrigger
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -29,7 +29,7 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
   "ans" should {
     "terminated subscriptions are archived" in { implicit env =>
       val leaderTerminatedSubscriptionTrigger =
-        sv1Backend.leaderBasedAutomation.trigger[TerminatedSubscriptionTrigger]
+        sv1Backend.dsoDelegateBasedAutomation.trigger[TerminatedSubscriptionTrigger]
 
       setTriggersWithin[Assertion](
         // TODO(#13199): Consider adding a retry to the submission below instead

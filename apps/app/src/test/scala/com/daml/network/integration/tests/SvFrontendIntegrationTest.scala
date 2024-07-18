@@ -20,7 +20,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.splice.wallet.payment.Unit as DamlUnit
-import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
+import com.daml.network.sv.automation.delegatebased.CloseVoteRequestTrigger
 
 import java.util.Optional
 
@@ -785,7 +785,10 @@ class SvFrontendIntegrationTest
           )
 
           clue("Pausing vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
+            sv1Backend.dsoDelegateBasedAutomation
+              .trigger[CloseVoteRequestTrigger]
+              .pause()
+              .futureValue
           }
 
           actAndCheck(
@@ -816,7 +819,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Resuming vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+            sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
           }
 
           clue("Voting to reject the other vote request") {
@@ -1329,15 +1332,15 @@ class SvFrontendIntegrationTest
           }
       }
 
-    "can request DSO leader election" in { implicit env =>
+    "can request DSO delegate election" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "sv1 operator can login and browse to the leader election tab", {
+          "sv1 operator can login and browse to the delegate election tab", {
             go to s"http://localhost:$sv1UIPort/leader"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
-          "We see a button for requesting a leader election",
+          "We see a button for requesting a delegate election",
           _ => {
             find(id("submit-ranking-leader-election")) should not be empty
           },
@@ -1353,11 +1356,11 @@ class SvFrontendIntegrationTest
 
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           actAndCheck(
-            "sv1 operator makes his own ranking for his leader preference", {
+            "sv1 operator makes his own ranking for his delegate preference", {
               click on "submit-ranking-leader-election"
             },
           )(
-            "The epoch advances by one and the leader name is changed.",
+            "The epoch advances by one and the delegate name is changed.",
             _ => {
               find(id("leader-election-epoch")).value.text should include(
                 sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString

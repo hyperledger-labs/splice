@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.leaderbased.{
+import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpiredAmuletTrigger,
 }
@@ -180,7 +180,7 @@ class WalletExpirationsIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredAmuletTrigger]),
+          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
           eventually()(aliceWalletClient.list().amulets shouldBe empty)

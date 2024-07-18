@@ -22,7 +22,7 @@ import com.daml.network.sv.admin.api.client.commands.{
   HttpSvSoftDomainMigrationPocAppClient,
   HttpSvAppClient,
 }
-import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvDsoAutomationService}
+import com.daml.network.sv.automation.{DsoDelegateBasedAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import com.daml.network.util.Contract
@@ -301,12 +301,12 @@ class SvAppBackendReference(
   def appState: SvApp.State = _appState[SvApp.State, SvApp]
 
   @Help.Summary(
-    "Returns the current leader based automation. Do not keep references to the result, as this automation gets replaced whenever the DSO leader changes."
+    "Returns the current delegate based automation. Do not keep references to the result, as this automation gets replaced whenever the DSO delegate changes."
   )
-  def leaderBasedAutomation: LeaderBasedAutomationService = {
-    appState.dsoAutomation.restartLeaderBasedAutomationTrigger.epochState
+  def dsoDelegateBasedAutomation: DsoDelegateBasedAutomationService = {
+    appState.dsoAutomation.restartDsoDelegateBasedAutomationTrigger.epochState
       .getOrElse(throw new RuntimeException("LeaderBasedAutomation is not fully started up"))
-      .leaderBasedAutomation
+      .dsoDelegateBasedAutomation
   }
 
   @Help.Summary(

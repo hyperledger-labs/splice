@@ -85,8 +85,8 @@ class SvDsoAutomationService(
 
   override def companion = SvDsoAutomationService
 
-  private[network] val restartLeaderBasedAutomationTrigger =
-    new RestartLeaderBasedAutomationTrigger(
+  private[network] val restartDsoDelegateBasedAutomationTrigger =
+    new RestartDsoDelegateBasedAutomationTrigger(
       triggerContext,
       domainTimeSync,
       domainUnpausedSync,
@@ -138,11 +138,11 @@ class SvDsoAutomationService(
     if (config.automation.enableClosedRoundArchival)
       registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, dsoStore, connection))
 
-    if (config.automation.enableLeaderReplacementTrigger) {
+    if (config.automation.enableDsoDelegateReplacementTrigger) {
       registerTrigger(new ElectionRequestTrigger(triggerContext, dsoStore, connection))
     }
 
-    registerTrigger(restartLeaderBasedAutomationTrigger)
+    registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
     registerTrigger(new DsoRulesTransferTrigger(triggerContext, dsoStore, connection))
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
@@ -433,7 +433,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],
-      aTrigger[RestartLeaderBasedAutomationTrigger],
+      aTrigger[RestartDsoDelegateBasedAutomationTrigger],
       aTrigger[DsoRulesTransferTrigger],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],

@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
-import com.daml.network.sv.automation.leaderbased.CloseVoteRequestWithEarlyClosingTrigger
+import com.daml.network.sv.automation.delegatebased.CloseVoteRequestWithEarlyClosingTrigger
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.DomainId
@@ -20,8 +20,8 @@ class DsoElectionTimeBasedIntegrationTest
 
   private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
 
-  // TODO(#7649): once flow is fixed add test to check that SVs can elect a new leader (currently locked contract issue)
-  "SVs can elect a new leader and if a leader gets offboarded a new leader is chosen while current ElectionRequests are archived" in {
+  // TODO(#7649): once flow is fixed add test to check that SVs can elect a new delegate (currently locked contract issue)
+  "SVs can elect a new delegate and if a delegate gets offboarded a new delegate is chosen while current ElectionRequests are archived" in {
     implicit env =>
       clue("Initialize DSO with 4 SVs") {
         startAllSync(
@@ -66,7 +66,7 @@ class DsoElectionTimeBasedIntegrationTest
         },
       )
 
-      clue("remove current leader such that dsoRules epoch is incremented") {
+      clue("remove current delegate such that dsoRules epoch is incremented") {
         val currentLeader = sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate
         val leaderBackend = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
           .find(
@@ -87,14 +87,14 @@ class DsoElectionTimeBasedIntegrationTest
               sv1Party.toProtoPrimitive,
               removeAction,
               "url",
-              "remove current leader",
+              "remove current delegate",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
         Seq(sv2Backend, sv3Backend, sv4Backend)
           .filter(
-            // current leader not voting
+            // current delegate not voting
             _.getDsoInfo().svParty.toProtoPrimitive != currentLeader
           )
           .foreach { sv =>
@@ -111,7 +111,7 @@ class DsoElectionTimeBasedIntegrationTest
           }
         clue("Leader has changed") {
           loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-            leaderBackend.leaderBasedAutomation
+            leaderBackend.dsoDelegateBasedAutomation
               .trigger[CloseVoteRequestWithEarlyClosingTrigger]
               .resume(),
             entries => {
@@ -140,8 +140,8 @@ class DsoElectionTimeBasedIntegrationTest
       }
   }
 
-  // TODO(#7649): enable test back if automatic leader election is re-enabled in new flow
-  "detect an inactive leader" ignore { implicit env =>
+  // TODO(#7649): enable test back if automatic delegate election is re-enabled in new flow
+  "detect an inactive delegate" ignore { implicit env =>
     val dsoRulesBeforeElection = clue("Initialize DSO with 4 SVs") {
       startAllSync(
         sv1ScanBackend,
@@ -173,10 +173,10 @@ class DsoElectionTimeBasedIntegrationTest
       })
     }
 
-    // Stop the leader so we can detect its inactivity later
+    // Stop the delegate so we can detect its inactivity later
     bracket(
       sv1Backend.stop(),
-      // when starting up, eventually SV1 will find out it was replaced as leader
+      // when starting up, eventually SV1 will find out it was replaced as delegate
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         sv1Backend.startSync(),
         entries => {
@@ -192,7 +192,7 @@ class DsoElectionTimeBasedIntegrationTest
       ),
     ) {
       clue(
-        "Advance time such that a new round should be opened. SVs should start their checks of the leader's inactivity"
+        "Advance time such that a new round should be opened. SVs should start their checks of the delegate's inactivity"
       ) {
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
           {
@@ -202,7 +202,7 @@ class DsoElectionTimeBasedIntegrationTest
             // TODO(#6856) Consider reverting this to a `forExactly`
             forAtLeast(3, entries) { line =>
               line.message should include(
-                "Starting check for leader inactivity"
+                "Starting check for delegate inactivity"
               )
             }
           },
@@ -210,7 +210,7 @@ class DsoElectionTimeBasedIntegrationTest
       }
 
       clue(
-        "A new leader is elected and leader-based triggers resume operating normally"
+        "A new delegate is elected and delegate-based triggers resume operating normally"
       ) {
         val effectiveTimeout = SvUtil
           .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)

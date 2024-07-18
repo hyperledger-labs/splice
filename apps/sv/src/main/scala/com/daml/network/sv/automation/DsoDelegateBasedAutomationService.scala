@@ -8,7 +8,7 @@ import com.daml.network.automation.{AutomationService, AutomationServiceCompanio
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.sv.automation.leaderbased.*
+import com.daml.network.sv.automation.delegatebased.*
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -16,7 +16,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 
-class LeaderBasedAutomationService(
+class DsoDelegateBasedAutomationService(
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
@@ -36,7 +36,7 @@ class LeaderBasedAutomationService(
       retryProvider,
     ) {
 
-  override def companion = LeaderBasedAutomationService
+  override def companion = DsoDelegateBasedAutomationService
 
   def start(): Unit = {
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
@@ -73,7 +73,7 @@ class LeaderBasedAutomationService(
 
 }
 
-object LeaderBasedAutomationService extends AutomationServiceCompanion {
+object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
   // defined because the service isn't available immediately in sv app state,
   // but created later by the restart trigger
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] = Seq(

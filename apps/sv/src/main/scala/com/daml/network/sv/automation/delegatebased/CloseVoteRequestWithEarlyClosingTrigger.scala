@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
@@ -34,7 +34,7 @@ class CloseVoteRequestWithEarlyClosingTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsLeader(
+  override def completeTaskAsDsoDelegate(
       voteRequestContract: AssignedContract[VoteRequest.ContractId, VoteRequest]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val trackingCid =

@@ -57,7 +57,7 @@ class SvFrontendTimeBasedIntegrationTest
   }
 
   "SV UIs" should {
-    // TODO(#7649): enable test back if automatic leader election is re-enabled in new flow
+    // TODO(#7649): enable test back if automatic delegate election is re-enabled in new flow
     "see election results reflected in the UI" ignore { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
@@ -65,7 +65,7 @@ class SvFrontendTimeBasedIntegrationTest
             login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
-          "We see the expected leader and epoch",
+          "We see the expected delegate and epoch",
           _ => {
             click on "information-tab-general"
             assertRowContentsMatch(
@@ -79,7 +79,7 @@ class SvFrontendTimeBasedIntegrationTest
         webDriver.quit()
       }
 
-      clue("stop the leader sv1 long enough for an election to occur") {
+      clue("stop the delegate sv1 long enough for an election to occur") {
         val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
           .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)
@@ -107,7 +107,7 @@ class SvFrontendTimeBasedIntegrationTest
             login(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
-          "We see a new leader and epoch",
+          "We see a new delegate and epoch",
           _ => {
             click on "information-tab-general"
             assertRowContentsDiffer(

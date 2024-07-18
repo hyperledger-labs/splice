@@ -14,8 +14,8 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{SpliceLedgerConnection, RetryProvider}
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.util.AssignedContract
-import com.daml.network.sv.automation.LeaderBasedAutomationService
-import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
+import com.daml.network.sv.automation.DsoDelegateBasedAutomationService
+import com.daml.network.sv.automation.delegatebased.SvTaskBasedTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.time.Clock
@@ -31,7 +31,7 @@ import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
 
-class RestartLeaderBasedAutomationTrigger(
+class RestartDsoDelegateBasedAutomationTrigger(
     override protected val context: TriggerContext,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
@@ -64,7 +64,9 @@ class RestartLeaderBasedAutomationTrigger(
     epochStateVar.foreach(epochState => Lifecycle.close(epochState.retryProvider)(logger))
 
   private def closeService(): Unit =
-    epochStateVar.foreach(epochState => Lifecycle.close(epochState.leaderBasedAutomation)(logger))
+    epochStateVar.foreach(epochState =>
+      Lifecycle.close(epochState.dsoDelegateBasedAutomation)(logger)
+    )
 
   def epochState: Option[EpochState] = epochStateVar
 
@@ -81,7 +83,8 @@ class RestartLeaderBasedAutomationTrigger(
   })(TraceContext.empty)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    SyncCloseable("Per-epoch LeaderBasedAutomationService", closeService()) +: super.closeAsync()
+    SyncCloseable("Per-epoch DsoDelegateBasedAutomationService", closeService()) +: super
+      .closeAsync()
 
   override def completeTask(
       dsoRules: DsoRulesContract
@@ -90,7 +93,7 @@ class RestartLeaderBasedAutomationTrigger(
 
       synchronized {
         val currentEpoch = dsoRules.payload.epoch
-        val currentLeader = PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate)
+        val currentDsoDelegate = PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate)
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
@@ -100,7 +103,7 @@ class RestartLeaderBasedAutomationTrigger(
           case Some(state) =>
             if (state.epoch != currentEpoch) {
               logger.info(
-                show"Noticed an DsoRules epoch change (from ${state.epoch} with leader ${state.leader} to $currentEpoch with leader ${currentLeader})."
+                show"Noticed an DsoRules epoch change (from ${state.epoch} with delegate ${state.dsoDelegate} to $currentEpoch with delegate ${currentDsoDelegate})."
               )
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
@@ -145,7 +148,7 @@ class RestartLeaderBasedAutomationTrigger(
            appLevelRetryProvider.futureSupervisor,
            context.metricsFactory,
          )
-       val leaderBasedAutomation = new LeaderBasedAutomationService(
+       val dsoDelegateBasedAutomation = new DsoDelegateBasedAutomationService(
          clock,
          domainTimeSync,
          domainUnpausedSync,
@@ -159,7 +162,7 @@ class RestartLeaderBasedAutomationTrigger(
          EpochState(
            epoch,
            PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
-           leaderBasedAutomation,
+           dsoDelegateBasedAutomation,
            retryProvider,
          )
        )
@@ -167,7 +170,7 @@ class RestartLeaderBasedAutomationTrigger(
        // Shutdown might have been initiated concurrently with our change to the epochStateVar
        if (appLevelRetryProvider.isClosing) {
          logger.debug(
-           "Detected race between update of state and shutdown: closing down leader-based automation again to be on the safe side."
+           "Detected race between update of state and shutdown: closing down delegate-based automation again to be on the safe side."
          )(TraceContext.empty)
          closeRetryProvider()
          closeService()
@@ -176,7 +179,7 @@ class RestartLeaderBasedAutomationTrigger(
          // Delay startup of tasks until here.
          // Even if right after the else, but before starting, it starts shutdown, that's okay,
          // because the child RetryProvider is already scheduled for shutdown.
-         leaderBasedAutomation.start()
+         dsoDelegateBasedAutomation.start()
          UnlessShutdown.Outcome(TaskSuccess(s"Started automation for epoch $epoch"))
        }
      }).onShutdown(
@@ -188,8 +191,8 @@ class RestartLeaderBasedAutomationTrigger(
 }
 
 case class EpochState(
-    val epoch: Long,
-    val leader: PartyId,
-    val leaderBasedAutomation: LeaderBasedAutomationService,
-    val retryProvider: RetryProvider,
+    epoch: Long,
+    dsoDelegate: PartyId,
+    dsoDelegateBasedAutomation: DsoDelegateBasedAutomationService,
+    retryProvider: RetryProvider,
 ) {}

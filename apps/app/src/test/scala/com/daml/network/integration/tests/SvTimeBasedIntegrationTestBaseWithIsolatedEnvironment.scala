@@ -131,7 +131,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
   override def environmentDefinition: EnvironmentDefinition =
-    baseEnvironmentDefinition.withoutLeaderReplacement
+    baseEnvironmentDefinition.withoutDsoDelegateReplacement
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
@@ -142,5 +142,5 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging
-      .withoutLeaderReplacement
+      .withoutDsoDelegateReplacement
 }

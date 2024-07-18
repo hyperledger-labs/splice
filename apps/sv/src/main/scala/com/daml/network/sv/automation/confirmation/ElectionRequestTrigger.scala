@@ -45,7 +45,7 @@ class ElectionRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      currentLeader = dsoRules.payload.dsoDelegate
+      currentDsoDelegate = dsoRules.payload.dsoDelegate
       self = store.key.svParty.toProtoPrimitive
 
       requiredNumRequests = Thresholds.requiredNumVotes(dsoRules)
@@ -70,13 +70,13 @@ class ElectionRequestTrigger(
             .map(dsoRules => {
 
               TaskSuccess(
-                show"Successfully completed a leader election to replace the leader $currentLeader with ${dsoRules.payload.dsoDelegate}"
+                show"Successfully completed a delegate election to replace the delegate $currentDsoDelegate with ${dsoRules.payload.dsoDelegate}"
               )
             })
         } else
           Future.successful(
             TaskSuccess(
-              show"not yet electing new leader," +
+              show"not yet electing new delegate," +
                 show" as there are only ${requestCids.size} out of" +
                 show" the required $requiredNumRequests requests."
             )

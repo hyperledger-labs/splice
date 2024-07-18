@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.splice
@@ -23,7 +23,7 @@ import scala.util.Random
 trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
-  protected def enableAutomaticLeaderElection: Boolean = false
+  protected def enableAutomaticDsoDelegateElection: Boolean = false
   private val store = svTaskContext.dsoStore
 
   final protected override def completeTask(
@@ -36,7 +36,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
       result <-
         if (sameEpoch) {
           if (isLeader) {
-            completeTaskAsLeader(task)
+            completeTaskAsDsoDelegate(task)
           } else {
             monitorTaskAsFollower(task)
           }
@@ -51,9 +51,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     } yield result
   }
 
-  /** Handle leader failure by voting for a new leader
+  /** Handle delegate failure by voting for a new delegate
     */
-  final protected def voteForNewLeader(
+  final protected def voteForNewDsoDelegate(
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       currentLeader: String,
   )(implicit
@@ -68,7 +68,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case QueryResult(_, Some(_)) =>
           Future.successful(
             TaskSuccess(
-              s"already voted in an election for epoch ${svTaskContext.epoch} to replace inactive leader ${currentLeader}"
+              s"already voted in an election for epoch ${svTaskContext.epoch} to replace inactive delegate ${currentLeader}"
             )
           )
         case QueryResult(offset, None) => {
@@ -102,7 +102,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
             .yieldUnit()
             .map(_ => {
               TaskSuccess(
-                s"successfully requested an election to replace inactive leader ${currentLeader}"
+                s"successfully requested an election to replace inactive delegate ${currentLeader}"
               )
             })
         }
@@ -110,7 +110,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     } yield retVal
   }
 
-  protected def completeTaskAsLeader(
+  protected def completeTaskAsDsoDelegate(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
@@ -118,7 +118,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
 
-    logger.debug(s"Starting check for leader inactivity")
+    logger.debug(s"Starting check for delegate inactivity")
     for {
       dsoRules <- store.getDsoRules()
       monitoredEpoch = dsoRules.payload.epoch
@@ -142,7 +142,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case UnlessShutdown.AbortedDueToShutdown =>
           Future.successful(
             TaskSuccess(
-              s"stopping the check for leader inactivity, as the trigger is being shut down"
+              s"stopping the check for delegate inactivity, as the trigger is being shut down"
             )
           )
         case UnlessShutdown.Outcome(()) => {
@@ -157,24 +157,24 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
             if (isLeaderInactive && dsoRules.payload.epoch != svTaskContext.epoch) {
               Future.successful(
                 TaskSuccess(
-                  s"skipping vote to replace leader $monitoredLeader because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
+                  s"skipping vote to replace delegate $monitoredLeader because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
                 )
               )
             } else if (isLeaderInactive) {
               // TODO(#6856) Resolve the busy loop in a more elegant way.
-              if (enableAutomaticLeaderElection) {
-                voteForNewLeader(dsoRules, monitoredLeader)
+              if (enableAutomaticDsoDelegateElection) {
+                voteForNewDsoDelegate(dsoRules, monitoredLeader)
               } else {
                 Future.successful(
                   TaskSuccess(
-                    s"skipping vote to replace leader $monitoredLeader because this trigger is configured to not trigger votes"
+                    s"skipping vote to replace delegate $monitoredLeader because this trigger is configured to not trigger votes"
                   )
                 )
               }
             } else {
               Future.successful(
                 TaskSuccess(
-                  s"Leader inactivity check completed, leader is active"
+                  s"Leader inactivity check completed, delegate is active"
                 )
               )
             }
@@ -189,7 +189,7 @@ object SvTaskBasedTrigger {
   case class Context(
       dsoStore: SvDsoStore,
       connection: SpliceLedgerConnection,
-      leader: PartyId,
+      dsoDelegate: PartyId,
       epoch: Long,
   )
 }

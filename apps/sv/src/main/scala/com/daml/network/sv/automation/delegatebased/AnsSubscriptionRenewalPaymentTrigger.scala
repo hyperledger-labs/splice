@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import org.apache.pekko.stream.Materializer
 import cats.implicits.catsSyntaxApplicativeId
@@ -53,7 +53,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
   //  1. There is no transfer context for the given rounds, i.e., the payment is expired in some form.
   //  2a. There is no entry because the entry has already been expired, i.e., the payment was too late.
   //  2b. There is no entry for another reason, which is not expected
-  override def completeTaskAsLeader(
+  override def completeTaskAsDsoDelegate(
       subscriptionPayment: AssignedContract[
         SubscriptionPayment.ContractId,
         SubscriptionPayment,

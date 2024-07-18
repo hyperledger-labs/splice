@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.splice.dsorules.VoteRequest
@@ -36,7 +36,9 @@ class CloseVoteRequestTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
+  override def completeTaskAsDsoDelegate(
+      task: Task
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val voteRequestCid = task.work.contractId
     for {
       dsoRules <- svTaskContext.dsoStore.getDsoRules()

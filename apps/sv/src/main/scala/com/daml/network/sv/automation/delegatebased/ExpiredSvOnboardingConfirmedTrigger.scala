@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.splice
@@ -33,7 +33,7 @@ class ExpiredSvOnboardingConfirmedTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
       cmd = dsoRules.exercise(
@@ -48,7 +48,7 @@ class ExpiredSvOnboardingConfirmedTrigger(
     } yield TaskSuccess("archived expired SV confirmed contract")
 }
 
-private[leaderbased] object ExpiredSvOnboardingConfirmedTrigger {
+private[delegatebased] object ExpiredSvOnboardingConfirmedTrigger {
   type Task = ScheduledTaskTrigger.ReadyTask[
     AssignedContract[
       splice.svonboarding.SvOnboardingConfirmed.ContractId,

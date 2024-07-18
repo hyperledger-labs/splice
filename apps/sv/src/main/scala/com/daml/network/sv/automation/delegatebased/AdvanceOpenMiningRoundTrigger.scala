@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.leaderbased
+package com.daml.network.sv.automation.delegatebased
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
@@ -40,13 +40,15 @@ class AdvanceOpenMiningRoundTrigger(
     } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
 
   /** How to process a task. */
-  override protected def completeTaskAsLeader(
+  override protected def completeTaskAsDsoDelegate(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
     for {
       dsoRules <- store.getDsoRules()
-      _ = logger.debug(s"Starting work as leader ${dsoRules.payload.dsoDelegate} for ${task.work}")
+      _ = logger.debug(
+        s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
+      )
       amuletPriceVotes <- store.listMemberAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(

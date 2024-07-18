@@ -20,7 +20,7 @@ import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.dso.DsoAnsResolver
-import com.daml.network.sv.automation.leaderbased.{
+import com.daml.network.sv.automation.delegatebased.{
   ExpiredAnsEntryTrigger,
   ExpiredAnsSubscriptionTrigger,
 }
@@ -66,8 +66,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           )(config)
       )
 
-  def leaderExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
-    sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsEntryTrigger]
+  def dsoDelegateExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
+    sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger]
 
   // created by the expiry test
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
@@ -346,7 +346,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq(leaderExpiredAnsEntryTrigger),
+        triggersToResumeAtStart = Seq(dsoDelegateExpiredAnsEntryTrigger),
       ) {
 
         val ansRules = sv1ScanBackend.getAnsRules()
@@ -396,7 +396,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         setTriggersWithin(
           Seq.empty,
           triggersToResumeAtStart =
-            Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
+            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
         ) {
           withClue("contracts removed with subscription trigger reenabled") {
             // Wait for subscription to be expired.
