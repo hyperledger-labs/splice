@@ -1414,6 +1414,37 @@ commands:
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
+
+  clone_and_update_splice:
+      steps:
+      - checkout_with_retry
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:8B2wBxIsk7yM7E9ipArxSxwBuuytFn6gDC+Iv/VCGpY"
+      - run:
+          name: clone splice-staging
+          command: |
+            # We have multiple SSH keys, and the first key is always used, which is the wrong one
+            # for the splice-staging repo, so we need to remove all keys and add the correct one.
+            # See https://circleci.com/docs/add-ssh-key/#adding-multiple-keys-with-blank-hostnames
+            ssh-add -D
+            ssh-add ~/.ssh/id_rsa_78fc53a008d592cd72fae08f46d19a21
+            cd ..
+            for i in $(seq 1 5)
+            do
+              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+            done
+            (exit $s)
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: dump latest into splice-staging
+          cmd: |
+            scripts/copy-to-splice.sh ../splice
+      - run:
+          name: copy circleci-specific files to the splice directory
+          command: |
+            mkdir -p ../splice/.circleci
+            cp -r .circleci/canton-scripts ../splice/.circleci
 jobs:
 
   autoscaler_prevent_scaledown:
@@ -3163,33 +3194,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:8B2wBxIsk7yM7E9ipArxSxwBuuytFn6gDC+Iv/VCGpY"
-      - run:
-          name: clone splice-staging
-          command: |
-            # We have multiple SSH keys, and the first key is always used, which is the wrong one
-            # for the splice-staging repo, so we need to remove all keys and add the correct one.
-            # See https://circleci.com/docs/add-ssh-key/#adding-multiple-keys-with-blank-hostnames
-            ssh-add -D
-            ssh-add ~/.ssh/id_rsa_78fc53a008d592cd72fae08f46d19a21
-            cd ..
-            for i in $(seq 1 5)
-            do
-              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
-            done
-            (exit $s)
-      - setup_sbt_test_job
-      - run_bash_command_in_nix:
-          cmd_name: dump latest into splice-staging
-          cmd: |
-            scripts/copy-to-splice.sh ../splice
-      - run:
-          name: copy circleci-specific files to the splice directory
-          command: |
-            mkdir -p ../splice/.circleci
-            cp -r .circleci/canton-scripts ../splice/.circleci
+      - clone_and_update_splice
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
