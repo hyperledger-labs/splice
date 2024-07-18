@@ -55,6 +55,8 @@ Upcoming
 
   * Helm charts that deploy a frontend (``cn-scan``, ``cn-validator``, ``cn-sv-node``, and ``cn-splitwell-web-ui``) now accept a new parameter, ``spliceInstanceNames``, to configure network-specific terminology. The correct values should be consumed from the `cn-svc-configs ui-config-values.yaml <https://github.com/DACH-NY/cn-svc-configs/blob/main/configs/ui-config-values.yaml>`_
 
+  * Docker environment variables of the form ``CN_APP_*_UI_*`` have been renamed to ``CN_APP_UI_*``, dropping the app name prefix. For users of the Helm charts, no further action is needed.
+
 * Sequencer
 
   * Improve performance of sequencer startup and querying the

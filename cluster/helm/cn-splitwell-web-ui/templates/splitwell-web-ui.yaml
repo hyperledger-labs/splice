@@ -25,29 +25,29 @@ spec:
         image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Chart.AppVersion }}"
         imagePullPolicy: Always
         env:
-        - name: CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID
+        - name: CN_APP_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
               key: client-id
               name: cn-app-splitwell-ui-auth
               optional: false
-        - name: CN_APP_SPLITWELL_UI_AUTH_URL
+        - name: CN_APP_UI_AUTH_URL
           valueFrom:
             secretKeyRef:
               key: url
               name: cn-app-splitwell-ui-auth
               optional: false
-        - name: CN_APP_SPLITWELL_UI_CLUSTER
+        - name: CN_APP_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}
-        - name: CN_APP_SPLITWELL_UI_NETWORK_NAME
+        - name: CN_APP_UI_NETWORK_NAME
           value: {{ .Values.spliceInstanceNames.networkName | quote }}
-        - name: CN_APP_SPLITWELL_UI_AMULET_NAME
+        - name: CN_APP_UI_AMULET_NAME
           value: {{ .Values.spliceInstanceNames.amuletName | quote }}
-        - name: CN_APP_SPLITWELL_UI_AMULET_NAME_ACRONYM
+        - name: CN_APP_UI_AMULET_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
-        - name: CN_APP_SPLITWELL_UI_NAME_SERVICE_NAME
+        - name: CN_APP_UI_NAME_SERVICE_NAME
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
-        - name: CN_APP_SPLITWELL_UI_NAME_SERVICE_NAME_ACRONYM
+        - name: CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         ports:
         - containerPort: 80
