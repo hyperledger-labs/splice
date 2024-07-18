@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
@@ -460,6 +461,19 @@ function internalScanUrl(config: SvConfig): pulumi.Output<string> {
   return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
 }
 
+// TODO(#13413) Drop this once the base version of ciperiodic is >= 0.1.16
+function onboardingType(onboarding: SvOnboarding): string {
+  const supportsRenamedOnboardingType =
+    defaultVersion.type == 'local' ||
+    defaultVersion.version.startsWith('0.1.16') ||
+    semver.gt(defaultVersion.version, '0.1.16');
+
+  if (onboarding.type == 'found-dso' && !supportsRenamedOnboardingType) {
+    return 'found-collective';
+  }
+  return onboarding.type;
+}
+
 function installSvApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SvConfig,
@@ -473,7 +487,7 @@ function installSvApp(
 
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
-    onboardingType: config.onboarding.type,
+    onboardingType: onboardingType(config.onboarding),
     onboardingName: config.onboardingName,
     onboardingFoundingSvRewardWeightBps:
       config.onboarding.type == 'found-dso'
