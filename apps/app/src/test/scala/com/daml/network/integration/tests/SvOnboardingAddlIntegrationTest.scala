@@ -150,7 +150,9 @@ class SvOnboardingAddlIntegrationTest
         }
       })
     }
-    actAndCheck(timeUntilSuccess = 1.minute)("SV2 comes back online", sv2Backend.startSync())(
+    // higher time required to account for possible domain reconnections when the sequencer is changed from the onboarding sv1 to it's own sv2
+    // TODO(#13405) remove increased timeout when canton fails fast during sequencer changes
+    actAndCheck(timeUntilSuccess = 2.minute)("SV2 comes back online", sv2Backend.startSync())(
       "SV4's onboarding gathers sufficient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
