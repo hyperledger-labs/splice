@@ -18,7 +18,7 @@ export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
 export const EXPECTED_MAX_BLOCK_RATE_PER_SECOND =
-  config.optionalEnv('EXPECTED_MAX_BLOCK_RATE_PER_SECOND') || '3';
+  config.optionalEnv('EXPECTED_MAX_BLOCK_RATE_PER_SECOND') || '3.5';
 
 export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
 

@@ -907,7 +907,7 @@ when the block rate exceeds **EXPECTED_MAX_BLOCK_RATE_PER_SECOND** blocks per se
 This variable is optional and can be configured per cluster in the .envrc.vars file:
 
 ```
-export EXPECTED_MAX_BLOCK_RATE_PER_SECOND="2.5" (default value)
+export EXPECTED_MAX_BLOCK_RATE_PER_SECOND="3.5" (default value)
 ```
 
 #### JVM debug information
