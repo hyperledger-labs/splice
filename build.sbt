@@ -1397,6 +1397,7 @@ printTests := {
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
+  def isSvReonboardingTest(name: String): Boolean = name contains "SvReonboardingIntegration"
 
   val allTestNames =
     definedTests
@@ -1486,6 +1487,11 @@ printTests := {
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
+    ),
+    (
+      "sv reonboarding test",
+      "test-full-class-names-sv-reonboarding.log",
+      (t: String) => isSvReonboardingTest(t),
     ),
     (
       "tests with wall clock time",
