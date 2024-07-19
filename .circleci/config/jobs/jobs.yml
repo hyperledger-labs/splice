@@ -887,9 +887,9 @@ jobs:
     steps:
       - checkout_with_retry
       - clone_and_update_splice
-      - run_bash_command_in_nix:
-          cmd_name: Create PR for Splice
-          cmd: |
+      - run:
+          name: Create PR for Splice
+          command: |
             # TODO: retries
 
             # We have multiple SSH keys, and the first key is always used, which is the wrong one
@@ -908,5 +908,6 @@ jobs:
             git commit -m "Update Splice from CCI"
             echo "Pushing"
             git push origin HEAD
-            echo "Creating PR"
-            gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
+            #echo "Creating PR"
+            #gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
+            # TODO: create a PR through the gh API directly in order not to require `gh`
