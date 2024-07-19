@@ -37,11 +37,11 @@ workflow:
           branch_ignores: "^(main|deployment/.*|release-line.*)$"
           max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
       # # Linting and formatting
-      # - static_tests:
-      #     <<: *notify-fail
-      #     context:
-      #       - artifactory
-      #       - slack-context
+      - static_tests:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
       # # Daml
       # - daml_test:
       #     <<: *notify-fail
