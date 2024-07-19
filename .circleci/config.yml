@@ -3209,7 +3209,7 @@ jobs:
   create_splice_pr:
     docker:
       - image: cimg/base:2024.01
-    resource_class: "small"
+    resource_class: "xlarge"
     environment:
       <<: *env
     steps:
