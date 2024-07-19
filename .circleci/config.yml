@@ -3240,8 +3240,6 @@ jobs:
           cmd_name: Create PR
           cmd: |
             echo "Creating PR"
-            unset GITHUB_TOKEN
-            export GITHUB_TOKEN=$GITHUB_TOKEN_SPLICE
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
 
   deploy_operator:
