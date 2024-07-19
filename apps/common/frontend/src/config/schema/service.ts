@@ -12,6 +12,7 @@ export const walletSchema = z.object({
 
 export const spliceInstanceNamesSchema = z.object({
   networkName: z.string(),
+  networkFaviconUrl: z.string().url(),
   amuletName: z.string(),
   amuletNameAcronym: z.string(),
   nameServiceName: z.string(),

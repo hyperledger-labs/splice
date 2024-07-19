@@ -17,6 +17,7 @@ window.splice_config = {
   //   },
   spliceInstanceNames: {
     networkName: 'Canton Network',
+    networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
     amuletName: 'Canton Coin',
     amuletNameAcronym: 'CC',
     nameServiceName: 'Canton Name Service',

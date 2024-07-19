@@ -43,6 +43,7 @@ function start_frontend() {
   local splice_instance_names="{
   spliceInstanceNames: {
     networkName: 'Ecilps',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
     amuletName: 'Teluma',
     amuletNameAcronym: 'TLM',
     nameServiceName: 'Teluma Name Service',
@@ -55,6 +56,7 @@ function start_frontend() {
     splice_instance_names="{
     spliceInstanceNames: {
       networkName: 'Canton Network',
+      networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
       amuletName: 'Canton Coin',
       amuletNameAcronym: 'CC',
       nameServiceName: 'Canton Name Service',

@@ -542,6 +542,7 @@
           "amuletNameAcronym": "CC",
           "nameServiceName": "Canton Name Service",
           "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
           "networkName": "Canton Network"
         },
         "svSponsorAddress": "https://sv.sv-2.global.canton.network.digitalasset.com",

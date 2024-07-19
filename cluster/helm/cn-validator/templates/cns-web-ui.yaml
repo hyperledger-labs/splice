@@ -46,6 +46,8 @@ spec:
           value: {{ .Values.clusterUrl | quote }}
         - name: CN_APP_UI_NETWORK_NAME
           value: {{ .Values.spliceInstanceNames.networkName | quote }}
+        - name: CN_APP_UI_NETWORK_FAVICON_URL
+          value: {{ .Values.spliceInstanceNames.networkFaviconUrl | quote }}
         - name: CN_APP_UI_AMULET_NAME
           value: {{ .Values.spliceInstanceNames.amuletName | quote }}
         - name: CN_APP_UI_AMULET_NAME_ACRONYM

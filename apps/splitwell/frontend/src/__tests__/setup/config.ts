@@ -20,6 +20,7 @@ const config = {
   //   },
   spliceInstanceNames: {
     networkName: 'Ecilps',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
     amuletName: 'Teluma',
     amuletNameAcronym: 'TLM',
     nameServiceName: 'Teluma Name Service',

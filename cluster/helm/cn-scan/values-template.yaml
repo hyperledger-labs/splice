@@ -32,6 +32,7 @@ failOnAppVersionMismatch: true
 
 spliceInstanceNames:
   networkName: "Splice"
+  networkFaviconUrl: "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png"
   amuletName: "Amulet"
   amuletNameAcronym: "AMT"
   nameServiceName: "Amulet Name Service"

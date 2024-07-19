@@ -15,6 +15,7 @@ window.splice_config = {
   clusterUrl: `https://${cluster}`,
   spliceInstanceNames: {
     networkName: "${CN_APP_UI_NETWORK_NAME}",
+    networkFaviconUrl: "${CN_APP_UI_NETWORK_FAVICON_URL}",
     amuletName: "${CN_APP_UI_AMULET_NAME}",
     amuletNameAcronym: "${CN_APP_UI_AMULET_NAME_ACRONYM}",
     nameServiceName: "${CN_APP_UI_NAME_SERVICE_NAME}",

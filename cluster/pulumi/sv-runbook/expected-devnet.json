@@ -710,6 +710,7 @@
           "amuletNameAcronym": "CC",
           "nameServiceName": "Canton Name Service",
           "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
           "networkName": "Canton Network"
         },
         "tolerations": [
@@ -941,6 +942,7 @@
           "amuletNameAcronym": "CC",
           "nameServiceName": "Canton Name Service",
           "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
           "networkName": "Canton Network"
         },
         "tolerations": [
@@ -1329,6 +1331,7 @@
           "amuletNameAcronym": "CC",
           "nameServiceName": "Canton Name Service",
           "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
           "networkName": "Canton Network"
         },
         "svValidator": true,
