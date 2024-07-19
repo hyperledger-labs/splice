@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.1.16
+------
 
 * CometBft
 

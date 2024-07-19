@@ -465,7 +465,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "cluster-gateway",
     "provider": "",

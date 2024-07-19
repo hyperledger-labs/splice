@@ -278,7 +278,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "docs-docs",
     "provider": "",
@@ -466,7 +466,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
@@ -598,7 +598,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-global-domain-0",
     "provider": "",
@@ -661,7 +661,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -714,7 +714,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -848,7 +848,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-participant-0",
     "provider": "",
@@ -982,7 +982,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1173,7 +1173,7 @@
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
-        "onboardingType": "found-collective",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_1",
@@ -1203,7 +1203,7 @@
           }
         ]
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1318,7 +1318,7 @@
           }
         }
       },
-      "version": "0.1.8"
+      "version": "0.1.16"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

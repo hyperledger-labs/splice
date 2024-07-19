@@ -1399,7 +1399,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1487,7 +1487,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -1570,7 +1570,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -1650,7 +1650,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "splitwell-participant-0",
     "provider": "",
@@ -1772,7 +1772,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -1997,7 +1997,7 @@
         "useSequencerConnectionsFromScan": true,
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",
@@ -2182,7 +2182,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
@@ -2314,7 +2314,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-global-domain-0",
     "provider": "",
@@ -2377,7 +2377,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -2430,7 +2430,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2564,7 +2564,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-participant-0",
     "provider": "",
@@ -2698,7 +2698,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2945,7 +2945,7 @@
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
-        "onboardingType": "found-collective",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_1",
@@ -2975,7 +2975,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -3078,7 +3078,7 @@
           }
         }
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -3260,7 +3260,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-cometbft-global-domain-0",
     "provider": "",
@@ -3392,7 +3392,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-global-domain-0",
     "provider": "",
@@ -3455,7 +3455,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -3508,7 +3508,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3642,7 +3642,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-participant-0",
     "provider": "",
@@ -3776,7 +3776,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -4026,7 +4026,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -4122,7 +4122,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -4304,7 +4304,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-cometbft-global-domain-0",
     "provider": "",
@@ -4436,7 +4436,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-global-domain-0",
     "provider": "",
@@ -4499,7 +4499,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -4552,7 +4552,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -4686,7 +4686,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-participant-0",
     "provider": "",
@@ -4820,7 +4820,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -5070,7 +5070,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -5166,7 +5166,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -5348,7 +5348,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-cometbft-global-domain-0",
     "provider": "",
@@ -5480,7 +5480,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-global-domain-0",
     "provider": "",
@@ -5543,7 +5543,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -5596,7 +5596,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -5730,7 +5730,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-participant-0",
     "provider": "",
@@ -5864,7 +5864,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -6114,7 +6114,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -6210,7 +6210,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",
@@ -6582,7 +6582,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -6655,7 +6655,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -6735,7 +6735,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "validator1-participant-0",
     "provider": "",
@@ -6849,7 +6849,7 @@
           }
         ]
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -7008,7 +7008,7 @@
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.1.15"
+      "version": "0.1.16"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
