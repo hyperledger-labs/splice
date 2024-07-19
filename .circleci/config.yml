@@ -3219,6 +3219,13 @@ jobs:
           cmd_name: Create PR for Splice
           cmd: |
             # TODO: retries
+
+            # We have multiple SSH keys, and the first key is always used, which is the wrong one
+            # for the splice-staging repo, so we need to remove all keys and add the correct one.
+            # See https://circleci.com/docs/add-ssh-key/#adding-multiple-keys-with-blank-hostnames
+            ssh-add -D
+            ssh-add ~/.ssh/id_rsa_78fc53a008d592cd72fae08f46d19a21
+
             cd ../splice
             branch="splice-cci-update-$(date +%s)"
             git config user.email "something@digitalasset.com"
