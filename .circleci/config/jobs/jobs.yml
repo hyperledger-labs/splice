@@ -888,7 +888,7 @@ jobs:
       - checkout_with_retry
       - clone_and_update_splice
       - run:
-          name: Create PR for Splice
+          name: Create and push branch
           command: |
             # TODO: retries
 
@@ -908,6 +908,10 @@ jobs:
             git commit -m "Update Splice from CCI"
             echo "Pushing"
             git push origin HEAD
-            #echo "Creating PR"
-            #gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
-            # TODO: create a PR through the gh API directly in order not to require `gh`
+      - run_bash_command_in_nix:
+          cmd_name: Create PR
+          cmd: |
+            echo "Creating PR"
+            unset GITHUB_TOKEN
+            export GITHUB_TOKEN=$GITHUB_TOKEN_SPLICE
+            gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
