@@ -71,6 +71,7 @@ in pkgs.mkShell {
     selenium-server-standalone
     shellcheck
     sphinx
+    openssh
     tmux
     toxiproxy
     unzip
