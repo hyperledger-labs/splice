@@ -624,6 +624,9 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      working_dir:
+        type: string
+        default: ""
       <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
@@ -632,6 +635,7 @@ commands:
           when: << parameters.when >>
           additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cluster: << parameters.cluster >>
+          working_dir: << parameters.working_dir >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -734,6 +738,9 @@ commands:
       background:
         type: boolean
         default: false
+      working_dir:
+        type: string
+        default: ""
     steps:
       - get_cluster:
           cluster: << parameters.cluster >>
@@ -747,6 +754,11 @@ commands:
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
+
+            if [ -n "<< parameters.working_dir >>" ]; then
+              echo "Changing into working directory << parameters.working_dir >>"
+              cd "<< parameters.working_dir >>"
+            fi
 
             # Attempt to build the nix env with retries to work around transient download failures
             MAX_RETRY_NIX_ENV=5
@@ -3143,6 +3155,52 @@ jobs:
           custom: |
             { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
+  build_splice:
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: "xlarge"
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:8B2wBxIsk7yM7E9ipArxSxwBuuytFn6gDC+Iv/VCGpY"
+      - run:
+          name: clone splice-staging
+          command: |
+            # We have multiple SSH keys, and the first key is always used, which is the wrong one
+            # for the splice-staging repo, so we need to remove all keys and add the correct one.
+            # See https://circleci.com/docs/add-ssh-key/#adding-multiple-keys-with-blank-hostnames
+            ssh-add -D
+            ssh-add ~/.ssh/id_rsa_78fc53a008d592cd72fae08f46d19a21
+            cd ..
+            for i in $(seq 1 5)
+            do
+              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+            done
+            (exit $s)
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: dump latest into splice-staging
+          cmd: |
+            scripts/copy-to-splice.sh ../splice
+      - run:
+          name: copy circleci-specific files to the splice directory
+          command: |
+            mkdir -p ../splice/.circleci
+            cp -r .circleci/canton-scripts ../splice/.circleci
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "update"
+          cmd_retry_count: 3
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "bundle"
+
   deploy_operator:
     circleci_ip_ranges: true
     docker:
@@ -4073,6 +4131,11 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      - build_splice:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
 
   deploy_cidaily:
     when:

@@ -202,3 +202,8 @@ workflow:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      - build_splice:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context

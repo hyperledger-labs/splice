@@ -466,6 +466,9 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      working_dir:
+        type: string
+        default: ""
       <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
@@ -474,6 +477,7 @@ commands:
           when: << parameters.when >>
           additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cluster: << parameters.cluster >>
+          working_dir: << parameters.working_dir >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -576,6 +580,9 @@ commands:
       background:
         type: boolean
         default: false
+      working_dir:
+        type: string
+        default: ""
     steps:
       - get_cluster:
           cluster: << parameters.cluster >>
@@ -589,6 +596,11 @@ commands:
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
+
+            if [ -n "<< parameters.working_dir >>" ]; then
+              echo "Changing into working directory << parameters.working_dir >>"
+              cd "<< parameters.working_dir >>"
+            fi
 
             # Attempt to build the nix env with retries to work around transient download failures
             MAX_RETRY_NIX_ENV=5

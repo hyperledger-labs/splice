@@ -65,6 +65,7 @@ in pkgs.mkShell {
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
+    rsync
     sbt
     scala
     selenium-server-standalone
