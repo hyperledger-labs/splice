@@ -908,9 +908,9 @@ jobs:
             git push origin HEAD
       - run_bash_command_in_nix:
           cmd_name: Create PR
+          additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
             commit=$(git rev-parse --short HEAD)
             cd ../splice
             date=$(date +%Y-%m-%d)
-            export GH_TOKEN=$GITHUB_TOKEN_SA
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI as of commit $commit" --base main --reviewer isegall-da
