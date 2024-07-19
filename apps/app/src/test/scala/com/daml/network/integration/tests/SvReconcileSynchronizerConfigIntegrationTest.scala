@@ -14,6 +14,7 @@ import com.daml.network.util.AmuletConfigSchedule
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.*
 
 class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase {
 
@@ -62,7 +63,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
         )
       )
     )
-    actAndCheck(
+    actAndCheck(timeUntilSuccess = 30.seconds)(
       "Voting on a AmuletRules config change for new fees config", {
         val (_, voteRequest) = actAndCheck(
           "Creating vote request",
