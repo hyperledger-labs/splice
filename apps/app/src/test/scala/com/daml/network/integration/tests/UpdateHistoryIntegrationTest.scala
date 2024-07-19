@@ -23,7 +23,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTest}
+import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
   TransactionTreeWrapper,
@@ -34,7 +34,6 @@ import com.digitalasset.canton.topology.DomainId
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
-
 import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
@@ -286,8 +285,8 @@ class UpdateHistoryIntegrationTest
 
     // Note: UpdateHistory does not preserve all information in updates,
     // so remove fields that are not preserved before comparing.
-    val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTest.withoutLostData)
-    val recordedUpdatesWithoutLostData = recordedUpdates.map(UpdateHistoryTest.withoutLostData)
+    val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTestBase.withoutLostData)
+    val recordedUpdatesWithoutLostData = recordedUpdates.map(UpdateHistoryTestBase.withoutLostData)
     actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
   }
 }

@@ -715,6 +715,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -723,6 +724,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         createdEventSignatories,
         domain,
         workflowId,
+        recordTime,
       )
 
       store.testIngestionSink
@@ -739,6 +741,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -747,6 +750,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         createdEventSignatories,
         domain,
         workflowId,
+        recordTime,
       )
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests

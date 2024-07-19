@@ -4,6 +4,7 @@
 package com.daml.network.store
 
 import cats.data.NonEmptyList
+import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
@@ -25,6 +26,7 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.migration.DomainMigrationInfo
+import com.daml.network.store.HistoryBackfilling.DomainRecordTimeRange
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
 import com.daml.network.util.ValueJsonCodecProtobuf as ProtobufCodec
@@ -285,7 +287,7 @@ final class UpdateHistory(
               logger.debug(
                 s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
               )
-              ingestUpdate_(update).andThen(updateOffset(offset))
+              ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
             case Some(lastIngestedOffset) =>
               if (offset <= lastIngestedOffset) {
                 logger.warn(
@@ -299,7 +301,7 @@ final class UpdateHistory(
                 logger.debug(
                   s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
                 )
-                ingestUpdate_(update).andThen(updateOffset(offset))
+                ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
               }
           })
           .map(_ => ())
@@ -323,236 +325,242 @@ final class UpdateHistory(
       """
           .as[Option[String]]
           .head
-
-      private def ingestUpdate_(
-          update: TreeUpdate
-      ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-        update match {
-          case ReassignmentUpdate(reassignment) =>
-            ingestReassignment(reassignment)
-          case TransactionTreeUpdate(tree) =>
-            ingestTransactionTree(tree)
-        }
-      }
-
-      private def ingestReassignment(
-          reassignment: Reassignment[ReassignmentEvent]
-      ): DBIOAction[?, NoStream, Effect.Write] = {
-        reassignment match {
-          case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
-            ingestAssignment(reassignment, event)
-          case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
-            ingestUnassignment(reassignment, event)
-        }
-      }
-
-      private def ingestUnassignment(
-          reassignment: Reassignment[?],
-          event: ReassignmentEvent.Unassign,
-      ): DBIOAction[?, NoStream, Effect.Write] = {
-        val safeUpdateId = lengthLimited(reassignment.updateId)
-        val safeRecordTime = reassignment.recordTime
-        val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
-        val safeUnassignId = lengthLimited(event.unassignId)
-        val safeContractId = lengthLimited(event.contractId.contractId)
-        sqlu"""
-        insert into update_history_unassignments(
-          history_id,update_id,record_time,
-          participant_offset,domain_id,migration_id,
-          reassignment_counter,target_domain,
-          reassignment_id,submitter,
-          contract_id
-        )
-        values (
-          $historyId, $safeUpdateId, $safeRecordTime,
-          $safeParticipantOffset, ${event.source}, $domainMigrationId,
-          ${event.counter}, ${event.target},
-          $safeUnassignId, ${event.submitter},
-          $safeContractId
-        )
-      """
-      }
-
-      private def ingestAssignment(
-          reassignment: Reassignment[?],
-          event: ReassignmentEvent.Assign,
-      ): DBIOAction[?, NoStream, Effect.Write] = {
-        val safeUpdateId = lengthLimited(reassignment.updateId)
-        val safeRecordTime = reassignment.recordTime
-        val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
-        val safeUnassignId = lengthLimited(event.unassignId)
-        val safeContractId = lengthLimited(event.createdEvent.getContractId)
-        val safeEventId = lengthLimited(event.createdEvent.getEventId)
-        val templateId = event.createdEvent.getTemplateId
-        val templateIdModuleName = lengthLimited(templateId.getModuleName)
-        val templateIdEntityName = lengthLimited(templateId.getEntityName)
-        val templateIdPackageId = lengthLimited(templateId.getPackageId)
-        val safePackageName = lengthLimited(event.createdEvent.getPackageName)
-        val createArguments =
-          String256M.tryCreate(ProtobufCodec.serializeValue(event.createdEvent.getArguments))
-        val contractKey =
-          event.createdEvent.getContractKey.toScala
-            .map(ProtobufCodec.serializeValue)
-            .map(s => String256M.tryCreate(s))
-        val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
-        val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
-        val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
-
-        sqlu"""
-        insert into update_history_assignments(
-          history_id,update_id,record_time,
-          participant_offset,domain_id,migration_id,
-          reassignment_counter,source_domain,
-          reassignment_id,submitter,
-          contract_id, event_id, created_at,
-          template_id_package_id, template_id_module_name, template_id_entity_name,
-          package_name, create_arguments,
-          signatories, observers, contract_key
-        )
-        values (
-          $historyId, $safeUpdateId, $safeRecordTime,
-          $safeParticipantOffset, ${event.target}, $domainMigrationId,
-          ${event.counter}, ${event.source},
-          $safeUnassignId, ${event.submitter},
-          $safeContractId, $safeEventId, $safeCreatedAt,
-          $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-          $safePackageName, $createArguments::jsonb,
-          $safeSignatories, $safeObservers, $contractKey::jsonb
-
-        )
-      """
-      }
-
-      private def ingestTransactionTree(
-          tree: TransactionTree
-      ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-        insertTransactionUpdateRow(tree).flatMap(updateRowId => {
-          // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
-          // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
-          DBIOAction.seq[Effect.Write](
-            tree.getEventsById.values().asScala.toSeq.map {
-              case created: CreatedEvent =>
-                insertCreateEventRow(created, updateRowId)
-              case exercised: ExercisedEvent =>
-                insertExerciseEventRow(exercised, updateRowId)
-              case _ =>
-                throw new RuntimeException("Unsupported event type")
-            }*
-          )
-        })
-      }
-
-      private def insertTransactionUpdateRow(
-          tree: TransactionTree
-      ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
-        val safeUpdateId = lengthLimited(tree.getUpdateId)
-        val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
-        val safeParticipantOffset = lengthLimited(tree.getOffset)
-        val safeDomainId = lengthLimited(tree.getDomainId)
-        val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
-        val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
-        val safeWorkflowId = lengthLimited(tree.getWorkflowId)
-        val safeCommandId = lengthLimited(tree.getCommandId)
-
-        (sql"""
-          insert into update_history_transactions(
-            history_id, update_id, record_time,
-            participant_offset, domain_id, migration_id,
-            effective_at, root_event_ids, workflow_id, command_id
-          )
-          values (
-            $historyId, $safeUpdateId, $safeRecordTime,
-            $safeParticipantOffset, $safeDomainId, $domainMigrationId,
-            $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
-          )
-          returning row_id
-        """.asUpdateReturning[Long].head)
-      }
-
-      private def insertCreateEventRow(
-          event: CreatedEvent,
-          updateRowId: Long,
-      ): DBIOAction[?, NoStream, Effect.Write] = {
-        val safeEventId = lengthLimited(event.getEventId)
-        val safeContractId = lengthLimited(event.getContractId)
-        val templateId = event.getTemplateId
-        val templateIdModuleName = lengthLimited(templateId.getModuleName)
-        val templateIdEntityName = lengthLimited(templateId.getEntityName)
-        val templateIdPackageId = lengthLimited(templateId.getPackageId)
-        val safePackageName = lengthLimited(event.getPackageName)
-        val createArguments = String256M.tryCreate(ProtobufCodec.serializeValue(event.getArguments))
-        val contractKey = event.getContractKey.toScala
-          .map(ProtobufCodec.serializeValue)
-          .map(s => String256M.tryCreate(s))
-        val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
-        val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
-        val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)
-
-        sqlu"""
-          insert into update_history_creates(
-            history_id, event_id, update_row_id,
-            contract_id, created_at,
-            template_id_package_id, template_id_module_name, template_id_entity_name,
-            package_name, create_arguments, signatories, observers,
-            contract_key
-          )
-          values (
-            $historyId, $safeEventId, $updateRowId,
-            $safeContractId, $safeCreatedAt,
-            $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-            $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
-            $contractKey::jsonb
-          )
-        """
-      }
-
-      private def insertExerciseEventRow(
-          event: ExercisedEvent,
-          updateRowId: Long,
-      ): DBIOAction[?, NoStream, Effect.Write] = {
-        val safeEventId = lengthLimited(event.getEventId)
-        val safeChoice = lengthLimited(event.getChoice)
-        val safeContractId = lengthLimited(event.getContractId)
-        val safeChildEventIds = event.getChildEventIds.asScala.toSeq.map(lengthLimited)
-        val templateId = event.getTemplateId
-        val templateIdModuleName = lengthLimited(templateId.getModuleName)
-        val templateIdEntityName = lengthLimited(templateId.getEntityName)
-        val templateIdPackageId = lengthLimited(templateId.getPackageId)
-        val safePackageName = lengthLimited(event.getPackageName)
-        val choiceArguments =
-          String256M.tryCreate(ProtobufCodec.serializeValue(event.getChoiceArgument))
-        val exerciseResult =
-          String256M.tryCreate(ProtobufCodec.serializeValue(event.getExerciseResult))
-        val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
-        val interfaceIdModuleName =
-          event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
-        val interfaceIdEntityName =
-          event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
-        val interfaceIdPackageId =
-          event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
-
-        sqlu"""
-          insert into update_history_exercises(
-            history_id, event_id, update_row_id,
-            child_event_ids, choice,
-            template_id_package_id, template_id_module_name, template_id_entity_name,
-            contract_id, consuming,
-            package_name, argument, result,
-            acting_parties,
-            interface_id_package_id, interface_id_module_name, interface_id_entity_name
-          )
-          values (
-            $historyId, $safeEventId, $updateRowId,
-            $safeChildEventIds, $safeChoice,
-            $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-            $safeContractId, ${event.isConsuming},
-            $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
-            $safeActingParties,
-            $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName
-          )
-        """
-      }
     }
+
+  private def ingestUpdate_(
+      update: TreeUpdate,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    update match {
+      case ReassignmentUpdate(reassignment) =>
+        ingestReassignment(reassignment, migrationId)
+      case TransactionTreeUpdate(tree) =>
+        ingestTransactionTree(tree, migrationId)
+    }
+  }
+
+  private def ingestReassignment(
+      reassignment: Reassignment[ReassignmentEvent],
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Write] = {
+    reassignment match {
+      case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
+        ingestAssignment(reassignment, event, migrationId)
+      case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
+        ingestUnassignment(reassignment, event, migrationId)
+    }
+  }
+
+  private def ingestUnassignment(
+      reassignment: Reassignment[?],
+      event: ReassignmentEvent.Unassign,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Write] = {
+    val safeUpdateId = lengthLimited(reassignment.updateId)
+    val safeRecordTime = reassignment.recordTime
+    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+    val safeUnassignId = lengthLimited(event.unassignId)
+    val safeContractId = lengthLimited(event.contractId.contractId)
+    sqlu"""
+      insert into update_history_unassignments(
+        history_id,update_id,record_time,
+        participant_offset,domain_id,migration_id,
+        reassignment_counter,target_domain,
+        reassignment_id,submitter,
+        contract_id
+      )
+      values (
+        $historyId, $safeUpdateId, $safeRecordTime,
+        $safeParticipantOffset, ${event.source}, $migrationId,
+        ${event.counter}, ${event.target},
+        $safeUnassignId, ${event.submitter},
+        $safeContractId
+      )
+    """
+  }
+
+  private def ingestAssignment(
+      reassignment: Reassignment[?],
+      event: ReassignmentEvent.Assign,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Write] = {
+    val safeUpdateId = lengthLimited(reassignment.updateId)
+    val safeRecordTime = reassignment.recordTime
+    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+    val safeUnassignId = lengthLimited(event.unassignId)
+    val safeContractId = lengthLimited(event.createdEvent.getContractId)
+    val safeEventId = lengthLimited(event.createdEvent.getEventId)
+    val templateId = event.createdEvent.getTemplateId
+    val templateIdModuleName = lengthLimited(templateId.getModuleName)
+    val templateIdEntityName = lengthLimited(templateId.getEntityName)
+    val templateIdPackageId = lengthLimited(templateId.getPackageId)
+    val safePackageName = lengthLimited(event.createdEvent.getPackageName)
+    val createArguments =
+      String256M.tryCreate(ProtobufCodec.serializeValue(event.createdEvent.getArguments))
+    val contractKey =
+      event.createdEvent.getContractKey.toScala
+        .map(ProtobufCodec.serializeValue)
+        .map(s => String256M.tryCreate(s))
+    val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
+    val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
+    val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
+
+    sqlu"""
+      insert into update_history_assignments(
+        history_id,update_id,record_time,
+        participant_offset,domain_id,migration_id,
+        reassignment_counter,source_domain,
+        reassignment_id,submitter,
+        contract_id, event_id, created_at,
+        template_id_package_id, template_id_module_name, template_id_entity_name,
+        package_name, create_arguments,
+        signatories, observers, contract_key
+      )
+      values (
+        $historyId, $safeUpdateId, $safeRecordTime,
+        $safeParticipantOffset, ${event.target}, $migrationId,
+        ${event.counter}, ${event.source},
+        $safeUnassignId, ${event.submitter},
+        $safeContractId, $safeEventId, $safeCreatedAt,
+        $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
+        $safePackageName, $createArguments::jsonb,
+        $safeSignatories, $safeObservers, $contractKey::jsonb
+
+      )
+    """
+  }
+
+  private def ingestTransactionTree(
+      tree: TransactionTree,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    insertTransactionUpdateRow(tree, migrationId).flatMap(updateRowId => {
+      // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
+      // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
+      DBIOAction.seq[Effect.Write](
+        tree.getEventsById.values().asScala.toSeq.map {
+          case created: CreatedEvent =>
+            insertCreateEventRow(created, updateRowId)
+          case exercised: ExercisedEvent =>
+            insertExerciseEventRow(exercised, updateRowId)
+          case _ =>
+            throw new RuntimeException("Unsupported event type")
+        }*
+      )
+    })
+  }
+
+  private def insertTransactionUpdateRow(
+      tree: TransactionTree,
+      migrationId: Long,
+  ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
+    val safeUpdateId = lengthLimited(tree.getUpdateId)
+    val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
+    val safeParticipantOffset = lengthLimited(tree.getOffset)
+    val safeDomainId = lengthLimited(tree.getDomainId)
+    val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
+    val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
+    val safeWorkflowId = lengthLimited(tree.getWorkflowId)
+    val safeCommandId = lengthLimited(tree.getCommandId)
+
+    (sql"""
+      insert into update_history_transactions(
+        history_id, update_id, record_time,
+        participant_offset, domain_id, migration_id,
+        effective_at, root_event_ids, workflow_id, command_id
+      )
+      values (
+        $historyId, $safeUpdateId, $safeRecordTime,
+        $safeParticipantOffset, $safeDomainId, $migrationId,
+        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
+      )
+      returning row_id
+    """.asUpdateReturning[Long].head)
+  }
+
+  private def insertCreateEventRow(
+      event: CreatedEvent,
+      updateRowId: Long,
+  ): DBIOAction[?, NoStream, Effect.Write] = {
+    val safeEventId = lengthLimited(event.getEventId)
+    val safeContractId = lengthLimited(event.getContractId)
+    val templateId = event.getTemplateId
+    val templateIdModuleName = lengthLimited(templateId.getModuleName)
+    val templateIdEntityName = lengthLimited(templateId.getEntityName)
+    val templateIdPackageId = lengthLimited(templateId.getPackageId)
+    val safePackageName = lengthLimited(event.getPackageName)
+    val createArguments = String256M.tryCreate(ProtobufCodec.serializeValue(event.getArguments))
+    val contractKey = event.getContractKey.toScala
+      .map(ProtobufCodec.serializeValue)
+      .map(s => String256M.tryCreate(s))
+    val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
+    val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
+    val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)
+
+    sqlu"""
+      insert into update_history_creates(
+        history_id, event_id, update_row_id,
+        contract_id, created_at,
+        template_id_package_id, template_id_module_name, template_id_entity_name,
+        package_name, create_arguments, signatories, observers,
+        contract_key
+      )
+      values (
+        $historyId, $safeEventId, $updateRowId,
+        $safeContractId, $safeCreatedAt,
+        $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
+        $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
+        $contractKey::jsonb
+      )
+    """
+  }
+
+  private def insertExerciseEventRow(
+      event: ExercisedEvent,
+      updateRowId: Long,
+  ): DBIOAction[?, NoStream, Effect.Write] = {
+    val safeEventId = lengthLimited(event.getEventId)
+    val safeChoice = lengthLimited(event.getChoice)
+    val safeContractId = lengthLimited(event.getContractId)
+    val safeChildEventIds = event.getChildEventIds.asScala.toSeq.map(lengthLimited)
+    val templateId = event.getTemplateId
+    val templateIdModuleName = lengthLimited(templateId.getModuleName)
+    val templateIdEntityName = lengthLimited(templateId.getEntityName)
+    val templateIdPackageId = lengthLimited(templateId.getPackageId)
+    val safePackageName = lengthLimited(event.getPackageName)
+    val choiceArguments =
+      String256M.tryCreate(ProtobufCodec.serializeValue(event.getChoiceArgument))
+    val exerciseResult =
+      String256M.tryCreate(ProtobufCodec.serializeValue(event.getExerciseResult))
+    val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
+    val interfaceIdModuleName =
+      event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
+    val interfaceIdEntityName =
+      event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
+    val interfaceIdPackageId =
+      event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
+
+    sqlu"""
+      insert into update_history_exercises(
+        history_id, event_id, update_row_id,
+        child_event_ids, choice,
+        template_id_package_id, template_id_module_name, template_id_entity_name,
+        contract_id, consuming,
+        package_name, argument, result,
+        acting_parties,
+        interface_id_package_id, interface_id_module_name, interface_id_entity_name
+      )
+      values (
+        $historyId, $safeEventId, $updateRowId,
+        $safeChildEventIds, $safeChoice,
+        $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
+        $safeContractId, ${event.isConsuming},
+        $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
+        $safeActingParties,
+        $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName
+      )
+    """
+  }
 
   private[this] def cleanUpDataAfterDomainMigration(
       historyId: Long
@@ -702,6 +710,53 @@ final class UpdateHistory(
       rows <- storage
         .query(
           finalQuery.toActionBuilder.as[SelectFromTransactions],
+          "getUpdates",
+        )
+      creates <- queryCreateEvents(rows.map(_.rowId))
+      exercises <- queryExerciseEvents(rows.map(_.rowId))
+    } yield {
+      rows.map { row =>
+        decodeTransaction(
+          row,
+          creates.getOrElse(row.rowId, Seq.empty),
+          exercises.getOrElse(row.rowId, Seq.empty),
+        ) -> row.migrationId
+      }
+    }
+  }
+
+  def getUpdatesBefore(
+      migrationId: Long,
+      domainId: DomainId,
+      beforeRecordTime: CantonTimestamp,
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
+    val query =
+      sql"""
+      (select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id
+      from update_history_transactions
+      where
+        history_id = $historyId and
+        migration_id = $migrationId and
+        domain_id = $domainId and
+        record_time < $beforeRecordTime
+        order by record_time desc limit ${limit.limit})
+        """
+
+    for {
+      rows <- storage
+        .query(
+          query.toActionBuilder.as[SelectFromTransactions],
           "getUpdates",
         )
       creates <- queryCreateEvents(rows.map(_.rowId))
@@ -1159,6 +1214,220 @@ final class UpdateHistory(
           <<[String],
         )
       )
+    }
+
+  private def getRecordTimeRange(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Map[DomainId, DomainRecordTimeRange]] = {
+    import HistoryBackfilling.domainTimeRangeSemigroupUnion
+
+    def range(table: String): Future[Map[DomainId, DomainRecordTimeRange]] = {
+      storage
+        .query(
+          sql"""
+             select domain_id, min(record_time), max(record_time)
+             from #$table
+             where history_id = $historyId and migration_id = $migrationId
+             group by domain_id
+           """
+            .as[(DomainId, CantonTimestamp, CantonTimestamp)],
+          s"getRecordTimeRange.$table",
+        )
+        .map(row =>
+          row.view
+            .map(row => row._1 -> DomainRecordTimeRange(row._2, row._3))
+            .toMap
+        )
+    }
+
+    for {
+      rangeTransactions <- range("update_history_transactions")
+      rangeAssignments <- range("update_history_assignments")
+      rangeUnassignments <- range("update_history_unassignments")
+    } yield (rangeTransactions |+| rangeUnassignments) |+| rangeAssignments
+  }
+
+  private def getIsBackfillingComplete(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Boolean] = storage
+    .query(
+      sql"""
+             select complete
+             from update_history_backfilling
+             where history_id = $historyId and migration_id = $migrationId
+           """.as[Boolean].headOption,
+      "getIsBackfillingComplete",
+    )
+    .map(_.getOrElse(false))
+
+  lazy val sourceHistory: HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] =
+    new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
+      override def isReady: Boolean = state
+        .get()
+        .historyId
+        .isDefined
+
+      override def previousMigrationId(
+          migrationId: Long
+      )(implicit tc: TraceContext): Future[Option[Long]] = storage.query(
+        sql"""
+             select max(migration_id)
+             from update_history_last_ingested_offsets
+             where history_id = $historyId and migration_id < $migrationId
+           """.as[Option[Long]].head,
+        "previousMigrationId",
+      )
+
+      override def recordTimeRange(
+          migrationId: Long
+      )(implicit tc: TraceContext): Future[Map[DomainId, DomainRecordTimeRange]] =
+        getRecordTimeRange(migrationId)
+
+      override def items(
+          migrationId: Long,
+          domainId: DomainId,
+          before: CantonTimestamp,
+          count: Int,
+      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+        getUpdatesBefore(
+          migrationId = migrationId,
+          domainId = domainId,
+          beforeRecordTime = before,
+          limit = PageLimit.tryCreate(count),
+        ).map(_.map(_._1))
+      }
+
+      override def isBackfillingComplete(migrationId: Long)(implicit
+          tc: TraceContext
+      ): Future[Boolean] = {
+        getIsBackfillingComplete(migrationId)
+      }
+    }
+
+  lazy val destinationHistory
+      : HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] =
+    new HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] {
+      override def isReady = state
+        .get()
+        .historyId
+        .isDefined
+
+      override def migrationIdRange(implicit tc: TraceContext): Future[Option[(Long, Long)]] = {
+        def range(table: String) = {
+          storage.query(
+            sql"""
+             select min(migration_id), max(migration_id)
+             from #$table
+             where history_id = $historyId
+           """.as[(Option[Long], Option[Long])].head,
+            s"migrationIdRange.$table",
+          )
+        }
+
+        for {
+          transactions <- range("update_history_transactions")
+          assignments <- range("update_history_assignments")
+          unassignments <- range("update_history_unassignments")
+        } yield {
+          val minO = List(
+            transactions._1,
+            assignments._1,
+            unassignments._1,
+          ).flatten.minOption
+          val maxO = List(
+            transactions._2,
+            assignments._2,
+            unassignments._2,
+          ).flatten.maxOption
+          (minO, maxO) match {
+            case (Some(min), Some(max)) => Some((min, max))
+            case _ => None
+          }
+        }
+      }
+
+      override def recordTimeRange(migrationId: Long)(implicit
+          tc: TraceContext
+      ): Future[Map[DomainId, DomainRecordTimeRange]] = {
+        getRecordTimeRange(migrationId)
+      }
+
+      override def insert(
+          migrationId: Long,
+          domainId: DomainId,
+          items: Seq[LedgerClient.GetTreeUpdatesResponse],
+      )(implicit
+          tc: TraceContext
+      ): Future[Unit] = {
+        // Because DbStorage requires all actions to be idempotent, and we can't just slap a "ON CONFLICT DO NOTHING"
+        // onto all subqueries of ingestUpdate_() because they are using "RETURNING" which doesn't work with the above,
+        // we simply check whether one of the items was already inserted.
+        val (headItemTable, headItemRecordTime) =
+          items.headOption
+            .getOrElse(
+              throw new RuntimeException("insert() must not be called with an empty sequence")
+            )
+            .update match {
+            case TransactionTreeUpdate(tree) =>
+              ("update_history_transactions", CantonTimestamp.assertFromInstant(tree.getRecordTime))
+            case ReassignmentUpdate(update) =>
+              update.event match {
+                case _: ReassignmentEvent.Assign =>
+                  ("update_history_assignments", update.recordTime)
+                case _: ReassignmentEvent.Unassign =>
+                  ("update_history_unassignments", update.recordTime)
+              }
+          }
+
+        val action = for {
+          itemExists <- sql"""
+             select exists(
+               select row_id
+               from #$headItemTable
+               where
+                 history_id = $historyId and
+                 migration_id = $migrationId and
+                 domain_id = $domainId and
+                 record_time = $headItemRecordTime
+             )
+           """.as[Boolean].head
+          _ <-
+            if (!itemExists) {
+              DBIOAction
+                .sequence(items.map(item => ingestUpdate_(item.update, migrationId)))
+            } else {
+              DBIOAction.successful(())
+            }
+        } yield ()
+
+        storage
+          .queryAndUpdate(
+            action.transactionally,
+            "destinationHistory.insert",
+          )
+          .map(_ => ())
+      }
+
+      override def isBackfillingComplete(migrationId: Long)(implicit
+          tc: TraceContext
+      ): Future[Boolean] = {
+        getIsBackfillingComplete(migrationId)
+      }
+
+      override def markBackfillingComplete(migrationId: Long)(implicit
+          tc: TraceContext
+      ): Future[Unit] = {
+        storage
+          .update(
+            sqlu"""
+             insert into update_history_backfilling (history_id, migration_id, complete)
+             values ($historyId, $migrationId, true)
+             on conflict (history_id, migration_id) do update set complete = true
+           """,
+            "destinationHistory.markBackfillingComplete",
+          )
+          .map(_ => ())
+      }
     }
 }
 

@@ -1,54 +1,23 @@
 package com.daml.network.store
 
-import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  DamlRecord,
-  ExercisedEvent,
-  Int64,
-  TransactionTree,
-  TreeEvent,
-  Value,
-}
+import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
 import com.daml.lf.data.Bytes
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import com.daml.network.environment.ledger.api.{
-  LedgerClient,
-  Reassignment,
-  ReassignmentEvent,
-  ReassignmentUpdate,
-  TransactionTreeUpdate,
-}
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
+import com.daml.network.environment.ledger.api.{ReassignmentUpdate, TransactionTreeUpdate}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.google.protobuf.ByteString
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
-import org.apache.pekko.stream.scaladsl.{Keep, Sink}
-import org.scalatest.Assertion
 
 import java.time.Instant
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class UpdateHistoryTest
-    extends StoreTest
-    with HasExecutionContext
-    with StoreErrors
-    with HasActorSystem
-    with SplicePostgresTest
-    with AcsJdbcTypes
-    with AcsTables {
+class UpdateHistoryTest extends UpdateHistoryTestBase {
 
-  import UpdateHistoryTest.*
+  import UpdateHistoryTestBase.*
 
   "UpdateHistory" should {
 
@@ -255,8 +224,8 @@ class UpdateHistoryTest
         for {
           _ <- initStore(store1)
           _ <- initStore(store2)
-          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
-          _ <- create(domain1, cid2, offset2, party2, store2, Instant.EPOCH.plusMillis(2))
+          _ <- create(domain1, cid1, offset1, party1, store1, time(1))
+          _ <- create(domain1, cid2, offset2, party2, store2, time(2))
           updates1 <- updates(store1)
           updates2 <- updates(store2)
         } yield {
@@ -283,8 +252,8 @@ class UpdateHistoryTest
           _ <- initStore(store1)
           _ <- initStore(store2)
           // Note: same offset (offsets are participant-specific)
-          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
-          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
+          _ <- create(domain1, cid1, offset1, party1, store1, time(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, time(2))
           updates1 <- updates(store1)
           updates2 <- updates(store2)
         } yield {
@@ -311,8 +280,8 @@ class UpdateHistoryTest
           _ <- initStore(store1)
           _ <- initStore(store2)
           // Note: same offset (offsets are participant-specific)
-          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
-          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
+          _ <- create(domain1, cid1, offset1, party1, store1, time(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, time(2))
           updates1 <- updates(store1)
           updates2 <- updates(store2)
         } yield {
@@ -339,8 +308,8 @@ class UpdateHistoryTest
           _ <- initStore(store1)
           _ <- initStore(store2)
           // Note: same offset (offsets are not preserved across hard domain migrations)
-          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
-          _ <- create(domain1, cid2, offset1, party1, store2, Instant.EPOCH.plusMillis(2))
+          _ <- create(domain1, cid1, offset1, party1, store1, time(1))
+          _ <- create(domain1, cid2, offset1, party1, store2, time(2))
           updates1 <- updates(store1, migration1)
           updates2 <- updates(store2, migration2)
         } yield {
@@ -365,8 +334,8 @@ class UpdateHistoryTest
         for {
           _ <- initStore(store1)
           // Note: the two contracts can share a record time (record times are not unique across domains)
-          _ <- create(domain1, cid1, offset1, party1, store1, Instant.EPOCH.plusMillis(1))
-          _ <- create(domain2, cid2, offset2, party1, store1, Instant.EPOCH.plusMillis(2))
+          _ <- create(domain1, cid1, offset1, party1, store1, time(1))
+          _ <- create(domain2, cid2, offset2, party1, store1, time(2))
           updates1 <- updates(store1)
         } yield {
           checkUpdates(
@@ -471,277 +440,6 @@ class UpdateHistoryTest
         }
       }
 
-    }
-  }
-
-  private def create(
-      domain: DomainId,
-      contractId: String,
-      offset: String,
-      party: PartyId,
-      store: UpdateHistory,
-      txEffectiveAt: Instant = defaultEffectiveAt,
-  ) = {
-    DomainSyntax(domain).create(
-      c = appRewardCoupon(
-        round = 0,
-        provider = party,
-        contractId = contractId,
-      ),
-      offset = offset,
-      txEffectiveAt = txEffectiveAt,
-      createdEventSignatories = Seq(party),
-    )(
-      store
-    )
-  }
-
-  private def validOffset(i: Int) = {
-    assert(i > 0)
-    "%08d".format(i)
-  }
-
-  // Universal begin offset (strictly smaller than any offset used in this suite)
-  private val beginOffset = "0".repeat(16)
-  // Universal end offset (strictly larger than any offset used in this suite)
-  private val endOffset = "9".repeat(16)
-
-  private def singleRootEvent(tree: TransactionTree): TreeEvent = {
-    val rootEventIds = tree.getRootEventIds.asScala
-    rootEventIds.length should be(1)
-    val rootEventId = rootEventIds.headOption.value
-    tree.getEventsById.get(rootEventId)
-  }
-  private def checkUpdates(
-      actual: Seq[LedgerClient.GetTreeUpdatesResponse],
-      expected: Seq[ExpectedUpdate],
-  ): Assertion = {
-    actual.length should be(expected.length)
-    actual.zip(expected).foreach {
-      case (GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain), expected) =>
-        val rootEvent = singleRootEvent(tree)
-        (rootEvent, expected) match {
-          case (rootEvent: CreatedEvent, ExpectedCreate(cid, domainId)) =>
-            rootEvent.getContractId should be(cid)
-            domain should be(domainId)
-          case (rootEvent: ExercisedEvent, ExpectedExercise(cid, domainId, choice)) =>
-            rootEvent.getContractId should be(cid)
-            rootEvent.getChoice should be(choice)
-            domain should be(domainId)
-          case _ => throw new RuntimeException("Unexpected event type")
-        }
-      case (GetTreeUpdatesResponse(ReassignmentUpdate(update), domain), expected) =>
-        (update.event, expected) match {
-          case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
-            unassign.contractId.contractId should be(expected.cid)
-            domain should be(expected.domainId)
-            unassign.source should be(expected.domainId)
-            unassign.target should be(expected.targetDomain)
-          case (assign: ReassignmentEvent.Assign, expected: ExpectedAssign) =>
-            assign.createdEvent.getContractId should be(expected.cid)
-            assign.source should be(expected.sourceDomain)
-            assign.target should be(expected.domainId)
-          case _ => throw new RuntimeException("Unexpected reassignment type")
-        }
-      case _ => throw new RuntimeException("Unexpected update type")
-    }
-    succeed
-  }
-
-  private def updates(
-      store: UpdateHistory,
-      migrationId: Long = migration1,
-  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
-    // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
-    for {
-      fromStream <- store
-        .updateStream(beginOffset, endOffset)
-        .toMat(Sink.seq)(Keep.right)
-        .run()
-      fromGetTransactions <- store.getUpdates(None, PageLimit.tryCreate(1000))
-    } yield {
-      fromStream
-        .filter(_.update match {
-          case TransactionTreeUpdate(_) => true
-          case ReassignmentUpdate(_) => false
-        }) should be(fromGetTransactions.filter(_._2 == migrationId).map(_._1))
-      fromStream
-    }
-  }
-
-  private def initStore(implicit store: UpdateHistory): Future[Unit] = {
-    store.testIngestionSink.initialize().map(_ => ())
-  }
-
-  private def mkStore(
-      updateStreamParty: PartyId = party1,
-      domainMigrationId: Long = migration1,
-      participantId: ParticipantId = participant1,
-      storeName: String = storeName1,
-  ): UpdateHistory = {
-    new UpdateHistory(
-      storage,
-      DomainMigrationInfo(
-        domainMigrationId,
-        None,
-      ),
-      storeName,
-      participantId,
-      updateStreamParty,
-      loggerFactory,
-      enableissue12777Workaround = true,
-    )
-  }
-
-  override protected def cleanDb(storage: DbStorage): Future[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
-
-  private val storeName1 = "store1"
-  private val party1 = userParty(1)
-  private val party2 = userParty(2)
-
-  private val migration1 = 1L
-  private val migration2 = 2L
-
-  private val domain1: DomainId = DomainId.tryFromString("domain1::domain")
-  private val domain2: DomainId = DomainId.tryFromString("domain2::domain")
-
-  private val cid1 = validContractId(1)
-  private val cid2 = validContractId(2)
-
-  private val offset1 = validOffset(1)
-  private val offset2 = validOffset(2)
-
-  private val participant1 = ParticipantId("participant1")
-  private val participant2 = ParticipantId("participant2")
-
-  private val reassignmentId1 = "%08d".format(1)
-}
-
-object UpdateHistoryTest {
-  sealed trait ExpectedUpdate extends Product with Serializable
-  final case class ExpectedCreate(cid: String, domainId: DomainId) extends ExpectedUpdate
-  final case class ExpectedExercise(cid: String, domainId: DomainId, choice: String)
-      extends ExpectedUpdate
-
-  final case class ExpectedAssign(cid: String, sourceDomain: DomainId, domainId: DomainId)
-      extends ExpectedUpdate
-
-  final case class ExpectedUnassign(cid: String, domainId: DomainId, targetDomain: DomainId)
-      extends ExpectedUpdate
-
-  def withoutLostData(response: GetTreeUpdatesResponse): GetTreeUpdatesResponse = {
-    response match {
-      case GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain) =>
-        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree)), domain)
-      case GetTreeUpdatesResponse(ReassignmentUpdate(transfer), domain) =>
-        GetTreeUpdatesResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
-      case _ => throw new RuntimeException("Invalid update type")
-    }
-  }
-
-  private def withoutLostData(tree: TransactionTree): TransactionTree = {
-    new TransactionTree(
-      /*updateId = */ tree.getUpdateId,
-      /*commandId = */ tree.getCommandId,
-      /*workflowId = */ tree.getWorkflowId,
-      /*effectiveAt = */ tree.getEffectiveAt,
-      /*offset = */ tree.getOffset,
-      /*eventsById = */ tree.getEventsById.asScala.view.mapValues(withoutLostData).toMap.asJava,
-      /*rootEventIds = */ tree.getRootEventIds,
-      /*domainId = */ tree.getDomainId,
-
-      // We don't care about tracing information in the update history.
-      /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
-
-      /*recordTime = */ tree.getRecordTime,
-    )
-  }
-
-  private def withoutLostData(event: TreeEvent): TreeEvent = {
-    event match {
-      case created: CreatedEvent =>
-        withoutLostData(created)
-      case exercised: ExercisedEvent =>
-        withoutLostData(exercised)
-      case _ => throw new RuntimeException("Invalid event type")
-    }
-  }
-
-  private def withoutLostData(created: CreatedEvent): CreatedEvent = {
-    new CreatedEvent(
-      // The witnesses returned by the API is the intersection of actual witnesses according
-      // to the daml model with the subscribing parties, and we're always subscribing as a single party,
-      // so this would always end up being the operator party of our own application which is not very useful.
-      /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
-
-      /*eventId = */ created.getEventId,
-      /*templateId = */ created.getTemplateId,
-      /*packageName = */ created.getPackageName,
-      /*contractId = */ created.getContractId,
-      /*arguments = */ created.getArguments,
-
-      // Binary data used for explicit disclosure of active contracts. Not useful for historical data.
-      /*createdEventBlob = */ ByteString.EMPTY, // Not preserved
-
-      // None of our daml models use interfaces.
-      // Interface views can be computed from the contract payload if you know the daml model.
-      // The ledger API only returns interface views that the application has subscribed to, i.e.,
-      // our applications will not see interface views of 3rd party daml code.
-      /*interfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
-      /*failedInterfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
-
-      /*contractKey = */ created.getContractKey,
-      /*signatories = */ created.getSignatories,
-      /*observers = */ created.getObservers,
-      /*createdAt = */ created.getCreatedAt,
-    )
-  }
-
-  private def withoutLostData(exercised: ExercisedEvent): ExercisedEvent = {
-    new ExercisedEvent(
-      // The witnesses returned by the API is the intersection of actual witnesses according
-      // to the daml model with the subscribing parties, and we're always subscribing as a single party,
-      // so this would always end up being the operator party of our own application which is not very useful.
-      /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
-
-      /*eventId = */ exercised.getEventId,
-      /*templateId = */ exercised.getTemplateId,
-      /*packageName = */ exercised.getPackageName,
-      /*interfaceId = */ exercised.getInterfaceId,
-      /*contractId = */ exercised.getContractId,
-      /*choice = */ exercised.getChoice,
-      /*choiceArgument = */ exercised.getChoiceArgument,
-      /*actingParties = */ exercised.getActingParties,
-      /*consuming = */ exercised.isConsuming,
-      /*childEventIds = */ exercised.getChildEventIds,
-      /*exerciseResult = */ exercised.getExerciseResult,
-    )
-  }
-
-  private def withoutLostData(
-      transfer: Reassignment[ReassignmentEvent]
-  ): Reassignment[ReassignmentEvent] = {
-    transfer match {
-      case Reassignment(updateId, offset, recordTime, assign: Assign) =>
-        Reassignment(
-          updateId,
-          offset,
-          recordTime,
-          assign.copy(
-            createdEvent = withoutLostData(assign.createdEvent)
-          ),
-        )
-      case Reassignment(updateId, offset, recordTime, unassign: Unassign) =>
-        Reassignment(
-          updateId,
-          offset,
-          recordTime,
-          unassign,
-        )
-      case _ => throw new RuntimeException("Invalid transfer type")
     }
   }
 }
