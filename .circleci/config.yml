@@ -39,7 +39,6 @@ parameters:
         healthcheck-cidaily,
         healthcheck-cilr,
         healthcheck-devnet,
-        healthcheck-testnet,
         redeploy-sv-runbook-cidaily,
         redeploy-validator-runbook-cidaily,
         reset-sv-runbook-cilr,
@@ -6239,24 +6238,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-
-  testnet_health_check:
-    when:
-      equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - preflight_check:
-          <<: *non_devnet_preflight_params
-          filters:
-            branches:
-              only:
-                - release-line-0.1.15
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "testnet"
-          migration_id: 2
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
 
   backup_testnet:
     when:

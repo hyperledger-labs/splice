@@ -55,7 +55,6 @@ class DsoPreflightIntegrationTest
           svPassword,
           Some(svInfo),
           votedSvParties,
-          true,
         )
       }
     }

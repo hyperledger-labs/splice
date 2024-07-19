@@ -16,7 +16,6 @@ trait SvUiIntegrationTestUtil extends TestCommon {
       svPassword: String,
       svInfo: Option[DsoInfo],
       votedSvParties: Seq[PartyId],
-      isDevNet: Boolean,
       extraChecks: => Unit = (),
   )(implicit webDriver: WebDriverType) = {
 
@@ -48,20 +47,17 @@ trait SvUiIntegrationTestUtil extends TestCommon {
         _ => find(id("information-tab-canton-domain-status")) should not be empty,
       )
 
-      // TODO(#5185): enable check for NonDevNet once we have a BFT domain on NonDevNet
-      if (isDevNet) {
-        actAndCheck(
-          "Click on domain status tab",
-          click on "information-tab-canton-domain-status",
-        )(
-          "Observe sequencer and mediator as active",
-          _ => {
-            val activeCells = findAll(className("active-value")).toSeq
-            activeCells should have length 2
-            forAll(activeCells)(_.text shouldBe "true")
-          },
-        )
-      }
+      actAndCheck(
+        "Click on domain status tab",
+        click on "information-tab-canton-domain-status",
+      )(
+        "Observe sequencer and mediator as active",
+        _ => {
+          val activeCells = findAll(className("active-value")).toSeq
+          activeCells should have length 2
+          forAll(activeCells)(_.text shouldBe "true")
+        },
+      )
 
       clue("SVs 1-4 have placed a amulet price vote") {
         actAndCheck(

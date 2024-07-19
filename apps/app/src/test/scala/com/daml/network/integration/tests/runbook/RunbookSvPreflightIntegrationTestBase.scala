@@ -46,7 +46,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     val svUiUrl = s"https://sv.sv.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     withFrontEnd("sv") { implicit webDriver =>
-      testSvUi(svUiUrl, svUsername, svPassword, None, Seq(), isDevNet)
+      testSvUi(svUiUrl, svUsername, svPassword, None, Seq())
     }
   }
 
