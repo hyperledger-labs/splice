@@ -33,6 +33,8 @@ spec:
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CANTON_PARTICIPANT_POSTGRES_SERVER
           value: {{ .Values.persistence.host }}
+        - name: CANTON_PARTICIPANT_POSTGRES_PORT
+          value: {{ .Values.persistence.port | quote }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: {{ .Values.persistence.schema }}
         - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
@@ -108,7 +110,7 @@ spec:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.persistence.host }} -p {{ .Values.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
                   echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
                   break

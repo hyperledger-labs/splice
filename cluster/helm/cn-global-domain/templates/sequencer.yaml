@@ -50,6 +50,8 @@ spec:
               value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             - name: CANTON_DOMAIN_POSTGRES_SERVER
               value: {{ .Values.sequencer.persistence.host }}
+            - name: CANTON_DOMAIN_POSTGRES_PORT
+              value: {{ .Values.sequencer.persistence.port | quote }}
             - name: CANTON_DOMAIN_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -135,7 +137,7 @@ spec:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} -p {{ .Values.sequencer.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
                   echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
                   break

@@ -130,7 +130,7 @@ spec:
           - 'bash'
           - '-c'
           - |
-            until errmsg=$(psql -h {{ $persistence.host }} --username=cnadmin --dbname={{ $persistence.databaseName }} -p {{ $persistence.port | default 5432 }} -c 'select 1' 2>&1); do
+            until errmsg=$(psql -h {{ $persistence.host }} -p {{ $persistence.port }} --username=cnadmin --dbname={{ $persistence.databaseName }} -p {{ $persistence.port | default 5432 }} -c 'select 1' 2>&1); do
                 echo "Waiting for database {{ $persistence.databaseName }}, at hostname {{ $persistence.host }}, port {{ $persistence.port | default 5432 }} to be accessible. Last error: $errmsg"
                 sleep 2;
             done

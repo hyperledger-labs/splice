@@ -19,6 +19,7 @@ sequencer:
     host: postgres.sv-1.svc.cluster.local
     secretName: "postgres-secrets"
     databaseName: cantonnet_sequencer
+    port: 5432
   resources:
     limits:
       cpu: "4"
@@ -32,6 +33,7 @@ mediator:
     host: postgres.sv-1.svc.cluster.local
     secretName: "postgres-secrets"
     databaseName: cantonnet_mediator
+    port: 5432
 
 metrics:
   enable: false
@@ -50,4 +52,3 @@ disableAutoInit: false
 # tolerations:
 
 enableAntiAffinity: true
-

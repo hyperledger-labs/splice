@@ -502,6 +502,7 @@
           "persistence": {
             "databaseName": "mediator_2",
             "host": "mediator-pg.sv.svc.cluster.local",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secret"
           }
@@ -523,6 +524,7 @@
           "persistence": {
             "databaseName": "sequencer_2",
             "host": "sequencer-pg.sv.svc.cluster.local",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secret"
           }
@@ -668,6 +670,7 @@
         "persistence": {
           "databaseName": "participant_2",
           "host": "participant-pg.sv.svc.cluster.local",
+          "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secret"

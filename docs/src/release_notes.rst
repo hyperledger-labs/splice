@@ -71,6 +71,9 @@ Upcoming
     We have also seen some issues with istio cancelling the database connection before the migration can finish (on much larger scale clusters than what we expect to have on dev/test/mainnet).
     In that case, consider disabling the istio proxy through ``annotations: traffic.sidecar.istio.io/excludeOutboundPorts: "YOURDATABASEPORT"`` on the sequencer deployment.
 
+* All helm charts now allow configuring the database port through ``persistence.port``. Note that for the ``cn-global-domain`` chart, this is nested under
+  ``sequencer.persistence`` and ``mediator.persistence``.
+
 0.1.15
 ------
 
