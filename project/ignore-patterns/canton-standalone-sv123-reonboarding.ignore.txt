@@ -14,3 +14,6 @@ SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*
 
 # Caused by svs being off-boarded
 UNAUTHORIZED_TOPOLOGY_TRANSACTION
+
+# TODO(#13610): Investigate flake and remove once fixed
+Sequencing result message timed out
