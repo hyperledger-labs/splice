@@ -897,6 +897,9 @@ jobs:
             git config user.name "CircleCI"
             git checkout -b "$branch"
             git add .
+            echo "Committing"
             git commit -m "Update Splice from CCI"
+            echo "Pushing"
             git push origin HEAD
+            echo "Creating PR"
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
