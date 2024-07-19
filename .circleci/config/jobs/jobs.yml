@@ -877,3 +877,23 @@ jobs:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
+
+  create_splice_pr:
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: "small"
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - clone_and_update_splice
+      - run:
+          name: Create PR for Splice
+          command: |
+            cd ../splice
+            branch="splice-cci-update-$(date +%s)"
+            git checkout -b "$branch"
+            git add .
+            git commit -m "Update Splice from CCI"
+            git push origin HEAD
+            gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base $branch
