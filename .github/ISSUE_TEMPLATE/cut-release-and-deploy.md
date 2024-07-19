@@ -18,7 +18,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Run `sbt cleanCnDars` to ensure a clean environment.
     - Run `sbt damlBuild`, this will generate the dar files in `daml/dars`.
     - Run `find daml -name "*.dar" -not -path "*daml/dars/*" -not -path "*current.dar" -not -path "*test*.dar" -exec cp -t daml/dars {} +` in the project root to move all the created `dar`s to `daml/dars` (excluding `*-current.dar` and `*-test.dar`), and commit the copied files.
-  - [ ] Update the release notes (`cluster/images/docs/src/release_notes.rst`):
+  - [ ] Update the release notes (`docs/src/release_notes.rst`):
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
     - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the preg version)
@@ -48,12 +48,12 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Pay particular attention to deleted or newly created resources.
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
-  - [ ] Update the branch references in `.circleci/configs/*.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
+  - [ ] Update the branch references in `.circleci/configs/*/${cluster}.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
   - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes` and `cluster: devnet`
     - Review the changes to the `deployment` stack.
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
   - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
-- [ ] Wait for [the operator](cluster/README.md#the-operator) to apply your changes
+- [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
   - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
 - [ ] Confirm that we didn't break anything (e.g., via the sv status grafana dashboard)
 
