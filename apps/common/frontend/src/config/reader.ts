@@ -30,6 +30,7 @@ export class ConfigReader<
       // Printing whole config files to the log is usually a bad idea because it can leak secrets,
       // but frontend configs are inherently unsafe and must not contain any secrets.
       console.info(`Config from VITE_SPLICE_CONFIG:`, envConfigString);
+      window.splice_config = envConfig;
       return this.schema.parse(envConfig);
     } else if (externalConfig !== undefined) {
       return this.schema.parse(externalConfig);

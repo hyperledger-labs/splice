@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, ErrorRouterPage, theme, UserProvider } from 'common-frontend';
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -88,10 +89,17 @@ const router = createBrowserRouter(
   )
 );
 
+const pageTitle = `${config.spliceInstanceNames.networkName} Wallet Application`;
 const App: React.FC = () => (
   <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <RouterProvider router={router} />
+    <HelmetProvider>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageTitle} />
+      </Helmet>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </HelmetProvider>
   </ThemeProvider>
 );
 

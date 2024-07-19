@@ -12,6 +12,7 @@ import {
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React, { useEffect } from 'react';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -121,8 +122,14 @@ const router = createBrowserRouter(
 
 const App: React.FC = () => (
   <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <RouterProvider router={router} />
+    <HelmetProvider>
+      <Helmet>
+        <title>Splitwell Sample Application</title>
+        <meta name="description" content="Splitwell Sample Application" />
+      </Helmet>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </HelmetProvider>
   </ThemeProvider>
 );
 

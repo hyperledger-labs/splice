@@ -4,6 +4,7 @@ import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, ErrorBoundary, ErrorRouterPage, UserProvider, theme } from 'common-frontend';
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   Route,
   RouterProvider,
@@ -78,8 +79,14 @@ const router = createBrowserRouter(
 const App: React.FC = () => (
   <ErrorBoundary>
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <RouterProvider router={router} />
+      <HelmetProvider>
+        <Helmet>
+          <title>Super Validator Operations</title>
+          <meta name="description" content="Super Validator Operations" />
+        </Helmet>
+        <CssBaseline />
+        <RouterProvider router={router} />
+      </HelmetProvider>
     </ThemeProvider>
   </ErrorBoundary>
 );

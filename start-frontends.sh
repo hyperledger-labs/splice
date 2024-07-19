@@ -220,7 +220,7 @@ function start_local_frontends() {
   fi
 
   # Scan
-  start_frontend   scan      3311 scan    "scan"               "false"           "none"
+  start_frontend   scan      3311 scan    "scan"               "false" 1
 
   # Splitwell
   if [ $app_manager -eq 1 ]; then

@@ -6,6 +6,7 @@ import { ErrorRouterPage, theme } from 'common-frontend';
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -39,7 +40,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+      <ScanClientProvider url={config.services.scan.url}>
+        <HelmetProvider>{children}</HelmetProvider>
+      </ScanClientProvider>
     </QueryClientProvider>
   );
 };
@@ -60,12 +63,19 @@ const router = createBrowserRouter(
   )
 );
 
+const pageTitle = `${config.spliceInstanceNames.networkName} Scan`;
 const App: React.FC = () => (
   <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>
+    <HelmetProvider>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageTitle} />
+      </Helmet>
+      <CssBaseline />
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>
+    </HelmetProvider>
   </ThemeProvider>
 );
 

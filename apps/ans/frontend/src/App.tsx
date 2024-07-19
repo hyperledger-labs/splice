@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, theme, UserProvider, ErrorRouterPage } from 'common-frontend';
 import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import React from 'react';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -69,10 +70,17 @@ const router = createBrowserRouter(
   )
 );
 
+const pageTitle = config.spliceInstanceNames.nameServiceName;
 const App: React.FC = () => (
   <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <RouterProvider router={router} />
+    <HelmetProvider>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageTitle} />
+      </Helmet>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </HelmetProvider>
   </ThemeProvider>
 );
 
