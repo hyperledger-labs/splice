@@ -349,6 +349,12 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -752,6 +758,12 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -886,6 +898,12 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1020,6 +1038,12 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
