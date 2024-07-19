@@ -3220,12 +3220,12 @@ jobs:
           command: |
             cd ../splice
             branch="splice-cci-update-$(date +%s)"
+            git config user.email "something@digitalasset.com"
+            git config user.name "CircleCI"
             git checkout -b "$branch"
             git add .
             git commit -m "Update Splice from CCI"
             git push origin HEAD
-            git config --global user.email "something@digitalasset.com"
-            git config --global user.name "CircleCI"
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI" --base main --reviewer isegall-da
 
   deploy_operator:
