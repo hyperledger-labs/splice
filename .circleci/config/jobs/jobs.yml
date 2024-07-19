@@ -887,9 +887,10 @@ jobs:
     steps:
       - checkout_with_retry
       - clone_and_update_splice
-      - run:
-          name: Create PR for Splice
-          command: |
+      - run_bash_command_in_nix:
+          cmd_name: Create PR for Splice
+          cmd: |
+            # TODO: retries
             cd ../splice
             branch="splice-cci-update-$(date +%s)"
             git config user.email "something@digitalasset.com"
