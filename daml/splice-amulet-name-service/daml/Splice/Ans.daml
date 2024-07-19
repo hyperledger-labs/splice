@@ -144,6 +144,8 @@ template AnsRules
           ((AnsEntryContext dso entry.user entry.name entry.url entry.description subscription.reference) == context)
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
+        time <- getTime
+        require "Current entry is not expired" (time < entry.expiresAt)
         -- accept payment
         result <- exercise paymentCid SubscriptionPayment_Collect with
           transferContext
