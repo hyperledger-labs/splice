@@ -1,3 +1,4 @@
+import * as glob from 'glob';
 import { config as dotenvConfig } from 'dotenv';
 import { expand } from 'dotenv-expand';
 
@@ -15,11 +16,10 @@ class CnConfig {
         'CN_PULUMI_LOAD_ENV_CONFIG_FILE'
       )
     ) {
-      const result = expand(
-        dotenvConfig({
-          path: [`${process.env.REPO_ROOT}/.envrc.vars`, `${process.env.REPO_ROOT}/.envrc.vars.da`],
-        })
+      const envrcs = [`${process.env.REPO_ROOT}/.envrc.vars`].concat(
+        glob.sync(`${process.env.REPO_ROOT}/.envrc.vars.*`)
       );
+      const result = expand(dotenvConfig({ path: envrcs }));
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
       }
