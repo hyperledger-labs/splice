@@ -2702,7 +2702,7 @@ jobs:
              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
 
-           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
            RELEASE_TAG=$(get-snapshot-version)
            if [ $(git tag -l "${RELEASE_TAG}") ]; then
              echo "tag ${RELEASE_TAG} already exists. not tagging"
@@ -3204,25 +3204,19 @@ jobs:
     steps:
       - checkout_with_retry
       - clone_and_update_splice
-      - run:
-          name: Create and push branch
-          command: |
-            # TODO: retries
-
-            cd ../splice
-            branch="splice-cci-update-$(date +%s)"
-            git config user.email "something@digitalasset.com"
-            git config user.name "CircleCI"
-            git checkout -b "$branch"
-            git add .
-            git commit -m "Update Splice from CCI"
-            git push origin HEAD
       - run_bash_command_in_nix:
           cmd_name: Create PR
           additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
             commit=$(git rev-parse --short HEAD)
             cd ../splice
+            branch="splice-cci-update-$(date +%s)"
+            git config user.email "circleci@circleci.com"
+            git config user.name "CircleCI"
+            git checkout -b "$branch"
+            git add .
+            git commit -m "Update Splice from CCI"
+            git push origin HEAD
             date=$(date +%Y-%m-%d)
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI as of commit $commit" --base main --reviewer isegall-da
 

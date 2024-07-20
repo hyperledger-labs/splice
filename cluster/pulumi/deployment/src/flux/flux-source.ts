@@ -11,7 +11,7 @@ const githubSecret = new k8s.core.v1.Secret('github', {
   },
   type: 'Opaque',
   stringData: {
-    username: config.optionalEnv('GITHUB_USERNAME') || 'githubuser-da',
+    username: config.optionalEnv('GITHUB_USERNAME') || 'canton-network-da',
     password: config.requireEnv('GITHUB_TOKEN'),
   },
 });
