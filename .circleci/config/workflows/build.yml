@@ -212,3 +212,8 @@ workflow:
           context:
             - artifactory
             - slack-context
+      - temp_cci_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context

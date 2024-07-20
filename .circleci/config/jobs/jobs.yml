@@ -887,10 +887,9 @@ jobs:
     steps:
       - checkout_with_retry
       - clone_and_update_splice
-      - run_bash_command_in_nix:
-          cmd_name: Create PR
-          additional_nix_args: "--keep GITHUB_TOKEN"
-          cmd: |
+      - run:
+          name: Create branch & commit
+          command: |
             commit=$(git rev-parse --short HEAD)
             cd ../splice
             branch="splice-cci-update-$(date +%s)"
@@ -899,6 +898,32 @@ jobs:
             git checkout -b "$branch"
             git add .
             git commit -m "Update Splice from CCI"
-            git push origin HEAD
+
+            for i in $(seq 1 5); do git push origin HEAD && s=0 && break || s=$? && sleep 5; done; (exit $s)
+
+      - run_bash_command_in_nix:
+          cmd_name: Push branch & create PR
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
             date=$(date +%Y-%m-%d)
             gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes in CCI as of commit $commit" --base main --reviewer isegall-da
+          cmd_retry_count: 5
+
+
+  temp_cci_test:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: Test git tag
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD \
+           --keep GITHUB_TOKEN"
+         cmd: |
+           git tag cci-test
+           git push origin cci-test
