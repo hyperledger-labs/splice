@@ -2,7 +2,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Usage: .circleci/download-ci-artifacts.sh and enter the ~5-digit CircleCI job number when prompted
+# Run .circleci/download-ci-artifacts.sh -h to see usage information.
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.
 
 
@@ -16,10 +16,11 @@ function usage() {
   echo "Flags:"
   echo "  -h                                                    display help message"
   echo "  -j   <CI_BUILD_NUM>                                   cci job number"
+  echo "  [-u   <CI_BUILD_URL>]                                 cci build url (with or without the parallel run number)"
   echo "  [-r   <RUN_NUM>]                                      cci run number (default all)"
 }
 
-while getopts "h:j:r:" arg; do
+while getopts "h:j:r:u:" arg; do
   case ${arg} in
     h)
       usage
@@ -30,6 +31,17 @@ while getopts "h:j:r:" arg; do
       ;;
     r)
       RUN_NUM="${OPTARG}"
+      ;;
+    u)
+      ci_build_url="$OPTARG"
+      url_pattern="https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/[0-9]+/workflows/[-a-z0-9]+/jobs/([0-9]+)(/parallel-runs/([0-9]+))?"
+      if [[ $ci_build_url =~ $url_pattern ]]; then
+        CI_BUILD_NUM="${BASH_REMATCH[1]}"
+        RUN_NUM="${BASH_REMATCH[3]}"
+      else
+        >&2 echo "Invalid CCI build URL: $ci_build_url"
+        exit 1
+      fi
       ;;
     ?)
       usage
