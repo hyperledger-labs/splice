@@ -2263,7 +2263,7 @@ function subcmd_restore_node() {
     fi
 
     if [ -z "$backup_run_id" ]; then
-        _info "No backup run_id given, looking for the latest backup"
+        _info "No backup run_id given, looking for the latest full backup"
         backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
