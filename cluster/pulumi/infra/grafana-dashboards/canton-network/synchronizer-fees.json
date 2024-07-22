@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 300,
+  "id": 1137,
   "links": [],
   "panels": [
     {
@@ -106,9 +106,9 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(type) (rate(daml_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", type=~\".+\"}[$__rate_interval]))",
+          "expr": "sum by(type) (rate(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\", type=~\".+\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -236,9 +236,9 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(type) (rate(daml_traffic_control_event_rejected_cost_total{namespace=\"$namespace\", job=\"$job\", member=~\"$member\"}[$__rate_interval]))",
+          "expr": "sum by(type) (rate(daml_sequencer_traffic_control_event_rejected_cost_total{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -336,8 +336,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "sum by(member) (daml_traffic_control_base_traffic_remainder{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", member=~\"(PAR|MED)::.*\"})",
+          "editorMode": "code",
+          "expr": "sum by(sender) (daml_sequencer_traffic_control_base_traffic_remainder{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\", sender=~\"(PAR|MED)::.*\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -448,16 +448,16 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(member) (daml_traffic_control_extra_traffic_limit{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", member=~\"PAR::.*\"})",
+          "expr": "sum by(member) (daml_sequencer_traffic_control_extra_traffic_purchased{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", member=~\"PAR::.*\"})",
           "fullMetaSearch": false,
           "hide": true,
           "includeNullMetadata": true,
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "extra_traffic_limit",
+          "refId": "extra_traffic_purchased",
           "useBackend": false
         },
         {
@@ -466,9 +466,9 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(member) (daml_traffic_control_extra_traffic_consumed{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", member=~\"PAR::.*\"})",
+          "expr": "sum by(sender) (daml_sequencer_traffic_control_extra_traffic_consumed{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\", sender=~\"PAR::.*\"})",
           "fullMetaSearch": false,
           "hide": true,
           "includeNullMetadata": true,
@@ -484,7 +484,7 @@
             "type": "__expr__",
             "uid": "__expr__"
           },
-          "expression": "$extra_traffic_limit - $extra_traffic_consumed",
+          "expression": "$extra_traffic_purchased - $extra_traffic_consumed",
           "hide": false,
           "refId": "extra_traffic_remainder",
           "type": "math"
@@ -501,7 +501,7 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "sv-1",
           "value": "sv-1"
         },
@@ -598,6 +598,6 @@
   "timezone": "",
   "title": "Synchronizer Fees",
   "uid": "fdnphvrryfq4gf",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }
