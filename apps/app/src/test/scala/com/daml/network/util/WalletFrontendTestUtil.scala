@@ -10,6 +10,14 @@ import scala.concurrent.duration.*
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
   protected def tapAmulets(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
+
+    def tap(): Unit = {
+      click on "tap-amount-field"
+      numberField("tap-amount-field").underlying.clear()
+      numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
+      click on "tap-button"
+    }
+
     val txDatesBefore =
       clue("Getting state before tap") {
         // The long eventually makes this robust against `StaleElementReferenceException` errors
@@ -21,10 +29,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     logger.debug(s"Transaction dates before tap: $txDatesBefore")
 
     clue("Tapping...") {
-      click on "tap-amount-field"
-      numberField("tap-amount-field").underlying.clear()
-      numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
-      click on "tap-button"
+      tap()
     }
 
     clue("Making sure the tap has been processed") {
@@ -32,7 +37,15 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       // The long eventually makes this robust against `StaleElementReferenceException` errors
       eventually(timeUntilSuccess = 2.minute) {
         find(className(errorDisplayElementClass)).map { errElem =>
-          (errElem.text.trim, find(className(errorDetailsElementClass)).map(_.text.trim))
+          (
+            errElem.text.trim,
+            find(className(errorDetailsElementClass)).map(_.text.trim) match {
+              case Some(errDetails) if errDetails.contains("UNABLE_TO_GET_TOPOLOGY_SNAPSHOT") =>
+                tap()
+                fail("Tapping again due to UNABLE_TO_GET_TOPOLOGY_SNAPSHOT error")
+              case errDetails => errDetails
+            },
+          )
         } shouldBe empty
         val txs = findAll(className("tx-row")).toSeq
         val txDatesAfter = txs.map(readDateFromRow)
