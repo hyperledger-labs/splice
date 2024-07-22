@@ -83,6 +83,7 @@ const App: React.FC = () => (
         <Helmet>
           <title>Super Validator Operations</title>
           <meta name="description" content="Super Validator Operations" />
+          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
         </Helmet>
         <CssBaseline />
         <RouterProvider router={router} />

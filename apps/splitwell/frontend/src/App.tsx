@@ -67,23 +67,30 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useConfig();
 
   return (
-    <AuthProvider authConf={config.auth}>
-      <QueryClientProvider client={queryClient}>
-        <ReactQueryDevtools initialIsOpen={false} />
-        <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-          <SplitwellClientProvider url={config.services.splitwell.url}>
-            <ScanClientProvider url={config.services.scan.url}>
-              <SplitwellLedgerApiClientProvider
-                jsonApiUrl={config.services.jsonApi.url}
-                packageIdResolver={new SplitwellPackageIdResolver()}
-              >
-                {children}
-              </SplitwellLedgerApiClientProvider>
-            </ScanClientProvider>
-          </SplitwellClientProvider>
-        </UserProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <Helmet>
+        <title>Splitwell Sample Application</title>
+        <meta name="description" content="Splitwell Sample Application" />
+        <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+      </Helmet>
+      <AuthProvider authConf={config.auth}>
+        <QueryClientProvider client={queryClient}>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+            <SplitwellClientProvider url={config.services.splitwell.url}>
+              <ScanClientProvider url={config.services.scan.url}>
+                <SplitwellLedgerApiClientProvider
+                  jsonApiUrl={config.services.jsonApi.url}
+                  packageIdResolver={new SplitwellPackageIdResolver()}
+                >
+                  {children}
+                </SplitwellLedgerApiClientProvider>
+              </ScanClientProvider>
+            </SplitwellClientProvider>
+          </UserProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 };
 
@@ -122,14 +129,8 @@ const router = createBrowserRouter(
 
 const App: React.FC = () => (
   <ThemeProvider theme={theme}>
-    <HelmetProvider>
-      <Helmet>
-        <title>Splitwell Sample Application</title>
-        <meta name="description" content="Splitwell Sample Application" />
-      </Helmet>
-      <CssBaseline />
-      <RouterProvider router={router} />
-    </HelmetProvider>
+    <CssBaseline />
+    <RouterProvider router={router} />
   </ThemeProvider>
 );
 
