@@ -42,7 +42,6 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off from main.
     - Run `git diff (git merge-base origin/release-line-0.x.z origin/main) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
     - Run `git log (git merge-base origin/release-line-0.x.z origin/main)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
-  - Note: At the moment, for mainnet the previous branch is still `deployment/mainnet` so view the diff against that when upgrading mainnet.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: preview-changes` and `cluster: devnet`.
     - Review the output together with someone else to see that there are no unexpected changes.
     - Pay particular attention to deleted or newly created resources.

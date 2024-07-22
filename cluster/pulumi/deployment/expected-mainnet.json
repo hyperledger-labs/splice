@@ -493,7 +493,7 @@
           "pullPolicy": "Always",
           "registry": "us-central1-docker.pkg.dev",
           "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
-          "tag": "0.1.16"
+          "tag": "0.0.1-deadbeef"
         },
         "resources": {
           "limits": {
@@ -586,7 +586,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/deployment/mainnet"
+          "name": "refs/heads/release-line-0.1.15"
         },
         "secretRef": {
           "name": "github"
