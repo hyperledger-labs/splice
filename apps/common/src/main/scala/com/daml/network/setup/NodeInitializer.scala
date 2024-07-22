@@ -15,10 +15,8 @@ import com.daml.network.util.PrettyInstances.prettyString
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{NodeIdentity, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.NodeIdentity
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -67,28 +65,6 @@ class NodeInitializer(
     val expectedId = targetId.getOrElse(dump.id)
     for {
       _ <- importKeysFromDump(dump, expectedId)
-      _ <-
-        // ^ means XOR!
-        // TODO(#11594): Remove this check entirely
-        if (dump.bootstrapTxs.isDefined ^ dump.authorizedStoreSnapshot.isDefined) {
-          Future.unit
-        } else {
-          Future.failed(
-            Status.INTERNAL
-              .withDescription(
-                "Error bootstrapping from dump: exactly one of `bootstrapTxs` and `authorizedStoreSnapshot` must be defined"
-              )
-              .asRuntimeException
-          )
-        }
-      _ <- dump.bootstrapTxs.traverse_ { bootstrapTxs =>
-        {
-          logger.warn(
-            "Bootstrapping from bootstrap transactions is deprecated. Please update your node identities dump."
-          )
-          importBootstrapTxs(bootstrapTxs, dump.id.uid)
-        }
-      }
       // the id must be initialized before we can import the snapshot
       _ <- retryProvider.ensureThat(
         RetryFor.WaitingOnInitDependency,
@@ -104,9 +80,7 @@ class NodeInitializer(
         (_: String) => connection.initId(expectedId).map(_ => ()),
         logger,
       )(implicitly, implicitly, prettyString, implicitly, implicitly)
-      _ <- dump.authorizedStoreSnapshot.traverse_ { snapshot =>
-        importAuthorizedStoreSnapshot(snapshot)
-      }
+      _ <- importAuthorizedStoreSnapshot(dump.authorizedStoreSnapshot)
       _ <-
         if (expectedId != dump.id) {
           connection.listMyKeys().flatMap { keys =>
@@ -142,22 +116,6 @@ class NodeInitializer(
     // this is idempotent
     dump.keys.traverse_(key => connection.importKeyPair(key.keyPair.toArray, key.name))
   }
-
-  private def importBootstrapTxs(
-      bootstrapTxs: Seq[GenericSignedTopologyTransaction],
-      uid: UniqueIdentifier,
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = for {
-    uploadedBootstrapTxs <- connection.getIdentityTransactions(uid, TopologyStoreId.AuthorizedStore)
-    missingBootstrapTxs = bootstrapTxs.filter(!uploadedBootstrapTxs.contains(_))
-    // things blow up later in init if we upload the same tx multiple times ¯\_(ツ)_/¯
-    _ <- {
-      logger.info(
-        s"Uploading ${missingBootstrapTxs.size} missing bootstrap transactions"
-      )
-      // This will be broadcast to the domain store.
-      connection.addTopologyTransactions(TopologyStoreId.AuthorizedStore, missingBootstrapTxs)
-    }
-  } yield ()
 
   private def importAuthorizedStoreSnapshot(
       authorizedStoreSnapshot: ByteString

@@ -8,8 +8,6 @@ import cats.syntax.either.*
 import com.daml.network.http.v0.definitions as http
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.NodeIdentity
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
@@ -21,9 +19,7 @@ import scala.util.Try
 final case class NodeIdentitiesDump(
     id: NodeIdentity,
     keys: Seq[NodeIdentitiesDump.NodeKey],
-    authorizedStoreSnapshot: Option[ByteString],
-    // TODO(#11594): Deprecated; to be removed in a future version.
-    bootstrapTxs: Option[Seq[GenericSignedTopologyTransaction]],
+    authorizedStoreSnapshot: ByteString,
     version: Option[String],
 ) extends PrettyPrinting {
   def toHttp: http.NodeIdentitiesDump = {
@@ -32,8 +28,7 @@ final case class NodeIdentitiesDump(
       keys
         .map(key => http.NodeKey(Base64.getEncoder.encodeToString(key.keyPair.toArray), key.name))
         .toVector,
-      authorizedStoreSnapshot.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
-      bootstrapTxs.map(_.map(tx => Base64.getEncoder.encodeToString(tx.toByteArray)).toVector),
+      Base64.getEncoder.encodeToString(authorizedStoreSnapshot.toByteArray),
       version,
     )
   }
@@ -48,8 +43,7 @@ final case class NodeIdentitiesDump(
       "NodeIdentitiesDump",
       param("id", _.id),
       param("numberOfKeys", _.keys.size),
-      param("bootstrapTxs", _.bootstrapTxs),
-      param("authorizedStoreSnapshotSize", _.authorizedStoreSnapshot.map(_.size)),
+      param("authorizedStoreSnapshotSize", _.authorizedStoreSnapshot.size),
       param("version", _.version.map(_.singleQuoted)),
     )
 }
@@ -63,16 +57,8 @@ object NodeIdentitiesDump {
         id = id(response.id),
         keys =
           response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair).toSeq, k.name)),
-        authorizedStoreSnapshot = response.authorizedStoreSnapshot.map(s =>
-          ByteString.copyFrom(Base64.getDecoder.decode(s))
-        ),
-        bootstrapTxs = response.bootstrapTxs.map(
-          _.toSeq.map(t =>
-            SignedTopologyTransaction
-              .fromTrustedByteString(ByteString.copyFrom(Base64.getDecoder.decode(t)))
-              .fold(err => throw new IllegalArgumentException(err.message), identity)
-          )
-        ),
+        authorizedStoreSnapshot =
+          ByteString.copyFrom(Base64.getDecoder.decode(response.authorizedStoreSnapshot)),
         version = response.version,
       )
     ).toEither.leftMap(_.getMessage())

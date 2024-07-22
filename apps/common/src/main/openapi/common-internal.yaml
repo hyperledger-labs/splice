@@ -66,7 +66,7 @@ components:
       required:
         - id
         - keys
-        # TODO(#11594): Make authorizedStoreSnapshot mandatory
+        - authorizedStoreSnapshot
       properties:
         id:
           type: string
@@ -78,11 +78,6 @@ components:
           description: |
             base64 encoded string of authorized store snapshot
           type: string
-        # TODO(#11594): Deprecated; to be removed in a future version.
-        bootstrapTxs:
-          type: array
-          items:
-            type: string
         version:
           type: string
 

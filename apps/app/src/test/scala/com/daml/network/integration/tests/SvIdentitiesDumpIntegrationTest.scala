@@ -71,9 +71,7 @@ class SvIdentitiesDumpIntegrationTest extends IntegrationTestWithSharedEnvironme
   }
 
   private def scrubAuthorizedStoreSnapshot(dump: NodeIdentitiesDump): NodeIdentitiesDump = {
-    dump.copy(
-      authorizedStoreSnapshot = dump.authorizedStoreSnapshot.map(_ => ByteString.EMPTY)
-    )
+    dump.copy(authorizedStoreSnapshot = ByteString.EMPTY)
   }
 }
 

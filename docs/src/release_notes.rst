@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* SV and validator apps
+
+  * Remove support for deprecated ``bootstrapTXs`` field on node identity dumps. Node identity dumps taken on a 0.1.2 snapshot or earlier version are no longer supported.
+
 0.1.16
 ------
 
