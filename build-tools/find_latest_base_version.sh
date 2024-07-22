@@ -5,5 +5,6 @@
 
 set -euo pipefail
 
-latest_release=$(cat "LATEST_RELEASE")
-echo "release-line-${latest_release}"
+#latest_release=$(cat "LATEST_RELEASE")
+# TODO(#13646) - revert to use latest release
+echo "0.2.0-snapshot.20240722.6497.0.v5cfaade6"
