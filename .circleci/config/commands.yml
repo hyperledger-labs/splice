@@ -35,9 +35,6 @@ commands:
           }
 
           for i in $(seq 1 5); do checkout && s=0 && break || s=$? && sleep 5; done; (exit $s)
-    - add_ssh_keys:
-        fingerprints:
-          - "SHA256:Zxio+I9wTRTgdNnaMBiYid5HoksMo/qhpxvzU4zsxqo"
     - run:
         name: Checkout submodule
         command: |
