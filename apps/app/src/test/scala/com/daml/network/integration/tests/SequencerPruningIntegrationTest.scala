@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.{ConfigTransforms, ParticipantClientConfig}
 import com.daml.network.console.ValidatorAppBackendReference
+import com.daml.network.sv.automation.singlesv.SequencerPruningTrigger
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -20,45 +21,49 @@ class SequencerPruningIntegrationTest
 
   override def environmentDefinition =
     super.environmentDefinition
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
-          config.copy(
-            localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
-              synchronizerNode.copy(
-                sequencer = synchronizerNode.sequencer.copy(
-                  pruning = Some(
-                    SequencerPruningConfig(
-                      pruningInterval = NonNegativeFiniteDuration(2.seconds),
-                      retentionPeriod = NonNegativeFiniteDuration(120.seconds),
+      .addConfigTransforms(
+        (_, config) =>
+          ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
+            config.copy(
+              localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
+                synchronizerNode.copy(
+                  sequencer = synchronizerNode.sequencer.copy(
+                    pruning = Some(
+                      SequencerPruningConfig(
+                        pruningInterval = NonNegativeFiniteDuration(2.seconds),
+                        retentionPeriod = NonNegativeFiniteDuration(120.seconds),
+                      )
                     )
                   )
                 )
               )
             )
-          )
-        }(config)
-      )
-      .addConfigTransform((_, config) =>
-        config.copy(
-          validatorApps = config.validatorApps + (
-            InstanceName.tryCreate("bobValidatorLocal") -> {
-              val bobValidatorConfig = config
-                .validatorApps(InstanceName.tryCreate("bobValidator"))
-              bobValidatorConfig
-                .copy(
-                  participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(5902)),
-                    bobValidatorConfig.participantClient.ledgerApi.copy(
-                      clientConfig =
-                        bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
-                          port = Port.tryCreate(5901)
-                        )
-                    ),
+          }(config),
+        (_, config) =>
+          ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
+            _.withPausedTrigger[SequencerPruningTrigger]
+          )(config),
+        (_, config) =>
+          config.copy(
+            validatorApps = config.validatorApps + (
+              InstanceName.tryCreate("bobValidatorLocal") -> {
+                val bobValidatorConfig = config
+                  .validatorApps(InstanceName.tryCreate("bobValidator"))
+                bobValidatorConfig
+                  .copy(
+                    participantClient = ParticipantClientConfig(
+                      ClientConfig(port = Port.tryCreate(5902)),
+                      bobValidatorConfig.participantClient.ledgerApi.copy(
+                        clientConfig =
+                          bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                            port = Port.tryCreate(5901)
+                          )
+                      ),
+                    )
                   )
-                )
-            }
-          )
-        )
+              }
+            )
+          ),
       )
 
   "sequencer can be pruned even if a participant is down" in { implicit env =>
@@ -95,6 +100,14 @@ class SequencerPruningIntegrationTest
       val participantId = bobValidatorLocalBackend.participantClientWithAdminToken.id
       bobValidatorLocalBackend.stop()
       participantId
+    }
+
+    // We only start the sequencer pruning triggers here to make sure that our own nodes are likely to
+    // have produced their first acknowledgement.
+    // This is slightly racy but checking their last acknowledgement explicitly is a bit awkward and
+    // this should be good enough for tests.
+    Seq(sv1Backend, sv2Backend).foreach { sv =>
+      sv.dsoAutomation.trigger[SequencerPruningTrigger].resume()
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
