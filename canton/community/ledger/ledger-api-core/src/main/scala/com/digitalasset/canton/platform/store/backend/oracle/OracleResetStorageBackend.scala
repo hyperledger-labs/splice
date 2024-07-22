@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend.oracle
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.platform.store.backend.ResetStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 
@@ -13,9 +13,8 @@ object OracleResetStorageBackend extends ResetStorageBackend {
 
   override def resetAll(connection: Connection): Unit =
     List(
-      "packages",
-      "lapi_package_entries",
       "lapi_parameters",
+      "lapi_ledger_end_domain_index",
       "lapi_command_completions",
       "lapi_events_create",
       "lapi_events_consuming_exercise",

@@ -14,15 +14,15 @@ import com.daml.error.{
   Explanation,
   Resolution,
 }
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.{Identifier, PackageId}
-import com.daml.lf.engine.Error as LfError
-import com.daml.lf.interpretation.Error as LfInterpretationError
-import com.daml.lf.language.{Ast, LanguageVersion}
-import com.daml.lf.transaction.{GlobalKey, TransactionVersion}
-import com.daml.lf.value.{Value, ValueCoder}
-import com.daml.lf.{VersionRange, language}
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.CommandExecutionErrorGroup
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId}
+import com.digitalasset.daml.lf.engine.Error as LfError
+import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
+import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
+import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion}
+import com.digitalasset.daml.lf.value.{Value, ValueCoder}
+import com.digitalasset.daml.lf.{VersionRange, language}
 import com.google.common.io.BaseEncoding
 import org.slf4j.event.Level
 
@@ -272,6 +272,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
               Seq(
                 (ErrorResource.TemplateId, key.templateId.toString),
                 (ErrorResource.ContractKey, encodedKey),
+                (ErrorResource.PackageName, key.packageName),
               )
             }
         }
@@ -323,6 +324,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
               (ErrorResource.ContractId, err.coid.coid),
               (ErrorResource.ContractKey, encodedKey),
               (ErrorResource.ContractKeyHash, err.declaredHash.toString),
+              (ErrorResource.PackageName, err.key.packageName),
             )
           }
       }
@@ -473,6 +475,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
             Seq(
               (ErrorResource.TemplateId, err.templateId.toString),
               (ErrorResource.ContractKey, encodedKey),
+              (ErrorResource.PackageName, err.packageName),
             )
           }
       }

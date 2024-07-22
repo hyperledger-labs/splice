@@ -3,64 +3,96 @@
 
 package com.digitalasset.canton.http.metrics
 
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory, Timer}
-import com.daml.metrics.api.MetricName
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.http.{DamlHttpMetrics, DamlWebSocketMetrics}
-import com.daml.metrics.{CacheMetrics, HealthMetrics}
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
+import com.daml.metrics.http.{DamlHttpHistograms, DamlHttpMetrics, DamlWebSocketMetrics, DamlWebSocketsHistograms}
+import com.daml.metrics.api.HistogramInventory
+import com.daml.metrics.api.HistogramInventory.Item
+import com.digitalasset.canton.http.metrics.HttpApiMetrics.ComponentName
 
 object HttpApiMetrics {
   lazy val ForTesting =
     new HttpApiMetrics(
-      NoOpMetricsFactory,
+      new HttpApiHistograms(MetricName("test"))(new HistogramInventory),
       NoOpMetricsFactory,
     )
 
   final val ComponentName = "json_api"
 }
 
+class HttpApiHistograms(parent: MetricName)(implicit
+    inventory: HistogramInventory
+) {
+
+  private val _http: DamlHttpHistograms = new DamlHttpHistograms()
+  private val _webSockets: DamlWebSocketsHistograms = new DamlWebSocketsHistograms()
+
+  val prefix: MetricName = parent :+ "http_json_api"
+
+  // Meters how long parsing and decoding of an incoming json payload takes
+  val incomingJsonParsingAndValidationTimer: Item =
+    Item(
+      prefix :+ "incoming_json_parsing_and_validation_timing",
+      "",
+      MetricQualification.Debug,
+    )
+
+  // Meters how long the construction of the response json payload takes
+  val responseCreationTimer: Item =
+    Item(
+      prefix :+ "response_creation_timing",
+      "",
+      MetricQualification.Debug,
+    )
+  // Meters how long a find by contract id database operation takes
+  val dbFindByContractId: Item =
+    Item(prefix :+ "db_find_by_contract_id_timing", "", MetricQualification.Debug)
+
+  // Meters how long processing of the command submission request takes on the ledger
+  val commandSubmissionLedgerTimer: Item =
+    Item(prefix :+ "command_submission_ledger_timing", "", MetricQualification.Debug)
+
+}
+
 // TODO(#13303) Clean up metrics
 class HttpApiMetrics(
-    defaultMetricsFactory: LabeledMetricsFactory,
+    parent: HttpApiHistograms,
     labeledMetricsFactory: LabeledMetricsFactory,
 ) {
   import HttpApiMetrics.*
+  import com.daml.metrics.api.MetricsContext.Implicits.empty
 
-  val prefix: MetricName = MetricName.Daml :+ "http_json_api"
-
-  object Db {
-    val prefix: MetricName = HttpApiMetrics.this.prefix :+ "db"
-
-    val fetchByIdFetch: Timer = defaultMetricsFactory.timer(prefix :+ "fetch_by_id_fetch")
-    val fetchByIdQuery: Timer = defaultMetricsFactory.timer(prefix :+ "fetch_by_id_query")
-    val fetchByKeyFetch: Timer = defaultMetricsFactory.timer(prefix :+ "fetch_by_key_fetch")
-    val fetchByKeyQuery: Timer = defaultMetricsFactory.timer(prefix :+ "fetch_by_key_query")
-    val searchFetch: Timer = defaultMetricsFactory.timer(prefix :+ "search_fetch")
-    val searchQuery: Timer = defaultMetricsFactory.timer(prefix :+ "search_query")
-  }
-
-  val surrogateTemplateIdCache =
-    new CacheMetrics(prefix :+ "surrogate_tpid_cache", labeledMetricsFactory)
+  val prefix: MetricName = parent.prefix
 
   // Meters how long parsing and decoding of an incoming json payload takes
   val incomingJsonParsingAndValidationTimer: Timer =
-    defaultMetricsFactory.timer(prefix :+ "incoming_json_parsing_and_validation_timing")
+    labeledMetricsFactory.timer(
+      parent.incomingJsonParsingAndValidationTimer.info
+    )
+
   // Meters how long the construction of the response json payload takes
   val responseCreationTimer: Timer =
-    defaultMetricsFactory.timer(prefix :+ "response_creation_timing")
-  // Meters how long a find by contract key database operation takes
-  val dbFindByContractKey: Timer =
-    defaultMetricsFactory.timer(prefix :+ "db_find_by_contract_key_timing")
+    labeledMetricsFactory.timer(
+      parent.responseCreationTimer.info
+    )
   // Meters how long a find by contract id database operation takes
   val dbFindByContractId: Timer =
-    defaultMetricsFactory.timer(prefix :+ "db_find_by_contract_id_timing")
+    labeledMetricsFactory.timer(
+      parent.dbFindByContractId.info
+    )
   // Meters how long processing of the command submission request takes on the ledger
   val commandSubmissionLedgerTimer: Timer =
-    defaultMetricsFactory.timer(prefix :+ "command_submission_ledger_timing")
+    labeledMetricsFactory.timer(
+      parent.commandSubmissionLedgerTimer.info
+    )
   // Meters http requests throughput
   // Meters how many websocket connections are currently active
   val websocketRequestCounter: Counter =
-    defaultMetricsFactory.counter(prefix :+ "websocket_request_count")
+    labeledMetricsFactory.counter(
+      MetricInfo(prefix :+ "websocket_request_count", "", MetricQualification.Debug)
+    )
 
   val http = new DamlHttpMetrics(labeledMetricsFactory, ComponentName)
   val websocket = new DamlWebSocketMetrics(labeledMetricsFactory, ComponentName)

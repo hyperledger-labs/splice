@@ -68,12 +68,17 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       "domain6",
       "domain7",
       "domain8",
+      "domain9",
     ).sorted
     iterators.packageNames.toList.sorted shouldBe List(
       "25.1",
       "50.1",
       "87.1",
       "94.1",
+    ).sorted
+    iterators.packageVersions.toList.sorted shouldBe List(
+      "25.2",
+      "87.2",
     ).sorted
   }
 
@@ -108,6 +113,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       contract_id = "24",
       template_id = "25",
       package_name = "25.1",
+      package_version = Some("25.2"),
       flat_event_witnesses = Set("26", "27", "28"),
       tree_event_witnesses = Set("29", "30", "31"),
       create_argument = Array.empty,
@@ -170,23 +176,10 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       deduplication_duration_nanos = Some(1),
       deduplication_start = Some(1),
       domain_id = "domain4",
+      message_uuid = None,
+      request_sequencer_counter = None,
+      is_transaction = true,
       trace_context = serializableTraceContext,
-    ),
-    DbDto.Package(
-      package_id = "79",
-      upload_id = "80",
-      source_description = Some("81"),
-      package_size = 2,
-      known_since = 2,
-      ledger_offset = "82",
-      _package = Array.empty,
-    ),
-    DbDto.PackageEntry(
-      ledger_offset = "83",
-      recorded_at = 1,
-      submission_id = Some("84"),
-      typ = "85",
-      rejection_reason = Some("86"),
     ),
     DbDto.EventAssign(
       event_offset = "",
@@ -197,6 +190,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       contract_id = "",
       template_id = "87",
       package_name = "87.1",
+      package_version = Some("87.2"),
       flat_event_witnesses = Set("88", "89"),
       create_argument = Array.empty,
       create_signatories = Set("90", "91"),
@@ -235,6 +229,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       trace_context = serializableTraceContext,
       record_time = 0,
     ),
+    DbDto.SequencerIndexMoved("domain9"),
   )
 
 }

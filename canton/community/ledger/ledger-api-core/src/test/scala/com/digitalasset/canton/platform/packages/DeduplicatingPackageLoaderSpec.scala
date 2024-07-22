@@ -4,13 +4,14 @@
 package com.digitalasset.canton.platform.packages
 
 import com.daml.daml_lf_dev.DamlLf
-import com.daml.lf.archive.DarParser
-import com.daml.lf.data.Ref.PackageId
-import com.daml.metrics.api.MetricName
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.resources.TestResourceContext
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
-import com.digitalasset.canton.testing.utils.{TestModels, TestResourceUtils}
+import com.digitalasset.canton.testing.utils.TestModels
+import com.digitalasset.canton.util.JarResourceUtils
+import com.digitalasset.daml.lf.archive.DarParser
+import com.digitalasset.daml.lf.data.Ref.PackageId
 import org.apache.pekko.actor.{ActorSystem, Scheduler}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should.Matchers
@@ -30,11 +31,12 @@ class DeduplicatingPackageLoaderSpec
 
   private[this] var actorSystem: ActorSystem = _
   private[this] val loadCount = new AtomicLong()
-  private[this] val metric = NoOpMetricsFactory.timer(MetricName("test-metric"))
+  private[this] val metric =
+    NoOpMetricsFactory.timer(MetricInfo(MetricName("test-metric"), "", MetricQualification.Debug))
 
   private[this] val dar =
     TestModels.com_daml_ledger_test_ModelTestDar_path
-      .pipe(TestResourceUtils.resourceFile)
+      .pipe(JarResourceUtils.resourceFile)
       .pipe(DarParser.assertReadArchiveFromFile(_))
 
   private[this] def delayedLoad(duration: FiniteDuration): Future[Option[DamlLf.Archive]] = {

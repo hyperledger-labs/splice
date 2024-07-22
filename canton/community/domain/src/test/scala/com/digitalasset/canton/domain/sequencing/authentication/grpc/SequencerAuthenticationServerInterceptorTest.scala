@@ -11,11 +11,11 @@ import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.api.v0.{Hello, HelloServiceGrpc}
 import com.digitalasset.canton.domain.sequencing.authentication.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.authentication.grpc.{
   AuthenticationTokenManagerTest,
   AuthenticationTokenWithExpiry,
-  SequencerClientNoAuthentication,
   SequencerClientTokenAuthentication,
 }
 import com.digitalasset.canton.sequencing.authentication.{
@@ -23,12 +23,7 @@ import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationTokenManagerConfig,
 }
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{
-  DomainId,
-  ParticipantId,
-  UnauthenticatedMemberId,
-  UniqueIdentifier,
-}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}
@@ -63,6 +58,7 @@ class SequencerAuthenticationServerInterceptorTest
 
     lazy val store: MemberAuthenticationStore = new InMemoryMemberAuthenticationStore()
     lazy val domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("popo::pipi"))
+
     lazy val authService = new MemberAuthenticationService(
       domainId,
       null,
@@ -97,11 +93,6 @@ class SequencerAuthenticationServerInterceptorTest
 
     val participantId =
       UniqueIdentifier.fromProtoPrimitive_("p1::default").map(new ParticipantId(_)).value
-    val unauthenticatedMemberId =
-      UniqueIdentifier
-        .fromProtoPrimitive_("unm1::default")
-        .map(new UnauthenticatedMemberId(_))
-        .value
     val neverExpire = CantonTimestamp.MaxValue
     val crypto = new SymbolicPureCrypto
     val token = AuthenticationTokenWithExpiry(AuthenticationToken.generate(crypto), neverExpire)
@@ -144,8 +135,8 @@ class SequencerAuthenticationServerInterceptorTest
           Seq,
           (
             Endpoint("localhost", Port.tryCreate(10)),
-            (_ => EitherT.pure[Future, Status](token)): TraceContext => EitherT[
-              Future,
+            (_ => EitherT.pure[FutureUnlessShutdown, Status](token)): TraceContext => EitherT[
+              FutureUnlessShutdown,
               Status,
               AuthenticationTokenWithExpiry,
             ],
@@ -170,20 +161,6 @@ class SequencerAuthenticationServerInterceptorTest
       client.hello(Hello.Request("hi")).futureValue.msg shouldBe "hello back"
     }
 
-    "succeed request if client does not need authentication" in new GrpcContext {
-      store
-        .saveToken(StoredAuthenticationToken(participantId, neverExpire, token.token))
-        .futureValue
-
-      val clientAuthentication =
-        new SequencerClientNoAuthentication(domainId, unauthenticatedMemberId)
-      channel = InProcessChannelBuilder
-        .forName(channelName)
-        .build()
-      val client = clientAuthentication(HelloServiceGrpc.stub(channel))
-      client.hello(Hello.Request("hi")).futureValue.msg shouldBe "hello back"
-    }
-
     "fail request if participant use interceptor with incorrect token information" in new GrpcContext {
       store
         .saveToken(StoredAuthenticationToken(participantId, neverExpire, token.token))
@@ -194,8 +171,10 @@ class SequencerAuthenticationServerInterceptorTest
           Seq,
           (
             Endpoint("localhost", Port.tryCreate(10)),
-            (_ => EitherT.pure[Future, Status](incorrectToken)): TraceContext => EitherT[
-              Future,
+            (
+                _ => EitherT.pure[FutureUnlessShutdown, Status](incorrectToken)
+            ): TraceContext => EitherT[
+              FutureUnlessShutdown,
               Status,
               AuthenticationTokenWithExpiry,
             ],
@@ -233,8 +212,8 @@ class SequencerAuthenticationServerInterceptorTest
           Seq,
           (
             Endpoint("localhost", Port.tryCreate(10)),
-            (_ => EitherT.pure[Future, Status](token)): TraceContext => EitherT[
-              Future,
+            (_ => EitherT.pure[FutureUnlessShutdown, Status](token)): TraceContext => EitherT[
+              FutureUnlessShutdown,
               Status,
               AuthenticationTokenWithExpiry,
             ],

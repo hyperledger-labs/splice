@@ -25,6 +25,7 @@ class ConsoleEnvironmentBinding {
        |import com.digitalasset.canton.topology.transaction._
        |import com.digitalasset.canton.crypto._
        |import com.digitalasset.canton.config._
+       |import com.digitalasset.canton.version.ProtocolVersion
        |import com.digitalasset.canton.admin.api.client.data._
        |import com.digitalasset.canton.participant.domain.DomainConnectionConfig
        |import com.digitalasset.canton.domain.config.DomainParametersConfig
@@ -38,6 +39,7 @@ class ConsoleEnvironmentBinding {
        |import ${classOf[com.digitalasset.canton.console.BootstrapScriptException].getName}
        |import com.digitalasset.canton.config.RequireTypes._
        |import com.digitalasset.canton.participant.admin.ResourceLimits
+       |import ch.qos.logback.classic.Level
        |import java.time.Instant
        |import scala.concurrent.ExecutionContextExecutor
        |import scala.concurrent.duration._

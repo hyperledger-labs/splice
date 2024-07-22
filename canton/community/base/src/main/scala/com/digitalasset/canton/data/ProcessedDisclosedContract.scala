@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.data
 
-import com.daml.lf.data.{Bytes, Ref, Time}
-import com.daml.lf.transaction.{GlobalKeyWithMaintainers, Node, TransactionVersion}
-import com.daml.lf.value.Value
+import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
+import com.digitalasset.daml.lf.transaction.{GlobalKeyWithMaintainers, Node, TransactionVersion}
+import com.digitalasset.daml.lf.value.Value
 
 /** An explicitly-disclosed contract that has been used during command interpretation
   * and enriched with additional contract metadata.
@@ -28,6 +28,7 @@ object ProcessedDisclosedContract {
   def apply(
       templateId: Ref.Identifier,
       packageName: Ref.PackageName,
+      packageVersion: Option[Ref.PackageVersion],
       contractId: Value.ContractId,
       argument: Value,
       createdAt: Time.Timestamp,
@@ -41,6 +42,7 @@ object ProcessedDisclosedContract {
       create = Node.Create(
         templateId = templateId,
         packageName = packageName,
+        packageVersion = packageVersion,
         coid = contractId,
         arg = argument,
         signatories = signatories,

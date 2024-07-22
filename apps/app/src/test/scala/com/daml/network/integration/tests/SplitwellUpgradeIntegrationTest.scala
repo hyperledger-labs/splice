@@ -44,8 +44,8 @@ class SplitwellUpgradeIntegrationTest
   "splitwell with upgraded domain" should {
     "report both domains" in { implicit env =>
       val splitwellDomains = splitwellBackend.getSplitwellDomainIds()
-      splitwellDomains.preferred.uid.id shouldBe "splitwellUpgrade"
-      splitwellDomains.others.map(_.uid.id) shouldBe Seq("splitwell")
+      splitwellDomains.preferred.uid.identifier shouldBe "splitwellUpgrade"
+      splitwellDomains.others.map(_.uid.identifier) shouldBe Seq("splitwell")
     }
 
     def installFirstAlice(alice: PartyId)(implicit env: FixtureParam) =
@@ -118,7 +118,7 @@ class SplitwellUpgradeIntegrationTest
               aliceValidatorBackend.participantClient.domains.id_of(splitwellUpgradeAlias)
             val splitwellDomainId =
               aliceValidatorBackend.participantClient.domains.id_of(splitwellAlias)
-            contractDomains shouldBe Map[String, DomainId](
+            contractDomains should contain theSameElementsAs Map[String, DomainId](
               newInstall.id.contractId -> splitwellUpgradeDomainId,
               install.id.contractId -> splitwellDomainId,
             )

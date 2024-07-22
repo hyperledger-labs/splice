@@ -21,7 +21,6 @@ import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.DisclosedContracts
-import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
@@ -52,6 +51,8 @@ import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
+
 import java.util.concurrent.TimeUnit
 
 sealed abstract class DedupConfig

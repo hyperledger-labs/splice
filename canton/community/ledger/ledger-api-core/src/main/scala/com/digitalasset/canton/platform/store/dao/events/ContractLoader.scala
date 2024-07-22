@@ -4,18 +4,17 @@
 package com.digitalasset.canton.platform.store.dao.events
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.lf.value.Value.ContractId
 import com.daml.metrics.InstrumentedGraph
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   LoggingContextWithTrace,
   NamedLoggerFactory,
   NamedLogging,
 }
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.ContractStorageBackend
 import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.{
   RawArchivedContract,
@@ -24,6 +23,7 @@ import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.{
 }
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
+import com.digitalasset.daml.lf.value.Value.ContractId
 import io.grpc.{Metadata, StatusRuntimeException}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
@@ -126,7 +126,7 @@ object ContractLoader {
   def create(
       contractStorageBackend: ContractStorageBackend,
       dbDispatcher: DbDispatcher,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       maxQueueSize: Int,
       maxBatchSize: Int,
       parallelism: Int,

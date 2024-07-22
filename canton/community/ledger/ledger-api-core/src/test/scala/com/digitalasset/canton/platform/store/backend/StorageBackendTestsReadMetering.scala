@@ -3,17 +3,17 @@
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.ApplicationId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.scalautil.Statement.discard
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.{
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.{
   ParticipantMetering,
   ReportData,
   TransactionMetering,
 }
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.ApplicationId
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Assertion, Inside}

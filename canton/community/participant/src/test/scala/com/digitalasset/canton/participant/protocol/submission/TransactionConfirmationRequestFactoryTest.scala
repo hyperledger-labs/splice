@@ -13,7 +13,8 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.data.*
-import com.digitalasset.canton.ledger.participant.state.v2.SubmitterInfo
+import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.UnableToDetermineParticipant
@@ -27,7 +28,7 @@ import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.sequencing.protocol.{MediatorsOfDomain, OpenEnvelope, Recipient}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, OpenEnvelope}
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
 import com.digitalasset.canton.store.SessionKeyStoreWithInMemoryCache
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
@@ -36,7 +37,6 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.OptionUtil
 import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -49,6 +49,7 @@ class TransactionConfirmationRequestFactoryTest
     extends AsyncWordSpec
     with ProtocolVersionChecksAsyncWordSpec
     with BaseTest
+    with HasExecutionContext
     with HasExecutorService {
 
   // Parties
@@ -57,7 +58,7 @@ class TransactionConfirmationRequestFactoryTest
 
   // General dummy parameters
   private val domain: DomainId = DefaultTestIdentities.domainId
-  private val mediator: MediatorsOfDomain = MediatorsOfDomain(MediatorGroupIndex.zero)
+  private val mediator: MediatorGroupRecipient = MediatorGroupRecipient(MediatorGroupIndex.zero)
   private val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch
   private val workflowId: Option[WorkflowId] = Some(
     WorkflowId.assertFromString("workflowIdConfirmationRequestFactoryTest")
@@ -69,24 +70,25 @@ class TransactionConfirmationRequestFactoryTest
       partyToParticipant: Map[ParticipantId, Seq[LfPartyId]],
       permission: ParticipantPermission = Submission,
       keyPurposes: Set[KeyPurpose] = KeyPurpose.All,
-      encKeyTag: Option[String] = None,
+      freshKeys: Boolean = false,
   ): DomainSnapshotSyncCryptoApi = {
 
     val map = partyToParticipant.fmap(parties => parties.map(_ -> permission).toMap)
-    TestingTopologyX()
+    TestingTopology()
       .withReversedTopology(map)
       .withDomains(domain)
       .withKeyPurposes(keyPurposes)
-      .withEncKeyTag(OptionUtil.noneAsEmptyString(encKeyTag))
+      .withFreshKeys(freshKeys)
       .build(loggerFactory)
       .forOwnerAndDomain(submittingParticipant, domain)
       .currentSnapshotApproximation
   }
 
   val defaultTopology: Map[ParticipantId, Seq[LfPartyId]] = Map(
-    submittingParticipant -> Seq(submitter, signatory),
+    submittingParticipant -> Seq(submitter, signatory, signatoryReplica),
     observerParticipant1 -> Seq(observer),
     observerParticipant2 -> Seq(observer),
+    extraParticipant -> Seq(extra),
   )
 
   // Collaborators
@@ -121,9 +123,8 @@ class TransactionConfirmationRequestFactoryTest
       override def createTransactionTree(
           transaction: WellFormedTransaction[WithoutSuffixes],
           submitterInfo: SubmitterInfo,
-          _confirmationPolicy: ConfirmationPolicy,
           _workflowId: Option[WorkflowId],
-          _mediator: MediatorsOfDomain,
+          _mediator: MediatorGroupRecipient,
           transactionSeed: SaltSeed,
           transactionUuid: UUID,
           _topologySnapshot: TopologySnapshot,
@@ -133,7 +134,7 @@ class TransactionConfirmationRequestFactoryTest
           validatePackageVettings: Boolean,
       )(implicit
           traceContext: TraceContext
-      ): EitherT[Future, TransactionTreeConversionError, GenTransactionTree] = {
+      ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, GenTransactionTree] = {
         val actAs = submitterInfo.actAs.toSet
         if (actAs != Set(ExampleTransactionFactory.submitter))
           fail(
@@ -156,8 +157,7 @@ class TransactionConfirmationRequestFactoryTest
       override def tryReconstruct(
           subaction: WellFormedTransaction[WithoutSuffixes],
           rootPosition: ViewPosition,
-          confirmationPolicy: ConfirmationPolicy,
-          mediator: MediatorsOfDomain,
+          mediator: MediatorGroupRecipient,
           submittingParticipantO: Option[ParticipantId],
           salts: Iterable[Salt],
           transactionUuid: UUID,
@@ -194,10 +194,7 @@ class TransactionConfirmationRequestFactoryTest
 
   // Input factory
   private val transactionFactory: ExampleTransactionFactory =
-    new ExampleTransactionFactory()(
-      confirmationPolicy = ConfirmationPolicy.Signatory,
-      ledgerTime = ledgerTime,
-    )
+    new ExampleTransactionFactory()(ledgerTime = ledgerTime)
 
   // Since the ConfirmationRequestFactory signs the envelopes in parallel,
   // we cannot predict the counter that SymbolicCrypto uses to randomize the signatures.
@@ -245,7 +242,7 @@ class TransactionConfirmationRequestFactoryTest
     val cryptoPureApi = cryptoSnapshot.pureCrypto
     val viewEncryptionScheme = cryptoPureApi.defaultSymmetricKeyScheme
 
-    val privateKeysetCache: TrieMap[NonEmpty[Set[Recipient]], SecureRandomness] =
+    val privateKeysetCache: TrieMap[NonEmpty[Set[ParticipantId]], SecureRandomness] =
       TrieMap.empty
 
     val expectedTransactionViewMessages = example.transactionViewTreesWithWitnesses.map {
@@ -255,6 +252,7 @@ class TransactionConfirmationRequestFactoryTest
             Some(
               Await
                 .result(cryptoSnapshot.sign(tree.transactionId.unwrap).value, 10.seconds)
+                .failOnShutdown
                 .valueOr(err => fail(err.toString))
             )
           } else None
@@ -281,7 +279,6 @@ class TransactionConfirmationRequestFactoryTest
           .valueOrFail("failed to create symmetric key from randomness")
 
         val participants = tree.informees
-          .map(_.party)
           .map(cryptoSnapshot.ipsSnapshot.activeParticipantsOf(_).futureValue)
           .flatMap(_.keySet)
 
@@ -290,9 +287,8 @@ class TransactionConfirmationRequestFactoryTest
             cryptoPureApi,
             symmetricKey,
             TransactionViewType,
-            testedProtocolVersion,
           )(
-            LightTransactionViewTree.fromTransactionViewTree(tree)
+            LightTransactionViewTree.fromTransactionViewTree(tree, testedProtocolVersion)
           )
           .valueOr(err => fail(s"Failed to encrypt view tree: $err"))
 
@@ -307,7 +303,9 @@ class TransactionConfirmationRequestFactoryTest
           {
             // simulates session key cache
             val keySeedSession = privateKeysetCache.getOrElseUpdate(
-              recipients.leafRecipients,
+              NonEmpty
+                .from(participants)
+                .getOrElse(fail("View without active participants of informees")),
               cryptoPureApi
                 .computeHkdf(
                   cryptoPureApi.generateSecureRandomness(keySeed.unwrap.size()).unwrap,
@@ -346,7 +344,8 @@ class TransactionConfirmationRequestFactoryTest
         OpenEnvelope(encryptedViewMessage, recipients)(testedProtocolVersion)
     }
 
-    val signature = cryptoSnapshot.sign(example.fullInformeeTree.transactionId.unwrap).futureValue
+    val signature =
+      cryptoSnapshot.sign(example.fullInformeeTree.transactionId.unwrap).failOnShutdown.futureValue
 
     TransactionConfirmationRequest(
       InformeeMessage(example.fullInformeeTree, signature)(testedProtocolVersion),
@@ -372,7 +371,7 @@ class TransactionConfirmationRequestFactoryTest
         .futureValue
         .getOrElse(fail("The defaultIdentitySnapshot really should have at least one key."))
     } yield participant -> cryptoPureApi
-      .encryptWith(randomness, publicKey, testedProtocolVersion)
+      .encryptWithVersion(randomness, publicKey, testedProtocolVersion)
       .valueOr(err => fail(err.toString))
 
     randomnessPairs.toMap
@@ -391,7 +390,6 @@ class TransactionConfirmationRequestFactoryTest
           factory
             .createConfirmationRequest(
               example.wellFormedUnsuffixedTransaction,
-              ConfirmationPolicy.Signatory,
               submitterInfo,
               workflowId,
               example.keyResolver,
@@ -404,6 +402,7 @@ class TransactionConfirmationRequestFactoryTest
               testedProtocolVersion,
             )
             .value
+            .failOnShutdown
             .map { res =>
               val expected = expectedConfirmationRequest(example, newCryptoSnapshot)
               stripSignatureAndOrderMap(res.value) shouldBe stripSignatureAndOrderMap(expected)
@@ -425,7 +424,6 @@ class TransactionConfirmationRequestFactoryTest
           factory
             .createConfirmationRequest(
               singleFetch.wellFormedUnsuffixedTransaction,
-              ConfirmationPolicy.Signatory,
               submitterInfo,
               workflowId,
               singleFetch.keyResolver,
@@ -437,6 +435,7 @@ class TransactionConfirmationRequestFactoryTest
               maxSequencingTime,
               testedProtocolVersion,
             )
+            .failOnShutdown
             .map(_ =>
               store
                 .getSessionKeyInfoIfPresent(recipientGroup)
@@ -446,9 +445,7 @@ class TransactionConfirmationRequestFactoryTest
         for {
           firstSessionKeyInfo <- getSessionKeyFromConfirmationRequest(newCryptoSnapshot)
           secondSessionKeyInfo <- getSessionKeyFromConfirmationRequest(newCryptoSnapshot)
-          // we add a tag that is to be appended to the encryption key id
-          // (to enforce that the key is different from the previous one, i.e. simulate a key rotation/revocation)
-          anotherCryptoSnapshot = createCryptoSnapshot(defaultTopology, encKeyTag = Some("-new"))
+          anotherCryptoSnapshot = createCryptoSnapshot(defaultTopology, freshKeys = true)
           thirdSessionKeyInfo <- getSessionKeyFromConfirmationRequest(anotherCryptoSnapshot)
         } yield {
           firstSessionKeyInfo shouldBe secondSessionKeyInfo
@@ -467,7 +464,6 @@ class TransactionConfirmationRequestFactoryTest
         factory
           .createConfirmationRequest(
             singleFetch.wellFormedUnsuffixedTransaction,
-            ConfirmationPolicy.Signatory,
             submitterInfo,
             workflowId,
             singleFetch.keyResolver,
@@ -479,6 +475,7 @@ class TransactionConfirmationRequestFactoryTest
             maxSequencingTime,
             testedProtocolVersion,
           )
+          .failOnShutdown
           .value
           .map(
             _ should equal(
@@ -503,7 +500,6 @@ class TransactionConfirmationRequestFactoryTest
         factory
           .createConfirmationRequest(
             singleFetch.wellFormedUnsuffixedTransaction,
-            ConfirmationPolicy.Signatory,
             submitterInfo,
             workflowId,
             singleFetch.keyResolver,
@@ -515,6 +511,7 @@ class TransactionConfirmationRequestFactoryTest
             maxSequencingTime,
             testedProtocolVersion,
           )
+          .failOnShutdown
           .value
           .map(
             _ should equal(
@@ -536,7 +533,6 @@ class TransactionConfirmationRequestFactoryTest
         factory
           .createConfirmationRequest(
             singleFetch.wellFormedUnsuffixedTransaction,
-            ConfirmationPolicy.Signatory,
             submitterInfo,
             workflowId,
             singleFetch.keyResolver,
@@ -548,6 +544,7 @@ class TransactionConfirmationRequestFactoryTest
             maxSequencingTime,
             testedProtocolVersion,
           )
+          .failOnShutdown
           .value
           .map(_ should equal(Left(TransactionTreeFactoryError(error))))
       }
@@ -566,7 +563,6 @@ class TransactionConfirmationRequestFactoryTest
         factory
           .createConfirmationRequest(
             singleFetch.wellFormedUnsuffixedTransaction,
-            ConfirmationPolicy.Signatory,
             submitterInfo,
             workflowId,
             singleFetch.keyResolver,
@@ -578,6 +574,7 @@ class TransactionConfirmationRequestFactoryTest
             maxSequencingTime,
             testedProtocolVersion,
           )
+          .failOnShutdown
           .value
           .map(
             _ should equal(
@@ -603,7 +600,6 @@ class TransactionConfirmationRequestFactoryTest
               factory
                 .createConfirmationRequest(
                   singleFetch.wellFormedUnsuffixedTransaction,
-                  ConfirmationPolicy.Signatory,
                   submitterInfo,
                   workflowId,
                   singleFetch.keyResolver,
@@ -616,6 +612,7 @@ class TransactionConfirmationRequestFactoryTest
                   testedProtocolVersion,
                 )
                 .value
+                .failOnShutdown
                 .map {
                   case Left(ParticipantAuthorizationError(message)) =>
                     message shouldBe s"$submittingParticipant does not host $submitter or is not active."

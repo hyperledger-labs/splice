@@ -3,8 +3,12 @@
 
 package com.digitalasset.canton.domain.sequencing.sequencer
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{CommunityStorageConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.domain.sequencing.sequencer.DatabaseSequencerConfig.TestingInterceptor
+import com.digitalasset.canton.domain.sequencing.sequencer.reference.{
+  CommunityReferenceSequencerDriverFactory,
+  ReferenceSequencerDriver,
+}
 import com.digitalasset.canton.time.Clock
 import pureconfig.ConfigCursor
 
@@ -34,6 +38,23 @@ object DatabaseSequencerConfig {
     */
   type TestingInterceptor =
     Clock => Sequencer => ExecutionContext => Sequencer
+
+  // TODO(#18407): Allow configuration of database sequencer as a part of unified sequencer
+  //  instead of hardcoding the values below
+  private[sequencer] final case class ForBlockSequencer(
+      writer: SequencerWriterConfig = SequencerWriterConfig.HighThroughput(),
+      reader: SequencerReaderConfig = new SequencerReaderConfig {
+        override val readBatchSize: Int = SequencerReaderConfig.defaultReadBatchSize
+        override val checkpointInterval: NonNegativeFiniteDuration =
+          SequencerReaderConfig.defaultCheckpointInterval
+      },
+      testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor] = None,
+  ) extends SequencerConfig
+      with DatabaseSequencerConfig {
+    override def supportsReplicas: Boolean = false
+
+    override def highAvailabilityEnabled: Boolean = false
+  }
 }
 
 sealed trait CommunitySequencerConfig extends SequencerConfig
@@ -63,8 +84,19 @@ object CommunitySequencerConfig {
     override def supportsReplicas: Boolean = false
   }
 
-  def default: CommunitySequencerConfig = ???
-  // TODO(#10244): add back the above definition by adding the necessary sbt project definitions
+  def default: CommunitySequencerConfig = {
+    val driverFactory = new CommunityReferenceSequencerDriverFactory
+    External(
+      driverFactory.name,
+      ConfigCursor(
+        driverFactory
+          .configWriter(confidential = false)
+          .to(ReferenceSequencerDriver.Config(storage = CommunityStorageConfig.Memory())),
+        List(),
+      ),
+      None,
+    )
+  }
 }
 
 /** Health check related sequencer config

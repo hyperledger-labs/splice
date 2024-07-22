@@ -4,6 +4,14 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.daml.ledger.api.v2.admin.command_inspection_service.CommandInspectionServiceGrpc.CommandInspectionServiceStub
+import com.daml.ledger.api.v2.admin.command_inspection_service.{
+  CommandInspectionServiceGrpc,
+  CommandState,
+  GetCommandStatusRequest,
+  GetCommandStatusResponse,
+}
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.*
 import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc.MeteringReportServiceStub
@@ -99,9 +107,10 @@ import com.daml.ledger.api.v2.testing.time_service.{
   TimeServiceGrpc,
 }
 import com.daml.ledger.api.v2.transaction.{Transaction, TransactionTree}
+import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
+  CumulativeFilter,
   Filters,
-  InclusiveFilters,
   TemplateFilter,
   TransactionFilter,
 }
@@ -127,13 +136,14 @@ import com.digitalasset.canton.admin.api.client.data.{
   UserRights,
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, JwksUrl}
-import com.digitalasset.canton.ledger.api.{DeduplicationPeriod, domain}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
+import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -329,6 +339,25 @@ object LedgerApiCommands {
 
     }
 
+    final case class ValidateDarFile(darPath: String)
+        extends BaseCommand[ValidateDarFileRequest, ValidateDarFileResponse, Unit] {
+
+      override def createRequest(): Either[String, ValidateDarFileRequest] =
+        for {
+          bytes <- BinaryFileUtil.readByteStringFromFile(darPath)
+        } yield ValidateDarFileRequest(bytes)
+
+      override def submitRequest(
+          service: PackageManagementServiceStub,
+          request: ValidateDarFileRequest,
+      ): Future[ValidateDarFileResponse] =
+        service.validateDarFile(request)
+      override def handleResponse(response: ValidateDarFileResponse): Either[String, Unit] =
+        Right(())
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
     final case class ListKnownPackages(limit: PositiveInt)
         extends BaseCommand[ListKnownPackagesRequest, ListKnownPackagesResponse, Seq[
           PackageDetails
@@ -351,6 +380,34 @@ object LedgerApiCommands {
     }
 
   }
+
+  object CommandInspectionService {
+    abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
+      override type Svc = CommandInspectionServiceStub
+
+      override def createService(channel: ManagedChannel): CommandInspectionServiceStub =
+        CommandInspectionServiceGrpc.stub(channel)
+    }
+
+    final case class GetCommandStatus(commandIdPrefix: String, state: CommandState, limit: Int)
+        extends BaseCommand[GetCommandStatusRequest, GetCommandStatusResponse, Seq[CommandStatus]] {
+      override def createRequest(): Either[String, GetCommandStatusRequest] = Right(
+        GetCommandStatusRequest(commandIdPrefix = commandIdPrefix, state = state, limit = limit)
+      )
+
+      override def submitRequest(
+          service: CommandInspectionServiceStub,
+          request: GetCommandStatusRequest,
+      ): Future[GetCommandStatusResponse] = service.getCommandStatus(request)
+
+      override def handleResponse(
+          response: GetCommandStatusResponse
+      ): Either[String, Seq[CommandStatus]] = {
+        response.commandStatus.traverse(CommandStatus.fromProto).leftMap(_.message)
+      }
+    }
+  }
+
   object ParticipantPruningService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
       override type Svc = ParticipantPruningServiceStub
@@ -401,11 +458,14 @@ object LedgerApiCommands {
       def actAs: Set[LfPartyId]
       def readAs: Set[LfPartyId]
       def participantAdmin: Boolean
+      def readAsAnyParty: Boolean
 
       protected def getRights: Seq[UserRight] = {
         actAs.toSeq.map(x => UserRight().withCanActAs(UserRight.CanActAs(x))) ++
           readAs.toSeq.map(x => UserRight().withCanReadAs(UserRight.CanReadAs(x))) ++
           (if (participantAdmin) Seq(UserRight().withParticipantAdmin(UserRight.ParticipantAdmin()))
+           else Seq()) ++
+          (if (readAsAnyParty) Seq(UserRight().withCanReadAsAnyParty(UserRight.CanReadAsAnyParty()))
            else Seq())
       }
     }
@@ -419,6 +479,7 @@ object LedgerApiCommands {
         isDeactivated: Boolean,
         annotations: Map[String, String],
         identityProviderId: String,
+        readAsAnyParty: Boolean,
     ) extends BaseCommand[CreateUserRequest, CreateUserResponse, LedgerApiUser]
         with HasRights {
 
@@ -610,6 +671,7 @@ object LedgerApiCommands {
           readAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderId: String,
+          readAsAnyParty: Boolean,
       ) extends BaseCommand[GrantUserRightsRequest, GrantUserRightsResponse, UserRights]
           with HasRights {
 
@@ -638,6 +700,7 @@ object LedgerApiCommands {
           readAs: Set[LfPartyId],
           participantAdmin: Boolean,
           identityProviderId: String,
+          readAsAnyParty: Boolean,
       ) extends BaseCommand[RevokeUserRightsRequest, RevokeUserRightsResponse, UserRights]
           with HasRights {
 
@@ -1402,9 +1465,9 @@ object LedgerApiCommands {
         val filter =
           if (templateFilter.nonEmpty) {
             Filters(
-              Some(
-                InclusiveFilters(templateFilters =
-                  templateFilter.map(tId =>
+              templateFilter.map(tId =>
+                CumulativeFilter(
+                  IdentifierFilter.TemplateFilter(
                     TemplateFilter(Some(tId.toIdentifier), includeCreatedEventBlob)
                   )
                 )

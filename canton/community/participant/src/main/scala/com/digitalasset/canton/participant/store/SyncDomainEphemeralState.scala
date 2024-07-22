@@ -16,6 +16,7 @@ import com.digitalasset.canton.lifecycle.{AsyncCloseable, CloseContext, Lifecycl
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
+import com.digitalasset.canton.participant.protocol.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ConflictDetector,
   NaiveRequestTracker,
@@ -29,18 +30,11 @@ import com.digitalasset.canton.participant.protocol.submission.{
   WatermarkTracker,
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.PendingTransferSubmission
-import com.digitalasset.canton.participant.protocol.{
-  Phase37Synchronizer,
-  ProcessingStartingPoints,
-  RequestCounterAllocatorImpl,
-  RequestJournal,
-  SubmissionTracker,
-}
 import com.digitalasset.canton.participant.store.memory.TransferCache
 import com.digitalasset.canton.participant.sync.TimelyRejectNotifier
 import com.digitalasset.canton.protocol.RootHash
 import com.digitalasset.canton.store.SessionKeyStore
-import com.digitalasset.canton.time.DomainTimeTracker
+import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -57,12 +51,13 @@ class SyncDomainEphemeralState(
     multiDomainEventLog: Eval[MultiDomainEventLog],
     val inFlightSubmissionTracker: InFlightSubmissionTracker,
     val startingPoints: ProcessingStartingPoints,
-    createTimeTracker: NamedLoggerFactory => DomainTimeTracker,
+    createTimeTracker: () => DomainTimeTracker,
     metrics: SyncDomainMetrics,
     sessionKeyCacheConfig: SessionKeyCacheConfig,
     override val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
+    clock: Clock,
 )(implicit executionContext: ExecutionContext, closeContext: CloseContext)
     extends SyncDomainEphemeralStateLookup
     with NamedLogging
@@ -121,6 +116,7 @@ class SyncDomainEphemeralState(
       timeouts,
       loggerFactory,
       futureSupervisor,
+      clock,
     )
   }
 
@@ -138,6 +134,7 @@ class SyncDomainEphemeralState(
       loggerFactory,
       futureSupervisor,
       persistentState.activeContractStore,
+      clock,
     )
   }
 
@@ -155,8 +152,8 @@ class SyncDomainEphemeralState(
   )
 
   // the time tracker, note, must be shutdown in sync domain as it is using the sequencer client to
-  // request time proofs
-  val timeTracker: DomainTimeTracker = createTimeTracker(loggerFactory)
+  // request time proofs.
+  val timeTracker: DomainTimeTracker = createTimeTracker()
 
   val submissionTracker: SubmissionTracker =
     SubmissionTracker(persistentState.protocolVersion)(

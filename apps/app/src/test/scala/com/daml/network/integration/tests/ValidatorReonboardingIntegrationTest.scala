@@ -224,7 +224,7 @@ class ValidatorReonboardingIntegrationTest
           )
 
           aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
-          aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNewForValidatorReonboardingIT"
+          aliceValidatorLocalBackend.participantClient.id.uid.identifier.unwrap shouldBe "aliceValidatorLocalNewForValidatorReonboardingIT"
 
           clue(s"party $partyId amulet balance is preserved") {
             val expectedAmulets: Range = 99 to 100

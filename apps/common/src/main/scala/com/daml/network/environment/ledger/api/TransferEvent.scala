@@ -10,6 +10,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.daml.ledger.api.v2.state_service
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 object IncompleteReassignmentEvent {

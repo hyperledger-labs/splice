@@ -3,9 +3,10 @@
 
 package com.digitalasset.canton.integration
 
-import com.daml.metrics.api.{MetricHandle, MetricName, MetricsContext}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
-import CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricName, MetricsContext}
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.MetricQualification.Debug
 import org.scalatest.Suite
 
 import scala.collection.concurrent.TrieMap
@@ -22,7 +23,7 @@ trait IntegrationTestMetrics {
     * Here we want to collect metrics about the test infrastructure, i.e., code that runs before
     * EnvironmentSetup starts the application. We therefore can't reuse any existing metric factories.
     */
-  protected def testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = NoOpMetricsFactory
+  protected def testInfrastructureMetricsFactory: LabeledMetricsFactory = NoOpMetricsFactory
 
   protected def testInfrastructureSuiteMetrics: IntegrationTestMetrics.SuiteMetrics =
     IntegrationTestMetrics.suiteMetrics.getOrElseUpdate(
@@ -68,91 +69,142 @@ object IntegrationTestMetrics {
     def environmentCreateFixture: MetricHandle.Timer
   }
 
-  class SuiteMetrics(suiteName: String, metricsFactory: CantonLabeledMetricsFactory)
+  class SuiteMetrics(suiteName: String, metricsFactory: LabeledMetricsFactory)
       extends EnvironmentMetrics {
     val context = MetricsContext(
       "suite_name" -> this.suiteName
     )
     override val environmentCreate = metricsFactory.timer(
-      metricsPrefix :+ "environment_create",
-      "Time it takes to create the environment",
+      MetricInfo(
+        metricsPrefix :+ "environment_create",
+        "Time it takes to create the environment",
+        Debug,
+      )
     )(context)
     override val environmentWait = metricsFactory.timer(
-      metricsPrefix :+ "environment_wait",
-      "Time the suite spends waiting in ConcurrentEnvironmentLimiter",
+      MetricInfo(
+        metricsPrefix :+ "environment_wait",
+        "Time the suite spends waiting in ConcurrentEnvironmentLimiter",
+        Debug,
+      )
     )(context)
     override val environmentDestroy = metricsFactory.timer(
-      metricsPrefix :+ "environment_destroy",
-      "Time it takes to clean up the environment",
+      MetricInfo(
+        metricsPrefix :+ "environment_destroy",
+        "Time it takes to clean up the environment",
+        Debug,
+      )
     )(context)
     override val environmentCreatePluginsBefore = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_plugins_before",
-      "Time it takes to run beforeEnvironmentCreated for all plugins",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_plugins_before",
+        "Time it takes to run beforeEnvironmentCreated for all plugins",
+        Debug,
+      )
     )(context)
     override val environmentCreatePluginsAfter = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_plugins_after",
-      "Time it takes to run afterEnvironmentCreated for all plugins",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_plugins_after",
+        "Time it takes to run afterEnvironmentCreated for all plugins",
+        Debug,
+      )
     )(context)
     override val environmentCreateFixture = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_fixture",
-      "Time it takes to run EnvironmentFactory.create",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_fixture",
+        "Time it takes to run EnvironmentFactory.create",
+        Debug,
+      )
     )(context)
 
     val pluginsBeforeTests = metricsFactory.timer(
-      metricsPrefix :+ "plugins_before_tests",
-      "Time it takes plugins to initialize before all tests",
+      MetricInfo(
+        metricsPrefix :+ "plugins_before_tests",
+        "Time it takes plugins to initialize before all tests",
+        Debug,
+      )
     )(context)
     val pluginsAfterTests = metricsFactory.timer(
-      metricsPrefix :+ "plugins_after_tests",
-      "Time it takes plugins to clean up after all tests",
+      MetricInfo(
+        metricsPrefix :+ "plugins_after_tests",
+        "Time it takes plugins to clean up after all tests",
+        Debug,
+      )
     )(context)
   }
 
   class TestMetrics(
       suiteName: String,
       testName: String,
-      metricsFactory: CantonLabeledMetricsFactory,
+      metricsFactory: LabeledMetricsFactory,
   ) extends EnvironmentMetrics {
     val context = MetricsContext(
       "suite_name" -> this.suiteName,
       "test_name" -> this.testName,
     )
     override val environmentCreate = metricsFactory.timer(
-      metricsPrefix :+ "environment_create",
-      "Time it takes to create the environment",
+      MetricInfo(
+        metricsPrefix :+ "environment_create",
+        "Time it takes to create the environment",
+        Debug,
+      )
     )(context)
     override val environmentWait = metricsFactory.timer(
-      metricsPrefix :+ "environment_wait",
-      "Time the suite spends waiting in ConcurrentEnvironmentLimiter",
+      MetricInfo(
+        metricsPrefix :+ "environment_wait",
+        "Time the suite spends waiting in ConcurrentEnvironmentLimiter",
+        Debug,
+      )
     )(context)
     override val environmentDestroy = metricsFactory.timer(
-      metricsPrefix :+ "environment_destroy",
-      "Time it takes to clean up the environment",
+      MetricInfo(
+        metricsPrefix :+ "environment_destroy",
+        "Time it takes to clean up the environment",
+        Debug,
+      )
     )(context)
     override val environmentCreatePluginsBefore = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_plugins_before",
-      "Time it takes to run beforeEnvironmentCreated for all plugins",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_plugins_before",
+        "Time it takes to run beforeEnvironmentCreated for all plugins",
+        Debug,
+      )
     )(context)
     override val environmentCreatePluginsAfter = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_plugins_after",
-      "Time it takes to run afterEnvironmentCreated for all plugins",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_plugins_after",
+        "Time it takes to run afterEnvironmentCreated for all plugins",
+        Debug,
+      )
     )(context)
     override val environmentCreateFixture = metricsFactory.timer(
-      metricsPrefix :+ "environment_create_fixture",
-      "Time it takes to run EnvironmentFactory.create",
+      MetricInfo(
+        metricsPrefix :+ "environment_create_fixture",
+        "Time it takes to run EnvironmentFactory.create",
+        Debug,
+      )
     )(context)
 
     val testExecution = metricsFactory.timer(
-      metricsPrefix :+ "test_execution",
-      "Time it takes to run the test body",
+      MetricInfo(
+        metricsPrefix :+ "test_execution",
+        "Time it takes to run the test body",
+        Debug,
+      )
     )(context)
     val testProvideEnvironment = metricsFactory.timer(
-      metricsPrefix :+ "test_provide_environment",
-      "Time it takes to run provideEnvironment()",
+      MetricInfo(
+        metricsPrefix :+ "test_provide_environment",
+        "Time it takes to run provideEnvironment()",
+        Debug,
+      )
     )(context)
     val testFinished = metricsFactory.timer(
-      metricsPrefix :+ "test_finished",
-      "Time it takes to run testFinished()",
+      MetricInfo(
+        metricsPrefix :+ "test_finished",
+        "Time it takes to run testFinished()",
+        Debug,
+      )
     )(context)
   }
 }

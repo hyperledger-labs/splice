@@ -6,9 +6,11 @@ package com.digitalasset.canton.participant.store.memory
 import cats.Monoid
 import cats.data.OptionT
 import com.daml.daml_lf_dev.DamlLf
-import com.daml.lf.data.Ref.PackageId
-import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
+import com.digitalasset.canton.LfPackageId
+import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.PackageService
@@ -17,7 +19,7 @@ import com.digitalasset.canton.participant.store.DamlPackageStore
 import com.digitalasset.canton.participant.store.memory.InMemoryDamlPackageStore.defaultPackageDescription
 import com.digitalasset.canton.protocol.PackageDescription
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{DiscardOps, LfPackageId}
+import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent
@@ -30,8 +32,9 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
     with NamedLogging {
   import DamlPackageStore.*
 
-  private val pkgData: concurrent.Map[LfPackageId, (DamlLf.Archive, String256M)] =
-    new ConcurrentHashMap[LfPackageId, (DamlLf.Archive, String256M)].asScala
+  private val pkgData
+      : concurrent.Map[LfPackageId, (DamlLf.Archive, String255, CantonTimestamp, Int)] =
+    new ConcurrentHashMap[LfPackageId, (DamlLf.Archive, String255, CantonTimestamp, Int)].asScala
 
   private val darData: concurrent.Map[Hash, (Array[Byte], String255)] =
     new ConcurrentHashMap[Hash, (Array[Byte], String255)].asScala
@@ -41,36 +44,34 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
 
   override def append(
       pkgs: List[DamlLf.Archive],
-      sourceDescription: String256M,
-      dar: Option[PackageService.Dar],
+      uploadedAt: CantonTimestamp,
+      sourceDescription: String255,
+      dar: PackageService.Dar,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
-
-    val pkgIds = pkgs.map(readPackageId)
-
     pkgs.foreach { pkgArchive =>
       val packageId = readPackageId(pkgArchive)
+      val packageSize = pkgArchive.getPayload.size()
       // only update the description if the given one is not empty
       if (sourceDescription.nonEmpty)
         pkgData
-          .put(packageId, (pkgArchive, sourceDescription))
-          .discard[Option[(DamlLf.Archive, String256M)]]
+          .put(packageId, (pkgArchive, sourceDescription, uploadedAt, packageSize))
+          .discard
       else
         pkgData
           .updateWith(packageId) {
-            case None => Some(pkgArchive -> defaultPackageDescription)
-            case Some((_, oldDescription)) => Some(pkgArchive -> oldDescription)
+            case None => Some((pkgArchive, defaultPackageDescription, uploadedAt, packageSize))
+            case Some((_, oldDescription, _, _)) =>
+              Some((pkgArchive, oldDescription, uploadedAt, packageSize))
           }
-          .discard[Option[(DamlLf.Archive, String256M)]]
+          .discard
     }
 
-    dar.foreach { dar =>
-      darData.put(dar.descriptor.hash, (dar.bytes.clone(), dar.descriptor.name)).discard
-      val hash = dar.descriptor.hash
-      val pkgS = pkgIds.toSet
-      darPackages.updateWith(hash)(optSet => Some(optSet.fold(pkgS)(_.union(pkgS))))
-    }
+    darData.put(dar.descriptor.hash, (dar.bytes.clone(), dar.descriptor.name)).discard
+    val hash = dar.descriptor.hash
+    val pkgS = pkgs.view.map(readPackageId).toSet
+    darPackages.updateWith(hash)(optSet => Some(optSet.fold(pkgS)(_.union(pkgS)))).discard
 
     FutureUnlessShutdown.unit
   }
@@ -83,9 +84,11 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
   override def getPackageDescription(
       packageId: LfPackageId
   )(implicit traceContext: TraceContext): Future[Option[PackageDescription]] =
-    Future.successful(pkgData.get(packageId).map { case (_, sourceDescription) =>
-      PackageDescription(packageId, sourceDescription)
-    })
+    Future.successful(
+      pkgData.get(packageId).map { case (_, sourceDescription, uploadedAt, packageSize) =>
+        PackageDescription(packageId, sourceDescription, uploadedAt, packageSize)
+      }
+    )
 
   override def listPackages(
       limit: Option[Int]
@@ -93,8 +96,8 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
     Future.successful(
       pkgData
         .take(limit.getOrElse(Int.MaxValue))
-        .map { case (pid, (_, sourceDescription)) =>
-          PackageDescription(pid, sourceDescription)
+        .map { case (pid, (_, sourceDescription, uploadedAt, packageSize)) =>
+          PackageDescription(pid, sourceDescription, uploadedAt, packageSize)
         }
         .to(Seq)
     )
@@ -161,5 +164,5 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
 }
 
 object InMemoryDamlPackageStore {
-  val defaultPackageDescription = String256M.tryCreate("default")
+  val defaultPackageDescription = String255.tryCreate("default")
 }

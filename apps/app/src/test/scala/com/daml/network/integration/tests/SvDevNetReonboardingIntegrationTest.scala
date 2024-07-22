@@ -27,7 +27,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         )(conf)
       )
 
-  "Reonboarding an SV with the same name removes the old SV from PartyToParticipantX and the Decentralized Namespace" in {
+  "Reonboarding an SV with the same name removes the old SV from PartyToParticipant and the Decentralized Namespace" in {
     implicit env =>
       clue("SV3 and SV4 use different participants") {
         sv3Backend.participantClient.id should not be sv4Backend.participantClient.id
@@ -45,7 +45,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         )
       }
 
-      def checkPartyToParticipantX(expected: Seq[ParticipantId]) = {
+      def checkPartyToParticipant(expected: Seq[ParticipantId]) = {
         eventually() {
           val mapping = sv1Backend.appState.participantAdminConnection
             .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
@@ -72,7 +72,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         }
       }
 
-      checkPartyToParticipantX(
+      checkPartyToParticipant(
         Seq(
           sv1Backend.participantClient.id,
           sv2Backend.participantClient.id,
@@ -104,7 +104,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       sv3ValidatorBackend.stop()
       startAllSync(sv4Backend, sv4ValidatorBackend)
 
-      checkPartyToParticipantX(
+      checkPartyToParticipant(
         Seq(
           sv1Backend.participantClient.id,
           sv2Backend.participantClient.id,
@@ -117,7 +117,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         "start sv4 with sv3 onboarding config",
         startAllSync(sv4Backend, sv4ValidatorBackend),
       )(
-        "old SV from PartyToParticipantX is removed and sv3 is overwritten with different party id",
+        "old SV from PartyToParticipant is removed and sv3 is overwritten with different party id",
         _ => {
           val mapping = sv1Backend.appState.participantAdminConnection
             .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)

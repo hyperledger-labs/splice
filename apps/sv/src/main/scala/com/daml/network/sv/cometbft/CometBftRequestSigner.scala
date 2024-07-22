@@ -78,7 +78,7 @@ object CometBftRequestSigner {
       keyBytes <- participantAdminConnection.exportKeyPair(fingerprint)
     } yield keyBytes match {
       case keyBytes: ByteString =>
-        val keyPair = CryptoKeyPair.fromByteString(keyBytes)
+        val keyPair = CryptoKeyPair.fromTrustedByteString(keyBytes)
         val pubKey = keyPair
           .map(_.publicKey)
           .map(_.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray)
@@ -121,7 +121,7 @@ object CometBftRequestSigner {
 
   private def fingerprintForPublicKey(publicKey: ByteString) = {
     val hash = Hash.digest(HashPurpose.PublicKeyFingerprint, publicKey, HashAlgorithm.Sha256)
-    val fingerprint = new Fingerprint(hash.toLengthLimitedHexString)
+    val fingerprint = Fingerprint.tryCreate(hash.toLengthLimitedHexString)
     fingerprint.toLengthLimitedString.toString()
   }
 

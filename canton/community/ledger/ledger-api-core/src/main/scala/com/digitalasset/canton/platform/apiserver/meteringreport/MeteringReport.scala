@@ -3,9 +3,12 @@
 
 package com.digitalasset.canton.platform.apiserver.meteringreport
 
-import com.daml.lf.data.Ref.{ApplicationId, ParticipantId}
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Ref.{ApplicationId, ParticipantId}
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import spray.json.{DefaultJsonProtocol, RootJsonFormat, *}
+
+import java.time.Instant
+import scala.util.Try
 
 import DefaultJsonProtocol.*
 
@@ -35,7 +38,12 @@ object MeteringReport {
   final case class ApplicationReport(application: ApplicationId, events: Long)
 
   implicit val TimestampFormat: RootJsonFormat[Timestamp] =
-    stringJsonFormat(Timestamp.fromString(_))(_.toString)
+    stringJsonFormat(v =>
+      for {
+        instant <- Try(Instant.parse(v)).toEither.left.map(_.getMessage)
+        timestamp <- Timestamp.fromInstant(instant)
+      } yield timestamp
+    )(_.toString)
 
   implicit val ApplicationIdFormat: RootJsonFormat[ApplicationId] =
     stringJsonFormat(ApplicationId.fromString)(identity)

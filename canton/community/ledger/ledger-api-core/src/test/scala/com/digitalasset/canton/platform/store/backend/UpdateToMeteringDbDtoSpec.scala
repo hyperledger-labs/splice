@@ -3,24 +3,29 @@
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.{ImmArray, Ref, Time}
-import com.daml.lf.transaction.TransactionNodeStatistics.EmptyActions
-import com.daml.lf.transaction.{
+import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
+import com.daml.metrics.api.{MetricName, MetricsContext}
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.metrics.IndexedUpdatesMetrics
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.transaction.TransactionNodeStatistics.EmptyActions
+import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
+import com.digitalasset.daml.lf.transaction.{
   CommittedTransaction,
+  NodeId,
   TransactionNodeStatistics,
   TransactionVersion,
   VersionedTransaction,
 }
-import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
-import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.Update
-import com.digitalasset.canton.ledger.participant.state.v2 as state
-import com.digitalasset.canton.metrics.IndexedUpdatesMetrics
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
 
@@ -44,7 +49,8 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
 
     val someHash = Hash.hashPrivateKey("p0")
 
-    val someRecordTime = Time.Timestamp.assertFromString("2000-01-01T00:00:00.000000Z")
+    val someRecordTime =
+      Time.Timestamp.assertFromInstant(Instant.parse("2000-01-01T00:00:00.000000Z"))
 
     val someCompletionInfo = state.CompletionInfo(
       actAs = Nil,
@@ -52,7 +58,7 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
       commandId = Ref.CommandId.assertFromString("c0"),
       optDeduplicationPeriod = None,
       submissionId = None,
-      statistics = Some(statistics),
+      messageUuid = None,
     )
     val someTransactionMeta = state.TransactionMeta(
       ledgerEffectiveTime = Time.Timestamp.assertFromLong(2),
@@ -64,11 +70,36 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
       optByKeyNodes = None,
     )
 
+    def someContractNode = TestNodeBuilder.create(
+      id = TransactionBuilder.newCid,
+      templateId = Ref.Identifier(
+        Ref.PackageId.assertFromString("abc"),
+        Ref.QualifiedName.assertFromString("Main:Template"),
+      ),
+      argument = Value.ValueUnit,
+      signatories = Set.empty,
+      observers = Set.empty,
+    )
+    val someConsumingExerciseNode = TestNodeBuilder.exercise(
+      contract = someContractNode,
+      choice = Ref.Name.assertFromString("somechoice"),
+      consuming = true,
+      actingParties = Set.empty,
+      argument = Value.ValueUnit,
+      byKey = false,
+    )
     val someTransactionAccepted = state.Update.TransactionAccepted(
       completionInfoO = Some(someCompletionInfo),
       transactionMeta = someTransactionMeta,
-      transaction = CommittedTransaction(
-        VersionedTransaction(TransactionVersion.VDev, Map.empty, ImmArray.empty)
+      transaction = TransactionBuilder.justCommitted(
+        someContractNode,
+        someContractNode,
+        someConsumingExerciseNode,
+        TestNodeBuilder.rollback(
+          ImmArray(
+            NodeId(2)
+          )
+        ),
       ),
       transactionId = Ref.TransactionId.assertFromString("TransactionId"),
       recordTime = someRecordTime,
@@ -76,12 +107,15 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
       hostedWitnesses = Nil,
       Map.empty,
       domainId = DomainId.tryFromString("da::default"),
+      domainIndex = None,
     )
 
     "extract transaction metering" in {
 
       val actual =
-        UpdateToMeteringDbDto(clock = () => timestamp, IndexedUpdatesMetrics)(MetricsContext.Empty)(
+        UpdateToMeteringDbDto(clock = () => timestamp, Set.empty, IndexedUpdatesMetrics)(
+          MetricsContext.Empty
+        )(
           List((Offset.fromHexString(offset), Traced[Update](someTransactionAccepted)))
         )
 
@@ -110,7 +144,9 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
       val expected: Vector[DbDto.TransactionMetering] = Vector(metering)
 
       val actual =
-        UpdateToMeteringDbDto(clock = () => timestamp, IndexedUpdatesMetrics)(MetricsContext.Empty)(
+        UpdateToMeteringDbDto(clock = () => timestamp, Set.empty, IndexedUpdatesMetrics)(
+          MetricsContext.Empty
+        )(
           List(
             (
               Offset.fromHexString(Ref.HexString.assertFromString("01")),
@@ -129,7 +165,7 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
 
     "return empty vector if input iterable is empty" in {
       val expected: Vector[DbDto.TransactionMetering] = Vector.empty
-      val actual = UpdateToMeteringDbDto(clock = () => timestamp, IndexedUpdatesMetrics)(
+      val actual = UpdateToMeteringDbDto(clock = () => timestamp, Set.empty, IndexedUpdatesMetrics)(
         MetricsContext.Empty
       )(List.empty)
       actual should equal(expected)(decided by DbDtoSeqEq)
@@ -138,12 +174,16 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
     // This is so infrastructure transactions, with a zero action count, are not included
     "filter zero action counts" in {
 
-      val txWithNoActionCount = someTransactionAccepted.copy(completionInfoO =
-        Some(someCompletionInfo.copy(statistics = Some(TransactionNodeStatistics.Empty)))
+      val txWithNoActionCount = someTransactionAccepted.copy(
+        transaction = CommittedTransaction(
+          VersionedTransaction(TransactionVersion.VDev, Map.empty, ImmArray.empty)
+        )
       )
 
       val actual =
-        UpdateToMeteringDbDto(clock = () => timestamp, IndexedUpdatesMetrics)(MetricsContext.Empty)(
+        UpdateToMeteringDbDto(clock = () => timestamp, Set.empty, IndexedUpdatesMetrics)(
+          MetricsContext.Empty
+        )(
           List((Offset.fromHexString(offset), Traced[Update](txWithNoActionCount)))
         )
 
@@ -152,7 +192,9 @@ class UpdateToMeteringDbDtoSpec extends AnyWordSpec with MetricValues {
 
     "increment metered events counter" in {
       val IndexedUpdatesMetrics = newUpdateMetrics
-      UpdateToMeteringDbDto(clock = () => timestamp, IndexedUpdatesMetrics)(MetricsContext.Empty)(
+      UpdateToMeteringDbDto(clock = () => timestamp, Set.empty, IndexedUpdatesMetrics)(
+        MetricsContext.Empty
+      )(
         List((Offset.fromHexString(offset), Traced[Update](someTransactionAccepted)))
       )
       IndexedUpdatesMetrics.meteredEventsMeter.value shouldBe (statistics.committed.actions + statistics.rolledBack.actions)

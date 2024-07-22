@@ -4,23 +4,33 @@
 package com.digitalasset.canton.topology.client
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.functor.*
-import com.daml.lf.data.Ref.PackageId
 import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.SequencerCounter
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, TimeAwaiter}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.store.{
+  PackageDependencyResolverUS,
+  TopologyStore,
+  TopologyStoreId,
+}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DiscardOps, SequencerCounter}
+import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.time.Duration as JDuration
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
 import scala.util.control.NonFatal
 
@@ -99,25 +109,25 @@ trait TopologyAwaiter extends FlagCloseable {
   }
 }
 
-// TODO(#15161) collapse with base trait
-abstract class BaseDomainTopologyClientX
-    extends BaseDomainTopologyClient
-    with DomainTopologyClientWithInitX {
-  override def observed(
-      sequencedTimestamp: SequencedTime,
-      effectiveTimestamp: EffectiveTime,
-      sequencerCounter: SequencerCounter,
-      transactions: Seq[GenericSignedTopologyTransactionX],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    observedInternal(sequencedTimestamp, effectiveTimestamp)
-}
-
-abstract class BaseDomainTopologyClient
+/** The domain topology client that reads data from a topology store
+  *
+  * @param domainId The domain-id corresponding to this store
+  * @param store The store
+  */
+class StoreBasedDomainTopologyClient(
+    val clock: Clock,
+    val domainId: DomainId,
+    protocolVersion: ProtocolVersion,
+    store: TopologyStore[TopologyStoreId],
+    packageDependenciesResolver: PackageDependencyResolverUS,
+    override val timeouts: ProcessingTimeout,
+    override protected val futureSupervisor: FutureSupervisor,
+    val loggerFactory: NamedLoggerFactory,
+)(implicit val executionContext: ExecutionContext)
     extends DomainTopologyClientWithInit
     with TopologyAwaiter
-    with TimeAwaiter {
-
-  def protocolVersion: ProtocolVersion
+    with TimeAwaiter
+    with NamedLogging {
 
   private val pendingChanges = new AtomicInteger(0)
 
@@ -160,14 +170,29 @@ abstract class BaseDomainTopologyClient
       checkAwaitingConditions()
   }
 
+  override def observed(
+      sequencedTimestamp: SequencedTime,
+      effectiveTimestamp: EffectiveTime,
+      sequencerCounter: SequencerCounter,
+      transactions: Seq[GenericSignedTopologyTransaction],
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    observedInternal(sequencedTimestamp, effectiveTimestamp)
+
   protected def currentKnownTime: CantonTimestamp = topologyKnownUntilTimestamp
 
   override def numPendingChanges: Int = pendingChanges.get()
 
-  protected def observedInternal(
+  private def observedInternal(
       sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+
+    def logIfNoPendingTopologyChanges(): Unit =
+      if (pendingChanges.decrementAndGet() == 0) {
+        logger.debug(
+          s"Effective at $effectiveTimestamp, there are no more pending topology changes (last were from $sequencedTimestamp)"
+        )
+      }
 
     // we update the head timestamp approximation with the current sequenced timestamp, right now
     updateHead(
@@ -177,29 +202,35 @@ abstract class BaseDomainTopologyClient
     )
     // notify anyone who is waiting on some condition
     checkAwaitingConditions()
-    // and we schedule an update to the effective time in due time so that we start using the
+    // and we use the domain time tracker to advance the time to the effective time in due time so that we start using the
     // right keys at the right time.
     if (effectiveTimestamp.value > sequencedTimestamp.value) {
-      val deltaDuration = effectiveTimestamp.value - sequencedTimestamp.value
       pendingChanges.incrementAndGet()
-      // schedule using after as we don't know the clock synchronisation level, but we know the relative time.
-      clock
-        .scheduleAfter(
-          _ => {
-            updateHead(
-              effectiveTimestamp,
-              ApproximateTime(effectiveTimestamp.value),
-              potentialTopologyChange = true,
-            )
-            if (pendingChanges.decrementAndGet() == 0) {
-              logger.debug(
-                s"Effective at $effectiveTimestamp, there are no more pending topology changes (last were from $sequencedTimestamp)"
+      domainTimeTracker.get match {
+        // use the domain time tracker if available to figure out time precisely
+        case Some(timeTracker) =>
+          timeTracker.awaitTick(effectiveTimestamp.value) match {
+            case Some(future) =>
+              future.foreach { timestamp =>
+                updateHead(
+                  EffectiveTime(timestamp),
+                  ApproximateTime(timestamp),
+                  potentialTopologyChange = true,
+                )
+                logIfNoPendingTopologyChanges()
+              }
+            // the effective timestamp has already been witnessed
+            case None =>
+              updateHead(
+                effectiveTimestamp,
+                ApproximateTime(effectiveTimestamp.value),
+                potentialTopologyChange = true,
               )
-            }
-          },
-          deltaDuration,
-        )
-        .discard
+              logIfNoPendingTopologyChanges()
+          }
+        case None =>
+          logger.warn("Not advancing the time using the time tracker as it's unavailable")
+      }
     }
     FutureUnlessShutdown.unit
   }
@@ -208,13 +239,28 @@ abstract class BaseDomainTopologyClient
   override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
     topologyKnownUntilTimestamp >= timestamp
 
+  override def trySnapshot(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): StoreBasedTopologySnapshot = {
+    ErrorUtil.requireArgument(
+      timestamp <= topologyKnownUntilTimestamp,
+      s"requested snapshot=$timestamp, topology known until=$topologyKnownUntilTimestamp",
+    )
+    new StoreBasedTopologySnapshot(
+      timestamp,
+      store,
+      packageDependenciesResolver,
+      loggerFactory,
+    )
+  }
+
   override def topologyKnownUntilTimestamp: CantonTimestamp =
     head.get().effectiveTimestamp.value.immediateSuccessor
 
   /** returns the current approximate timestamp
     *
     * whenever we get an update, we do set the approximate timestamp first to the sequencer time
-    * and schedule an update on the clock to advance the approximate time to the effective time
+    * and use the domain time tracker to advance the approximate time to the effective time
     * after the time difference elapsed.
     */
   override def approximateTimestamp: CantonTimestamp =
@@ -272,7 +318,12 @@ abstract class BaseDomainTopologyClient
 
 object StoreBasedDomainTopologyClient {
 
-  def NoPackageDependencies: PackageId => EitherT[Future, PackageId, Set[PackageId]] = { _ =>
-    EitherT(Future.successful(Either.right(Set.empty[PackageId])))
+  object NoPackageDependencies extends PackageDependencyResolverUS {
+    override def packageDependencies(packagesId: PackageId)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+      EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]](
+        FutureUnlessShutdown.pure(Right(Set.empty[PackageId]))
+      )
   }
 }

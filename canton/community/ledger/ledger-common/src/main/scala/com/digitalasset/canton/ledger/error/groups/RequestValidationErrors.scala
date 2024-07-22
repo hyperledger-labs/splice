@@ -14,14 +14,14 @@ import com.daml.error.{
   Explanation,
   Resolution,
 }
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.PackageId
-import com.daml.lf.language.{LookupError, Reference}
 import com.digitalasset.canton.ledger.error.LedgerApiErrors.{
   EarliestOffsetMetadataKey,
   LatestOffsetMetadataKey,
 }
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.RequestValidationErrorGroup
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.language.{LookupError, Reference}
 
 import java.time.Duration
 
@@ -250,8 +250,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     final case class Reject(reason: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          // TODO(i12777): Update the cause to mention a 'request' instead of a 'command'
-          cause = s"The submitted command has invalid arguments: ${reason}"
+          cause = s"The submitted request has invalid arguments: ${reason}"
         )
   }
 

@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
@@ -8,9 +9,9 @@ import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.util.DomainMigrationUtil.UpgradeSynchronizerNode
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.{BaseTest, DiscardOps}
+import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

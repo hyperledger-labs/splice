@@ -7,7 +7,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.{Applicative, Functor}
 import com.daml.metrics.api.MetricHandle.Timer
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -27,13 +27,7 @@ object EitherTUtil {
   def onErrorOrFailure[A, B](errorHandler: () => Unit)(
       fn: => EitherT[Future, A, B]
   )(implicit executionContext: ExecutionContext): EitherT[Future, A, B] =
-    fn.thereafter {
-      case Failure(_) =>
-        errorHandler()
-      case Success(Left(_)) =>
-        errorHandler()
-      case _ => ()
-    }
+    fn.thereafterSuccessOrFailure(_ => (), errorHandler())
 
   def onErrorOrFailureUnlessShutdown[A, B](
       errorHandler: Either[Throwable, A] => Unit,
@@ -51,7 +45,7 @@ object EitherTUtil {
       case _ => ()
     }
 
-  /** Lifts an `if (cond) then ... else ()` into the `EitherT` a  pplicative */
+  /** Lifts an `if (cond) then ... else ()` into the `EitherT` applicative */
   def ifThenET[F[_], L](cond: Boolean)(`then`: => EitherT[F, L, _])(implicit
       F: Applicative[F]
   ): EitherT[F, L, Unit] =
@@ -76,6 +70,12 @@ object EitherTUtil {
   ): EitherT[Future, E, A] =
     liftFailedFuture(fut.map(Right(_)), errorHandler)
 
+  /** Variation of fromFuture  that takes a [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] */
+  def fromFuture[E, A](futUnlSht: FutureUnlessShutdown[A], errorHandler: Throwable => E)(implicit
+      ec: ExecutionContext
+  ): EitherT[FutureUnlessShutdown, E, A] =
+    liftFailedFuture(futUnlSht.map(Right(_)), errorHandler)
+
   /** Lift a failed future into a Left value. */
   def liftFailedFuture[E, A](fut: Future[Either[E, A]], errorHandler: Throwable => E)(implicit
       executionContext: ExecutionContext
@@ -83,6 +83,18 @@ object EitherTUtil {
     EitherT(fut.recover[Either[E, A]] { case NonFatal(x) =>
       errorHandler(x).asLeft[A]
     })
+
+  /** Variation of liftFailedFuture that takes a [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] */
+  def liftFailedFuture[E, A](
+      futUnlSht: FutureUnlessShutdown[Either[E, A]],
+      errorHandler: Throwable => E,
+  )(implicit
+      executionContext: ExecutionContext
+  ): EitherT[FutureUnlessShutdown, E, A] = {
+    EitherT(futUnlSht.recover[Either[E, A]] { case NonFatal(x) =>
+      UnlessShutdown.Outcome(errorHandler(x).asLeft[A])
+    })
+  }
 
   /** Log `message` if `result` fails with an exception or results in a `Left` */
   def logOnError[E, R](result: EitherT[Future, E, R], message: String, level: Level = Level.ERROR)(
@@ -149,7 +161,7 @@ object EitherTUtil {
   /** Measure time of EitherT-based calls, inspired by upstream com.daml.metrics.Timed.future */
   def timed[F[_], E, R](timerMetric: Timer)(
       code: => EitherT[F, E, R]
-  )(implicit executionContext: ExecutionContext, F: Thereafter[F]): EitherT[F, E, R] = {
+  )(implicit F: Thereafter[F]): EitherT[F, E, R] = {
     val timer = timerMetric.startAsync()
     code.thereafter { _ =>
       timer.stop()

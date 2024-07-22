@@ -3,11 +3,13 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
   SqlStringInterpolation,
 }
+
+import java.sql.Connection
 
 object QueryStrategy {
 
@@ -40,6 +42,15 @@ trait QueryStrategy {
     * @return the function name
     */
   def booleanOrAggregationFunction: String = "bool_or"
+
+  /** Select a singleton element from some column based on max value of another column
+    *
+    * @param singletonColumn column whose value should be returned when the orderingColumn hits max
+    * @param orderingColumn column used for sorting the input rows
+    * @return an sql clause to be composed into the sql query
+    */
+  def lastByProxyAggregateFuction(singletonColumn: String, orderingColumn: String): String =
+    s"(array_agg($singletonColumn ORDER BY $orderingColumn DESC))[1]"
 
   /** Predicate which tests if the element referenced by the `elementColumnName`
     * is in the array from column `arrayColumnName`
@@ -126,4 +137,6 @@ trait QueryStrategy {
   }
 
   def analyzeTable(tableName: String): CompositeSql
+
+  def forceSynchronousCommitForCurrentTransactionForPostgreSQL(connection: Connection): Unit = ()
 }

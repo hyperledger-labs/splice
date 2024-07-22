@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.protocol.transfer
 
 import cats.data.EitherT
 import com.digitalasset.canton.*
+import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, TransferSubmitterMetadata}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.submission.SeedGenerator
@@ -14,7 +15,7 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingS
   TransferProcessorError,
 }
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.sequencing.protocol.{MediatorsOfDomain, Recipients}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, Recipients}
 import com.digitalasset.canton.time.TimeProofTestUtil
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
@@ -31,7 +32,7 @@ class TransferOutValidationTest
   private val sourceDomain = SourceDomainId(
     DomainId.tryFromString("domain::source")
   )
-  private val sourceMediator = MediatorsOfDomain(MediatorGroupIndex.tryCreate(100))
+  private val sourceMediator = MediatorGroupRecipient(MediatorGroupIndex.tryCreate(100))
   private val targetDomain = TargetDomainId(
     DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::target"))
   )
@@ -61,7 +62,7 @@ class TransferOutValidationTest
 
   val transferId = TransferId(sourceDomain, CantonTimestamp.Epoch)
   val uuid = new UUID(3L, 4L)
-  private val pureCrypto = TestingIdentityFactoryX.pureCrypto()
+  private val pureCrypto = new SymbolicPureCrypto
   private val seedGenerator = new SeedGenerator(pureCrypto)
   val seed = seedGenerator.generateSaltSeed()
 
@@ -77,11 +78,11 @@ class TransferOutValidationTest
     metadata = ContractMetadata.tryCreate(
       signatories = Set(submitterParty1),
       stakeholders = Set(submitterParty1),
-      maybeKeyWithMaintainers = None,
+      maybeKeyWithMaintainersVersioned = None,
     ),
   )
 
-  private val identityFactory = TestingTopologyX()
+  private val identityFactory = TestingTopology()
     .withDomains(sourceDomain.unwrap)
     .withReversedTopology(
       Map(

@@ -10,6 +10,7 @@ import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
@@ -27,7 +28,7 @@ object EnvelopeContent
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v30
+      ProtocolVersion.v31
     )(v30.EnvelopeContent)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toByteStringUnversioned,
@@ -57,7 +58,7 @@ object EnvelopeContent
       context: (HashOps, ProtocolVersion),
       contentP: v30.EnvelopeContent,
   ): ParsingResult[EnvelopeContent] = {
-    val (_, expectedProtocolVersion) = context
+    val (hashOps, expectedProtocolVersion) = context
     import v30.EnvelopeContent.SomeEnvelopeContent as Content
     for {
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -67,13 +68,17 @@ object EnvelopeContent
         case Content.EncryptedViewMessage(messageP) =>
           EncryptedViewMessage.fromProto(messageP)
         case Content.TransferOutMediatorMessage(messageP) =>
-          TransferOutMediatorMessage.fromProtoV30(context)(messageP)
+          TransferOutMediatorMessage.fromProtoV30(
+            (hashOps, SourceProtocolVersion(expectedProtocolVersion))
+          )(messageP)
         case Content.TransferInMediatorMessage(messageP) =>
-          TransferInMediatorMessage.fromProtoV30(context)(messageP)
+          TransferInMediatorMessage.fromProtoV30(
+            (hashOps, TargetProtocolVersion(expectedProtocolVersion))
+          )(messageP)
         case Content.RootHashMessage(messageP) =>
           RootHashMessage.fromProtoV30(SerializedRootHashMessagePayload.fromByteString)(messageP)
         case Content.TopologyTransactionsBroadcast(messageP) =>
-          TopologyTransactionsBroadcastX.fromProtoV30(expectedProtocolVersion, messageP)
+          TopologyTransactionsBroadcast.fromProtoV30(expectedProtocolVersion, messageP)
         case Content.Empty => Left(OtherError("Cannot deserialize an empty message content"))
       }): ParsingResult[UnsignedProtocolMessage]
     } yield EnvelopeContent(content)(rpv)

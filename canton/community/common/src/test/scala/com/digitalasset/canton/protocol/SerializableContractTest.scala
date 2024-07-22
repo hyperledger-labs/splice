@@ -3,12 +3,19 @@
 
 package com.digitalasset.canton.protocol
 
-import com.daml.lf.data.{Bytes, Ref}
-import com.daml.lf.value.Value
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash, TestSalt}
 import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.canton.{BaseTest, LfPartyId, LfTimestamp, LfValue, LfVersioned}
+import com.digitalasset.canton.{
+  BaseTest,
+  LfPackageName,
+  LfPartyId,
+  LfTimestamp,
+  LfValue,
+  LfVersioned,
+}
+import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
 class SerializableContractTest extends AnyWordSpec with BaseTest {
@@ -26,9 +33,11 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       val metadata = ContractMetadata.tryCreate(
         signatories = Set(alice),
         stakeholders = Set(alice, bob),
-        maybeKeyWithMaintainers = Some(
+        maybeKeyWithMaintainersVersioned = Some(
           ExampleTransactionFactory.globalKeyWithMaintainers(
-            LfGlobalKey.build(templateId, Value.ValueUnit).value,
+            LfGlobalKey
+              .build(templateId, Value.ValueUnit, LfPackageName.assertFromString("package-name"))
+              .value,
             Set(alice),
           )
         ),
@@ -65,9 +74,11 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       AuthenticatedContractIdVersionV10.fromDiscriminator(contractIdDiscriminator, contractIdSuffix)
 
     val pkgName = Ref.PackageName.assertFromString("pkgName")
+    val pkgVersion = Some(Ref.PackageVersion.assertFromString("0.1.2"))
     val disclosedContract = ProcessedDisclosedContract(
       templateId = templateId,
       packageName = pkgName,
+      packageVersion = pkgVersion,
       contractId = authenticatedContractId,
       argument = LfValue.ValueNil,
       createdAt = createdAt,
@@ -92,6 +103,7 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
                 transactionVersion,
                 LfValue.ContractInstance(
                   packageName = pkgName,
+                  packageVersion = pkgVersion,
                   template = templateId,
                   arg = LfValue.ValueNil,
                 ),

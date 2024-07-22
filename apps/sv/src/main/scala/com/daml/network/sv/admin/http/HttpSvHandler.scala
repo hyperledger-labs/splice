@@ -29,7 +29,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.SequencerDomainStateX
+import com.digitalasset.canton.topology.transaction.SequencerDomainState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
@@ -505,7 +505,7 @@ class HttpSvHandler(
           .map { result =>
             result
               .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerDomainStateX]]](None) {
+              .foldLeft[Option[TopologyResult[SequencerDomainState]]](None) {
                 case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
                   None
                 case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>

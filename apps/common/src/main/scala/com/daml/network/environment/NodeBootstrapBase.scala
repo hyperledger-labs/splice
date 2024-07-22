@@ -3,14 +3,13 @@
 
 package com.daml.network.environment
 
-import org.apache.pekko.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.network.SpliceMetrics
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
@@ -18,13 +17,13 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 import com.daml.network.admin.http.{AdminRoutes, HttpAdminService}
 
 object NodeBootstrap {
@@ -51,7 +50,6 @@ trait NodeBootstrap[+N <: CantonNode]
   def getNode: Option[N]
 
   // TODO(#736): following methods are only here because of the CantonNodeBootstrap trait
-  def getId: Option[NodeId] = None
   def crypto: Option[Crypto] = ???
 
 }

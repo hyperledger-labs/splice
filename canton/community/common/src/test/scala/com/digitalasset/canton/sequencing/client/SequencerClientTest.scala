@@ -6,25 +6,34 @@ package com.digitalasset.canton.sequencing.client
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.metrics.api.{MetricName, MetricsContext}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{CryptoPureApi, Fingerprint, HashPurpose}
+import com.digitalasset.canton.crypto.{
+  DomainSyncCryptoClient,
+  Fingerprint,
+  HashPurpose,
+  SyncCryptoApi,
+}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthComponent.AlwaysHealthyComponent
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
-import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerClientMetrics}
-import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.{CommonMockMetrics, TrafficConsumptionMetrics}
+import com.digitalasset.canton.protocol.messages.{
+  DefaultOpenEnvelope,
+  ProtocolMessage,
+  UnsignedProtocolMessage,
+}
 import com.digitalasset.canton.protocol.{
   DomainParametersLookup,
   DynamicDomainParametersLookup,
   TestDomainParameters,
+  v30,
 }
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
@@ -46,8 +55,13 @@ import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
   SequencerClientTransportPekko,
 }
-import com.digitalasset.canton.sequencing.handshake.HandshakeRequestError
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.{
+  EventCostCalculator,
+  TrafficConsumed,
+  TrafficReceipt,
+  TrafficStateController,
+}
 import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
@@ -62,13 +76,17 @@ import com.digitalasset.canton.store.{
   SequencerCounterTrackerStore,
 }
 import com.digitalasset.canton.time.{DomainTimeTracker, MockTimeRequestSubmitter, SimClock}
-import com.digitalasset.canton.topology.DefaultTestIdentities.{participant1, sequencerId}
+import com.digitalasset.canton.topology.DefaultTestIdentities.{
+  daSequencerId,
+  domainId,
+  participant1,
+}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.{DomainTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
@@ -90,11 +108,7 @@ class SequencerClientTest
     with CloseableTest
     with BeforeAndAfterAll {
 
-  private lazy val metrics =
-    new SequencerClientMetrics(
-      MetricName("SequencerClientTest"),
-      NoOpMetricsFactory,
-    )(MetricsContext.Empty)
+  private lazy val metrics = CommonMockMetrics.sequencerClient
   private lazy val firstSequencerCounter = SequencerCounter(42L)
   private lazy val deliver: Deliver[Nothing] =
     SequencerTestUtils.mockDeliver(
@@ -103,7 +117,7 @@ class SequencerClientTest
       DefaultTestIdentities.domainId,
     )
   private lazy val signedDeliver: OrdinarySerializedEvent = {
-    OrdinarySequencedEvent(SequencerTestUtils.sign(deliver), None)(traceContext)
+    OrdinarySequencedEvent(SequencerTestUtils.sign(deliver))(traceContext)
   }
 
   private lazy val nextDeliver: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
@@ -124,6 +138,19 @@ class SequencerClientTest
 
   private var actorSystem: ActorSystem = _
   private lazy val materializer: Materializer = Materializer(actorSystem)
+  private lazy val topologyWithTrafficControl = TestingTopology(Set(domainId))
+    .withDynamicDomainParameters(
+      DefaultTestIdentities.defaultDynamicDomainParameters.tryUpdate(
+        trafficControlParameters = Some(
+          TrafficControlParameters(
+            maxBaseTrafficAmount = NonNegativeLong.zero
+          )
+        )
+      ),
+      validFrom = CantonTimestamp.MinValue,
+    )
+    .build()
+    .forOwnerAndDomain(participant1, domainId)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -181,7 +208,7 @@ class SequencerClientTest
       "doesn't give prior event to the application handler" in {
         val validated = new AtomicBoolean()
         val processed = new AtomicBoolean()
-        val env @ Env(_, transport, _, _, _) = factory.create(
+        val env @ Env(_, transport, _, _, _, _) = factory.create(
           eventValidator = new SequencedEventValidator {
             override def validate(
                 priorEvent: Option[PossiblyIgnoredSerializedEvent],
@@ -361,7 +388,7 @@ class SequencerClientTest
   def richSequencerClient(): Unit = {
     "subscribe" should {
       "stores the event in the SequencedEventStore" in {
-        val env @ Env(client, transport, _, sequencedEventStore, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, sequencedEventStore, _, _) = RichEnvFactory.create()
         val storedEventF = for {
           _ <- env.subscribeAfter()
           _ <- transport.subscriber.value.sendToHandler(signedDeliver)
@@ -374,7 +401,7 @@ class SequencerClientTest
       }
 
       "stores the event even if the handler fails" in {
-        val env @ Env(client, transport, _, sequencedEventStore, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, sequencedEventStore, _, _) = RichEnvFactory.create()
         val storedEventF = for {
           _ <- env.subscribeAfter(eventHandler = alwaysFailingHandler)
           _ <- loggerFactory.assertLogs(
@@ -401,7 +428,7 @@ class SequencerClientTest
       "completes the sequencer client if the subscription closes due to an error" in {
         val error =
           EventValidationError(GapInSequencerCounter(SequencerCounter(666), SequencerCounter(0)))
-        val env @ Env(client, transport, _, _, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, _, _, _) = RichEnvFactory.create()
         val closeReasonF = for {
           _ <- env.subscribeAfter(CantonTimestamp.MinValue, alwaysSuccessfulHandler)
           subscription = transport.subscriber
@@ -431,7 +458,7 @@ class SequencerClientTest
             FutureUnlessShutdown.failed[AsyncResult](error)
           )
 
-        val env @ Env(client, transport, _, _, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, _, _, _) = RichEnvFactory.create()
         val closeReasonF = for {
           _ <- env.subscribeAfter(CantonTimestamp.MinValue, handler)
           closeReason <- loggerFactory.assertLogs(
@@ -451,8 +478,8 @@ class SequencerClientTest
               )
               logEntry.throwable shouldBe Some(error)
             },
-            _.warningMessage should include(
-              s"Closing resilient sequencer subscription due to error: HandlerError($syncError)"
+            _.errorMessage should include(
+              s"Sequencer subscription is being closed due to handler exception (this indicates a bug): $syncError"
             ),
           )
 
@@ -470,7 +497,7 @@ class SequencerClientTest
         val handler: PossiblyIgnoredApplicationHandler[ClosedEnvelope] =
           ApplicationHandler.create("shutdown")(_ => FutureUnlessShutdown.abortedDueToShutdown)
 
-        val env @ Env(client, transport, _, _, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, _, _, _) = RichEnvFactory.create()
         val closeReasonF = for {
           _ <- env.subscribeAfter(eventHandler = handler)
           closeReason <- {
@@ -495,7 +522,7 @@ class SequencerClientTest
         val asyncFailure = HandlerResult.asynchronous(FutureUnlessShutdown.failed(error))
         val asyncException = ApplicationHandlerException(error, deliver.counter, deliver.counter)
 
-        val env @ Env(client, transport, _, _, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, _, _, _) = RichEnvFactory.create()
         val closeReasonF = for {
           _ <- env.subscribeAfter(
             eventHandler = ApplicationHandler.create("async-failure")(_ => asyncFailure)
@@ -525,8 +552,8 @@ class SequencerClientTest
               )
               logEntry.throwable shouldBe Some(error)
             },
-            _.warningMessage should include(
-              s"Closing resilient sequencer subscription due to error: HandlerError($asyncException)"
+            _.errorMessage should include(
+              s"Sequencer subscription is being closed due to handler exception (this indicates a bug): $asyncException"
             ),
           )
         } yield closeReason
@@ -539,7 +566,7 @@ class SequencerClientTest
       "completes the sequencer client if asynchronous event processing shuts down" in {
         val asyncShutdown = HandlerResult.asynchronous(FutureUnlessShutdown.abortedDueToShutdown)
 
-        val env @ Env(client, transport, _, _, _) = RichEnvFactory.create()
+        val env @ Env(client, transport, _, _, _, _) = RichEnvFactory.create()
         val closeReasonF = for {
           _ <- env.subscribeAfter(
             CantonTimestamp.MinValue,
@@ -566,7 +593,7 @@ class SequencerClientTest
 
     "subscribeTracking" should {
       "updates sequencer counter prehead" in {
-        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker) =
+        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker, _) =
           RichEnvFactory.create()
         val preHeadF = for {
           _ <- client.subscribeTracking(
@@ -585,7 +612,7 @@ class SequencerClientTest
 
       "replays from the sequencer counter prehead" in {
         val processedEvents = new ConcurrentLinkedQueue[SequencerCounter]
-        val Env(client, _transport, sequencerCounterTrackerStore, _, timeTracker) =
+        val Env(client, _transport, sequencerCounterTrackerStore, _, timeTracker, _) =
           RichEnvFactory.create(
             storedEvents = Seq(deliver, nextDeliver, deliver44, deliver45),
             cleanPrehead = Some(CursorPrehead(nextDeliver.counter, nextDeliver.timestamp)),
@@ -614,7 +641,7 @@ class SequencerClientTest
       "resubscribes after replay" in {
         val processedEvents = new ConcurrentLinkedQueue[SequencerCounter]
 
-        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker) =
+        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker, _) =
           RichEnvFactory.create(
             storedEvents = Seq(deliver, nextDeliver, deliver44),
             cleanPrehead = Some(CursorPrehead(nextDeliver.counter, nextDeliver.timestamp)),
@@ -643,7 +670,7 @@ class SequencerClientTest
       }
 
       "does not update the prehead if the application handler fails" in {
-        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker) =
+        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker, _) =
           RichEnvFactory.create()
         val preHeadF = for {
           _ <- client.subscribeTracking(
@@ -687,7 +714,7 @@ class SequencerClientTest
             }
           }
 
-        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker) =
+        val Env(client, transport, sequencerCounterTrackerStore, _, timeTracker, _) =
           RichEnvFactory.create(
             options = SequencerClientConfig(eventInboxSize = PositiveInt.tryCreate(1))
           )
@@ -715,6 +742,108 @@ class SequencerClientTest
 
         testF.futureValue
         client.close()
+      }
+    }
+
+    "submissionCost" should {
+      "compute submission cost and update traffic state when receiving the receipt" in {
+        val env = RichEnvFactory.create(
+          initialSequencerCounter = SequencerCounter.Genesis,
+          topologyO = Some(topologyWithTrafficControl),
+        )
+        val messageId = MessageId.tryCreate("mock-deliver")
+        val trafficReceipt = TrafficReceipt(
+          consumedCost = NonNegativeLong.tryCreate(4),
+          extraTrafficConsumed = NonNegativeLong.tryCreate(4),
+          baseTrafficRemainder = NonNegativeLong.zero,
+        )
+        val testF = for {
+          _ <- env.subscribeAfter()
+          _ <- env
+            .sendAsync(
+              Batch.of(
+                testedProtocolVersion,
+                (new TestProtocolMessage("_unused"), Recipients.cc(participant1)),
+              ),
+              messageId = messageId,
+            )
+            .value
+          _ <- env.transport.subscriber.value.sendToHandler(
+            OrdinarySequencedEvent(
+              SequencerTestUtils.sign(
+                SequencerTestUtils.mockDeliver(
+                  0L,
+                  CantonTimestamp.MinValue.immediateSuccessor,
+                  DefaultTestIdentities.domainId,
+                  messageId = Some(messageId),
+                  trafficReceipt = Some(trafficReceipt),
+                )
+              )
+            )(traceContext)
+          )
+          _ <- env.client.flushClean()
+        } yield {
+          env.trafficStateController.getTrafficConsumed shouldBe TrafficConsumed(
+            participant1,
+            CantonTimestamp.MinValue.immediateSuccessor,
+            trafficReceipt.extraTrafficConsumed,
+            trafficReceipt.baseTrafficRemainder,
+            trafficReceipt.consumedCost,
+          )
+        }
+
+        testF.futureValue
+        env.client.close()
+      }
+
+      "consume traffic from deliver errors" in {
+        val env = RichEnvFactory.create(
+          initialSequencerCounter = SequencerCounter.Genesis,
+          topologyO = Some(topologyWithTrafficControl),
+        )
+        val messageId = MessageId.tryCreate("mock-deliver")
+        val trafficReceipt = TrafficReceipt(
+          NonNegativeLong.tryCreate(4),
+          NonNegativeLong.tryCreate(4),
+          NonNegativeLong.zero,
+        )
+        val testF = for {
+          _ <- env.subscribeAfter()
+          _ <- env
+            .sendAsync(
+              Batch.of(
+                testedProtocolVersion,
+                (new TestProtocolMessage("_unused"), Recipients.cc(participant1)),
+              ),
+              messageId = messageId,
+            )
+            .value
+          _ <- env.transport.subscriber.value.sendToHandler(
+            OrdinarySequencedEvent(
+              SequencerTestUtils.sign(
+                SequencerTestUtils.mockDeliverError(
+                  0L,
+                  CantonTimestamp.MinValue.immediateSuccessor,
+                  DefaultTestIdentities.domainId,
+                  messageId = messageId,
+                  trafficReceipt = Some(trafficReceipt),
+                )
+              )
+            )(traceContext)
+          )
+          _ <- env.client.flushClean()
+        } yield {
+          env.trafficStateController.getTrafficConsumed shouldBe TrafficConsumed(
+            participant1,
+            CantonTimestamp.MinValue.immediateSuccessor,
+            trafficReceipt.extraTrafficConsumed,
+            trafficReceipt.baseTrafficRemainder,
+            trafficReceipt.consumedCost,
+          )
+        }
+
+        testF.futureValue
+        env.client.close()
       }
     }
 
@@ -813,7 +942,7 @@ class SequencerClientTest
           _ <- env.changeTransport(
             SequencerTransports.single(
               SequencerAlias.tryCreate("somethingElse"),
-              sequencerId,
+              daSequencerId,
               secondTransport,
             )
           )
@@ -830,7 +959,7 @@ class SequencerClientTest
       "fail to reassign sequencerId" in {
         val secondTransport = MockTransport()
         val secondSequencerId = SequencerId(
-          UniqueIdentifier(Identifier.tryCreate("da2"), Namespace(Fingerprint.tryCreate("default")))
+          UniqueIdentifier.tryCreate("da2", Namespace(Fingerprint.tryCreate("default")))
         )
 
         val env = RichEnvFactory.create()
@@ -874,7 +1003,7 @@ class SequencerClientTest
     def sendToHandler(event: OrdinarySerializedEvent): Future[Unit]
 
     def sendToHandler(event: SequencedEvent[ClosedEnvelope]): Future[Unit] = {
-      sendToHandler(OrdinarySequencedEvent(SequencerTestUtils.sign(event), None)(traceContext))
+      sendToHandler(OrdinarySequencedEvent(SequencerTestUtils.sign(event))(traceContext))
     }
   }
 
@@ -920,6 +1049,7 @@ class SequencerClientTest
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       sequencedEventStore: SequencedEventStore,
       timeTracker: DomainTimeTracker,
+      trafficStateController: TrafficStateController,
   ) {
 
     def subscribeAfter(
@@ -938,7 +1068,7 @@ class SequencerClientTest
         newTransport: SequencerClientTransport & SequencerClientTransportPekko
     )(implicit ev: Client <:< RichSequencerClient): Future[Unit] = {
       changeTransport(
-        SequencerTransports.default(sequencerId, newTransport)
+        SequencerTransports.default(daSequencerId, newTransport)
       )
     }
 
@@ -948,11 +1078,12 @@ class SequencerClientTest
       ev(client).changeTransport(sequencerTransports)
 
     def sendAsync(
-        batch: Batch[DefaultOpenEnvelope]
+        batch: Batch[DefaultOpenEnvelope],
+        messageId: MessageId = client.generateMessageId,
     )(implicit
         traceContext: TraceContext
     ): EitherT[Future, SendAsyncClientError, Unit] =
-      client.sendAsync(batch).onShutdown(fail())
+      client.sendAsync(batch, messageId = messageId).onShutdown(fail())
   }
 
   private class MockSubscription[E] extends SequencerSubscription[E] {
@@ -1003,15 +1134,33 @@ class SequencerClientTest
 
     val lastSend = new AtomicReference[Option[SubmissionRequest]](None)
 
-    override def acknowledge(request: AcknowledgeRequest)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
-      Future.unit
-
     override def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
         traceContext: TraceContext
-    ): EitherT[Future, String, Unit] =
-      EitherT.rightT(())
+    ): EitherT[FutureUnlessShutdown, String, Boolean] =
+      EitherT.rightT(true)
+
+    override def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] =
+      EitherT.pure(
+        GetTrafficStateForMemberResponse(
+          Some(
+            TrafficState(
+              extraTrafficPurchased = NonNegativeLong.zero,
+              // Use the timestamp as the traffic consumed
+              // This allows us to assert how the state returned by this function is used by the state controller to
+              // refresh its own traffic state
+              extraTrafficConsumed =
+                NonNegativeLong.tryCreate(Math.abs(request.timestamp.toProtoPrimitive)),
+              baseTrafficRemainder = NonNegativeLong.zero,
+              lastConsumedCost = NonNegativeLong.zero,
+              timestamp = request.timestamp,
+              serial = None,
+            )
+          ),
+          testedProtocolVersion,
+        )
+      )
 
     private def sendAsync(
         request: SubmissionRequest
@@ -1023,15 +1172,10 @@ class SequencerClientTest
     override def sendAsyncSigned(
         request: SignedContent[SubmissionRequest],
         timeout: Duration,
-    )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientResponseError, Unit] =
-      sendAsync(request.content)
-
-    override def sendAsyncUnauthenticatedVersioned(
-        request: SubmissionRequest,
-        timeout: Duration,
     )(implicit
         traceContext: TraceContext
-    ): EitherT[Future, SendAsyncClientResponseError, Unit] = ???
+    ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
+      sendAsync(request.content).mapK(FutureUnlessShutdown.outcomeK)
 
     override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
         implicit traceContext: TraceContext
@@ -1050,17 +1194,8 @@ class SequencerClientTest
     override def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
       SubscriptionErrorRetryPolicy.never
 
-    override def handshake(request: HandshakeRequest)(implicit
-        traceContext: TraceContext
-    ): EitherT[Future, HandshakeRequestError, HandshakeResponse] = ???
-
     override protected def loggerFactory: NamedLoggerFactory =
       SequencerClientTest.this.loggerFactory
-
-    override def subscribeUnauthenticated[E](
-        request: SubscriptionRequest,
-        handler: SerializedEventHandler[E],
-    )(implicit traceContext: TraceContext): SequencerSubscription[E] = ???
 
     override def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
         traceContext: TraceContext
@@ -1088,10 +1223,6 @@ class SequencerClientTest
         new AlwaysHealthyComponent("sequencer-client-test-source", logger),
       )
     }
-
-    override def subscribeUnauthenticated(request: SubscriptionRequest)(implicit
-        traceContext: TraceContext
-    ): SequencerSubscriptionPekko[SubscriptionError] = subscribe(request)
 
     override def subscriptionRetryPolicyPekko
         : SubscriptionErrorRetryPolicyPekko[SubscriptionError] =
@@ -1124,6 +1255,7 @@ class SequencerClientTest
         eventValidator: SequencedEventValidator = eventAlwaysValid,
         options: SequencerClientConfig = SequencerClientConfig(),
         initialSequencerCounter: SequencerCounter = firstSequencerCounter,
+        topologyO: Option[DomainSyncCryptoClient] = None,
     )(implicit closeContext: CloseContext): Env[Client]
 
     protected def preloadStores(
@@ -1135,7 +1267,7 @@ class SequencerClientTest
       val signedEvents = storedEvents.map(SequencerTestUtils.sign)
       val preloadStores = for {
         _ <- sequencedEventStore.store(
-          signedEvents.map(OrdinarySequencedEvent(_, None)(TraceContext.empty))
+          signedEvents.map(OrdinarySequencedEvent(_)(TraceContext.empty))
         )
         _ <- cleanPrehead.traverse_(prehead =>
           sequencerCounterTrackerStore.advancePreheadSequencerCounterTo(prehead)
@@ -1172,26 +1304,46 @@ class SequencerClientTest
     override def signRequest[A <: HasCryptographicEvidence](
         request: A,
         hashPurpose: HashPurpose,
+        snapshot: Option[SyncCryptoApi],
     )(implicit
         ec: ExecutionContext,
         traceContext: TraceContext,
-    ): EitherT[Future, String, SignedContent[A]] = {
+    ): EitherT[FutureUnlessShutdown, String, SignedContent[A]] = {
       val signedContent = SignedContent(
         request,
         SymbolicCrypto.emptySignature,
         None,
         testedProtocolVersion,
       )
-      EitherT(Future.successful(Either.right[String, SignedContent[A]](signedContent)))
+      EitherT(FutureUnlessShutdown.pure(Either.right[String, SignedContent[A]](signedContent)))
     }
   }
 
   private class ConstantSequencedEventValidatorFactory(eventValidator: SequencedEventValidator)
       extends SequencedEventValidatorFactory {
-    override def create(
-        unauthenticated: Boolean
-    )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
+    override def create(loggerFactory: NamedLoggerFactory)(implicit
+        traceContext: TraceContext
+    ): SequencedEventValidator =
       eventValidator
+  }
+
+  private object TestProtocolMessage
+  private class TestProtocolMessage(_text: String)
+      extends ProtocolMessage
+      with UnsignedProtocolMessage {
+    override def domainId: DomainId = fail("shouldn't be used")
+
+    override def representativeProtocolVersion: RepresentativeProtocolVersion[companionObj.type] =
+      fail("shouldn't be used")
+
+    override protected val companionObj: AnyRef = TestProtocolMessage
+
+    override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
+      v30.EnvelopeContent.SomeEnvelopeContent.Empty
+
+    override def productElement(n: Int): Any = fail("shouldn't be used")
+    override def productArity: Int = fail("shouldn't be used")
+    override def canEqual(that: Any): Boolean = fail("shouldn't be used")
   }
 
   private object RichEnvFactory extends EnvFactory[RichSequencerClient] {
@@ -1201,14 +1353,13 @@ class SequencerClientTest
         eventValidator: SequencedEventValidator,
         options: SequencerClientConfig,
         initialSequencerCounter: SequencerCounter,
+        topologyO: Option[DomainSyncCryptoClient] = None,
     )(implicit closeContext: CloseContext): Env[RichSequencerClient] = {
       val clock = new SimClock(loggerFactory = loggerFactory)
       val timeouts = DefaultProcessingTimeouts.testing
       val transport = MockTransport()
       val sendTrackerStore = new InMemorySendTrackerStore()
       val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory)
-      val sendTracker =
-        new SendTracker(Map.empty, sendTrackerStore, metrics, loggerFactory, timeouts)
       val sequencerCounterTrackerStore =
         new InMemorySequencerCounterTrackerStore(loggerFactory, timeouts)
       val timeTracker = new DomainTimeTracker(
@@ -1220,10 +1371,38 @@ class SequencerClientTest
       )
       val eventValidatorFactory = new ConstantSequencedEventValidatorFactory(eventValidator)
 
+      val topologyClient =
+        topologyO.getOrElse(
+          TestingTopology(Set(DefaultTestIdentities.domainId))
+            .build(loggerFactory)
+            .forOwnerAndDomain(participant1, domainId)
+        )
+      val trafficStateController = new TrafficStateController(
+        participant1,
+        loggerFactory,
+        topologyClient,
+        TrafficState.empty(CantonTimestamp.MinValue),
+        testedProtocolVersion,
+        new EventCostCalculator(loggerFactory),
+        futureSupervisor,
+        timeouts,
+        TrafficConsumptionMetrics.noop,
+      )
+      val sendTracker =
+        new SendTracker(
+          Map.empty,
+          sendTrackerStore,
+          metrics,
+          loggerFactory,
+          timeouts,
+          Some(trafficStateController),
+          participant1,
+        )
+
       val client = new RichSequencerClientImpl(
         DefaultTestIdentities.domainId,
         participant1,
-        SequencerTransports.default(DefaultTestIdentities.sequencerId, transport),
+        SequencerTransports.default(DefaultTestIdentities.daSequencerId, transport),
         options,
         TestingConfigInternal(),
         BaseTest.defaultStaticDomainParameters.protocolVersion,
@@ -1237,8 +1416,9 @@ class SequencerClientTest
         CommonMockMetrics.sequencerClient,
         None,
         false,
-        mock[CryptoPureApi],
+        topologyClient,
         LoggingConfig(),
+        Some(trafficStateController),
         loggerFactory,
         futureSupervisor,
         initialSequencerCounter,
@@ -1246,7 +1426,14 @@ class SequencerClientTest
 
       preloadStores(storedEvents, cleanPrehead, sequencedEventStore, sequencerCounterTrackerStore)
 
-      Env(client, transport, sequencerCounterTrackerStore, sequencedEventStore, timeTracker)
+      Env(
+        client,
+        transport,
+        sequencerCounterTrackerStore,
+        sequencedEventStore,
+        timeTracker,
+        trafficStateController,
+      )
     }
   }
 
@@ -1257,14 +1444,13 @@ class SequencerClientTest
         eventValidator: SequencedEventValidator,
         options: SequencerClientConfig,
         initialSequencerCounter: SequencerCounter,
+        topologyO: Option[DomainSyncCryptoClient] = None,
     )(implicit closeContext: CloseContext): Env[SequencerClient] = {
       val clock = new SimClock(loggerFactory = loggerFactory)
       val timeouts = DefaultProcessingTimeouts.testing
       val transport = MockTransport()
       val sendTrackerStore = new InMemorySendTrackerStore()
       val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory)
-      val sendTracker =
-        new SendTracker(Map.empty, sendTrackerStore, metrics, loggerFactory, timeouts)
       val sequencerCounterTrackerStore =
         new InMemorySequencerCounterTrackerStore(loggerFactory, timeouts)
       val timeTracker = new DomainTimeTracker(
@@ -1275,11 +1461,35 @@ class SequencerClientTest
         loggerFactory,
       )
       val eventValidatorFactory = new ConstantSequencedEventValidatorFactory(eventValidator)
+      val topologyClient = topologyO.getOrElse(
+        TestingTopology().build(loggerFactory).forOwnerAndDomain(participant1, domainId)
+      )
+      val trafficStateController = new TrafficStateController(
+        participant1,
+        loggerFactory,
+        topologyClient,
+        TrafficState.empty(CantonTimestamp.MinValue),
+        testedProtocolVersion,
+        new EventCostCalculator(loggerFactory),
+        futureSupervisor,
+        timeouts,
+        TrafficConsumptionMetrics.noop,
+      )
+      val sendTracker =
+        new SendTracker(
+          Map.empty,
+          sendTrackerStore,
+          metrics,
+          loggerFactory,
+          timeouts,
+          Some(trafficStateController),
+          participant1,
+        )
 
       val client = new SequencerClientImplPekko(
         DefaultTestIdentities.domainId,
         participant1,
-        SequencerTransports.default(DefaultTestIdentities.sequencerId, transport),
+        SequencerTransports.default(DefaultTestIdentities.daSequencerId, transport),
         options,
         TestingConfigInternal(),
         BaseTest.defaultStaticDomainParameters.protocolVersion,
@@ -1293,8 +1503,9 @@ class SequencerClientTest
         CommonMockMetrics.sequencerClient,
         None,
         false,
-        mock[CryptoPureApi],
+        topologyClient,
         LoggingConfig(),
+        Some(trafficStateController),
         loggerFactory,
         futureSupervisor,
         initialSequencerCounter,
@@ -1302,7 +1513,14 @@ class SequencerClientTest
 
       preloadStores(storedEvents, cleanPrehead, sequencedEventStore, sequencerCounterTrackerStore)
 
-      Env(client, transport, sequencerCounterTrackerStore, sequencedEventStore, timeTracker)
+      Env(
+        client,
+        transport,
+        sequencerCounterTrackerStore,
+        sequencedEventStore,
+        timeTracker,
+        trafficStateController,
+      )
     }
   }
 }

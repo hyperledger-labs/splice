@@ -9,6 +9,7 @@ import cats.syntax.option.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.RequireTypes.NegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.participant.event.RecordOrderPublisher.{
   PendingEventPublish,
@@ -247,7 +248,10 @@ trait MultiDomainEventLogTest
   private lazy val recoveryBounds: Seq[(EventLogId, Option[LocalOffset])] = Seq(
     eventLogIds(0) -> None, // recover all events
     eventLogIds(1) -> Some(8), // recover some events
-    eventLogIds(2) -> Some(Long.MaxValue), // recover no events, as there is no event
+    // Long.MaxValue would throw out-of-bound exception for the Canton timestamp
+    eventLogIds(2) -> Some(
+      CantonTimestamp.MaxValue.getEpochSecond
+    ), // recover no events, as there is no event
     eventLogIds(3) -> Some(0), // recover no events, as the bound is in the past
   )
   private lazy val recoveryPublicationTime: CantonTimestamp = CantonTimestamp.ofEpochSecond(30)

@@ -7,12 +7,12 @@ import cats.data.EitherT
 import cats.instances.future.*
 import cats.syntax.foldable.*
 import cats.{Applicative, Id}
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.{ExecutionContextIdlenessExecutorService}
 import com.digitalasset.canton.config.{DbConfig, LocalNodeConfig, ProcessingTimeout, StorageConfig}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.mediator.{
   MediatorNode,
-  MediatorNodeBootstrapX,
+  MediatorNodeBootstrap,
   MediatorNodeConfigCommon,
   MediatorNodeParameters,
 }
@@ -20,7 +20,7 @@ import com.digitalasset.canton.domain.sequencing.config.{
   SequencerNodeConfigCommon,
   SequencerNodeParameters,
 }
-import com.digitalasset.canton.domain.sequencing.{SequencerNodeBootstrapX, SequencerNodeX}
+import com.digitalasset.canton.domain.sequencing.{SequencerNode, SequencerNodeBootstrap}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.*
@@ -28,10 +28,10 @@ import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.resource.DbStorage.RetryConfig
 import com.digitalasset.canton.resource.{DbMigrations, DbMigrationsFactory}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Thereafter.syntax.*
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
-import scala.util.{Failure, Success}
 
 /** Group of CantonNodes of the same type (domains, participants, sequencers). */
 trait Nodes[+Node <: CantonNode, +NodeBootstrap <: CantonNodeBootstrap[Node]]
@@ -147,14 +147,13 @@ class ManagedNodes[
       )
       .flatMap(startNode(name, _).map(_ => ()))
 
-  // TODO(#17726) Ratko, Thibault: The access to `nodes` in runStartup is not covered by the synchronized block. Are there concurrency issues here?
-  @SuppressWarnings(Array("com.digitalasset.canton.SynchronizedFuture"))
   private def startNode(
       name: InstanceName,
       config: NodeConfig,
   ): EitherT[Future, StartupError, NodeBootstrap] = if (isClosing)
     EitherT.leftT(ShutdownDuringStartup(name, "Won't start during shutdown"))
   else {
+    // Does not run concurrently with itself as ensured by putIfAbsent below
     def runStartup(
         promise: Promise[Either[StartupError, NodeBootstrap]]
     ): EitherT[Future, StartupError, NodeBootstrap] = {
@@ -179,32 +178,19 @@ class ManagedNodes[
         nodes.put(name, Running(instance)).discard
         instance
       }
-      import com.digitalasset.canton.util.Thereafter.syntax.*
-      promise.completeWith(startup.value)
       // remove node upon failure
-      startup.thereafter {
-        case Success(Right(_)) => ()
-        case Success(Left(_)) =>
-          nodes.remove(name).discard
-        case Failure(_) =>
-          nodes.remove(name).discard
-      }
+      val withCleanup = startup.thereafterSuccessOrFailure(_ => (), nodes.remove(name).discard)
+      promise.completeWith(withCleanup.value)
+      withCleanup
     }
 
-    blocking(synchronized {
-      nodes.get(name) match {
-        case Some(PreparingDatabase(promise)) => EitherT(promise.future)
-        case Some(StartingUp(promise, _)) => EitherT(promise.future)
-        case Some(Running(node)) => EitherT.rightT(node)
-        case None =>
-          val promise = Promise[Either[StartupError, NodeBootstrap]]()
-          nodes
-            .put(name, PreparingDatabase(promise))
-            .discard // discard is okay as this is running in the sync block
-          runStartup(promise) // startup will run async
-      }
-    })
-
+    val promise = Promise[Either[StartupError, NodeBootstrap]]()
+    nodes.putIfAbsent(name, PreparingDatabase(promise)) match {
+      case None => runStartup(promise) // startup will run async
+      case Some(PreparingDatabase(promise)) => EitherT(promise.future)
+      case Some(StartingUp(promise, _)) => EitherT(promise.future)
+      case Some(Running(node)) => EitherT.rightT(node)
+    }
   }
 
   private def configAndParams(
@@ -222,7 +208,7 @@ class ManagedNodes[
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP
-        _ <- runMigration(name, config.storage, params.devVersionSupport)
+        _ <- runMigration(name, config.storage, params.alphaVersionSupport)
       } yield ()
     }
   )
@@ -232,7 +218,7 @@ class ManagedNodes[
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP
-        _ <- runRepairMigration(name, config.storage, params.devVersionSupport)
+        _ <- runRepairMigration(name, config.storage, params.alphaVersionSupport)
       } yield ()
     }
   )
@@ -315,7 +301,7 @@ class ManagedNodes[
       params: CantonNodeParameters,
   ): Either[StartupError, Unit] =
     runIfUsingDatabase[Id](storageConfig) { dbConfig =>
-      val migrations = migrationsFactory.create(dbConfig, name, params.devVersionSupport)
+      val migrations = migrationsFactory.create(dbConfig, name, params.alphaVersionSupport)
       import TraceContext.Implicits.Empty.*
       logger.info(s"Setting up database schemas for $name")
 
@@ -348,11 +334,11 @@ class ManagedNodes[
   private def runMigration(
       name: InstanceName,
       storageConfig: StorageConfig,
-      devVersionSupport: Boolean,
+      alphaVersionSupport: Boolean,
   ): Either[StartupError, Unit] =
     runIfUsingDatabase[Id](storageConfig) { dbConfig =>
       migrationsFactory
-        .create(dbConfig, name, devVersionSupport)
+        .create(dbConfig, name, alphaVersionSupport)
         .migrateDatabase()
         .leftMap(FailedDatabaseMigration(name, _))
         .value
@@ -362,11 +348,11 @@ class ManagedNodes[
   private def runRepairMigration(
       name: InstanceName,
       storageConfig: StorageConfig,
-      devVersionSupport: Boolean,
+      alphaVersionSupport: Boolean,
   ): Either[StartupError, Unit] =
     runIfUsingDatabase[Id](storageConfig) { dbConfig =>
       migrationsFactory
-        .create(dbConfig, name, devVersionSupport)
+        .create(dbConfig, name, alphaVersionSupport)
         .repairFlywayMigration()
         .leftMap(FailedDatabaseRepairMigration(name, _))
         .value
@@ -395,20 +381,15 @@ class ParticipantNodes[B <: CantonNodeBootstrap[N], N <: CantonNode, PC <: Local
       loggerFactory,
     ) {}
 
-object ParticipantNodes {
-  type ParticipantNodesX[PC <: LocalParticipantConfig] =
-    ParticipantNodes[ParticipantNodeBootstrapX, ParticipantNodeX, PC]
-}
-
-class SequencerNodesX[SC <: SequencerNodeConfigCommon](
-    create: (String, SC) => SequencerNodeBootstrapX,
+class SequencerNodes[SC <: SequencerNodeConfigCommon](
+    create: (String, SC) => SequencerNodeBootstrap,
     migrationsFactory: DbMigrationsFactory,
     timeouts: ProcessingTimeout,
     configs: Map[String, SC],
     parameters: String => SequencerNodeParameters,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
-    extends ManagedNodes[SequencerNodeX, SC, SequencerNodeParameters, SequencerNodeBootstrapX](
+    extends ManagedNodes[SequencerNode, SC, SequencerNodeParameters, SequencerNodeBootstrap](
       create,
       migrationsFactory,
       timeouts,
@@ -418,8 +399,8 @@ class SequencerNodesX[SC <: SequencerNodeConfigCommon](
       loggerFactory,
     )
 
-class MediatorNodesX[MNC <: MediatorNodeConfigCommon](
-    create: (String, MNC) => MediatorNodeBootstrapX,
+class MediatorNodes[MNC <: MediatorNodeConfigCommon](
+    create: (String, MNC) => MediatorNodeBootstrap,
     migrationsFactory: DbMigrationsFactory,
     timeouts: ProcessingTimeout,
     configs: Map[String, MNC],
@@ -430,7 +411,7 @@ class MediatorNodesX[MNC <: MediatorNodeConfigCommon](
       MediatorNode,
       MNC,
       MediatorNodeParameters,
-      MediatorNodeBootstrapX,
+      MediatorNodeBootstrap,
     ](
       create,
       migrationsFactory,

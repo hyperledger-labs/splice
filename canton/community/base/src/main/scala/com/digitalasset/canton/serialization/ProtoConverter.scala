@@ -5,7 +5,6 @@ package com.digitalasset.canton.serialization
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.lf.data.Ref
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.ProtoDeserializationError.{
@@ -14,7 +13,12 @@ import com.digitalasset.canton.ProtoDeserializationError.{
   StringConversionError,
   TimestampConversionError,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt, PositiveLong}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
+  NonNegativeLong,
+  PositiveInt,
+  PositiveLong,
+}
 import com.digitalasset.canton.protocol.{LfContractId, LfTemplateId}
 import com.digitalasset.canton.util.OptionUtil
 import com.digitalasset.canton.{
@@ -27,6 +31,7 @@ import com.digitalasset.canton.{
   LfWorkflowId,
   ProtoDeserializationError,
 }
+import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.timestamp.Timestamp
 import com.google.protobuf.{ByteString, CodedInputStream, InvalidProtocolBufferException}
 
@@ -93,6 +98,12 @@ object ProtoConverter {
   ): ParsingResult[A] =
     protoParser(parseFrom)(value).flatMap(fromProto)
 
+  def parseEnum[A, P](
+      fromProto: P => ParsingResult[Option[A]],
+      field: String,
+      value: P,
+  ): ParsingResult[A] = fromProto(value).sequence.getOrElse(Left(FieldNotSet(field)))
+
   def parseRequiredNonEmpty[A, P](
       fromProto: P => ParsingResult[A],
       field: String,
@@ -105,14 +116,23 @@ object ProtoConverter {
       parsed <- contentNE.toNEF.traverse(fromProto)
     } yield parsed
 
-  def parsePositiveInt(i: Int): ParsingResult[PositiveInt] =
-    PositiveInt.create(i).leftMap(ProtoDeserializationError.InvariantViolation(_))
+  def parsePositiveInt(field: String, i: Int): ParsingResult[PositiveInt] =
+    PositiveInt.create(i).leftMap(ProtoDeserializationError.InvariantViolation(field, _))
 
-  def parsePositiveLong(l: Long): ParsingResult[PositiveLong] =
-    PositiveLong.create(l).leftMap(ProtoDeserializationError.InvariantViolation(_))
+  def parsePositiveLong(field: String, l: Long): ParsingResult[PositiveLong] =
+    PositiveLong
+      .create(l)
+      .leftMap(ProtoDeserializationError.InvariantViolation(field, _))
 
-  def parseNonNegativeLong(l: Long): ParsingResult[NonNegativeLong] =
-    NonNegativeLong.create(l).leftMap(ProtoDeserializationError.InvariantViolation(_))
+  def parseNonNegativeInt(field: String, i: Int): ParsingResult[NonNegativeInt] =
+    NonNegativeInt
+      .create(i)
+      .leftMap(ProtoDeserializationError.InvariantViolation(field, _))
+
+  def parseNonNegativeLong(field: String, l: Long): ParsingResult[NonNegativeLong] =
+    NonNegativeLong
+      .create(l)
+      .leftMap(ProtoDeserializationError.InvariantViolation(field, _))
 
   def parseLfPartyId(party: String): ParsingResult[LfPartyId] =
     parseString(party)(LfPartyId.fromString)

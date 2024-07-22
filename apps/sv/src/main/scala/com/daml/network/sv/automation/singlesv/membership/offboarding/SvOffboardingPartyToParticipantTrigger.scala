@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{CollectionHasAsScala}
 
 /** Offboard a participant from the hosting of the DSO party.
-  * - Runs when a member part of offboardedSvs still exist on the partyToParticipantX mapping
+  * - Runs when a member part of offboardedSvs still exist on the PartyToParticipant mapping
   */
 class SvOffboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,

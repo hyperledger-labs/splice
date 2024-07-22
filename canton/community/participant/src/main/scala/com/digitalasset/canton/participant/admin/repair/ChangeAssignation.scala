@@ -6,9 +6,9 @@ package com.digitalasset.canton.participant.admin.repair
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.lf.data.Bytes
 import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.repair.ChangeAssignation.Changed
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
@@ -21,6 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
+import com.digitalasset.daml.lf.data.Bytes
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -177,7 +178,7 @@ private final class ChangeAssignation(
     (SerializableContract, ChangeAssignation.Data[(LfContractId, TransferCounter)])
   ]] =
     repairSource.domain.persistentState.contractStore
-      .lookupManyUncached(contractIdsWithTransferCounters.map(_.payload._1))
+      .lookupManyExistingUncached(contractIdsWithTransferCounters.map(_.payload._1))
       .map(_.map(_.contract).zip(contractIdsWithTransferCounters))
       .leftMap(contractId =>
         s"Failed to look up contract $contractId in domain ${repairSource.domain.alias}"

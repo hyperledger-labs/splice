@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status

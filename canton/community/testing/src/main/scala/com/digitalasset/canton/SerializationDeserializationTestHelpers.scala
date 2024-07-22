@@ -5,6 +5,7 @@ package com.digitalasset.canton
 
 import com.digitalasset.canton.SerializationDeserializationTestHelpers.DefaultValueUntilExclusive
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 import org.reflections.Reflections
@@ -29,65 +30,118 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
       companion: HasVersionedMessageCompanion[T],
       defaults: List[DefaultValueUntilExclusive[T]] = Nil,
   )(implicit arb: Arbitrary[T]): Assertion =
-    testVersionedCommon(companion, companion.fromByteString, defaults)
+    testVersionedCommon(companion, companion.fromTrustedByteString, defaults)
 
   /*
    Test for classes extending `HasProtocolVersionedWrapper` (protocol version embedded in the instance),
-   without context for deserialization.
+   in different flavours:
+    - with or without context for deserialization
+    - with or without memoization
 
-   No deserialization validation (`fromByteStringUnsafe`) because the protocol version of the generated
-   instances is unpredictable.
+    In some instances, the context needs to contain a protocol version which is used to validate the deserialization.
    */
+
   protected def testProtocolVersioned[T <: HasProtocolVersionedWrapper[
     T
   ], DeserializedValueClass <: HasRepresentativeProtocolVersion](
-      companion: HasProtocolVersionedWrapperWithoutContextCompanion[T, DeserializedValueClass]
+      companion: HasProtocolVersionedWrapperWithoutContextCompanion[T, DeserializedValueClass],
+      protocolVersion: ProtocolVersion,
   )(implicit arb: Arbitrary[T]): Assertion = {
     testProtocolVersionedCommon(
       companion,
-      companion.fromByteStringUnsafe,
+      companion.fromByteString(protocolVersion),
     )
   }
 
-  /*
-   Test for classes extending `HasProtocolVersionedWrapper` (protocol version embedded in the instance),
-   with memoization and without context for deserialization.
-
-   No deserialization validation (`fromByteStringUnsafe`) because the protocol version of the generated
-  instances is unpredictable.
-   */
   protected def testMemoizedProtocolVersioned[T <: HasProtocolVersionedWrapper[T]](
-      companion: HasMemoizedProtocolVersionedWrapperCompanion[T]
+      companion: HasMemoizedProtocolVersionedWrapperCompanion[T],
+      protocolVersion: ProtocolVersion,
   )(implicit arb: Arbitrary[T]): Assertion = {
     testProtocolVersionedCommon(
       companion,
-      companion.fromByteStringUnsafe,
+      companion.fromByteString(protocolVersion),
+    )
+  }
+  protected def testMemoizedProtocolVersioned2[T <: HasProtocolVersionedWrapper[
+    T
+  ], U <: HasProtocolVersionedWrapper[?]](
+      companion: HasMemoizedProtocolVersionedWrapperCompanion2[T, U],
+      protocolVersion: ProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion = {
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(protocolVersion),
     )
   }
 
-  /*
-   Test for classes extending `HasProtocolVersionedWrapper` (protocol version embedded in the instance),
-   with memoization and context for deserialization.
-
-   No deserialization validation (`fromByteStringUnsafe`) because the protocol version of the generated
-  instances is unpredictable.
-   */
   protected def testMemoizedProtocolVersionedWithCtx[T <: HasProtocolVersionedWrapper[T], Context](
       companion: HasMemoizedProtocolVersionedWithContextCompanion[T, Context],
       context: Context,
   )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
-      companion.fromByteStringUnsafe(context),
+      companion.fromTrustedByteString(context),
     )
 
-  /*
-   Test for classes extending `HasProtocolVersionedWrapper` (protocol version embedded in the instance),
-   with context for deserialization.
+  protected def testProtocolVersionedWithCtxAndValidation[T <: HasProtocolVersionedWrapper[
+    T
+  ], Context](
+      companion: HasProtocolVersionedWithContextAndValidationCompanion[T, Context],
+      context: Context,
+      protocolVersion: ProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion =
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(context, protocolVersion),
+    )
 
-   No deserialization validation (`fromByteStringUnsafe`) because the protocol version of the generated
-  instances is unpredictable.
-   */
+  protected def testProtocolVersionedWithCtxAndValidationWithTargetProtocolVersion[
+      T <: HasProtocolVersionedWrapper[
+        T
+      ],
+      Context,
+  ](
+      companion: HasProtocolVersionedWithContextAndValidationWithTargetProtocolVersionCompanion[
+        T,
+        Context,
+      ],
+      context: Context,
+      protocolVersion: TargetProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion =
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(context, protocolVersion),
+    )
+
+  protected def testProtocolVersionedWithCtxAndValidationWithSourceProtocolVersion[
+      T <: HasProtocolVersionedWrapper[
+        T
+      ],
+      Context,
+  ](
+      companion: HasProtocolVersionedWithContextAndValidationWithSourceProtocolVersionCompanion[
+        T,
+        Context,
+      ],
+      context: Context,
+      protocolVersion: SourceProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion =
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(context, protocolVersion),
+    )
+
+  protected def testMemoizedProtocolVersionedWithCtxAndValidation[T <: HasProtocolVersionedWrapper[
+    T
+  ]](
+      companion: HasMemoizedProtocolVersionedWithValidationCompanion[T],
+      protocolVersion: ProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion =
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(protocolVersion),
+    )
+
   protected def testProtocolVersionedWithCtx[T <: HasProtocolVersionedWrapper[
     T
   ], DeserializedValueClass <: HasRepresentativeProtocolVersion, Context](
@@ -96,7 +150,18 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
   )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
-      companion.fromByteStringUnsafe(context),
+      companion.fromTrustedByteString(context),
+    )
+
+  protected def testProtocolVersionedAndValidation[T <: HasProtocolVersionedWrapper[
+    T
+  ], DeserializedValueClass <: HasRepresentativeProtocolVersion](
+      companion: HasProtocolVersionedWithValidationCompanion[T],
+      protocolVersion: ProtocolVersion,
+  )(implicit arb: Arbitrary[T]): Assertion =
+    testProtocolVersionedCommon(
+      companion,
+      companion.fromByteString(protocolVersion),
     )
 
   /*
@@ -152,7 +217,6 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
       withClue(
         s"Comparing ${companion.name} with representative ${instance.representativeProtocolVersion}"
       ) {
-
         instance shouldBe deserializedInstance
         instance.representativeProtocolVersion shouldBe deserializedInstance.representativeProtocolVersion
       }

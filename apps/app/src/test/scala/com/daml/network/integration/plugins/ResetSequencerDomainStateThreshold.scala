@@ -4,6 +4,7 @@ import com.daml.network.console.{ParticipantClientReference, SvAppBackendReferen
 import com.daml.network.integration.tests.SpliceTests
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.topology.DomainId
 import io.grpc

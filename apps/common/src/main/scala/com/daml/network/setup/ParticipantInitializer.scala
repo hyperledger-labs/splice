@@ -7,7 +7,7 @@ import com.daml.network.config.ParticipantBootstrapDumpConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Identifier, ParticipantId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -74,7 +74,7 @@ class ParticipantInitializer(
         for {
           dump <- ParticipantInitializer.getDump(c)
           newParticipantId = c.newParticipantIdentifier.fold(dump.id)(id =>
-            ParticipantId(UniqueIdentifier(Identifier.tryCreate(id), dump.id.uid.namespace))
+            ParticipantId(UniqueIdentifier.tryCreate(id, dump.id.uid.namespace))
           )
           result <- nodeInitializer.initializeAndWait(dump, Some(newParticipantId))
         } yield result

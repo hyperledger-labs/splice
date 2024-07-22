@@ -4,8 +4,8 @@
 package com.digitalasset.canton.ledger.api.auth
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.lf.data.Ref
 import com.digitalasset.canton.ledger.api.domain.IdentityProviderId
+import com.digitalasset.daml.lf.data.Ref
 
 import java.time.{Duration, Instant}
 
@@ -52,6 +52,12 @@ final case class ClaimActAsParty(name: Ref.Party) extends Claim
   * Does NOT authorize to issue commands.
   */
 final case class ClaimReadAsParty(name: Ref.Party) extends Claim
+
+/** Authorized to read all data as any party on the participant.
+  *
+  * Does NOT authorize to issue commands.
+  */
+final case object ClaimReadAsAnyParty extends Claim
 
 sealed trait ClaimSet
 
@@ -150,12 +156,26 @@ object ClaimSet {
       Either.cond(
         claims.exists {
           case ClaimActAsAnyParty => true
+          case ClaimReadAsAnyParty => true
           case ClaimActAsParty(p) if p == party => true
           case ClaimReadAsParty(p) if p == party => true
           case _ => false
         },
         (),
         AuthorizationError.MissingReadClaim(party),
+      )
+    }
+
+    /** Returns true if the set of claims authorizes the user to read data as any party, unless the claims expired */
+    def canReadAsAnyParty: Either[AuthorizationError, Unit] = {
+      Either.cond(
+        claims.exists {
+          case ClaimActAsAnyParty => true
+          case ClaimReadAsAnyParty => true
+          case _ => false
+        },
+        (),
+        AuthorizationError.MissingReadAsAnyPartyClaim,
       )
     }
   }

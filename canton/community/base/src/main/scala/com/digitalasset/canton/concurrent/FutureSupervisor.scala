@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.concurrent
 
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.LoggerUtil
@@ -143,9 +143,10 @@ object FutureSupervisor {
       fut.thereafter {
         case Failure(exception) =>
           log(
-            s"${description} failed with exception after ${elapsed(itm)}: $exception",
+            s"$description failed with exception after ${elapsed(itm)}",
             logLevel,
             errorLoggingContext,
+            Some(exception),
           )
         case Success(_) =>
           val time = elapsed(itm)

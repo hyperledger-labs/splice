@@ -53,7 +53,8 @@ do
             daemon=1
             ;;
         -p)
-            POSTGRES_MODE="${OPTARG}"
+            POSTGRES_MODE="$2"
+            shift
             ;;
         -w)
             simtime=0
@@ -64,7 +65,8 @@ do
             echo "starting canton with simulated time only"
             ;;
         -c)
-            CANTON="${OPTARG}"
+            CANTON="$2"
+            shift
             echo "using custom canton binary: $CANTON"
             ;;
         -f)

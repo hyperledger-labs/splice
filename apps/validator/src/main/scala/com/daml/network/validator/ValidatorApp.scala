@@ -702,6 +702,7 @@ class ValidatorApp(
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
         config.contactPoint,
+        config.supportsSoftDomainMigrationPoc,
         loggerFactory,
       )
       domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {

@@ -3,133 +3,205 @@
 
 package com.digitalasset.canton.domain.metrics
 
-import com.daml.metrics.api.MetricDoc.MetricQualification.{Debug, Traffic}
-import com.daml.metrics.api.MetricHandle.{Counter, Gauge, Meter}
-import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
+import com.daml.metrics.api.MetricHandle.*
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{
+  HistogramInventory,
+  MetricInfo,
+  MetricName,
+  MetricQualification,
+  MetricsContext,
+}
 import com.daml.metrics.grpc.{DamlGrpcServerMetrics, GrpcServerMetrics}
 import com.daml.metrics.{CacheMetrics, HealthMetrics}
 import com.digitalasset.canton.environment.BaseMetrics
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.metrics.{
-  CantonLabeledMetricsFactory,
+  DbStorageHistograms,
   DbStorageMetrics,
+  SequencerClientHistograms,
   SequencerClientMetrics,
+  TrafficConsumptionMetrics,
 }
+import com.digitalasset.canton.sequencing.protocol.{
+  AllMembersOfDomain,
+  MediatorGroupRecipient,
+  MemberRecipient,
+  ParticipantsOfParty,
+  Recipient,
+  SequencersOfDomain,
+}
+import com.digitalasset.canton.topology.{MediatorId, Member, ParticipantId, SequencerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 
+class SequencerHistograms(val parent: MetricName)(implicit
+    inventory: HistogramInventory
+) {
+
+  private[metrics] val prefix = parent :+ "sequencer"
+  private[metrics] val sequencerClient = new SequencerClientHistograms(parent)
+  private[metrics] val dbStorage = new DbStorageHistograms(parent)
+  private[metrics] val bftOrdering: BftOrderingHistograms = new BftOrderingHistograms(prefix)
+}
+
 class SequencerMetrics(
-    parent: MetricName,
-    val openTelemetryMetricsFactory: CantonLabeledMetricsFactory,
+    histograms: SequencerHistograms,
+    val openTelemetryMetricsFactory: LabeledMetricsFactory,
     val grpcMetrics: GrpcServerMetrics,
     val healthMetrics: HealthMetrics,
 ) extends BaseMetrics {
-  override val prefix: MetricName = parent
+  override val prefix: MetricName = histograms.prefix
   private implicit val mc: MetricsContext = MetricsContext.Empty
+
+  lazy val bftOrdering: BftOrderingMetrics =
+    new BftOrderingMetrics(
+      histograms.bftOrdering,
+      openTelemetryMetricsFactory,
+      new DamlGrpcServerMetrics(openTelemetryMetricsFactory, "bftordering"),
+      new HealthMetrics(openTelemetryMetricsFactory),
+    )
+
   override def storageMetrics: DbStorageMetrics = dbStorage
 
-  object sequencerClient extends SequencerClientMetrics(prefix, openTelemetryMetricsFactory)
+  object block extends BlockMetrics(prefix, openTelemetryMetricsFactory)
 
-  @MetricDoc.Tag(
-    summary = "Number of active sequencer subscriptions",
-    description =
-      """This metric indicates the number of active subscriptions currently open and actively
-        |served subscriptions at the sequencer.""",
-    qualification = Debug,
-  )
-  val subscriptionsGauge: Gauge[Int] =
-    openTelemetryMetricsFactory.gauge[Int](MetricName(prefix :+ "subscriptions"), 0)(
-      MetricsContext.Empty
+  object sequencerClient
+      extends SequencerClientMetrics(histograms.sequencerClient, openTelemetryMetricsFactory)
+
+  object publicApi {
+    private val prefix = SequencerMetrics.this.prefix :+ "public-api"
+    val subscriptionsGauge: Gauge[Int] =
+      openTelemetryMetricsFactory.gauge[Int](
+        MetricInfo(
+          prefix :+ "subscriptions",
+          summary = "Number of active sequencer subscriptions",
+          description =
+            """This metric indicates the number of active subscriptions currently open and actively
+            |served subscriptions at the sequencer.""",
+          qualification = MetricQualification.Traffic,
+        ),
+        0,
+      )
+
+    val messagesProcessed: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "processed",
+        summary = "Number of messages processed by the sequencer",
+        description =
+          """This metric measures the number of successfully validated messages processed
+          |by the sequencer since the start of this process.""",
+        qualification = MetricQualification.Traffic,
+      )
     )
-  @MetricDoc.Tag(
-    summary = "Number of messages processed by the sequencer",
-    description = """This metric measures the number of successfully validated messages processed
-                    |by the sequencer since the start of this process.""",
-    qualification = Debug,
-  )
-  val messagesProcessed: Meter = openTelemetryMetricsFactory.meter(prefix :+ "processed")
 
-  @MetricDoc.Tag(
-    summary = "Number of message bytes processed by the sequencer",
-    description =
-      """This metric measures the total number of message bytes processed by the sequencer.
-        |If the message received by the sequencer contains duplicate or irrelevant fields,
-        |the contents of these fields do not contribute to this metric.""",
-    qualification = Debug,
-  )
-  val bytesProcessed: Meter = openTelemetryMetricsFactory.meter(prefix :+ "processed-bytes")
+    val bytesProcessed: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ s"processed-${Histogram.Bytes}",
+        summary = "Number of message bytes processed by the sequencer",
+        description =
+          """This metric measures the total number of message bytes processed by the sequencer.
+          |If the message received by the sequencer contains duplicate or irrelevant fields,
+          |the contents of these fields do not contribute to this metric.""",
+        qualification = MetricQualification.Traffic,
+      )
+    )
 
-  @MetricDoc.Tag(
-    summary = "Number of time requests received by the sequencer",
-    description =
-      """When a Participant needs to know the domain time it will make a request for a time proof to be sequenced.
-        |It would be normal to see a small number of these being sequenced, however if this number becomes a significant
-        |portion of the total requests to the sequencer it could indicate that the strategy for requesting times may
-        |need to be revised to deal with different clock skews and latencies between the sequencer and participants.""",
-    qualification = Debug,
-  )
-  val timeRequests: Meter = openTelemetryMetricsFactory.meter(prefix :+ "time-requests")
+    val timeRequests: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "time-requests",
+        summary = "Number of time requests received by the sequencer",
+        description =
+          """When a Participant needs to know the domain time it will make a request for a time proof to be sequenced.
+          |It would be normal to see a small number of these being sequenced, however if this number becomes a significant
+          |portion of the total requests to the sequencer it could indicate that the strategy for requesting times may
+          |need to be revised to deal with different clock skews and latencies between the sequencer and participants.""",
+        qualification = MetricQualification.Debug,
+      )
+    )
+  }
 
-  @MetricDoc.Tag(
-    summary = "Age of oldest unpruned sequencer event.",
-    description =
-      """This gauge exposes the age of the oldest, unpruned sequencer event in hours as a way to quantify the
-        |pruning backlog.""",
-    qualification = Debug,
-  )
   val maxEventAge: Gauge[Long] =
-    openTelemetryMetricsFactory.gauge[Long](MetricName(prefix :+ "max-event-age"), 0L)(
-      MetricsContext.Empty
+    openTelemetryMetricsFactory.gauge[Long](
+      MetricInfo(
+        prefix :+ "max-event-age",
+        summary = "Age of oldest unpruned sequencer event.",
+        description =
+          """This gauge exposes the age of the oldest, unpruned sequencer event in hours as a way to quantify the
+            |pruning backlog.""",
+        qualification = MetricQualification.Debug,
+      ),
+      0L,
     )
 
-  object dbStorage extends DbStorageMetrics(prefix, openTelemetryMetricsFactory)
+  object dbStorage extends DbStorageMetrics(histograms.dbStorage, openTelemetryMetricsFactory)
 
   // TODO(i14580): add testing
   object trafficControl {
     private val prefix: MetricName = SequencerMetrics.this.prefix :+ "traffic-control"
 
-    val balanceCache: CacheMetrics =
-      new CacheMetrics(prefix :+ "balance-cache", openTelemetryMetricsFactory)
+    val trafficConsumption = new TrafficConsumptionMetrics(prefix, openTelemetryMetricsFactory)
 
-    @MetricDoc.Tag(
-      summary = "Raw size of an event received in the sequencer.",
-      description =
-        """This the raw payload size of an event, on the write path. Final event cost calculation.""",
-      qualification = Traffic,
-    )
-    val eventReceived: Meter = openTelemetryMetricsFactory.meter(prefix :+ "event-received-size")
+    val purchaseCache: CacheMetrics =
+      new CacheMetrics(prefix :+ "purchase-cache", openTelemetryMetricsFactory)
 
-    @MetricDoc.Tag(
-      summary = "Cost of rejected event.",
-      description =
-        """Cost of an event that was rejected because it exceeded the sender's traffic limit.""",
-      qualification = Traffic,
-    )
-    val eventRejected: Meter = openTelemetryMetricsFactory.meter(prefix :+ "event-rejected-cost")
+    val consumedCache: CacheMetrics =
+      new CacheMetrics(prefix :+ "consumed-cache", openTelemetryMetricsFactory)
 
-    @MetricDoc.Tag(
-      summary = "Cost of delivered event.",
-      description = """Cost of an event that was delivered.""",
-      qualification = Traffic,
-    )
-    val eventDelivered: Meter = openTelemetryMetricsFactory.meter(prefix :+ "event-delivered-cost")
+    val wastedSequencing: Meter =
+      openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "wasted-sequencing",
+          summary =
+            "Byte size of events that got sequenced but failed to pass validation steps after sequencing",
+          description =
+            """Record the raw byte size of events that are ordered but were not delivered because of traffic enforcement.
+              |""",
+          qualification = MetricQualification.Traffic,
+        )
+      )
 
-    @MetricDoc.Tag(
-      summary = "Counts balance updates fully processed by the sequencer.",
-      description = """Value of balance updates for all (aggregated).""",
-      qualification = Traffic,
+    val wastedTraffic: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "wasted-traffic",
+        summary = "Cost of event that was deducted but not delivered.",
+        description = """Events can have their cost deducted but still not be delivered
+            | due to other failed validation after ordering. This metrics records the traffic cost
+            | of such events.""",
+        qualification = MetricQualification.Traffic,
+      )
     )
+
+    val eventDelivered: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "event-delivered-cost",
+        summary = "Cost of delivered event.",
+        description = """Cost of an event that was delivered.""",
+        qualification = MetricQualification.Traffic,
+      )
+    )
+
     val balanceUpdateProcessed: Counter =
-      openTelemetryMetricsFactory.counter(prefix :+ "balance-update")
+      openTelemetryMetricsFactory.counter(
+        MetricInfo(
+          prefix :+ "balance-update",
+          summary = "Counts balance updates fully processed by the sequencer.",
+          description = """Value of balance updates for all (aggregated).""",
+          qualification = MetricQualification.Traffic,
+        )
+      )
 
-    @MetricDoc.Tag(
-      summary = "Counts cache misses when trying to retrieve a balance for a given timestamp.",
-      description = """The per member cache only keeps in memory a subset of all the non-pruned balance updates persisted in the database.
-          |If the cache contains *some* balances for a member but not the one requested, a DB call will be made to try to retrieve it.
-          |When that happens, this metric is incremented. If this occurs too frequently, consider increasing the config value of trafficBalanceCacheSizePerMember.""",
-      qualification = Traffic,
-    )
     val balanceCacheMissesForTimestamp: Counter =
-      openTelemetryMetricsFactory.counter(prefix :+ "balance-cache-miss-for-timestamp")
+      openTelemetryMetricsFactory.counter(
+        MetricInfo(
+          prefix :+ "balance-cache-miss-for-timestamp",
+          summary = "Counts cache misses when trying to retrieve a balance for a given timestamp.",
+          description = """The per member cache only keeps in memory a subset of all the non-pruned balance updates persisted in the database.
+                        |If the cache contains *some* balances for a member but not the one requested, a DB call will be made to try to retrieve it.
+                        |When that happens, this metric is incremented. If this occurs too frequently, consider increasing the config value of trafficPurchasedCacheSizePerMember.""",
+          qualification = MetricQualification.Debug,
+        )
+      )
   }
 }
 
@@ -137,68 +209,157 @@ object SequencerMetrics {
 
   @VisibleForTesting
   def noop(testName: String) = new SequencerMetrics(
-    MetricName(testName),
+    new SequencerHistograms(MetricName(testName))(new HistogramInventory),
     NoOpMetricsFactory,
     new DamlGrpcServerMetrics(NoOpMetricsFactory, "sequencer"),
     new HealthMetrics(NoOpMetricsFactory),
   )
 
+  private[domain] final case class RecipientStats(
+      participants: Boolean = false,
+      mediators: Boolean = false,
+      sequencers: Boolean = false,
+      broadcast: Boolean = false,
+  ) {
+
+    private[domain] def metricsContext(
+        sender: Member,
+        logger: TracedLogger,
+        warnOnUnexpected: Boolean = true,
+    )(implicit traceContext: TraceContext): MetricsContext = {
+      val messageType = {
+        // by looking at the recipient lists and the sender, we'll figure out what type of message we've been getting
+        (sender, participants, mediators, sequencers, broadcast) match {
+          case (ParticipantId(_), false, true, false, false) =>
+            "send-confirmation-response"
+          case (ParticipantId(_), true, true, false, false) =>
+            "send-confirmation-request"
+          case (MediatorId(_), true, false, false, false) =>
+            "send-verdict"
+          case (ParticipantId(_), true, false, false, false) =>
+            "send-commitment"
+          case (SequencerId(_), true, false, true, false) =>
+            "send-topup"
+          case (SequencerId(_), false, true, true, false) =>
+            "send-topup-med"
+          case (_, false, false, false, true) =>
+            "send-topology"
+          case (_, false, false, false, false) =>
+            "send-time-proof"
+          case _ =>
+            def r(boolean: Boolean, s: String) = if (boolean) Seq(s) else Seq.empty
+
+            val recipients = r(participants, "participants") ++
+              r(mediators, "mediators") ++
+              r(sequencers, "sequencers") ++
+              r(broadcast, "broadcast")
+            if (warnOnUnexpected)
+              logger.warn(s"Unexpected message from $sender to " + recipients.mkString(","))
+            "send-unexpected"
+        }
+      }
+      MetricsContext(
+        "sender" -> sender.toString,
+        "type" -> messageType,
+      )
+    }
+  }
+
+  def submissionTypeMetricsContext(
+      allRecipients: Set[Recipient],
+      sender: Member,
+      logger: TracedLogger,
+      warnOnUnexpected: Boolean = true,
+  )(implicit traceContext: TraceContext): MetricsContext = {
+    allRecipients
+      .foldLeft(RecipientStats()) {
+        case (acc, MemberRecipient(ParticipantId(_)) | ParticipantsOfParty(_)) =>
+          acc.copy(participants = true)
+        case (acc, MemberRecipient(MediatorId(_)) | MediatorGroupRecipient(_)) =>
+          acc.copy(mediators = true)
+        case (acc, MemberRecipient(SequencerId(_)) | SequencersOfDomain) =>
+          acc.copy(sequencers = true)
+        case (acc, AllMembersOfDomain) => acc.copy(broadcast = true)
+      }
+      .metricsContext(sender, logger, warnOnUnexpected)
+  }
 }
 
+class MediatorHistograms(val parent: MetricName)(implicit
+    inventory: HistogramInventory
+) {
+
+  private[metrics] val prefix = parent :+ "mediator"
+  private[metrics] val sequencerClient = new SequencerClientHistograms(parent)
+  private[metrics] val dbStorage = new DbStorageHistograms(parent)
+
+}
 class MediatorMetrics(
-    parent: MetricName,
-    val openTelemetryMetricsFactory: CantonLabeledMetricsFactory,
+    histograms: MediatorHistograms,
+    val openTelemetryMetricsFactory: LabeledMetricsFactory,
     val grpcMetrics: GrpcServerMetrics,
     val healthMetrics: HealthMetrics,
 ) extends BaseMetrics {
 
-  val prefix: MetricName = parent
+  override val prefix: MetricName = histograms.prefix
   private implicit val mc: MetricsContext = MetricsContext.Empty
 
   override def storageMetrics: DbStorageMetrics = dbStorage
 
-  object dbStorage extends DbStorageMetrics(prefix, openTelemetryMetricsFactory)
+  object dbStorage extends DbStorageMetrics(histograms.dbStorage, openTelemetryMetricsFactory)
 
-  object sequencerClient extends SequencerClientMetrics(prefix, openTelemetryMetricsFactory)
+  object sequencerClient
+      extends SequencerClientMetrics(histograms.sequencerClient, openTelemetryMetricsFactory)
 
-  @MetricDoc.Tag(
-    summary = "Number of currently outstanding requests",
-    description = """This metric provides the number of currently open requests registered
-                    |with the mediator.""",
-    qualification = Debug,
-  )
   val outstanding: Gauge[Int] =
-    openTelemetryMetricsFactory.gauge(prefix :+ "outstanding-requests", 0)(MetricsContext.Empty)
+    openTelemetryMetricsFactory.gauge(
+      MetricInfo(
+        prefix :+ "outstanding-requests",
+        summary = "Number of currently outstanding requests",
+        description = """This metric provides the number of currently open requests registered
+                      |with the mediator.""",
+        qualification = MetricQualification.Debug,
+      ),
+      0,
+    )(MetricsContext.Empty)
 
-  @MetricDoc.Tag(
-    summary = "Number of totally processed requests",
-    description = """This metric provides the number of totally processed requests since the system
+  val requests: Meter = openTelemetryMetricsFactory.meter(
+    MetricInfo(
+      prefix :+ "requests",
+      summary = "Number of totally processed requests",
+      description =
+        """This metric provides the number of totally processed requests since the system
                     |has been started.""",
-    qualification = Debug,
+      qualification = MetricQualification.Debug,
+    )
   )
-  val requests: Meter = openTelemetryMetricsFactory.meter(prefix :+ "requests")
 
-  @MetricDoc.Tag(
-    summary = "Age of oldest unpruned confirmation response.",
-    description =
-      """This gauge exposes the age of the oldest, unpruned confirmation response in hours as a way to quantify the
-        |pruning backlog.""",
-    qualification = Debug,
-  )
   val maxEventAge: Gauge[Long] =
-    openTelemetryMetricsFactory.gauge[Long](MetricName(prefix :+ "max-event-age"), 0L)(
+    openTelemetryMetricsFactory.gauge[Long](
+      MetricInfo(
+        prefix :+ "max-event-age",
+        summary = "Age of oldest unpruned confirmation response.",
+        description =
+          """This gauge exposes the age of the oldest, unpruned confirmation response in hours as a way to quantify the
+          |pruning backlog.""",
+        qualification = MetricQualification.Debug,
+      ),
+      0L,
+    )(
       MetricsContext.Empty
     )
 
   // TODO(i14580): add testing
   object trafficControl {
-    @MetricDoc.Tag(
-      summary = "Event rejected because of traffic limit exceeded",
-      description =
-        """This metric is being incremented every time a sequencer rejects an event because
+    val eventRejected: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "event-rejected",
+        summary = "Event rejected because of traffic limit exceeded",
+        description =
+          """This metric is being incremented every time a sequencer rejects an event because
            the sender does not have enough credit.""",
-      qualification = Traffic,
+        qualification = MetricQualification.Traffic,
+      )
     )
-    val eventRejected: Meter = openTelemetryMetricsFactory.meter(prefix :+ "event-rejected")
   }
 }

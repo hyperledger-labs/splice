@@ -13,12 +13,13 @@ import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.{CantonTimestamp, Counter}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.block.UninitializedBlockHeight
 import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore.CheckpointDataAtCounter
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{Member, UnauthenticatedMemberId}
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, retry}
@@ -42,6 +43,8 @@ class UniqueKeyViolationException(message: String) extends RuntimeException(mess
 
 class InMemorySequencerStore(
     protocolVersion: ProtocolVersion,
+    sequencerMember: Member,
+    unifiedSequencer: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContext
@@ -52,7 +55,7 @@ class InMemorySequencerStore(
   private val members = TrieMap[Member, RegisteredMember]()
   private val payloads = new ConcurrentSkipListMap[CantonTimestamp, StoredPayload]()
   private val events = new ConcurrentSkipListMap[CantonTimestamp, StoreEvent[PayloadId]]()
-  private val watermark = new AtomicReference[Option[CantonTimestamp]](None)
+  private val watermark = new AtomicReference[Option[Watermark]](None)
   private val checkpoints =
     TrieMap[SequencerMemberId, ConcurrentSkipListMap[SequencerCounter, CheckpointDataAtCounter]]()
   // using a concurrent hash map for the thread safe computeIfPresent updates
@@ -75,22 +78,13 @@ class InMemorySequencerStore(
       members
         .getOrElseUpdate(
           member,
-          RegisteredMember(SequencerMemberId(nextNewMemberId.getAndIncrement()), timestamp),
+          RegisteredMember(
+            SequencerMemberId(nextNewMemberId.getAndIncrement()),
+            timestamp,
+          ),
         )
         .memberId
     }
-
-  override def unregisterUnauthenticatedMember(member: UnauthenticatedMemberId)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    disabledClientsRef
-      .getAndUpdate(disabledClients =>
-        disabledClients.copy(members = disabledClients.members - member)
-      )
-
-    evictFromCache(member)
-    Future.successful(members.remove(member)).void
-  }
 
   protected override def lookupMemberInternal(member: Member)(implicit
       traceContext: TraceContext
@@ -107,8 +101,13 @@ class InMemorySequencerStore(
         .flatMap { existingPayload =>
           // if we found an existing payload it must have a matching instance discriminator
           if (existingPayload.instanceDiscriminator == instanceDiscriminator) None // no error
-          else
-            SavePayloadsError.ConflictingPayloadId(id, existingPayload.instanceDiscriminator).some
+          else {
+            if (unifiedSequencer) {
+              None
+            } else {
+              SavePayloadsError.ConflictingPayloadId(id, existingPayload.instanceDiscriminator).some
+            }
+          }
         }
         .toLeft(())
         .leftWiden[SavePayloadsError]
@@ -129,17 +128,31 @@ class InMemorySequencerStore(
       }
     )
 
+  override def resetWatermark(instanceIndex: Int, ts: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, SaveWatermarkError, Unit] =
+    EitherT.pure[Future, SaveWatermarkError] {
+      watermark.getAndUpdate {
+        case None => Some(Watermark(ts, online = false))
+        case Some(current) if ts <= current.timestamp => Some(Watermark(ts, online = false))
+        case Some(current) => Some(current)
+      }.discard
+    }
+
   override def saveWatermark(instanceIndex: Int, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SaveWatermarkError, Unit] =
     EitherT.pure[Future, SaveWatermarkError] {
-      watermark.set(Some(ts))
+      watermark.set(Some(Watermark(ts, online = true)))
     }
 
   override def fetchWatermark(instanceIndex: Int, maxRetries: Int = retry.Forever)(implicit
       traceContext: TraceContext
   ): Future[Option[Watermark]] =
-    Future.successful(watermark.get.map(Watermark(_, online = true)))
+    Future.successful(watermark.get())
+
+  override def safeWatermark(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] =
+    Future.successful(watermark.get.map(_.timestamp))
 
   override def goOffline(instanceIndex: Int)(implicit traceContext: TraceContext): Future[Unit] =
     Future.unit
@@ -149,7 +162,7 @@ class InMemorySequencerStore(
   ): Future[CantonTimestamp] =
     Future.successful {
       // we're the only sequencer that can write the watermark so just take the provided value
-      watermark.set(now.some)
+      watermark.set(Some(Watermark(now, online = true)))
       now
     }
 
@@ -169,7 +182,7 @@ class InMemorySequencerStore(
         Payload(payloadId, storedPayload.content)
       }
 
-    val watermarkO = watermark.get()
+    val watermarkO = watermark.get().map(_.timestamp)
 
     // if there's no watermark, we can't return any events
     watermarkO.fold[ReadEvents](SafeWatermark(watermarkO)) { watermark =>
@@ -195,19 +208,19 @@ class InMemorySequencerStore(
 
   private def isMemberRecipient(member: SequencerMemberId)(event: StoreEvent[_]): Boolean =
     event match {
-      case DeliverStoreEvent(sender, messageId, recipients, payload, topologyTimestampO, _trace) =>
-        recipients.contains(
+      case deliver: DeliverStoreEvent[_] =>
+        deliver.members.contains(
           member
         ) // only if they're a recipient (sender should already be a recipient)
-      case DeliverErrorStoreEvent(sender, _messageId, _error, _trace) =>
-        sender == member // only if we're the sender
+      case receipt: ReceiptStoreEvent => receipt.sender == member // only if we're the sender
+      case error: DeliverErrorStoreEvent => error.sender == member // only if we're the sender
     }
 
   /** No implementation as only required for crash recovery */
   override def deleteEventsPastWatermark(instanceIndex: Int)(implicit
       traceContext: TraceContext
-  ): Future[Unit] =
-    Future.unit
+  ): Future[Option[CantonTimestamp]] =
+    Future.successful(watermark.get().map(_.timestamp))
 
   override def saveCounterCheckpoint(
       memberId: SequencerMemberId,
@@ -430,14 +443,11 @@ class InMemorySequencerStore(
 
   override def isEnabled(memberId: SequencerMemberId)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, MemberDisabledError.type, Unit] = {
+  ): Future[Boolean] = {
     val member = lookupExpectedMember(memberId)
-    EitherT
-      .cond[Future](
-        !disabledClientsRef.get().members.contains(member),
-        (),
-        MemberDisabledError,
-      )
+    Future.successful(
+      !disabledClientsRef.get().members.contains(member)
+    )
   }
 
   /** There can be no other sequencers sharing this storage */
@@ -462,40 +472,7 @@ class InMemorySequencerStore(
       traceContext: TraceContext
   ): Future[SequencerSnapshot] = {
 
-    val watermarkO = watermark.get()
-    val disabledClients = disabledClientsRef.get()
-
-    val memberCheckpoints = watermarkO.fold[Map[Member, CounterCheckpoint]](Map()) { watermark =>
-      val registeredMembers = members.filter { case (member, RegisteredMember(_, registeredFrom)) =>
-        !disabledClients.members.contains(member) && registeredFrom <= timestamp
-      }.toSeq
-      val validEvents = events
-        .headMap(if (watermark < timestamp) watermark else timestamp, true)
-        .asScala
-        .toSeq
-
-      registeredMembers.map { case (member, RegisteredMember(id, _)) =>
-        val checkpointO = for {
-          memberCheckpoints <- checkpoints.get(id)
-          checkpoint <- memberCheckpoints.asScala.toSeq.findLast(e => e._2.timestamp <= timestamp)
-        } yield checkpoint
-        val memberEvents = validEvents.filter(e =>
-          isMemberRecipient(id)(e._2) && checkpointO.fold(true)(_._2.timestamp < e._1)
-        )
-        def counter(c: Int): SequencerCounter = Counter[SequencerCounterDiscriminator](c.toLong)
-
-        val checkpoint = CounterCheckpoint(
-          checkpointO.map(_._1).getOrElse(counter(-1)) + memberEvents.size,
-          memberEvents
-            .map(_._1)
-            .maxOption
-            .orElse(checkpointO.map(_._2.timestamp))
-            .getOrElse(CantonTimestamp.MinValue),
-          checkpointO.flatMap(_._2.latestTopologyClientTimestamp),
-        )
-        (member, checkpoint)
-      }.toMap
-    }
+    val memberCheckpoints = computeMemberCheckpoints(timestamp)
 
     val lastTs = memberCheckpoints.map(_._2.timestamp).maxOption.getOrElse(CantonTimestamp.MinValue)
 
@@ -508,10 +485,64 @@ class InMemorySequencerStore(
         Map.empty,
         None,
         protocolVersion,
-        Map.empty,
+        Seq.empty,
         Seq.empty,
       )
     )
+  }
+
+  def checkpointsAtTimestamp(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Map[Member, CounterCheckpoint]] = Future.successful(computeMemberCheckpoints(timestamp))
+
+  private def computeMemberCheckpoints(
+      timestamp: CantonTimestamp
+  ): Map[Member, CounterCheckpoint] = {
+    val watermarkO = watermark.get()
+    val disabledClients = disabledClientsRef.get()
+    val sequencerMemberO = members.get(sequencerMember)
+
+    watermarkO.fold[Map[Member, CounterCheckpoint]](Map()) { watermark =>
+      val registeredMembers = members.filter { case (member, RegisteredMember(_, registeredFrom)) =>
+        !disabledClients.members.contains(member) && registeredFrom <= timestamp
+      }.toSeq
+      val validEvents = events
+        .headMap(if (watermark.timestamp < timestamp) watermark.timestamp else timestamp, true)
+        .asScala
+        .toSeq
+
+      registeredMembers.map { case (member, RegisteredMember(id, _)) =>
+        val checkpointO = for {
+          memberCheckpoints <- checkpoints.get(id)
+          checkpoint <- memberCheckpoints.asScala.toSeq.findLast(e => e._2.timestamp <= timestamp)
+        } yield checkpoint
+        val memberEvents = validEvents.filter(e =>
+          isMemberRecipient(id)(e._2) && checkpointO.fold(true)(_._2.timestamp < e._1)
+        )
+
+        val latestSequencerTimestamp = sequencerMemberO
+          .flatMap(member =>
+            validEvents
+              .filter(e => isMemberRecipient(id)(e._2) && isMemberRecipient(member.memberId)(e._2))
+              .map(_._1)
+              .maxOption
+          )
+          .orElse(checkpointO.flatMap(_._2.latestTopologyClientTimestamp))
+
+        def counter(c: Int): SequencerCounter = Counter[SequencerCounterDiscriminator](c.toLong)
+
+        val checkpoint = CounterCheckpoint(
+          checkpointO.map(_._1).getOrElse(counter(-1)) + memberEvents.size,
+          memberEvents
+            .map(_._1)
+            .maxOption
+            .orElse(checkpointO.map(_._2.timestamp))
+            .getOrElse(CantonTimestamp.MinValue),
+          latestSequencerTimestamp,
+        )
+        (member, checkpoint)
+      }.toMap
+    }
   }
 }
 

@@ -42,6 +42,16 @@ trait PrettyUtil {
       }
     }
 
+  /** Like prettyOfClass, except takes an explicit name for the class.
+    */
+  def prettyOfClassWithName[T](name: String)(getParamTrees: (T => Option[Tree])*): Pretty[T] =
+    inst => {
+      if (inst == null) nullTree
+      else {
+        Tree.Apply(name, getParamTrees.mapFilter(_(inst)).iterator)
+      }
+    }
+
   /** A tree presenting the type name only. (E.g., for case objects.)
     */
   def prettyOfObject[T <: Product]: Pretty[T] = inst =>
@@ -183,4 +193,16 @@ object PrettyUtil extends PrettyUtil {
 
   /** How to pretty-print `null` values. This is consistent with [[pprint.Walker.treeify]] */
   private[pretty] val nullTree = Tree.Literal("null")
+}
+
+import scala.language.implicitConversions
+
+/** A trait for case classes that should be pretty-printed with their name only.
+  */
+trait PrettyNameOnlyCase extends Product with PrettyPrinting {
+  @SuppressWarnings(Array("org.wartremover.warts.Product"))
+  override protected[pretty] def pretty: Pretty[this.type] = prettyOfObject
+}
+object PrettyNameOnlyCase {
+  implicit def toString(pt: PrettyNameOnlyCase): String = pt.toString
 }

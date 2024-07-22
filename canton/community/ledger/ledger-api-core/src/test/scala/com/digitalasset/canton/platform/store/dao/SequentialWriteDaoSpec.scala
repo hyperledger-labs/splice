@@ -3,11 +3,8 @@
 
 package com.digitalasset.canton.platform.store.dao
 
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.Party
-import com.daml.lf.data.Time.Timestamp
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.Update
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.{DomainIndex, Update}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.platform.PackageName
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
@@ -26,6 +23,9 @@ import com.digitalasset.canton.platform.store.interning.{
 }
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.Party
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.mockito.MockitoSugar.mock
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -128,7 +128,8 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
       throw new UnsupportedOperationException
 
     override def updateLedgerEnd(
-        params: ParameterStorageBackend.LedgerEnd
+        params: ParameterStorageBackend.LedgerEnd,
+        domainIndexes: Map[DomainId, DomainIndex],
     )(connection: Connection): Unit =
       blocking(synchronized {
         connection shouldBe someConnection
@@ -179,6 +180,9 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
         connection: Connection
     ): ParameterStorageBackend.PruneUptoInclusiveAndLedgerEnd =
       throw new UnsupportedOperationException
+
+    override def domainLedgerEnd(domainId: DomainId)(connection: Connection): DomainIndex =
+      throw new UnsupportedOperationException
   }
 }
 
@@ -190,8 +194,9 @@ object SequentialWriteDaoSpec {
   private def offset(s: String): Offset = Offset.fromHexString(Ref.HexString.assertFromString(s))
 
   private def someUpdate(key: String) = Some(
-    Update.PublicPackageUploadRejected(
+    Update.PartyAllocationRejected(
       submissionId = Ref.SubmissionId.assertFromString("abc"),
+      participantId = Ref.ParticipantId.assertFromString("participant"),
       recordTime = Timestamp.now(),
       rejectionReason = key,
     )
@@ -221,6 +226,7 @@ object SequentialWriteDaoSpec {
     contract_id = "1",
     template_id = "",
     package_name = "2",
+    package_version = Some("1.2"),
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
     create_argument = Array.empty,
@@ -269,11 +275,11 @@ object SequentialWriteDaoSpec {
     record_time = 0,
   )
 
-  val singlePartyFixture: Option[Update.PublicPackageUploadRejected] =
+  val singlePartyFixture: Option[Update.PartyAllocationRejected] =
     someUpdate("singleParty")
-  val partyAndCreateFixture: Option[Update.PublicPackageUploadRejected] =
+  val partyAndCreateFixture: Option[Update.PartyAllocationRejected] =
     someUpdate("partyAndCreate")
-  val allEventsFixture: Option[Update.PublicPackageUploadRejected] =
+  val allEventsFixture: Option[Update.PartyAllocationRejected] =
     someUpdate("allEventsFixture")
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -290,16 +296,28 @@ object SequentialWriteDaoSpec {
 
   private val updateToDbDtoFixture: Offset => Traced[Update] => Iterator[DbDto] =
     _ => {
-      case Traced(r: Update.PublicPackageUploadRejected) =>
+      case Traced(r: Update.PartyAllocationRejected) =>
         someUpdateToDbDtoFixture(r.rejectionReason).iterator
       case _ => throw new Exception
     }
 
   private val dbDtoToStringsForInterningFixture: Iterable[DbDto] => DomainStringIterators = {
     case iterable if iterable.size == 5 =>
-      new DomainStringIterators(Iterator.empty, List("1").iterator, Iterator.empty, Iterator("2"))
+      new DomainStringIterators(
+        Iterator.empty,
+        List("1").iterator,
+        Iterator.empty,
+        Iterator("2"),
+        Iterator("1.2"),
+      )
     case _ =>
-      new DomainStringIterators(Iterator.empty, Iterator.empty, Iterator.empty, Iterator.empty)
+      new DomainStringIterators(
+        Iterator.empty,
+        Iterator.empty,
+        Iterator.empty,
+        Iterator.empty,
+        Iterator.empty,
+      )
   }
 
   private val stringInterningViewFixture: StringInterning with InternizingStringInterningView = {
@@ -314,12 +332,15 @@ object SequentialWriteDaoSpec {
 
       override def domainId: StringInterningDomain[DomainId] = throw new NotImplementedException
 
+      override def packageVersion: StringInterningDomain[Ref.PackageVersion] =
+        throw new NotImplementedException
       override def internize(
           domainStringIterators: DomainStringIterators
       ): Iterable[(Int, String)] = {
         if (domainStringIterators.templateIds.isEmpty) Nil
         else List(1 -> "a", 2 -> "b")
       }
+
     }
   }
 

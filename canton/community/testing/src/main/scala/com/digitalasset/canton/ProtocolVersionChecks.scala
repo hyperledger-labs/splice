@@ -44,7 +44,10 @@ trait ProtocolVersionChecksFixtureAnyWordSpec {
     def onlyRunWith(protocolVersion: ProtocolVersion): OnlyRunWhenWordSpecStringWrapper =
       new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion == protocolVersion)
 
-    def onlyRunWithLessThan(
+    def onlyRunWhen(condition: ProtocolVersion => Boolean): OnlyRunWhenWordSpecStringWrapper =
+      new OnlyRunWhenWordSpecStringWrapper(verb, condition(testedProtocolVersion))
+
+    def onlyRunLessThan(
         minProtocolVersion: ProtocolVersion
     ): OnlyRunWhenWordSpecStringWrapper =
       new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion < minProtocolVersion)
@@ -56,6 +59,9 @@ trait ProtocolVersionChecksFixtureAnyWordSpec {
   }
 
   implicit class ProtocolCheckTaggedString(verb: ResultOfTaggedAsInvocationOnString) {
+    def onlyRunWhen(condition: Boolean): OnlyRunWhenResultOfTaggedAsInvocationOnString =
+      new OnlyRunWhenResultOfTaggedAsInvocationOnString(verb, condition)
+
     def onlyRunWithOrGreaterThan(
         minProtocolVersion: ProtocolVersion
     ): OnlyRunWhenResultOfTaggedAsInvocationOnString =
@@ -196,15 +202,22 @@ trait ProtocolVersionChecksAsyncWordSpec {
   this: TestEssentials & AsyncWordSpecLike =>
 
   implicit class ProtocolCheckString(verb: String) {
+    def onlyRunWhen(condition: Boolean): OnlyRunWhenWordSpecStringWrapper =
+      new OnlyRunWhenWordSpecStringWrapper(verb, condition)
     def onlyRunWithOrGreaterThan(
         minProtocolVersion: ProtocolVersion
     ): OnlyRunWhenWordSpecStringWrapper =
-      new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion >= minProtocolVersion)
+      onlyRunWhen(_ >= minProtocolVersion)
 
     def onlyRunWithOrLessThan(
         minProtocolVersion: ProtocolVersion
     ): OnlyRunWhenWordSpecStringWrapper =
-      new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion <= minProtocolVersion)
+      onlyRunWhen(testedProtocolVersion <= minProtocolVersion)
+
+    private def onlyRunWhen(
+        condition: ProtocolVersion => Boolean
+    ): OnlyRunWhenWordSpecStringWrapper =
+      new OnlyRunWhenWordSpecStringWrapper(verb, condition(testedProtocolVersion))
   }
 
   protected final class OnlyRunWhenWordSpecStringWrapper(

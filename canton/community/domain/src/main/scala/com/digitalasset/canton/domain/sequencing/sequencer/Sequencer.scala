@@ -7,17 +7,21 @@ import cats.data.EitherT
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
   RegisterMemberError,
   SequencerAdministrationError,
+  SequencerError,
   SequencerWriteError,
 }
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
+  SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
-import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
+import com.digitalasset.canton.health.admin.data.{SequencerAdminStatus, SequencerHealthStatus}
 import com.digitalasset.canton.health.{AtomicHealthElement, CloseableHealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLogging}
@@ -26,16 +30,16 @@ import com.digitalasset.canton.scheduler.PruningScheduler
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
+import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.TrafficControlErrors.TrafficControlError
-import com.digitalasset.canton.util.EitherTUtil
 import io.grpc.ServerServiceDefinition
 import org.apache.pekko.Done
 import org.apache.pekko.stream.KillSwitch
 import org.apache.pekko.stream.scaladsl.Source
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 /** Errors from pruning */
 sealed trait PruningError {
@@ -77,19 +81,25 @@ trait Sequencer
     SequencerHealthStatus(isActive = true)
   override def closingState: SequencerHealthStatus = SequencerHealthStatus.shutdownStatus
 
+  /** True if member is registered in sequencer persistent state / storage (i.e. database).
+    */
   def isRegistered(member: Member)(implicit traceContext: TraceContext): Future[Boolean]
 
-  def registerMember(member: Member)(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, SequencerWriteError[RegisterMemberError], Unit]
+  /** True if registered member has not been disabled.
+    */
+  def isEnabled(member: Member)(implicit traceContext: TraceContext): Future[Boolean]
+
+  private[sequencing] def registerMemberInternal(member: Member, timestamp: CantonTimestamp)(
+      implicit traceContext: TraceContext
+  ): EitherT[Future, RegisterError, Unit]
 
   def sendAsyncSigned(signedSubmission: SignedContent[SubmissionRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SendAsyncError, Unit]
+  ): EitherT[FutureUnlessShutdown, SendAsyncError, Unit]
 
   def sendAsync(submission: SubmissionRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SendAsyncError, Unit]
+  ): EitherT[FutureUnlessShutdown, SendAsyncError, Unit]
 
   def read(member: Member, offset: SequencerCounter)(implicit
       traceContext: TraceContext
@@ -105,17 +115,7 @@ trait Sequencer
     */
   def snapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, SequencerSnapshot]
-
-  /** First check is the member is registered and if not call `registerMember` */
-  def ensureRegistered(member: Member)(implicit
-      executionContext: ExecutionContext,
-      traceContext: TraceContext,
-  ): EitherT[Future, SequencerWriteError[RegisterMemberError], Unit] =
-    for {
-      isRegistered <- EitherT.right[SequencerWriteError[RegisterMemberError]](isRegistered(member))
-      _ <- EitherTUtil.ifThenET(!isRegistered)(registerMember(member))
-    } yield ()
+  ): EitherT[Future, SequencerError, SequencerSnapshot]
 
   /** Disable the provided member. Should prevent them from reading or writing in the future (although they can still be addressed).
     * Their unread data can also be pruned.
@@ -135,36 +135,46 @@ trait Sequencer
     */
   private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter
 
-  /** Return the status of the specified members. If the list is empty, return the status of all members.
+  /** Return the latest known status of the specified members, either at wall clock time of this sequencer or
+    * latest known sequenced event, whichever is the most recent.
+    * This method should be used for information purpose only and not to get a deterministic traffic state
+    * as the state will depend on current time. To get the state at a specific timestamp, use [[getTrafficStateAt]] instead.
+    * If the list is empty, return the status of all members.
     * Requested members who are not registered in the Sequencer will not be in the response.
     * Registered members with no sent or received event will return an empty status.
     */
-  def trafficStatus(members: Seq[Member])(implicit
+  def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SequencerTrafficStatus]
 
-  def setTrafficBalance(
+  /** Sets the traffic purchased of a member to the new provided value.
+    * This will only become effective if / when properly authorized by enough sequencers according to the
+    * domain owners threshold.
+    */
+  def setTrafficPurchased(
       member: Member,
       serial: PositiveInt,
-      totalTrafficBalance: NonNegativeLong,
+      totalTrafficPurchased: NonNegativeLong,
       sequencerClient: SequencerClient,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TrafficControlError, CantonTimestamp]
 
-  /** Return the full traffic state of all known members.
-    * This should not be exposed externally as is as it contains information not relevant to external consumers.
-    * Use [[trafficStatus]] instead.
+  /** Return the traffic state of a member at a given timestamp.
     */
-  def trafficStates(implicit
+  def getTrafficStateAt(member: Member, timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[Member, TrafficState]]
+  ): EitherT[FutureUnlessShutdown, SequencerRateLimitError.TrafficNotFound, Option[TrafficState]]
 
   /** Return the rate limit manager for this sequencer, if it exists.
     */
   def rateLimitManager: Option[SequencerRateLimitManager] = None
 
   def adminServices: Seq[ServerServiceDefinition] = Seq.empty
+
+  /** Status relating to administrative sequencer operations.
+    */
+  def adminStatus: SequencerAdminStatus
 }
 
 /** Sequencer pruning interface.
@@ -206,24 +216,6 @@ trait SequencerPruning {
       oldestEventTimestamp: Option[CantonTimestamp]
   ): Either[PruningSupportError, Unit]
 
-  /** Acknowledge that a member has successfully handled all events up to and including the timestamp provided.
-    * Makes earlier events for this member available for pruning.
-    * The timestamp is in sequencer time and will likely correspond to an event that the client has processed however
-    * this is not validated.
-    * It is assumed that members in consecutive calls will never acknowledge an earlier timestamp however this is also
-    * not validated (and could be invalid if the member has many subscriptions from the same or many processes).
-    * It is expected that members will periodically call this endpoint with their latest clean timestamp rather than
-    * calling it for every event they process. The default interval is in the range of once a minute.
-    *
-    * A member should only acknowledge timestamps it has actually received.
-    * The behaviour of the sequencer is implementation-defined when a member acknowledges a later timestamp.
-    *
-    * @see com.digitalasset.canton.sequencing.client.SequencerClientConfig.acknowledgementInterval for the default interval
-    */
-  def acknowledge(member: Member, timestamp: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
-
   /** Newer version of acknowledgements.
     * To be active for protocol versions >= 4.
     * The signature is checked on the server side to avoid that malicious sequencers create fake
@@ -260,4 +252,49 @@ object Sequencer extends HasLoggerName {
     * was pulled. Termination of the main flow must be awaited separately.
     */
   type EventSource = Source[OrdinarySerializedEventOrError, (KillSwitch, Future[Done])]
+
+  /** Type alias for a content that is signed by the sender (as in, whoever sent the SubmissionRequest to the sequencer).
+    * Note that the sequencer itself can be the "sender": for instance when processing balance updates for traffic control,
+    * the sequencer will craft a SetTrafficPurchased protocol message and sign it as the "sender".
+    */
+  type SenderSigned[A <: HasCryptographicEvidence] = SignedContent[A]
+
+  /** Type alias for content that has been signed by the sequencer. The purpose of this is to identify which sequencer has processed a submission request,
+    * such that after the request is ordered and processed by all sequencers, each sequencer knows which sequencer received the submission request.
+    * The signature here will always be one of a sequencer.
+    */
+  type SequencerSigned[A <: HasCryptographicEvidence] =
+    SignedContent[OrderingRequest[SenderSigned[A]]]
+
+  /** Ordering request signed by the sequencer.
+    * Outer signature is the signature of the sequencer that received the submission request.
+    * Inner signature is the signature of the member from which the submission request originated.
+    *
+    *                            ┌─────────────────┐       ┌────────────┐
+    *                            │SenderSigned     │       │Sequencer   │
+    * ┌─────────────────┐        │  ┌──────────────┤       │            │
+    * │Sender           │signs   │  │Submission    │sends  │            │
+    * │(e.g participant)├───────►│  │Request       ├──────►│            │
+    * └─────────────────┘        └──┴──────────────┘       └─────┬──────┘
+    *                                                            │
+    *                                                            │signs
+    *                                                            ▼
+    *                                                 ┌──────────────────────┐
+    *                                                 │SequencerSigned       │
+    *                                                 │ ┌────────────────────┤
+    *                                         send to │ │SenderSigned        │
+    *                                         ordering│ │ ┌──────────────────┤
+    *                                        ◄────────┤ │ │Submission        │
+    *                                                 │ │ │Request           │
+    *                                                 └─┴─┴──────────────────┘
+    */
+  type SignedOrderingRequest = SequencerSigned[SubmissionRequest]
+
+  implicit class SignedOrderingRequestOps(val value: SignedOrderingRequest) extends AnyVal {
+    def signedSubmissionRequest: SignedContent[SubmissionRequest] =
+      value.content.content
+    def submissionRequest: SubmissionRequest = signedSubmissionRequest.content
+  }
+
+  type RegisterError = SequencerWriteError[RegisterMemberError]
 }

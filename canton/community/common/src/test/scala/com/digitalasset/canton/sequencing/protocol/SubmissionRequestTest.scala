@@ -32,17 +32,17 @@ class SubmissionRequestTest extends BaseTestWordSpec {
     SubmissionRequest.tryCreate(
       DefaultTestIdentities.participant1,
       MessageId.fromUuid(new UUID(1L, 1L)),
-      isRequest = false,
       Batch.empty(testedProtocolVersion),
       maxSequencingTime = CantonTimestamp.MaxValue,
       topologyTimestamp = defaultTopologyTimestamp,
       Some(defaultAggregationRule),
+      Option.empty[SequencingSubmissionCost],
       testedProtocolVersion,
     )
 
   "aggregation id" should {
     "authenticate the relevant fields" in {
-      if (testedProtocolVersion >= ProtocolVersion.v30) {
+      if (testedProtocolVersion >= ProtocolVersion.v31) {
 
         val envelope1 = ClosedEnvelope.create(
           ByteString.copyFromUtf8("Content1"),
@@ -102,7 +102,7 @@ class SubmissionRequestTest extends BaseTestWordSpec {
     }
 
     "ignore sender-specific fields" in {
-      if (testedProtocolVersion >= ProtocolVersion.v30) {
+      if (testedProtocolVersion >= ProtocolVersion.v31) {
         val envelope1 = ClosedEnvelope.create(
           ByteString.copyFromUtf8("some-content"),
           Recipients.cc(DefaultTestIdentities.participant1, DefaultTestIdentities.participant3),
@@ -125,7 +125,6 @@ class SubmissionRequestTest extends BaseTestWordSpec {
         val requestsWithoutSignatures = Seq(
           submissionRequestWithEnvelope1,
           submissionRequestWithEnvelope1.copy(sender = DefaultTestIdentities.participant3),
-          submissionRequestWithEnvelope1.copy(isRequest = true),
           submissionRequestWithEnvelope1.copy(messageId = MessageId.fromUuid(new UUID(10, 10))),
         )
 
@@ -143,7 +142,7 @@ class SubmissionRequestTest extends BaseTestWordSpec {
 
         val someSignature = SymbolicCrypto.signature(
           ByteString.copyFromUtf8("A signature"),
-          DefaultTestIdentities.participant1.uid.namespace.fingerprint,
+          DefaultTestIdentities.participant1.fingerprint,
         )
 
         val requestsWithSignatures = Seq(
@@ -160,7 +159,6 @@ class SubmissionRequestTest extends BaseTestWordSpec {
               envelope2.copy(signatures = Seq(someSignature, Signature.noSignature)),
             )
           ),
-          submissionRequestWithEnvelope2.copy(isRequest = true),
           submissionRequestWithEnvelope2.copy(messageId = MessageId.fromUuid(new UUID(10, 10))),
         )
 

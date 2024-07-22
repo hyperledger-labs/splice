@@ -4,14 +4,14 @@
 package com.digitalasset.canton.platform.apiserver.meteringreport
 
 import com.daml.ledger.api.v2.admin.metering_report_service.*
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.ApplicationId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.struct.spray.StructJsonFormat
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReport.*
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.ApplicationId
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.struct.Struct
-import com.google.protobuf.timestamp.{Timestamp as ProtoTimestamp}
+import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
 import spray.json.enrichAny
 
 import HmacSha256.Key

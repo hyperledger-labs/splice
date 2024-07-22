@@ -5,12 +5,10 @@ package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.SqlParser.{int, long}
 import anorm.{ParameterMetaData, RowParser, ToStatement, ~}
-import com.daml.lf.data.Time
-import com.daml.lf.data.Time.Timestamp
 import com.daml.scalautil.Statement.discard
-import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.{
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.{
   ParticipantMetering,
   ReportData,
 }
@@ -26,12 +24,14 @@ import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
 }
 import com.digitalasset.canton.platform.store.backend.common.MeteringParameterStorageBackendImpl.assertLedgerMeteringEnd
 import com.digitalasset.canton.platform.store.backend.common.MeteringStorageBackendImpl.*
-import com.digitalasset.canton.platform.store.backend.common.SimpleSqlAsVectorOf.*
+import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
 import com.digitalasset.canton.platform.store.backend.{
   Conversions,
   MeteringStorageReadBackend,
   MeteringStorageWriteBackend,
 }
+import com.digitalasset.daml.lf.data.Time
+import com.digitalasset.daml.lf.data.Time.Timestamp
 
 import java.sql.Connection
 

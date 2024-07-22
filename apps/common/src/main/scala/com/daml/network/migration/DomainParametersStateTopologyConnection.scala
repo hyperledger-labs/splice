@@ -6,7 +6,7 @@ package com.daml.network.migration
 import cats.data.OptionT
 import com.daml.network.environment.TopologyAdminConnection
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.topology.transaction.DomainParametersStateX
+import com.digitalasset.canton.topology.transaction.DomainParametersState
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,7 +22,7 @@ class DomainParametersStateTopologyConnection(connection: TopologyAdminConnectio
       tc: TraceContext,
       ec: ExecutionContext,
   ): OptionT[Future, TopologyAdminConnection.TopologyResult[
-    DomainParametersStateX
+    DomainParametersState
   ]] = {
     OptionT(
       connection

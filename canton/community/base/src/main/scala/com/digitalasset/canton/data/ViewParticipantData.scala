@@ -34,6 +34,7 @@ import com.digitalasset.canton.{
   LfLookupByKeyCommand,
   LfPackageId,
   LfPartyId,
+  LfVersioned,
   ProtoDeserializationError,
   checked,
 }
@@ -55,13 +56,13 @@ import com.google.protobuf.ByteString
   *   For [[com.digitalasset.canton.protocol.WellFormedTransaction]]s, the creation therefore is not rolled
   *   back either as the archival can only refer to non-rolled back creates.
   * @param resolvedKeys
-  * Specifies how to resolve [[com.daml.lf.engine.ResultNeedKey]] requests from DAMLe (resulting from e.g., fetchByKey,
+  * Specifies how to resolve [[com.digitalasset.daml.lf.engine.ResultNeedKey]] requests from DAMLe (resulting from e.g., fetchByKey,
   * lookupByKey) when interpreting the view. The resolved contract IDs must be in the [[coreInputs]].
   * Stores only the resolution difference between this view's global key inputs
   * [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]]
   * and the aggregated global key inputs from the subviews
   * (see [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]] for the aggregation algorithm).
-  * In [[com.daml.lf.transaction.ContractKeyUniquenessMode.Strict]],
+  * In [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Strict]],
   * the [[com.digitalasset.canton.data.FreeKey]] resolutions must be checked during conflict detection.
   * @param actionDescription The description of the root action of the view
   * @param rollbackContext The rollback context of the root action of the view.
@@ -82,7 +83,7 @@ final case class ViewParticipantData private (
     coreInputs: Map[LfContractId, InputContract],
     createdCore: Seq[CreatedContract],
     createdInSubviewArchivedInCore: Set[LfContractId],
-    resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
+    resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
     actionDescription: ActionDescription,
     rollbackContext: RollbackContext,
     salt: Salt,
@@ -131,9 +132,9 @@ final case class ViewParticipantData private (
       )
 
     def isAssignedKeyInconsistent(
-        keyWithResolution: (LfGlobalKey, SerializableKeyResolution)
+        keyWithResolution: (LfGlobalKey, LfVersioned[SerializableKeyResolution])
     ): Boolean = {
-      val (key, resolution) = keyWithResolution
+      val (key, LfVersioned(_, resolution)) = keyWithResolution
       resolution.resolution.fold(false) { cid =>
         val inconsistent = for {
           inputContract <- coreInputs.get(cid)
@@ -151,7 +152,7 @@ final case class ViewParticipantData private (
 
   def rootAction: RootAction =
     actionDescription match {
-      case CreateActionDescription(contractId, _seed, _version) =>
+      case CreateActionDescription(contractId, _seed) =>
         val createdContract = createdCore.headOption.getOrElse(
           throw InvalidViewParticipantData(
             show"No created core contracts declared for a view that creates contract $contractId at the root"
@@ -176,7 +177,7 @@ final case class ViewParticipantData private (
 
       case ExerciseActionDescription(
             inputContractId,
-            commandTemplateId,
+            templateId,
             choice,
             interfaceId,
             packagePreference,
@@ -184,7 +185,6 @@ final case class ViewParticipantData private (
             actors,
             byKey,
             _seed,
-            _version,
             failed,
           ) =>
         val inputContract = coreInputs.getOrElse(
@@ -193,12 +193,6 @@ final case class ViewParticipantData private (
             show"Input contract $inputContractId of the Exercise root action is not declared as core input."
           ),
         )
-
-        // commandTemplateId is not populated prior to ProtocolVersion.v5
-        val templateId = commandTemplateId match {
-          case Some(templateId) => templateId
-          case _ => inputContract.contract.contractInstance.unversioned.template
-        }
 
         val cmd = if (byKey) {
           val key = inputContract.contract.metadata.maybeKey
@@ -212,7 +206,7 @@ final case class ViewParticipantData private (
             templateId = templateId,
             contractKey = key,
             choiceId = choice,
-            argument = chosenValue,
+            argument = chosenValue.unversioned,
           )
         } else {
           LfExerciseCommand(
@@ -220,19 +214,19 @@ final case class ViewParticipantData private (
             interfaceId = interfaceId,
             contractId = inputContractId,
             choiceId = choice,
-            argument = chosenValue,
+            argument = chosenValue.unversioned,
           )
         }
         RootAction(cmd, actors, failed, packagePreference)
 
-      case FetchActionDescription(inputContractId, actors, byKey, _version) =>
+      case FetchActionDescription(inputContractId, actors, byKey, templateId) =>
         val inputContract = coreInputs.getOrElse(
           inputContractId,
           throw InvalidViewParticipantData(
             show"Input contract $inputContractId of the Fetch root action is not declared as core input."
           ),
         )
-        val templateId = inputContract.contract.contractInstance.unversioned.template
+
         val cmd = if (byKey) {
           val key = inputContract.contract.metadata.maybeKey
             .map(_.key)
@@ -247,8 +241,8 @@ final case class ViewParticipantData private (
         }
         RootAction(cmd, actors, failed = false, packageIdPreference = Set.empty)
 
-      case LookupByKeyActionDescription(key, _version) =>
-        val keyResolution = resolvedKeys.getOrElse(
+      case LookupByKeyActionDescription(LfVersioned(_version, key)) =>
+        val LfVersioned(_, keyResolution) = resolvedKeys.getOrElse(
           key,
           throw InvalidViewParticipantData(
             show"Key $key of LookupByKey root action is not resolved."
@@ -274,7 +268,7 @@ final case class ViewParticipantData private (
     coreInputs = coreInputs.values.map(_.toProtoV30).toSeq,
     createdCore = createdCore.map(_.toProtoV30),
     createdInSubviewArchivedInCore = createdInSubviewArchivedInCore.toSeq.map(_.toProtoPrimitive),
-    resolvedKeys = resolvedKeys.toList.map { case (k, res) => ResolvedKey(k, res).toProtoV30 },
+    resolvedKeys = resolvedKeys.toList.map(ResolvedKey.fromPair(_).toProtoV30),
     actionDescription = Some(actionDescription.toProtoV30),
     rollbackContext = if (rollbackContext.isEmpty) None else Some(rollbackContext.toProtoV30),
     salt = Some(salt.toProtoV30),
@@ -296,9 +290,9 @@ final case class ViewParticipantData private (
   )
 
   /** Extends [[resolvedKeys]] with the maintainers of assigned keys */
-  val resolvedKeysWithMaintainers: Map[LfGlobalKey, KeyResolutionWithMaintainers] =
-    resolvedKeys.fmap {
-      case assigned @ AssignedKey(contractId) =>
+  val resolvedKeysWithMaintainers: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]] =
+    resolvedKeys.fmap(_.map {
+      case AssignedKey(contractId) =>
         val maintainers =
           // checked by `inconsistentAssignedKey` above
           checked(
@@ -309,16 +303,16 @@ final case class ViewParticipantData private (
               ),
             )
           ).maintainers
-        AssignedKeyWithMaintainers(contractId, maintainers)(assigned.version)
+        AssignedKeyWithMaintainers(contractId, maintainers)
       case free @ FreeKey(_) => free
-    }
+    })
 
   @VisibleForTesting
   def copy(
       coreInputs: Map[LfContractId, InputContract] = this.coreInputs,
       createdCore: Seq[CreatedContract] = this.createdCore,
       createdInSubviewArchivedInCore: Set[LfContractId] = this.createdInSubviewArchivedInCore,
-      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution] = this.resolvedKeys,
+      resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]] = this.resolvedKeys,
       actionDescription: ActionDescription = this.actionDescription,
       rollbackContext: RollbackContext = this.rollbackContext,
       salt: Salt = this.salt,
@@ -339,7 +333,7 @@ object ViewParticipantData
   override val name: String = "ViewParticipantData"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.ViewParticipantData)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ViewParticipantData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -361,12 +355,12 @@ object ViewParticipantData
     * and the key is not in [[ViewParticipantData.resolvedKeys]].
     * @throws com.digitalasset.canton.serialization.SerializationCheckFailed if this instance cannot be serialized
     */
-  @throws[SerializationCheckFailed[com.daml.lf.value.ValueCoder.EncodeError]]
+  @throws[SerializationCheckFailed[com.digitalasset.daml.lf.value.ValueCoder.EncodeError]]
   def tryCreate(hashOps: HashOps)(
       coreInputs: Map[LfContractId, InputContract],
       createdCore: Seq[CreatedContract],
       createdInSubviewArchivedInCore: Set[LfContractId],
-      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
+      resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
       actionDescription: ActionDescription,
       rollbackContext: RollbackContext,
       salt: Salt,
@@ -402,7 +396,7 @@ object ViewParticipantData
       coreInputs: Map[LfContractId, InputContract],
       createdCore: Seq[CreatedContract],
       createdInSubviewArchivedInCore: Set[LfContractId],
-      resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution],
+      resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]],
       actionDescription: ActionDescription,
       rollbackContext: RollbackContext,
       salt: Salt,
@@ -451,7 +445,7 @@ object ViewParticipantData
       createdInSubviewArchivedInCore <- createdInSubviewArchivedInCoreP
         .traverse(ProtoConverter.parseLfContractId)
       resolvedKeys <- resolvedKeysP.traverse(
-        ResolvedKey.fromProtoV30(_).map(rk => rk.key -> rk.resolution)
+        ResolvedKey.fromProtoV30(_).map(_.toPair)
       )
       resolvedKeysMap = resolvedKeys.toMap
       actionDescription <- ProtoConverter

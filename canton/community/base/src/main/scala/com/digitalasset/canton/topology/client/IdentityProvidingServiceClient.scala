@@ -8,19 +8,21 @@ import cats.data.EitherT
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
-import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.protocol.{
   DynamicDomainParameters,
   DynamicDomainParametersWithValidity,
+  DynamicSequencingParametersWithValidity,
 }
 import com.digitalasset.canton.sequencing.TrafficControlParameters
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
+import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
@@ -28,14 +30,16 @@ import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
   PartyInfo,
 }
 import com.digitalasset.canton.topology.processing.{
-  TopologyTransactionProcessingSubscriberCommon,
-  TopologyTransactionProcessingSubscriberX,
+  EffectiveTime,
+  SequencedTime,
+  TopologyTransactionProcessingSubscriber,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.SingleUseCell
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, checked}
+import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable
@@ -299,6 +303,10 @@ trait PartyTopologySnapshotClient {
       parties: Seq[LfPartyId]
   )(implicit traceContext: TraceContext): Future[Set[LfPartyId]]
 
+  def activeParticipantsOfPartiesWithGroupAddressing(
+      parties: Seq[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]]
+
   /** Returns a list of all known parties on this domain */
   def inspectKnownParties(
       filterParty: String,
@@ -345,6 +353,10 @@ trait KeyTopologySnapshotClient {
   /** returns all signing keys */
   def signingKeys(owner: Member)(implicit traceContext: TraceContext): Future[Seq[SigningPublicKey]]
 
+  def signingKeysUS(owner: Member)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[SigningPublicKey]]
+
   def signingKeys(members: Seq[Member])(implicit
       traceContext: TraceContext
   ): Future[Map[Member, Seq[SigningPublicKey]]]
@@ -382,12 +394,6 @@ trait ParticipantTopologySnapshotClient {
 
   this: BaseTopologySnapshotClient =>
 
-  // used by domain to fetch all participants
-  @Deprecated(since = "3.0")
-  def participants()(implicit
-      traceContext: TraceContext
-  ): Future[Seq[(ParticipantId, ParticipantPermission)]]
-
   /** Checks whether the provided participant exists and is active */
   def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext
@@ -420,7 +426,7 @@ trait MediatorDomainStateClient {
     })
 
   def isMediatorActive(
-      mediator: MediatorsOfDomain
+      mediator: MediatorGroupRecipient
   )(implicit traceContext: TraceContext): Future[Boolean] =
     mediatorGroup(mediator.group).map {
       case Some(group) => group.isActive
@@ -476,18 +482,18 @@ trait VettedPackagesSnapshotClient {
   def findUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
-  )(implicit traceContext: TraceContext): EitherT[Future, PackageId, Set[PackageId]]
-
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]]
 }
 
 trait DomainGovernanceSnapshotClient {
   this: BaseTopologySnapshotClient with NamedLogging =>
 
   def trafficControlParameters[A](
-      protocolVersion: ProtocolVersion
+      protocolVersion: ProtocolVersion,
+      warnOnUsingDefault: Boolean = true,
   )(implicit tc: TraceContext): FutureUnlessShutdown[Option[TrafficControlParameters]] =
     FutureUnlessShutdown.outcomeF {
-      findDynamicDomainParametersOrDefault(protocolVersion)
+      findDynamicDomainParametersOrDefault(protocolVersion, warnOnUsingDefault = warnOnUsingDefault)
         .map(_.trafficControlParameters)
     }
 
@@ -515,6 +521,10 @@ trait DomainGovernanceSnapshotClient {
       traceContext: TraceContext
   ): Future[Either[String, DynamicDomainParametersWithValidity]]
 
+  def findDynamicSequencingParameters()(implicit
+      traceContext: TraceContext
+  ): Future[Either[String, DynamicSequencingParametersWithValidity]]
+
   /** List all the dynamic domain parameters (past and current) */
   def listDynamicDomainParametersChanges()(implicit
       traceContext: TraceContext
@@ -527,6 +537,14 @@ trait MembersTopologySnapshotClient {
   def allMembers()(implicit traceContext: TraceContext): Future[Set[Member]]
 
   def isMemberKnown(member: Member)(implicit traceContext: TraceContext): Future[Boolean]
+
+  def areMembersKnown(members: Set[Member])(implicit
+      traceContext: TraceContext
+  ): Future[Set[Member]]
+
+  def memberFirstKnownAt(member: Member)(implicit
+      traceContext: TraceContext
+  ): Future[Option[(SequencedTime, EffectiveTime)]]
 }
 
 trait TopologySnapshot
@@ -537,24 +555,24 @@ trait TopologySnapshot
     with VettedPackagesSnapshotClient
     with MediatorDomainStateClient
     with SequencerDomainStateClient
-    with DomainTrafficControlStateClient
     with DomainGovernanceSnapshotClient
     with MembersTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
 
 // architecture-handbook-entry-end: IdentityProvidingServiceClient
 
-trait DomainTopologyClientWithInitX
-    extends DomainTopologyClientWithInit
-    with TopologyTransactionProcessingSubscriberX
-
 /** The internal domain topology client interface used for initialisation and efficient processing */
 trait DomainTopologyClientWithInit
     extends DomainTopologyClient
-    with TopologyTransactionProcessingSubscriberCommon
+    with TopologyTransactionProcessingSubscriber
     with HasFutureSupervision
     with NamedLogging {
 
   implicit override protected def executionContext: ExecutionContext
+
+  protected val domainTimeTracker: SingleUseCell[DomainTimeTracker] = new SingleUseCell()
+
+  def setDomainTimeTracker(tracker: DomainTimeTracker): Unit =
+    domainTimeTracker.putIfAbsent(tracker).discard
 
   /** current number of changes waiting to become effective */
   def numPendingChanges: Int
@@ -835,6 +853,11 @@ private[client] trait PartyTopologySnapshotLoader
   ): Future[Set[LfPartyId]] =
     loadAndMapPartyInfos(parties, identity, _.groupAddressing).map(_.keySet)
 
+  final override def activeParticipantsOfPartiesWithGroupAddressing(
+      parties: Seq[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]] =
+    loadAndMapPartyInfos(parties, _.participants.keySet, _.groupAddressing)
+
   final override def consortiumThresholds(
       parties: Set[LfPartyId]
   )(implicit traceContext: TraceContext): Future[Map[LfPartyId, PositiveInt]] =
@@ -878,21 +901,21 @@ trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient {
   private[client] def loadUnvettedPackagesOrDependencies(
       participant: ParticipantId,
       packageId: PackageId,
-  )(implicit traceContext: TraceContext): EitherT[Future, PackageId, Set[PackageId]]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]]
 
   protected def findUnvettedPackagesOrDependenciesUsingLoader(
       participantId: ParticipantId,
       packages: Set[PackageId],
-      loader: (ParticipantId, PackageId) => EitherT[Future, PackageId, Set[PackageId]],
-  ): EitherT[Future, PackageId, Set[PackageId]] =
+      loader: (ParticipantId, PackageId) => EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]],
+  ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
     packages.toList
-      .parFlatTraverse(packageId => loader(participantId, packageId).map(_.toList))
-      .map(_.toSet)
+      .parTraverse(packageId => loader(participantId, packageId))
+      .map(_.flatten.toSet)
 
   override def findUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
-  )(implicit traceContext: TraceContext): EitherT[Future, PackageId, Set[PackageId]] =
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
     findUnvettedPackagesOrDependenciesUsingLoader(
       participantId,
       packages,
@@ -919,5 +942,4 @@ trait TopologySnapshotLoader
     with KeyTopologySnapshotClientLoader
     with VettedPackagesSnapshotLoader
     with DomainGovernanceSnapshotLoader
-    with DomainTrafficControlStateClient
     with NamedLogging

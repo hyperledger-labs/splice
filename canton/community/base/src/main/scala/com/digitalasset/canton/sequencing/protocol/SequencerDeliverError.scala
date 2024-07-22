@@ -7,7 +7,13 @@ import com.daml.error.*
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
-import com.digitalasset.canton.error.{BaseCantonError, TransactionError, TransactionErrorImpl}
+import com.digitalasset.canton.error.{
+  Alarm,
+  AlarmErrorCode,
+  BaseCantonError,
+  TransactionError,
+  TransactionErrorImpl,
+}
 import com.digitalasset.canton.topology.Member
 import com.google.rpc.status.Status
 
@@ -36,15 +42,24 @@ sealed abstract class SequencerDeliverErrorCode(id: String, category: ErrorCateg
 
 @Explanation("""Delivery errors wrapped into sequenced events""")
 object SequencerErrors extends SequencerErrorGroup {
-  @Explanation("""This error occurs when the sequencer cannot parse the submission request.""")
-  @Resolution(
-    """This usually indicates a misconfiguration of the system components or an application bug and requires operator intervention."""
-  )
-  object SubmissionRequestMalformed
-      extends SequencerDeliverErrorCode(
-        id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED",
-        ErrorCategory.InvalidIndependentOfSystemState,
-      )
+  @Explanation("""
+      |This error occurs when the sequencer receives an invalid submission request, e.g. it has an
+      |aggregation rule with an unreachable threshold.
+      |Malformed requests will not emit any deliver event.
+      |""".stripMargin)
+  @Resolution("""
+      |Check if the sender is running an attack.
+      |If you can rule out an attack, please reach out to Canton support.
+      |""".stripMargin)
+  case object SubmissionRequestMalformed
+      extends AlarmErrorCode(id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED") {
+    final case class Error(
+        submissionRequest: SubmissionRequest,
+        error: String,
+    ) extends Alarm({
+          s"Send request [${submissionRequest.messageId}] is malformed. Discarding request. $error"
+        })
+  }
 
   @Explanation(
     """This error occurs when the sequencer cannot accept submission request due to the current state of the system."""
@@ -52,7 +67,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This usually indicates a misconfiguration of the system components or an application bug and requires operator intervention. Please refer to a specific error message to understand the exact cause."""
   )
-  object SubmissionRequestRefused
+  case object SubmissionRequestRefused
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_SUBMISSION_REQUEST_REFUSED",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -64,7 +79,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  object TopoologyTimestampTooEarly
+  case object TopoologyTimestampTooEarly
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_TOPOLOGY_TIMESTAMP_TOO_EARLY",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -87,7 +102,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  object TopologyTimestampAfterSequencingTimestamp
+  case object TopologyTimestampAfterSequencingTimestamp
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_TOPOLOGY_TIMESTAMP_AFTER_SEQUENCING_TIMESTAMP",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -107,7 +122,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  object TopologyTimestampMissing
+  case object TopologyTimestampMissing
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_TOPOLOGY_TIMESTAMP_MISSING",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -119,7 +134,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """In case there was a recent concurrent dynamic domain parameter change, simply retry the submission. Otherwise this error code indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  object MaxSequencingTimeTooFar
+  case object MaxSequencingTimeTooFar
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -140,7 +155,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  object UnknownRecipients
+  case object UnknownRecipients
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_UNKNOWN_RECIPIENTS",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -156,7 +171,7 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This is expected to happen during operation of a system with aggregate submissions enabled. No action required."""
   )
-  object AggregateSubmissionAlreadySent
+  case object AggregateSubmissionAlreadySent
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_AGGREGATE_SUBMISSION_ALREADY_SENT",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -168,19 +183,31 @@ object SequencerErrors extends SequencerErrorGroup {
   @Resolution(
     """This error indicates that an aggregate submission has already been accepted by the sequencer and for some reason there is a repeated submission. This is likely caused by retrying a submission. This can usually be ignored."""
   )
-  object AggregateSubmissionStuffing
+  case object AggregateSubmissionStuffing
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_AGGREGATE_SUBMISSION_STUFFING",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       )
 
   @Explanation(
-    """Sequencer has refused a submission request due to insufficient credits in the sender's traffic balance."""
+    """The provided submission cost is outdated compared to the domain state at sequencing time."""
   )
   @Resolution(
-    """Acquire more traffic credits with the system by topping up traffic credits for the sender."""
+    """Re-submit the request with an updated submission cost."""
   )
-  object TrafficCredit
+  case object OutdatedTrafficCost
+      extends SequencerDeliverErrorCode(
+        id = "OUTDATED_TRAFFIC_COST",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      )
+
+  @Explanation(
+    """Sequencer has refused a submission request due to insufficient credits in the sender's traffic purchased entry."""
+  )
+  @Resolution(
+    """Acquire more traffic credits with the system by purchasing traffic credits for the sender."""
+  )
+  case object TrafficCredit
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_NOT_ENOUGH_TRAFFIC_CREDIT",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -193,7 +220,7 @@ object SequencerErrors extends SequencerErrorGroup {
     """Clients should connect to another sequencer with older event history to consume the tombstoned events
       |before reconnecting to the recently onboarded sequencer."""
   )
-  object PersistTombstone
+  case object PersistTombstone
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_TOMBSTONE_PERSISTED",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,

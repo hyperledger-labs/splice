@@ -3,8 +3,8 @@
 
 package com.daml.network.environment
 
-import com.daml.lf.data.Ref.{PackageName, PackageVersion}
-import com.daml.lf.language.Ast.PackageMetadata
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.language.Ast.PackageMetadata
 import com.daml.network.util.DarUtil
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
 import com.google.protobuf.ByteString

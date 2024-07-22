@@ -5,6 +5,7 @@ package com.digitalasset.canton.integration
 
 import com.daml.metrics.Timed
 import com.digitalasset.canton.CloseableTest
+import com.digitalasset.canton.config.DefaultPorts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
@@ -89,7 +90,9 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
           config
       ),
     )
-    val finalConfig = configTransform(pluginConfig)
+
+    // Once all the plugins and config transformation is done apply the defaults
+    val finalConfig = configTransform(pluginConfig).withDefaults(new DefaultPorts())
 
     val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
     val environmentFixture = Timed.value(
@@ -103,11 +106,16 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
              * therefore actual metrics have to be reported.
              * The in memory metrics are used when no reporters are configured and the metrics are
              * observed directly in the test scenarios.
+             *
+             * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
+             * which is accessible using env.environment.metricsRegistry
+             *
              * */
             if (finalConfig.monitoring.metrics.reporters.isEmpty)
-              MetricsFactoryType.InMemory(scopedMetricsFactory.forContext)
+              MetricsFactoryType.InMemory(scopedMetricsFactory)
             else MetricsFactoryType.External,
           initializeGlobalOpenTelemetry = false,
+          sequencerTransportSeed = Some(1L),
         ),
       ),
     )

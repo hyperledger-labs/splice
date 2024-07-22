@@ -192,7 +192,7 @@ class JoiningNodeInitializer(
         if (dsoPartyIsAuthorized) {
           logger.info("DSO party is authorized to our participant.")
           for {
-            _ <- SetupUtil.grantSvUserRightReadAsDso(
+            _ <- SetupUtil.grantSvUserRightActAsDso(
               svAutomation.connection,
               config.ledgerApiUser,
               svStore.key.dsoParty,
@@ -639,10 +639,10 @@ class JoiningNodeInitializer(
                 // We need to wait for the ledger API server to see the party otherwise the
                 // grantUserRights call will fail.
                 _ <- initConnection.waitForPartyOnLedgerApi(svStore.key.dsoParty)
-                _ <- svStoreWithIngestion.connection.grantUserRights(
+                _ <- SetupUtil.grantSvUserRightActAsDso(
+                  svStoreWithIngestion.connection,
                   config.ledgerApiUser,
-                  Seq.empty,
-                  Seq(svStore.key.dsoParty),
+                  svStore.key.dsoParty,
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for dsoParty")
                 dsoAutomation = newSvDsoAutomationService(

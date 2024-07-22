@@ -4,20 +4,20 @@
 package com.digitalasset.canton.ledger.runner.common
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.lf.VersionRange
-import com.daml.lf.interpretation.Limits
-import com.daml.lf.language.LanguageVersion
-import com.daml.lf.transaction.ContractKeyUniquenessMode
+import com.daml.tls.{TlsConfiguration, TlsVersion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.ledger.api.tls.{TlsConfiguration, TlsVersion}
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.config.{IdentityProviderManagementConfig, *}
-import com.digitalasset.canton.platform.indexer.{IndexerConfig, PackageMetadataViewConfig}
+import com.digitalasset.canton.platform.indexer.IndexerConfig
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.DbSupport.DataSourceProperties
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig.SynchronousCommitValue
+import com.digitalasset.daml.lf.VersionRange
+import com.digitalasset.daml.lf.interpretation.Limits
+import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode
 import io.netty.handler.ssl.ClientAuth
 import org.scalacheck.Gen
 
@@ -47,8 +47,8 @@ object ArbitraryConfig {
     duration.map(NonNegativeFiniteDuration.tryFromJavaDuration)
 
   val versionRange: Gen[VersionRange[LanguageVersion]] = for {
-    min <- Gen.oneOf(LanguageVersion.All)
-    max <- Gen.oneOf(LanguageVersion.All)
+    min <- Gen.oneOf(LanguageVersion.AllV2)
+    max <- Gen.oneOf(LanguageVersion.AllV2)
     if LanguageVersion.Ordering.compare(max, min) >= 0
   } yield VersionRange[LanguageVersion](min, max)
 
@@ -179,11 +179,6 @@ object ArbitraryConfig {
     optElement <- Gen.option(element)
   } yield optElement
 
-  val packageMetadataViewConfig = for {
-    initLoadParallelism <- Gen.chooseNum(0, Int.MaxValue)
-    initProcessParallelism <- Gen.chooseNum(0, Int.MaxValue)
-  } yield PackageMetadataViewConfig(initLoadParallelism, initProcessParallelism)
-
   val indexerConfig = for {
     batchingParallelism <- nonNegativeIntGen
     enableCompression <- Gen.oneOf(true, false)
@@ -192,7 +187,6 @@ object ArbitraryConfig {
     maxInputBufferSize <- nonNegativeIntGen
     restartDelay <- nonNegativeFiniteDurationGen
     submissionBatchSize <- Gen.long
-    packageMetadataViewConfig <- packageMetadataViewConfig
   } yield IndexerConfig(
     batchingParallelism = batchingParallelism,
     enableCompression = enableCompression,
@@ -201,7 +195,6 @@ object ArbitraryConfig {
     maxInputBufferSize = maxInputBufferSize,
     restartDelay = restartDelay,
     submissionBatchSize = submissionBatchSize,
-    packageMetadataView = packageMetadataViewConfig,
   )
 
   def genActiveContractsServiceStreamConfig: Gen[ActiveContractsServiceStreamsConfig] =

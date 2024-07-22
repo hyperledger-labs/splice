@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.{
   DbDto,
@@ -27,8 +27,6 @@ private[backend] class IngestionStorageBackendTemplate(
     val lastEventSequentialId = ledgerEnd.lastEventSeqId
 
     List(
-      SQL"DELETE FROM lapi_package_entries WHERE ${queryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_packages WHERE ${queryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_command_completions WHERE ${queryStrategy
           .offsetIsGreater("completion_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_events_create WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
@@ -36,6 +34,8 @@ private[backend] class IngestionStorageBackendTemplate(
           .offsetIsGreater("event_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_events_non_consuming_exercise WHERE ${queryStrategy
           .offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_events_unassign WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_events_assign WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_party_entries WHERE ${queryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_string_interning WHERE internal_id > $lastStringInterningId",
       SQL"DELETE FROM lapi_pe_create_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
@@ -43,6 +43,8 @@ private[backend] class IngestionStorageBackendTemplate(
       SQL"DELETE FROM lapi_pe_consuming_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_pe_consuming_id_filter_non_stakeholder_informee WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_pe_non_consuming_id_filter_informee WHERE event_sequential_id > $lastEventSequentialId",
+      SQL"DELETE FROM lapi_pe_unassign_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
+      SQL"DELETE FROM lapi_pe_assign_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_transaction_meta WHERE ${queryStrategy
           .offsetIsGreater("event_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_transaction_metering WHERE ${queryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",

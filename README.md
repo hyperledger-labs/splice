@@ -588,7 +588,7 @@ and the package ids change. That way there is no dedicated vote required.
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `382728dd8ec53cd119acc6030e361b0692a85f8c`
+Current Canton commit: `06451f6d8679fc80d785fd19c43c33d6a6f10ed1`
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
    In that repo, execute the following steps:
@@ -1034,6 +1034,18 @@ PRs/commits that include `[breaking]` in their commit message, or that bump the 
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
+
+### Testing hard migrations
+
+To test a full hard migration flow, you need to run the custom hard migration workflow in CI. To do so, trigger a CI pipeline on the branch you want to test with the following variables:
+
+- `run-job`: `deploy-hard-migration`
+- `cluster`: the scratch you want to use, eg: `scratchneta`
+- `base-version`: the version from which to upgrade, ideally the latest available release, eg: `0.1.15`
+
+The workflow will deploy everything required for the `base-version`, run the preflights, prepare and execute a hard migration to the artifacts built from the branch, and run the preflights again to ensure the migration was successful.
+
+In case you want to test an upgrade to a specific (snapshot) release that is different from the latest state on your branch, you can pick this release via the optional `upgrade-version` parameter.
 
 ## Building and Running the Wallet and Splitwell Apps
 

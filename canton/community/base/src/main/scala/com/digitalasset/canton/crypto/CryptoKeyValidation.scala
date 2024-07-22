@@ -5,10 +5,7 @@ package com.digitalasset.canton.crypto
 
 import cats.syntax.either.*
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
-import com.digitalasset.canton.crypto.provider.jce.JceJavaConverter
-import com.digitalasset.canton.crypto.provider.tink.TinkKeyFormat
-import com.google.crypto.tink.KeysetHandle
-import com.google.crypto.tink.proto.OutputPrefixType
+import com.digitalasset.canton.crypto.provider.jce.JceJavaKeyConverter
 
 import java.security.PublicKey as JPublicKey
 import scala.collection.concurrent.TrieMap
@@ -19,36 +16,6 @@ object CryptoKeyValidation {
   // keeps track of the public keys that have been validated
   private lazy val validatedPublicKeys: TrieMap[PublicKey, Either[KeyParseAndValidateError, Unit]] =
     TrieMap.empty
-
-  private[crypto] def parseAndValidateTinkKey(
-      publicKey: PublicKey
-  ): Either[KeyParseAndValidateError, KeysetHandle] =
-    for {
-      /* deserialize the public key using Tink and only then regenerate fingerprint. If the
-       * deserialization fails, the format is not correct and we fail validation.
-       */
-      handle <- TinkKeyFormat
-        .deserializeHandle(publicKey.key)
-        .leftMap(err => KeyParseAndValidateError(err.show))
-      fingerprint <- TinkKeyFormat
-        .fingerprint(handle, HashAlgorithm.Sha256)
-        .leftMap(KeyParseAndValidateError)
-      _ <- Either.cond(
-        fingerprint == publicKey.id,
-        (),
-        KeyParseAndValidateError(
-          s"The regenerated fingerprint $fingerprint does not match the fingerprint of the object: ${publicKey.id}"
-        ),
-      )
-      outputPrefixType = handle.getKeysetInfo.getKeyInfo(0).getOutputPrefixType
-      _ <- Either.cond(
-        outputPrefixType == OutputPrefixType.RAW,
-        (),
-        KeyParseAndValidateError(
-          s"Wrong output prefix type: expected RAW got $outputPrefixType"
-        ),
-      )
-    } yield handle
 
   private[crypto] def parseAndValidateDerOrRawKey(
       publicKey: PublicKey
@@ -64,14 +31,9 @@ object CryptoKeyValidation {
         ),
       )
       // we try to convert the key to a Java key to ensure the format is correct
-      jceJavaConverter = new JceJavaConverter(
-        SigningKeyScheme.allSchemes,
-        EncryptionKeyScheme.allSchemes,
-      )
-      javaPublicKeyAndAlgorithm <- jceJavaConverter
+      javaPublicKey <- JceJavaKeyConverter
         .toJava(publicKey)
         .leftMap(err => KeyParseAndValidateError(err.show))
-      (_, javaPublicKey) = javaPublicKeyAndAlgorithm
     } yield javaPublicKey
   }
 
@@ -85,11 +47,6 @@ object CryptoKeyValidation {
       errFn: String => E,
   ): Either[E, Unit] = {
     val parseRes = publicKey.format match {
-      case CryptoKeyFormat.Tink =>
-        /* We check the cache first and if it's not there we:
-         * 1. deserialize handle (and consequently check the key format); 2. check fingerprint
-         */
-        parseAndValidateTinkKey(publicKey).map(_ => ())
       case CryptoKeyFormat.Der | CryptoKeyFormat.Raw =>
         /* We check the cache first and if it's not there we:
          * 1. check fingerprint; 2. convert to Java Key (and consequently check the key format)
@@ -104,6 +61,43 @@ object CryptoKeyValidation {
       .getOrElseUpdate(publicKey, parseRes)
       .leftMap(err => errFn(s"Failed to deserialize ${publicKey.format} public key: $err"))
   }
+
+  private[crypto] def selectEncryptionAlgorithmSpec[E](
+      keySpec: EncryptionKeySpec,
+      defaultAlgorithmSpec: EncryptionAlgorithmSpec,
+      supportedAlgorithmSpecs: Set[EncryptionAlgorithmSpec],
+      errFn: EncryptionAlgorithmSpec => E,
+  ): Either[E, EncryptionAlgorithmSpec] = {
+    if (defaultAlgorithmSpec.supportedEncryptionKeySpecs.contains(keySpec))
+      Right(defaultAlgorithmSpec)
+    else
+      supportedAlgorithmSpecs
+        .find(_.supportedEncryptionKeySpecs.contains(keySpec))
+        .toRight(errFn(defaultAlgorithmSpec))
+  }
+
+  /** Ensures that a given key specification is supported by the selected crypto algorithm. It
+    * also checks if this crypto algorithm is part of the set of supported algorithms.
+    */
+  private[crypto] def ensureEncryptionSpec[E](
+      keySpec: EncryptionKeySpec,
+      defaultAlgorithmSpec: EncryptionAlgorithmSpec,
+      supportedAlgorithmSpecs: Set[EncryptionAlgorithmSpec],
+      errFnAlgorithm: EncryptionAlgorithmSpec => E,
+      errFnKey: EncryptionKeySpec => E,
+  ): Either[E, Unit] =
+    for {
+      _ <- Either.cond(
+        supportedAlgorithmSpecs.contains(defaultAlgorithmSpec),
+        (),
+        errFnAlgorithm(defaultAlgorithmSpec),
+      )
+      _ <- Either.cond(
+        defaultAlgorithmSpec.supportedEncryptionKeySpecs.contains(keySpec),
+        (),
+        errFnKey(keySpec),
+      )
+    } yield ()
 
   private[crypto] def ensureFormat[E](
       actual: CryptoKeyFormat,

@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
-/** Result message that the mediator sends to all stakeholders of a request with its verdict.
+/** Result message that the mediator sends to all informees of a request with its verdict.
   *
   * @param domainId the domain on which the request is running
   * @param viewType determines which processor (transaction / transfer) must process this message
@@ -99,7 +99,7 @@ object ConfirmationResultMessage
   override val name: String = "ConfirmationResultMessage"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(
       v30.ConfirmationResultMessage
     )(
       supportedProtoVersionMemoized(_)(fromProtoV30),

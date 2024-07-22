@@ -5,7 +5,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableResult,

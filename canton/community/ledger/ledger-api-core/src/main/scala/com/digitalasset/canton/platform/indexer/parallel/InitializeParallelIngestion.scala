@@ -3,13 +3,12 @@
 
 package com.digitalasset.canton.platform.indexer.parallel
 
-import com.daml.lf.data.Ref
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.{ReadService, Update}
+import com.digitalasset.canton.ledger.participant.state.{ReadService, Update}
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.{
   IngestionStorageBackend,
@@ -18,6 +17,7 @@ import com.digitalasset.canton.platform.store.backend.{
 }
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.daml.lf.data.Ref
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
@@ -29,7 +29,7 @@ private[platform] final case class InitializeParallelIngestion(
     ingestionStorageBackend: IngestionStorageBackend[?],
     parameterStorageBackend: ParameterStorageBackend,
     stringInterningStorageBackend: StringInterningStorageBackend,
-    metrics: Metrics,
+    metrics: LedgerApiServerMetrics,
     loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 

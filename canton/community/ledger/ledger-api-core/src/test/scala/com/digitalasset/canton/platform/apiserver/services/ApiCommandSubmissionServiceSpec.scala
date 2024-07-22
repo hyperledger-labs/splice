@@ -5,7 +5,6 @@ package com.digitalasset.canton.platform.apiserver.services
 
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand}
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
-import com.daml.lf.data.Ref
 import com.daml.tracing.{DefaultOpenTelemetry, SpanAttribute}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.MockMessages.*
@@ -16,8 +15,10 @@ import com.digitalasset.canton.ledger.api.validation.{
   ValidateUpgradingPackageResolutions,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.tracing.TestTelemetrySetup
+import com.digitalasset.daml.lf.data.Ref
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import org.mockito.captor.ArgCaptor
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
@@ -130,15 +131,16 @@ class ApiCommandSubmissionServiceSpec
   ) =
     new ApiCommandSubmissionService(
       commandSubmissionService = commandSubmissionService,
-      commandsValidator = CommandsValidator(
-        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.UpgradingDisabled
+      commandsValidator = new CommandsValidator(
+        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty
       ),
       writeService = null,
       currentLedgerTime = () => Instant.EPOCH,
       currentUtcTime = () => Instant.EPOCH,
       maxDeduplicationDuration = Duration.ZERO,
       submissionIdGenerator = () => Ref.SubmissionId.assertFromString(generatedSubmissionId),
-      metrics = Metrics.ForTesting,
+      tracker = CommandProgressTracker.NoOp,
+      metrics = LedgerApiServerMetrics.ForTesting,
       telemetry = new DefaultOpenTelemetry(OpenTelemetrySdk.builder().build()),
       loggerFactory = loggerFactory,
     )

@@ -1,11 +1,11 @@
 package com.daml.network.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.apache.pekko.actor.ActorSystem
 import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{BaseTest, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 import org.scalatest.wordspec.AsyncWordSpec

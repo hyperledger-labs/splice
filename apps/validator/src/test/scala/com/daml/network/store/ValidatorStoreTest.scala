@@ -1,7 +1,7 @@
 package com.daml.network.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 
 import java.time.Instant
@@ -12,8 +12,8 @@ import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{
-  ValidatorSynchronizerConfig,
   ValidatorDecentralizedSynchronizerConfig,
+  ValidatorSynchronizerConfig,
 }
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore

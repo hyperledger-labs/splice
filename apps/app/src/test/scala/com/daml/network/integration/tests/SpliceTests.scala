@@ -4,7 +4,9 @@ import cats.syntax.parallel.*
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.*
@@ -16,15 +18,12 @@ import com.daml.network.integration.plugins.{
   UpdateHistorySanityCheckPlugin,
   WaitForPorts,
 }
-import com.daml.network.metrics.SpliceMetricsFactory
 import com.daml.network.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
 import com.daml.network.util.{Auth0Util, CommonAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
-import com.digitalasset.canton.metrics.MetricsFactoryType.External
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
@@ -39,7 +38,7 @@ import org.apache.pekko.http.scaladsl.Http
 import org.scalactic.source
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.matchers.{Matcher, MatchResult}
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,9 +70,12 @@ object SpliceTests extends LazyLogging {
           },
           metricsEnabled = true,
           config = Tracer(),
-          histograms = Seq.empty,
+          histogramConfigs = Seq.empty,
           loggerFactory = NamedLoggerFactory.root,
           cardinality = MetricStorage.DEFAULT_MAX_CARDINALITY,
+          testingSupportAdhocMetrics = false,
+          histogramInventory = new HistogramInventory(),
+          histogramFilter = new MetricsInfoFilter(Seq.empty, Set.empty),
         )
         .tap { otel =>
           sys.addShutdownHook {
@@ -96,13 +98,13 @@ object SpliceTests extends LazyLogging {
       with TestCommon
       with LedgerApiExtensions {
 
-    override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
-      SpliceMetricsFactory
-        .forConfig(
-          configuredOpenTelemetry.getMeterProvider,
-          metricsFactoryType = External,
-        )
-        .createLabeledMetricsFactory(MetricsContext.Empty)
+    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
+      new OpenTelemetryMetricsFactory(
+        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
+        Set.empty,
+        Some(noTracingLogger.underlying),
+        MetricsContext.Empty,
+      )
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -163,13 +165,13 @@ object SpliceTests extends LazyLogging {
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
-    override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
-      SpliceMetricsFactory
-        .forConfig(
-          configuredOpenTelemetry.getMeterProvider,
-          metricsFactoryType = External,
-        )
-        .createLabeledMetricsFactory(MetricsContext.Empty)
+    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
+      new OpenTelemetryMetricsFactory(
+        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
+        Set.empty,
+        Some(noTracingLogger.underlying),
+        MetricsContext.Empty,
+      )
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty

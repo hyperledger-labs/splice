@@ -4,35 +4,32 @@
 package com.digitalasset.canton.console.commands
 
 import better.files.File
+import ch.qos.logback.classic.Level
 import com.digitalasset.canton.admin.api.client.commands.{
   StatusAdminCommands,
-  TopologyAdminCommandsX,
+  TopologyAdminCommands,
 }
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
+import com.digitalasset.canton.console.CommandErrors.CommandError
 import com.digitalasset.canton.console.ConsoleMacros.utils
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CantonHealthAdministration,
-  CommandErrors,
   CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   Help,
   Helpful,
 }
+import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.{data, v30}
-import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.util.ResourceUtil
-import io.grpc.StatusRuntimeException
+import io.grpc.Context
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Await, Promise, TimeoutException}
 
-// TODO(#15161): fold HealthAdministrationCommon into HealthAdministrationX
-abstract class HealthAdministrationCommon[S <: data.NodeStatus.Status](
+class HealthAdministration[S <: data.NodeStatus.Status](
     runner: AdminCommandRunner,
     consoleEnvironment: ConsoleEnvironment,
     deserialize: v30.StatusResponse.Status => ParsingResult[S],
@@ -51,7 +48,9 @@ abstract class HealthAdministrationCommon[S <: data.NodeStatus.Status](
   }
 
   @Help.Summary("Returns true if the node has an identity")
-  def has_identity(): Boolean
+  def has_identity(): Boolean = adminCommand(
+    TopologyAdminCommands.Init.GetId()
+  ).toEither.isRight
 
   @Help.Summary("Wait for the node to have an identity")
   @Help.Description(
@@ -65,30 +64,22 @@ abstract class HealthAdministrationCommon[S <: data.NodeStatus.Status](
   )
   def dump(
       outputFile: File = CantonHealthAdministration.defaultHealthDumpName,
-      timeout: NonNegativeDuration = timeouts.ledgerCommand,
+      timeout: NonNegativeDuration = timeouts.unbounded,
       chunkSize: Option[Int] = None,
   ): String = consoleEnvironment.run {
-    val requestComplete = Promise[String]()
     val responseObserver =
-      new GrpcByteChunksToFileObserver[v30.HealthDumpResponse](outputFile, requestComplete)
+      new FileStreamObserver[v30.HealthDumpResponse](outputFile, _.chunk)
 
-    def call = consoleEnvironment.run {
+    def call: ConsoleCommandResult[Context.CancellableContext] =
       adminCommand(new StatusAdminCommands.GetHealthDump(responseObserver, chunkSize))
-    }
 
-    try {
-      ResourceUtil.withResource(call) { _ =>
-        CommandSuccessful(
-          Await.result(requestComplete.future, timeout.duration)
-        )
-      }
-    } catch {
-      case sre: StatusRuntimeException =>
-        GenericCommandError(GrpcError("Generating health dump file", "dump", sre).toString)
-      case _: TimeoutException =>
-        outputFile.delete(swallowIOExceptions = true)
-        CommandErrors.ConsoleTimeout.Error(timeout.asJavaApproximation)
-    }
+    processResult(
+      call,
+      responseObserver.result,
+      timeout,
+      "Generating health dump",
+      cleanupOnError = () => outputFile.delete(),
+    ).map(_ => outputFile.pathAsString)
   }
 
   private def runningCommand =
@@ -111,10 +102,25 @@ abstract class HealthAdministrationCommon[S <: data.NodeStatus.Status](
     // in case the node is not reachable, we assume it is not running
     falseIfUnreachable(runningCommand)
 
+  @Help.Summary("Check if the node is ready for setting the node's id")
+  def is_ready_for_id(): Boolean = falseIfUnreachable(
+    adminCommand(StatusAdminCommands.IsReadyForId)
+  )
+
+  @Help.Summary("Check if the node is ready for uploading the node's identity topology")
+  def is_ready_for_node_topology(): Boolean = falseIfUnreachable(
+    adminCommand(StatusAdminCommands.IsReadyForNodeTopology)
+  )
+
+  @Help.Summary("Check if the node is ready for initialization")
+  def is_ready_for_initialization(): Boolean = falseIfUnreachable(
+    adminCommand(StatusAdminCommands.IsReadyForInitialization)
+  )
+
   @Help.Summary("Check if the node is running and is the active instance (mediator, participant)")
   def active: Boolean = status match {
     case NodeStatus.Success(status) => status.active
-    case NodeStatus.NotInitialized(active) => active
+    case NodeStatus.NotInitialized(active, _) => active
     case _ => false
   }
 
@@ -140,25 +146,48 @@ abstract class HealthAdministrationCommon[S <: data.NodeStatus.Status](
     })
   }
 
+  @Help.Summary("Wait for the node to be ready for setting the node's id")
+  def wait_for_ready_for_id(): Unit = waitFor(is_ready_for_id())
+  @Help.Summary("Wait for the node to be ready for uploading the node's identity topology")
+  def wait_for_ready_for_node_topology(): Unit = waitFor(is_ready_for_node_topology())
+  @Help.Summary("Wait for the node to be ready for initialization")
+  def wait_for_ready_for_initialization(): Unit = waitFor(is_ready_for_initialization())
+
   protected def waitFor(condition: => Boolean): Unit = {
     // all calls here are potentially unbounded. we do not know how long it takes
     // for a node to start or for a node to become initialised. so we use the unbounded
     // timeout
     utils.retry_until_true(timeout = consoleEnvironment.commandTimeouts.unbounded)(condition)
   }
-}
 
-class HealthAdministrationX[S <: data.NodeStatus.Status](
-    runner: AdminCommandRunner,
-    consoleEnvironment: ConsoleEnvironment,
-    deserialize: v30.StatusResponse.Status => ParsingResult[S],
-) extends HealthAdministrationCommon[S](runner, consoleEnvironment, deserialize) {
-
-  override def has_identity(): Boolean = runner
-    .adminCommand(
-      TopologyAdminCommandsX.Init.GetId()
+  @Help.Summary("Change the log level of the process")
+  @Help.Description(
+    "If the default logback configuration is used, this will change the log level of the process."
+  )
+  def set_log_level(level: Level): Unit = consoleEnvironment.run {
+    adminCommand(
+      new StatusAdminCommands.SetLogLevel(level)
     )
-    .toEither
-    .isRight
+  }
+
+  @Help.Summary("Show the last errors logged")
+  @Help.Description(
+    """Returns a map with the trace-id as key and the most recent error messages as value. Requires that --log-last-errors is enabled (and not turned off)."""
+  )
+  def last_errors(): Map[String, String] = consoleEnvironment.run {
+    adminCommand(
+      new StatusAdminCommands.GetLastErrors()
+    )
+  }
+
+  @Help.Summary("Show all messages logged with the given traceId in a recent interval")
+  @Help.Description(
+    "Returns a list of buffered log messages associated to a given trace-id. Usually, the trace-id is taken from last_errors()"
+  )
+  def last_error_trace(traceId: String): Seq[String] = consoleEnvironment.run {
+    adminCommand(
+      new StatusAdminCommands.GetLastErrorTrace(traceId)
+    )
+  }
 
 }

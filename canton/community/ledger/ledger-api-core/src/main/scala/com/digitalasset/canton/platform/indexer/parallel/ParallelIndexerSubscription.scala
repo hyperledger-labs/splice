@@ -3,20 +3,20 @@
 
 package com.digitalasset.canton.platform.indexer.parallel
 
-import com.daml.lf.data.Ref
 import com.daml.metrics.InstrumentedGraph.*
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.Update
-import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.daml.scalautil.Statement.discard
+import com.digitalasset.canton.concurrent.DirectExecutionContext
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.{DomainIndex, Update}
 import com.digitalasset.canton.logging.{
   LoggingContextWithTrace,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.index.InMemoryStateUpdater
 import com.digitalasset.canton.platform.indexer.ha.Handle
 import com.digitalasset.canton.platform.indexer.parallel.AsyncSupport.*
@@ -28,7 +28,9 @@ import com.digitalasset.canton.platform.store.interning.{
   InternizingStringInterningView,
   StringInterning,
 }
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.daml.lf.data.Ref
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
@@ -51,7 +53,8 @@ private[platform] final case class ParallelIndexerSubscription[DB_BATCH](
     submissionBatchSize: Long,
     maxOutputBatchedBufferSize: Int,
     maxTailerBatchSize: Int,
-    metrics: Metrics,
+    excludedPackageIds: Set[Ref.PackageId],
+    metrics: LedgerApiServerMetrics,
     inMemoryStateUpdaterFlow: InMemoryStateUpdater.UpdaterFlow,
     stringInterningView: StringInterning & InternizingStringInterningView,
     tracer: Tracer,
@@ -59,9 +62,7 @@ private[platform] final case class ParallelIndexerSubscription[DB_BATCH](
 ) extends NamedLogging
     with Spanning {
   import ParallelIndexerSubscription.*
-  private implicit val metricsContext: MetricsContext = MetricsContext(
-    "participant_id" -> participantId
-  )
+
   private def mapInSpan(
       mapper: Offset => Traced[Update] => Iterator[DbDto]
   )(offset: Offset)(update: Traced[Update]): Iterator[DbDto] = {
@@ -75,58 +76,72 @@ private[platform] final case class ParallelIndexerSubscription[DB_BATCH](
       materializer: Materializer,
   )(implicit traceContext: TraceContext): InitializeParallelIngestion.Initialized => Handle = {
     initialized =>
-      val (killSwitch, completionFuture) = BatchingParallelIngestionPipe(
-        submissionBatchSize = submissionBatchSize,
-        inputMappingParallelism = inputMappingParallelism,
-        inputMapper = inputMapperExecutor.execute(
-          inputMapper(
-            metrics,
-            mapInSpan(
-              UpdateToDbDto(
-                participantId = participantId,
-                translation = translation,
-                compressionStrategy = compressionStrategy,
-                metrics = metrics,
+      import MetricsContext.Implicits.empty
+      val storeLedgerEndF = storeLedgerEnd(
+        parameterStorageBackend.updateLedgerEnd,
+        dbDispatcher,
+        metrics,
+        logger,
+      )
+      val (killSwitch, completionFuture) = initialized.readServiceSource
+        .buffered(metrics.parallelIndexer.inputBufferLength, maxInputBufferSize)
+        .via(
+          BatchingParallelIngestionPipe(
+            submissionBatchSize = submissionBatchSize,
+            inputMappingParallelism = inputMappingParallelism,
+            inputMapper = inputMapperExecutor.execute(
+              inputMapper(
+                metrics,
+                mapInSpan(
+                  UpdateToDbDto(
+                    participantId = participantId,
+                    translation = translation,
+                    compressionStrategy = compressionStrategy,
+                    metrics = metrics,
+                  )
+                ),
+                UpdateToMeteringDbDto(
+                  metrics = metrics.indexerEvents,
+                  excludedPackageIds = excludedPackageIds,
+                ),
+                logger,
               )
             ),
-            UpdateToMeteringDbDto(metrics = metrics.indexerEvents),
-            logger,
+            seqMapperZero =
+              seqMapperZero(initialized.initialEventSeqId, initialized.initialStringInterningId),
+            seqMapper = seqMapper(
+              dtos => stringInterningView.internize(DbDtoToStringsForInterning(dtos)),
+              metrics,
+            ),
+            batchingParallelism = batchingParallelism,
+            batcher = batcherExecutor.execute(
+              batcher(ingestionStorageBackend.batch(_, stringInterningView))
+            ),
+            ingestingParallelism = ingestionParallelism,
+            ingester = ingester(
+              ingestFunction = ingestionStorageBackend.insertBatch,
+              zeroDbBatch = ingestionStorageBackend.batch(Vector.empty, stringInterningView),
+              dbDispatcher = dbDispatcher,
+              metrics = metrics,
+            ),
+            maxTailerBatchSize = maxTailerBatchSize,
+            ingestTail = ingestTail[DB_BATCH](
+              storeLedgerEndF,
+              logger,
+            ),
           )
-        ),
-        seqMapperZero =
-          seqMapperZero(initialized.initialEventSeqId, initialized.initialStringInterningId),
-        seqMapper = seqMapper(
-          dtos => stringInterningView.internize(DbDtoToStringsForInterning(dtos)),
-          metrics,
-        ),
-        batchingParallelism = batchingParallelism,
-        batcher = batcherExecutor.execute(
-          batcher(ingestionStorageBackend.batch(_, stringInterningView))
-        ),
-        ingestingParallelism = ingestionParallelism,
-        ingester = ingester(
-          ingestFunction = ingestionStorageBackend.insertBatch,
-          zeroDbBatch = ingestionStorageBackend.batch(Vector.empty, stringInterningView),
-          dbDispatcher = dbDispatcher,
-          metrics = metrics,
-        ),
-        maxTailerBatchSize = maxTailerBatchSize,
-        ingestTail = ingestTail[DB_BATCH](
-          parameterStorageBackend.updateLedgerEnd,
-          dbDispatcher,
-          metrics,
-          logger,
-        ),
-      )(
-        initialized.readServiceSource
-          .buffered(metrics.parallelIndexer.inputBufferLength, maxInputBufferSize)
-      )
+        )
         .map(batch => batch.offsetsUpdates -> batch.lastSeqEventId)
         .buffered(
           counter = metrics.parallelIndexer.outputBatchedBufferLength,
           size = maxOutputBatchedBufferSize,
         )
         .via(inMemoryStateUpdaterFlow)
+        .map { updates =>
+          updates.foreach { case (_, Traced(update)) =>
+            discard(update.persisted.trySuccess(()))
+          }
+        }
         .viaMat(KillSwitches.single)(Keep.right[NotUsed, UniqueKillSwitch])
         .toMat(Sink.ignore)(Keep.both)
         .run()(materializer)
@@ -158,7 +173,7 @@ object ParallelIndexerSubscription {
   )
 
   def inputMapper(
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       toDbDto: Offset => Traced[Update] => Iterator[DbDto],
       toMeteringDbDto: Iterable[(Offset, Traced[Update])] => Vector[DbDto.TransactionMetering],
       logger: TracedLogger,
@@ -181,7 +196,6 @@ object ParallelIndexerSubscription {
 
     val batch = mainBatch ++ meteringBatch
 
-    // TODO(i11665): Replace with NonEmpty after sorting out the dependencies
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     val last = input.last
 
@@ -216,7 +230,7 @@ object ParallelIndexerSubscription {
 
   def seqMapper(
       internize: Iterable[DbDto] => Iterable[(Int, String)],
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
   )(
       previous: Batch[Vector[DbDto]],
       current: Batch[Vector[DbDto]],
@@ -268,11 +282,10 @@ object ParallelIndexerSubscription {
               .tap(_ => lastTransactionMetaEventSeqId = eventSeqId)
 
           case unChanged: DbDto.CommandCompletion => unChanged
-          case unChanged: DbDto.Package => unChanged
-          case unChanged: DbDto.PackageEntry => unChanged
           case unChanged: DbDto.PartyEntry => unChanged
           case unChanged: DbDto.StringInterningDto => unChanged
           case unChanged: DbDto.TransactionMetering => unChanged
+          case unChanged: DbDto.SequencerIndexMoved => unChanged
         }
 
         val (newLastStringInterningId, dbDtosWithStringInterning) =
@@ -306,7 +319,7 @@ object ParallelIndexerSubscription {
       ingestFunction: (Connection, DB_BATCH) => Unit,
       zeroDbBatch: DB_BATCH,
       dbDispatcher: DbDispatcher,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
   )(implicit traceContext: TraceContext): Batch[DB_BATCH] => Future[Batch[DB_BATCH]] =
     batch =>
       LoggingContextWithTrace.withNewLoggingContext(
@@ -326,35 +339,65 @@ object ParallelIndexerSubscription {
       lastStringInterningId = batch.lastStringInterningId,
     )
 
+  def ledgerEndDomainIndexFrom(
+      domainIndexes: Vector[(DomainId, DomainIndex)]
+  ): Map[DomainId, DomainIndex] =
+    domainIndexes.groupMapReduce(_._1)(_._2)(_ max _)
+
   def ingestTail[DB_BATCH](
-      ingestTailFunction: LedgerEnd => Connection => Unit,
-      dbDispatcher: DbDispatcher,
-      metrics: Metrics,
+      storeLedgerEnd: (LedgerEnd, Map[DomainId, DomainIndex]) => Future[Unit],
       logger: TracedLogger,
   )(implicit
       traceContext: TraceContext
-  ): Vector[Batch[DB_BATCH]] => Future[Vector[Batch[DB_BATCH]]] = batchOfBatches =>
-    batchOfBatches.lastOption match {
-      case Some(lastBatch) =>
-        LoggingContextWithTrace.withNewLoggingContext("updateOffset" -> lastBatch.lastOffset) {
-          implicit loggingContext =>
-            dbDispatcher.executeSql(metrics.parallelIndexer.tailIngestion) { connection =>
-              ingestTailFunction(ledgerEndFrom(lastBatch))(connection)
-              metrics.indexer.ledgerEndSequentialId
-                .updateValue(lastBatch.lastSeqEventId)
-              metrics.indexer.lastReceivedRecordTime
-                .updateValue(lastBatch.lastRecordTime)
-              logger.debug(
-                s"Ledger end updated in IndexDB, ${loggingContext.serializeFiltered("updateOffset")}."
-              )(lastBatch.lastTraceContext)
+  ): Vector[Batch[DB_BATCH]] => Future[Vector[Batch[DB_BATCH]]] = {
+    val directExecutionContext = DirectExecutionContext(logger)
+    batchOfBatches =>
+      batchOfBatches.lastOption match {
+        case Some(lastBatch) =>
+          storeLedgerEnd(
+            ledgerEndFrom(lastBatch),
+            ledgerEndDomainIndexFrom(
               batchOfBatches
+                .flatMap(_.offsetsUpdates)
+                .flatMap(_._2.value.domainIndexOpt)
+            ),
+          ).map(_ => batchOfBatches)(directExecutionContext)
+
+        case None =>
+          val message = "Unexpectedly encountered a zero-sized batch in ingestTail"
+          logger.error(message)
+          Future.failed(new IllegalStateException(message))
+      }
+  }
+
+  private def storeLedgerEnd(
+      storeTailFunction: (LedgerEnd, Map[DomainId, DomainIndex]) => Connection => Unit,
+      dbDispatcher: DbDispatcher,
+      metrics: LedgerApiServerMetrics,
+      logger: TracedLogger,
+  )(implicit
+      traceContext: TraceContext
+  ): (LedgerEnd, Map[DomainId, DomainIndex]) => Future[Unit] =
+    (ledgerEnd, ledgerEndDomainIndexes) =>
+      LoggingContextWithTrace.withNewLoggingContext("updateOffset" -> ledgerEnd.lastOffset) {
+        implicit loggingContext =>
+          def domainIndexesLog: String = ledgerEndDomainIndexes.toVector
+            .sortBy(_._1.toProtoPrimitive)
+            .map { case (domainId, domainIndex) =>
+              s"${domainId.toProtoPrimitive.take(20).mkString} -> $domainIndex"
             }
-        }
-      case None =>
-        val message = "Unexpectedly encountered a zero-sized batch in ingestTail"
-        logger.error(message)
-        Future.failed(new IllegalStateException(message))
-    }
+            .mkString("domain-indexes: [", ", ", "]")
+
+          dbDispatcher.executeSql(metrics.parallelIndexer.tailIngestion) { connection =>
+            storeTailFunction(ledgerEnd, ledgerEndDomainIndexes)(connection)
+            metrics.indexer.ledgerEndSequentialId
+              .updateValue(ledgerEnd.lastEventSeqId)
+            logger.debug(
+              s"Ledger end updated in IndexDB $domainIndexesLog ${loggingContext
+                  .serializeFiltered("updateOffset")}."
+            )(loggingContext.traceContext)
+          }
+      }
 
   private def cleanUnusedBatch[DB_BATCH](
       zeroDbBatch: DB_BATCH

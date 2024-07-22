@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
-import com.daml.lf.data.Bytes
+import com.digitalasset.daml.lf.data.Bytes
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.environment.ledger.api.{ReassignmentUpdate, TransactionTreeUpdate}
 import com.digitalasset.canton.concurrent.Threading

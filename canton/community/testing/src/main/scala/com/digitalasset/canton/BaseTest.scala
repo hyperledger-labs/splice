@@ -6,12 +6,16 @@ package com.digitalasset.canton
 import cats.Functor
 import cats.data.{EitherT, OptionT}
 import cats.syntax.parallel.*
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.{AcsCommitmentsCatchUpConfig, StaticDomainParameters}
+import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -21,10 +25,13 @@ import com.digitalasset.canton.version.{
   ReleaseProtocolVersion,
 }
 import io.opentelemetry.api.trace.Tracer
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.metrics.SdkMeterProvider
+import io.opentelemetry.sdk.trace.SdkTracerProvider
 import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
 import org.scalacheck.Test
 import org.scalactic.source.Position
-import org.scalactic.{Prettifier, source}
+import org.scalactic.{source, Prettifier}
 import org.scalatest.*
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.exceptions.TestFailedException
@@ -120,6 +127,31 @@ trait BaseTest
     with AppendedClues { self =>
 
   import scala.language.implicitConversions
+
+  /** A metrics factory constructed from an OpenTelemetryOnDemandMetricsReader which allows to make assertion
+    * on the content of the metrics registry.
+    */
+  def testableMetricsFactory(
+      testName: String,
+      onDemandMetricsReader: OpenTelemetryOnDemandMetricsReader,
+      histograms: Set[String],
+  ): OpenTelemetryMetricsFactory = {
+    val sdkBuilder = OpenTelemetrySdk.builder()
+    val meterProvider = SdkMeterProvider.builder()
+    meterProvider.registerMetricReader(onDemandMetricsReader)
+    sdkBuilder.setMeterProvider(meterProvider.build())
+    val openTelemetry = ConfiguredOpenTelemetry(
+      sdkBuilder.build(),
+      SdkTracerProvider.builder(),
+      onDemandMetricsReader,
+    )
+    new OpenTelemetryMetricsFactory(
+      openTelemetry.openTelemetry.meterBuilder(testName).build(),
+      histograms,
+      None,
+      MetricsContext.Empty,
+    )
+  }
 
   /** Allows for invoking `myEitherT.futureValue` when `myEitherT: EitherT[Future, _, _]`.
     */
@@ -228,10 +260,23 @@ trait BaseTest
   )(implicit ec: ExecutionContext, position: Position): Future[A] =
     e.fold(fail(clue))(Predef.identity)
 
+  /** Converts an OptionT into a FutureUnlessShutdown, failing in case of a [[scala.None$]]. */
+  def valueOrFailUS[A](e: OptionT[FutureUnlessShutdown, A])(
+      clue: String
+  )(implicit ec: ExecutionContext, position: Position): FutureUnlessShutdown[A] =
+    e.fold(fail(clue))(Predef.identity)
+
   /** Converts an OptionT into a Future, failing in case of a [[scala.Some$]]. */
   def noneOrFail[A](e: OptionT[Future, A])(
       clue: String
   )(implicit ec: ExecutionContext, position: Position): Future[Assertion] = {
+    e.fold(succeed)(some => fail(s"$clue, value is $some"))
+  }
+
+  /** Converts an OptionT into a FutureUnlessShutdown, failing in case of a [[scala.Some$]]. */
+  def noneOrFailUS[A](e: OptionT[FutureUnlessShutdown, A])(
+      clue: String
+  )(implicit ec: ExecutionContext, position: Position): FutureUnlessShutdown[Assertion] = {
     e.fold(succeed)(some => fail(s"$clue, value is $some"))
   }
 
@@ -291,6 +336,12 @@ trait BaseTest
 
     def leftOrFailShutdown(clue: String)(implicit ec: ExecutionContext, pos: Position): Future[E] =
       self.leftOrFail(eitherT)(clue).onShutdown(fail(s"Shutdown during $clue"))
+
+    def failOnShutdown(implicit ec: ExecutionContext, pos: Position): EitherT[Future, E, A] =
+      eitherT.onShutdown(fail("Unexpected shutdown"))
+
+    def futureValueUS(implicit pos: Position): Either[E, A] =
+      eitherT.value.futureValueUS
   }
 
   implicit class EitherTUnlessShutdownSyntax[E, A](
@@ -308,8 +359,15 @@ trait BaseTest
       fut.onShutdown(fail(s"Shutdown during $clue"))
     def failOnShutdown(implicit ec: ExecutionContext, pos: Position): Future[A] =
       fut.onShutdown(fail(s"Unexpected shutdown"))
-    def futureValueUS(implicit ec: ExecutionContext, pos: Position): A =
-      fut.failOnShutdown.futureValue
+    def futureValueUS(implicit pos: Position): A =
+      fut.unwrap.futureValue.onShutdown(fail("Unexpected shutdown"))
+  }
+
+  implicit class UnlessShutdownSyntax[A](us: UnlessShutdown[A]) {
+    def failOnShutdown(clue: String)(implicit pos: Position): A =
+      us.onShutdown(fail(s"Shutdown during $clue"))
+    def failOnShutdown(implicit pos: Position): A =
+      us.onShutdown(fail(s"Unexpected shutdown"))
   }
 
   def forEveryParallel[A](inputs: Seq[A])(
@@ -399,11 +457,6 @@ object BaseTest {
     testCode // try one last time and throw exception, if assertion keeps failing
   }
 
-  def eventuallyNoException[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
-  )(testCode: => T): T = BaseTest.eventually(timeUntilSuccess, maxPollInterval, false)(testCode)
-
   // Uses SymbolicCrypto for the configured crypto schemes
   lazy val defaultStaticDomainParameters: StaticDomainParameters =
     defaultStaticDomainParametersWith()
@@ -411,9 +464,9 @@ object BaseTest {
   def defaultStaticDomainParametersWith(
       protocolVersion: ProtocolVersion = testedProtocolVersion,
       acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig] = None,
-  ): StaticDomainParameters = StaticDomainParameters.create(
+  ): StaticDomainParameters = StaticDomainParameters(
     requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
-    requiredEncryptionKeySchemes = SymbolicCryptoProvider.supportedEncryptionKeySchemes,
+    requiredEncryptionSpecs = SymbolicCryptoProvider.supportedEncryptionSpecs,
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,

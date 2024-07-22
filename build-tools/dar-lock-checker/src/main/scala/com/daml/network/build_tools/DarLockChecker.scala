@@ -4,7 +4,8 @@
 package com.daml.network.build_tools
 
 import better.files.*
-import com.daml.lf.archive.{DarDecoder, DarParser}
+import com.digitalasset.daml.lf.archive.{DarDecoder, DarParser}
+
 import scala.sys.process.*
 
 object DarLockChecker {

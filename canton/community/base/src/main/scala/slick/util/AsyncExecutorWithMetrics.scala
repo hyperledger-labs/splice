@@ -3,9 +3,9 @@
 
 package slick.util
 
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.QueryCostMonitoringConfig
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.metrics.DbQueueMetrics
 import com.digitalasset.canton.time.PositiveFiniteDuration
 import com.digitalasset.canton.util.{LoggerUtil, MonadUtil}
@@ -14,10 +14,10 @@ import slick.util.AsyncExecutor.{PrioritizedRunnable, Priority, WithConnection}
 
 import java.lang.management.ManagementFactory
 import java.util
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import java.util.concurrent.{TimeUnit, *}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import javax.management.{InstanceNotFoundException, ObjectName}
-import scala.annotation.{nowarn, tailrec}
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
@@ -440,11 +440,8 @@ class AsyncExecutorWithMetrics(
       logger.warn("Abandoning ThreadPoolExecutor (not yet destroyed after 30 seconds)")
   }
 
-  // don't warn due to deprecated message
-  @nowarn("cat=deprecation")
   private class DaemonThreadFactory(namePrefix: String) extends ThreadFactory {
-    private[this] val group =
-      Option(System.getSecurityManager).fold(Thread.currentThread.getThreadGroup)(_.getThreadGroup)
+    private[this] val group = Thread.currentThread.getThreadGroup
     private[this] val threadNumber = new AtomicInteger(1)
 
     def newThread(r: Runnable): Thread = {

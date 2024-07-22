@@ -3,20 +3,22 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.lf.data.Ref.{Identifier, Party}
-import com.daml.lf.data.logging.*
-import com.daml.lf.value.Value
-import com.daml.lf.value.Value.ContractId
 import com.daml.logging.entries.LoggingValue.OfString
 import com.daml.logging.entries.ToLoggingKey.*
-import com.daml.logging.entries.{LoggingEntries, LoggingEntry, LoggingValue}
+import com.daml.logging.entries.{LoggingEntries, LoggingEntry, LoggingKey, LoggingValue}
 import com.digitalasset.canton.ledger.api.domain.{
   Commands,
+  CumulativeFilter,
   EventId,
   ParticipantOffset,
+  TemplateWildcardFilter,
   TransactionFilter,
   TransactionId,
 }
+import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
+import com.digitalasset.daml.lf.data.logging.*
+import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.value.Value.ContractId
 import scalaz.syntax.tag.ToTagOps
 
 package object logging {
@@ -75,12 +77,34 @@ package object logging {
     "filters" -> LoggingValue.Nested(
       LoggingEntries.fromMap(
         filters.filtersByParty.view.map { case (party, partyFilters) =>
-          party.toLoggingKey -> (partyFilters.inclusive match {
-            case None => LoggingValue.from("all-templates")
-            case Some(inclusiveFilters) =>
-              LoggingValue.from(inclusiveFilters.templateFilters.map(_.templateTypeRef))
+          party.toLoggingKey -> filtersToLoggingValue(partyFilters)
+        }.toMap ++
+          filters.filtersForAnyParty.fold(Map.empty[LoggingKey, LoggingValue])(filters =>
+            Map("anyParty" -> filtersToLoggingValue(filters))
+          )
+      )
+    )
+
+  private def filtersToLoggingValue(filter: CumulativeFilter): LoggingValue =
+    LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "templates" -> LoggingValue.from(
+            filter.templateFilters.map(_.templateTypeRef)
+          ),
+          "interfaces" -> LoggingValue.from(
+            filter.interfaceFilters.map(_.interfaceId)
+          ),
+        )
+          ++ (filter.templateWildcardFilter match {
+            case Some(TemplateWildcardFilter(includeCreatedEventBlob)) =>
+              Map(
+                "all-templates, created_event_blob" -> LoggingValue.from(
+                  includeCreatedEventBlob
+                )
+              )
+            case None => Map.empty
           })
-        }.toMap
       )
     )
 

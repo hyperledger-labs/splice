@@ -4,7 +4,7 @@
 package com.daml.network.wallet.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.{

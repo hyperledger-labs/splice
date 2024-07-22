@@ -65,7 +65,7 @@ class PreHookRequestJournalStore(
       commitTime: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): EitherT[Future, RequestJournalStoreError, Unit] =
     for {
-      _ <- EitherT.liftF(
+      _ <- EitherT.right(
         preReplaceHook
           .getAndSet(emptyReplaceHook)(rc, requestTimestamp, newState, commitTime)
       )
@@ -98,6 +98,9 @@ class PreHookRequestJournalStore(
   override def repairRequests(fromInclusive: RequestCounter)(implicit
       traceContext: TraceContext
   ): Future[Seq[RequestData]] = backing.repairRequests(fromInclusive)
+
+  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[Int] =
+    backing.totalDirtyRequests()
 }
 
 object PreHookRequestJournalStore {

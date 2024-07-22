@@ -13,17 +13,13 @@ import com.digitalasset.canton.participant.store.EventLogId.DomainEventLogId
 import com.digitalasset.canton.participant.store.SyncDomainPersistentState
 import com.digitalasset.canton.protocol.TargetDomainId
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.store.db.{
-  DbSequencedEventStore,
-  DbSequencerCounterTrackerStore,
-  SequencerClientDiscriminator,
-}
+import com.digitalasset.canton.store.db.{DbSequencedEventStore, DbSequencerCounterTrackerStore}
 import com.digitalasset.canton.store.memory.InMemorySendTrackerStore
 import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
-import com.digitalasset.canton.topology.store.db.DbTopologyStoreX
-import com.digitalasset.canton.topology.{DomainOutboxQueue, DomainTopologyManagerX}
+import com.digitalasset.canton.topology.store.db.DbTopologyStore
+import com.digitalasset.canton.topology.{DomainOutboxQueue, DomainTopologyManager, ParticipantId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.version.Transfer.TargetProtocolVersion
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
@@ -31,6 +27,7 @@ import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import scala.concurrent.ExecutionContext
 
 class DbSyncDomainPersistentState(
+    participantId: ParticipantId,
     override val domainId: IndexedDomain,
     val protocolVersion: ProtocolVersion,
     clock: Clock,
@@ -41,7 +38,6 @@ class DbSyncDomainPersistentState(
     val batching: BatchingConfig,
     val timeouts: ProcessingTimeout,
     override val enableAdditionalConsistencyChecks: Boolean,
-    enableTopologyTransactionValidation: Boolean,
     indexedStringStore: IndexedStringStore,
     val loggerFactory: NamedLoggerFactory,
     val futureSupervisor: FutureSupervisor,
@@ -94,10 +90,9 @@ class DbSyncDomainPersistentState(
       timeouts,
       loggerFactory,
     )
-  private val client = SequencerClientDiscriminator.fromIndexedDomainId(domainId)
   val sequencedEventStore = new DbSequencedEventStore(
     storage,
-    client,
+    domainId,
     protocolVersion,
     timeouts,
     loggerFactory,
@@ -124,7 +119,7 @@ class DbSyncDomainPersistentState(
   val parameterStore: DbDomainParameterStore =
     new DbDomainParameterStore(domainId.item, storage, timeouts, loggerFactory)
   val sequencerCounterTrackerStore =
-    new DbSequencerCounterTrackerStore(client, storage, timeouts, loggerFactory)
+    new DbSequencerCounterTrackerStore(domainId, storage, timeouts, loggerFactory)
   // TODO(i5660): Use the db-based send tracker store
   val sendTrackerStore = new InMemorySendTrackerStore()
 
@@ -138,7 +133,7 @@ class DbSyncDomainPersistentState(
     )
 
   override val topologyStore =
-    new DbTopologyStoreX(
+    new DbTopologyStore(
       storage,
       DomainStore(domainId.item),
       timeouts,
@@ -147,12 +142,13 @@ class DbSyncDomainPersistentState(
 
   override val domainOutboxQueue = new DomainOutboxQueue(loggerFactory)
 
-  override val topologyManager = new DomainTopologyManagerX(
+  override val topologyManager = new DomainTopologyManager(
+    participantId.uid,
     clock = clock,
     crypto = crypto,
     store = topologyStore,
     outboxQueue = domainOutboxQueue,
-    enableTopologyTransactionValidation,
+    protocolVersion = protocolVersion,
     timeouts = timeouts,
     futureSupervisor = futureSupervisor,
     loggerFactory = loggerFactory,

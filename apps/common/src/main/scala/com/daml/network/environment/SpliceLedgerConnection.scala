@@ -45,7 +45,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.daml.network.environment.BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
-import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -65,6 +65,7 @@ import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.daml.lf.data.Ref
 
 /** BaseLedgerConnection is a read-only ledger connection, typically used during initialization when we don't
   * want to allow command submissions yet.
@@ -208,8 +209,8 @@ class BaseLedgerConnection(
       participantId <- participantAdminConnection.getParticipantId()
       namespace = namespaceO.getOrElse(participantId.uid.namespace)
       partyId = PartyId(
-        UniqueIdentifier(
-          Identifier.tryCreate(hint),
+        UniqueIdentifier.tryCreate(
+          hint,
           namespace,
         )
       )
@@ -263,7 +264,7 @@ class BaseLedgerConnection(
       userRights: Seq[User.Right],
       identityProviderId: Option[String] = None,
   ): Future[PartyId] = {
-    val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+    val userId = Ref.UserId.assertFromString(user)
     val userLf = new User(userId, party.toLf)
     for {
       user <- client
@@ -393,7 +394,7 @@ class BaseLedgerConnection(
   def getUserActAs(
       username: String
   ): Future[Set[PartyId]] = {
-    val userId = com.daml.lf.data.Ref.UserId.assertFromString(username)
+    val userId = Ref.UserId.assertFromString(username)
     for {
       userRights <- client.listUserRights(userId)
     } yield userRights.collect { case actAs: User.Right.CanActAs =>
@@ -404,7 +405,7 @@ class BaseLedgerConnection(
   def getUserReadAs(
       username: String
   ): Future[Set[PartyId]] = {
-    val userId = com.daml.lf.data.Ref.UserId.assertFromString(username)
+    val userId = Ref.UserId.assertFromString(username)
     for {
       userRights <- client.listUserRights(userId)
     } yield userRights.collect { case readAs: User.Right.CanReadAs =>
@@ -669,7 +670,9 @@ class SpliceLedgerConnection(
             trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
               case None => Future.unit
               case Some(availableTraffic) =>
-                if (availableTraffic <= reservedTraffic && commandPriority == CommandPriority.Low)
+                if (
+                  availableTraffic <= reservedTraffic.unwrap && commandPriority == CommandPriority.Low
+                )
                   throw Status.ABORTED
                     .withDescription(
                       s"Traffic balance below reserved traffic amount ($availableTraffic < $reservedTraffic)"

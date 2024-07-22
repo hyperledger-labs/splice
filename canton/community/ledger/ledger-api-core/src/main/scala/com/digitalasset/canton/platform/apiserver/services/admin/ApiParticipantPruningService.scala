@@ -9,22 +9,21 @@ import com.daml.ledger.api.v2.admin.participant_pruning_service.{
   PruneRequest,
   PruneResponse,
 }
-import com.daml.lf.data.Ref
 import com.daml.metrics.Tracked
 import com.daml.metrics.api.MetricsContext
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.Telemetry
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.{
+import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.digitalasset.canton.ledger.participant.state.index.{
   IndexParticipantPruningService,
   LedgerEndService,
 }
-import com.digitalasset.canton.ledger.participant.state.v2.ReadService
-import com.digitalasset.canton.ledger.participant.state.v2 as state
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
   withEnrichedLoggingContext,
@@ -36,12 +35,13 @@ import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
   NamedLogging,
 }
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.platform.ApiOffset.ApiOffsetConverter
 import com.digitalasset.canton.platform.apiserver.ApiException
 import com.digitalasset.canton.platform.apiserver.services.logging
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref
 import io.grpc.protobuf.StatusProto
 import io.grpc.{ServerServiceDefinition, StatusRuntimeException}
 
@@ -50,9 +50,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final class ApiParticipantPruningService private (
     readBackend: IndexParticipantPruningService with LedgerEndService,
-    writeBackend: state.WriteParticipantPruningService,
-    readService: ReadService,
-    metrics: Metrics,
+    writeService: WriteService,
+    metrics: LedgerApiServerMetrics,
     telemetry: Telemetry,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -106,7 +105,7 @@ final class ApiParticipantPruningService private (
             )(MetricsContext(("phase", "underlyingLedger")))
 
             _ = logger.debug("Getting incomplete reassignments")
-            incompletReassignmentOffsets <- readService.incompleteReassignmentOffsets(
+            incompletReassignmentOffsets <- writeService.incompleteReassignmentOffsets(
               validAt = pruneUpTo,
               stakeholders = Set.empty, // getting all incomplete reassignments
             )
@@ -153,7 +152,7 @@ final class ApiParticipantPruningService private (
     logger.info(
       s"About to prune participant ledger up to ${pruneUpTo.toApiString} inclusively starting with the write service."
     )
-    writeBackend
+    writeService
       .prune(pruneUpTo, submissionId, pruneAllDivulgedContracts)
       .toScalaUnwrapped
       .flatMap {
@@ -241,9 +240,8 @@ final class ApiParticipantPruningService private (
 object ApiParticipantPruningService {
   def createApiService(
       readBackend: IndexParticipantPruningService with LedgerEndService,
-      writeBackend: state.WriteParticipantPruningService,
-      readService: state.ReadService,
-      metrics: Metrics,
+      writeService: WriteService,
+      metrics: LedgerApiServerMetrics,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -251,8 +249,7 @@ object ApiParticipantPruningService {
   ): ParticipantPruningServiceGrpc.ParticipantPruningService with GrpcApiService =
     new ApiParticipantPruningService(
       readBackend,
-      writeBackend,
-      readService,
+      writeService,
       metrics,
       telemetry,
       loggerFactory,

@@ -153,7 +153,7 @@ class WalletBuyTrafficRequestIntegrationTest
         // Since we run multiple suites against the same shared Canton instance, MemberTraffic contracts corresponding to
         // traffic purchases made in a previous suite and synced to the domain could be missing when this test is run.
         // This step creates a new MemberTraffic contract to reconcile these differences, if they exist.
-        val initialTrafficAmount =
+        val initialPurchasedTraffic =
           ensureOnLedgerStateInSyncWithSequencerState(aliceValidatorBackend)
 
         createValidTrafficRequest(aliceWalletClient, aliceValidatorBackend, aliceValidatorBackend)
@@ -167,7 +167,7 @@ class WalletBuyTrafficRequestIntegrationTest
                 status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Completed
             }
             clue("Receiving validator's on-ledger traffic is updated") {
-              val expectedTotalPurchasedTraffic = (initialTrafficAmount + minTopupAmount)
+              val expectedTotalPurchasedTraffic = initialPurchasedTraffic + minTopupAmount
               getTotalPurchasedTraffic(
                 aliceValidatorBackend.participantClient.id,
                 activeSynchronizerId,
@@ -191,25 +191,29 @@ class WalletBuyTrafficRequestIntegrationTest
         }
         clue("Receiving validator's sequencer traffic limit is updated") {
           val trafficLimitOffset = getTrafficLimitOffset(aliceValidatorBackend.participantClient.id)
-          val expectedTrafficLimit = initialTrafficAmount + minTopupAmount + trafficLimitOffset
+          val expectedTrafficLimit = initialPurchasedTraffic + minTopupAmount + trafficLimitOffset
           // Note that this check would fail if we do not sync the on-ledger and sequencer traffic states at the beginning of this test.
-          eventually() {
-            getSequencerTrafficLimit(
-              aliceValidatorBackend,
-              activeSynchronizerId,
-            ) shouldBe expectedTrafficLimit
-            // double-check that scan returns the same result
-            val participantId = sv1ScanBackend.getPartyToParticipant(
-              activeSynchronizerId,
-              aliceValidatorBackend.getValidatorPartyId(),
-            )
-            sv1ScanBackend
-              .getMemberTrafficStatus(
+          withClue(
+            s"Initial purchased: $initialPurchasedTraffic, min topup $minTopupAmount, offset $trafficLimitOffset"
+          ) {
+            eventually() {
+              getTrafficState(
+                aliceValidatorBackend,
                 activeSynchronizerId,
-                participantId,
+              ).extraTrafficPurchased.value shouldBe expectedTrafficLimit
+              // double-check that scan returns the same result
+              val participantId = sv1ScanBackend.getPartyToParticipant(
+                activeSynchronizerId,
+                aliceValidatorBackend.getValidatorPartyId(),
               )
-              .actual
-              .totalLimit shouldBe expectedTrafficLimit
+              sv1ScanBackend
+                .getMemberTrafficStatus(
+                  activeSynchronizerId,
+                  participantId,
+                )
+                .actual
+                .totalLimit shouldBe expectedTrafficLimit
+            }
           }
         }
       }
@@ -321,7 +325,9 @@ class WalletBuyTrafficRequestIntegrationTest
           .totalPurchased shouldBe purchasedTraffic
       )
       // topology state of traffic for member on domain
-      def sequencerTrafficLimit = getSequencerTrafficLimit(validatorApp, activeSynchronizerId)
+      def sequencerTrafficLimit =
+        getTrafficState(validatorApp, activeSynchronizerId).extraTrafficPurchased.value
+
       // double-check that scan returns the same result
       sv1ScanBackend
         .getMemberTrafficStatus(activeSynchronizerId, participantId)
@@ -329,24 +335,26 @@ class WalletBuyTrafficRequestIntegrationTest
         .totalLimit shouldBe sequencerTrafficLimit
 
       val trafficLimitOffset = getTrafficLimitOffset(participantId)
-      val diff = sequencerTrafficLimit - purchasedTraffic - trafficLimitOffset
-      logger.debug(
-        s"xxx - Sequencer limit = ${sequencerTrafficLimit}, Purchased amount = ${purchasedTraffic}, offset = ${trafficLimitOffset}"
-      )
-      actAndCheck(
-        "Create new MemberTraffic if needed", {
-          if (diff > 0) {
-            clue(s"Creating new MemberTraffic contract for amount $diff") {
-              buyMemberTraffic(validatorApp, diff, env.environment.clock.now)
+      val diff =
+        sequencerTrafficLimit - purchasedTraffic - trafficLimitOffset
+      withClue(
+        s"Sequencer limit = $sequencerTrafficLimit, Purchased amount = $purchasedTraffic, offset = $trafficLimitOffset"
+      ) {
+        actAndCheck(
+          "Create new MemberTraffic if needed", {
+            if (diff > 0) {
+              clue(s"Creating new MemberTraffic contract for amount $diff") {
+                buyMemberTraffic(validatorApp, diff.longValue, env.environment.clock.now)
+              }
             }
-          }
-        },
-      )(
-        "See that total purchased traffic is reconciled with sequencer state",
-        _ => {
-          purchasedTraffic + trafficLimitOffset shouldBe sequencerTrafficLimit
-        },
-      )
+          },
+        )(
+          "See that total purchased traffic is reconciled with sequencer state",
+          _ => {
+            purchasedTraffic + trafficLimitOffset shouldBe sequencerTrafficLimit
+          },
+        )
+      }
       purchasedTraffic
     }
   }

@@ -6,12 +6,12 @@ package com.daml.network.sv.onboarding.founder
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
-  catsSyntaxTuple5Semigroupal,
+  catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.splice
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
@@ -55,17 +55,17 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, PositiveS
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
-  StoredTopologyTransactionsX,
+  StoredTopologyTransaction,
+  StoredTopologyTransactions,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.{
-  DecentralizedNamespaceDefinitionX,
-  SignedTopologyTransactionX,
-  TopologyChangeOpX,
-  TopologyMappingX,
+  DecentralizedNamespaceDefinition,
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyMapping,
 }
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -328,14 +328,14 @@ class FoundingNodeInitializer(
         synchronizerNode.sequencerAdminConnection.getSequencerId,
       ).flatMapN { case (participantId, mediatorId, sequencerId) =>
         val namespace =
-          DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
+          DecentralizedNamespaceDefinition.computeNamespace(Set(participantId.uid.namespace))
         val domainId = DomainId(
-          UniqueIdentifier(
-            Identifier.tryCreate("global-domain"),
+          UniqueIdentifier.tryCreate(
+            "global-domain",
             namespace,
           )
         )
-        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v30)
+        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v31)
         val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
@@ -343,6 +343,7 @@ class FoundingNodeInitializer(
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
         )
+        val svKeyFingerprint = participantId.uid.namespace.fingerprint
         for {
           _ <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,
@@ -351,9 +352,16 @@ class FoundingNodeInitializer(
             synchronizerNode.sequencerAdminConnection.getStatus
               .map(_.successOption.map(_.domainId)),
             for {
+              // must be done before the other topology transaction as the decentralize namespace is used for authorization
+              decentralizedNamespace <- participantAdminConnection
+                .proposeInitialDecentralizedNamespaceDefinition(
+                  namespace,
+                  NonEmpty.mk(Set, participantId.uid.namespace),
+                  threshold = PositiveInt.one,
+                  signedBy = svKeyFingerprint,
+                )
               (
                 identityTransactions,
-                decentralizedNamespace,
                 domainParametersState,
                 sequencerState,
                 mediatorState,
@@ -367,48 +375,24 @@ class FoundingNodeInitializer(
                     .getId()
                     .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
                 }.map(_.flatten),
-                // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
-                // been proposed.
-                participantAdminConnection.proposeInitialDecentralizedNamespaceDefinition(
-                  namespace,
-                  NonEmpty.mk(Set, participantId.uid.namespace),
-                  threshold = PositiveInt.one,
-                  signedBy = participantId.uid.namespace.fingerprint,
-                ),
                 participantAdminConnection.proposeInitialDomainParameters(
                   domainId,
                   values,
-                  signedBy = participantId.uid.namespace.fingerprint,
+                  signedBy = svKeyFingerprint,
                 ),
-                TopologyAdminConnection.proposeCollectively(
-                  NonEmpty.mk(
-                    List,
-                    participantAdminConnection,
-                    synchronizerNode.sequencerAdminConnection,
-                  )
-                ) { case (con, id) =>
-                  con.proposeInitialSequencerDomainState(
-                    domainId,
-                    active = Seq(sequencerId),
-                    observers = Seq.empty,
-                    signedBy = id.namespace.fingerprint,
-                  )
-                },
-                TopologyAdminConnection.proposeCollectively(
-                  NonEmpty.mk(
-                    List,
-                    participantAdminConnection,
-                    synchronizerNode.mediatorAdminConnection,
-                  )
-                ) { case (con, id) =>
-                  con.proposeInitialMediatorDomainState(
-                    domainId,
-                    group = NonNegativeInt.zero,
-                    active = Seq(mediatorId),
-                    observers = Seq.empty,
-                    signedBy = id.namespace.fingerprint,
-                  )
-                },
+                participantAdminConnection.proposeInitialSequencerDomainState(
+                  domainId,
+                  active = Seq(sequencerId),
+                  observers = Seq.empty,
+                  signedBy = svKeyFingerprint,
+                ),
+                participantAdminConnection.proposeInitialMediatorDomainState(
+                  domainId,
+                  group = NonNegativeInt.zero,
+                  active = Seq(mediatorId),
+                  observers = Seq.empty,
+                  signedBy = svKeyFingerprint,
+                ),
               ).tupled
               bootstrapTransactions =
                 (Seq(
@@ -417,9 +401,9 @@ class FoundingNodeInitializer(
                   sequencerState,
                   mediatorState,
                 ) ++ identityTransactions).sorted
-                  .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+                  .mapFilter(_.selectOp[TopologyChangeOp.Replace])
                   .map(signed =>
-                    StoredTopologyTransactionX(
+                    StoredTopologyTransaction(
                       SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
                       EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
                       None,
@@ -427,7 +411,7 @@ class FoundingNodeInitializer(
                     )
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
-                StoredTopologyTransactionsX(bootstrapTransactions),
+                StoredTopologyTransactions(bootstrapTransactions),
                 synchronizerNode.staticDomainParameters,
               )
             } yield (),
@@ -440,7 +424,6 @@ class FoundingNodeInitializer(
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
               domainId,
-              synchronizerNode.staticDomainParameters,
               synchronizerNode.sequencerConnection,
             ),
             logger,
@@ -502,9 +485,8 @@ class FoundingNodeInitializer(
     ): Future[Unit] = {
       val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(domainId)
       for {
-        (participantId, mediatorId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
+        (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
-          localSynchronizerNode.mediatorAdminConnection.getMediatorId,
           localSynchronizerNode.sequencerAdminConnection.listSequencerTrafficControlState(),
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithOffset(),
@@ -624,13 +606,13 @@ object FoundingNodeInitializer {
   /** Same ordering as https://github.com/DACH-NY/canton/blob/2fc1a37d815623cb68dcb4b75bc33a498065990e/enterprise/app-base/src/main/scala/com/digitalasset/canton/console/EnterpriseConsoleMacros.scala#L160
     */
   implicit val bootstrapTransactionOrdering
-      : Ordering[SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]] =
+      : Ordering[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
     (x, y) => {
-      def toOrdinal(t: SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]) = {
+      def toOrdinal(t: SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]) = {
         t.transaction.mapping.code match {
-          case Code.NamespaceDelegationX => 1
-          case Code.OwnerToKeyMappingX => 2
-          case Code.DecentralizedNamespaceDefinitionX => 3
+          case Code.NamespaceDelegation => 1
+          case Code.OwnerToKeyMapping => 2
+          case Code.DecentralizedNamespaceDefinition => 3
           case _ => 4
         }
       }

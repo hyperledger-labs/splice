@@ -9,11 +9,11 @@ import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
 import com.daml.tracing
 import com.daml.tracing.Spans
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TraceIdentifiers
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.TransactionTreeStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.{
@@ -51,7 +51,7 @@ class TransactionsTreeStreamReader(
     queryValidRange: QueryValidRange,
     eventStorageBackend: EventStorageBackend,
     lfValueTranslation: LfValueTranslation,
-    metrics: Metrics,
+    metrics: LedgerApiServerMetrics,
     tracer: Tracer,
     reassignmentStreamReader: ReassignmentStreamReader,
     val loggerFactory: NamedLoggerFactory,
@@ -69,7 +69,7 @@ class TransactionsTreeStreamReader(
 
   def streamTreeTransaction(
       queryRange: EventsRange,
-      requestingParties: Set[Party],
+      requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -112,7 +112,7 @@ class TransactionsTreeStreamReader(
 
   private def doStreamTreeTransaction(
       queryRange: EventsRange,
-      requestingParties: Set[Party],
+      requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -127,7 +127,8 @@ class TransactionsTreeStreamReader(
       new QueueBasedConcurrencyLimiter(maxParallelPayloadQueries, executionContext)
     val deserializationQueriesLimiter =
       new QueueBasedConcurrencyLimiter(transactionsProcessingParallelism, executionContext)
-    val filterParties = requestingParties.toVector
+    val filterParties: Vector[Option[Party]] =
+      requestingParties.fold(Vector(None: Option[Party]))(_.map(Some(_)).toVector)
     val idPageSizing = IdPageSizing.calculateFrom(
       maxIdPageSize = maxIdsPerIdPage,
       // The ids for tree transactions are retrieved from seven separate id tables:
@@ -136,8 +137,8 @@ class TransactionsTreeStreamReader(
       //   * Exercise consuming stakeholder
       //   * Exercise consuming non-stakeholder
       //   * Exercise non-consuming
-      //   * Assing
-      //   * Unassing
+      //   * Assign
+      //   * Unassign
       // To account for that we assign a seventh of the working memory to each table.
       workingMemoryInBytesForIdPages = maxWorkingMemoryInBytesForIdPages / 7,
       numOfDecomposedFilters = filterParties.size,
@@ -146,7 +147,7 @@ class TransactionsTreeStreamReader(
     )
 
     def fetchIds(
-        filterParty: Party,
+        filterParty: Option[Party],
         target: EventIdSourceForInformees,
         maxParallelIdQueriesLimiter: QueueBasedConcurrencyLimiter,
         metric: DatabaseMetrics,
@@ -163,7 +164,7 @@ class TransactionsTreeStreamReader(
                 eventStorageBackend.transactionStreamingQueries.fetchEventIdsForInformee(
                   target = target
                 )(
-                  informee = filterParty,
+                  informeeO = filterParty,
                   startExclusive = state.fromIdExclusive,
                   endInclusive = queryRange.endInclusiveEventSeqId,
                   limit = state.pageSize,
@@ -307,13 +308,13 @@ class TransactionsTreeStreamReader(
           queryRange = queryRange,
           filteringConstraints = TemplatePartiesFilter(
             relation = Map.empty,
-            wildcardParties = requestingParties,
+            templateWildcardParties = requestingParties,
           ),
           eventProjectionProperties = eventProjectionProperties,
           payloadQueriesLimiter = payloadQueriesLimiter,
           deserializationQueriesLimiter = deserializationQueriesLimiter,
           idPageSizing = idPageSizing,
-          decomposedFilters = requestingParties.map(DecomposedFilter(_, None)).toVector,
+          decomposedFilters = filterParties.map(DecomposedFilter(_, None)),
           maxParallelIdAssignQueries = maxParallelIdAssignQueries,
           maxParallelIdUnassignQueries = maxParallelIdUnassignQueries,
           maxPagesPerIdPagesBuffer = maxPagesPerIdPagesBuffer,

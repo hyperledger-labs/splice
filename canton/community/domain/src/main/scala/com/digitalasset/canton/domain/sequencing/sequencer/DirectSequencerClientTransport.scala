@@ -6,13 +6,13 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.domain.sequencing.service.DirectSequencerSubscriptionFactory
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
-import com.digitalasset.canton.lifecycle.{OnShutdownRunner, SyncCloseable}
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, OnShutdownRunner, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
@@ -22,11 +22,10 @@ import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
   SequencerClientTransportPekko,
 }
-import com.digitalasset.canton.sequencing.handshake.HandshakeRequestError
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
-  HandshakeRequest,
-  HandshakeResponse,
+  GetTrafficStateForMemberRequest,
+  GetTrafficStateForMemberResponse,
   SignedContent,
   SubmissionRequest,
   SubscriptionRequest,
@@ -38,6 +37,7 @@ import com.digitalasset.canton.util.PekkoUtil.DelayedKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, PekkoUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.{Done, NotUsed}
@@ -54,6 +54,7 @@ class DirectSequencerClientTransport(
     sequencer: Sequencer,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
+    protocolVersion: ProtocolVersion,
 )(implicit materializer: Materializer, ec: ExecutionContext)
     extends SequencerClientTransport
     with SequencerClientTransportPekko
@@ -66,30 +67,31 @@ class DirectSequencerClientTransport(
   override def sendAsyncSigned(
       request: SignedContent[SubmissionRequest],
       timeout: Duration,
-  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientResponseError, Unit] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
     sequencer
       .sendAsyncSigned(request)
       .leftMap(SendAsyncClientError.RequestRefused)
 
-  override def sendAsyncUnauthenticatedVersioned(
-      request: SubmissionRequest,
-      timeout: Duration,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, SendAsyncClientResponseError, Unit] =
-    ErrorUtil.internalError(
-      new UnsupportedOperationException("Direct client does not support unauthenticated sends")
-    )
-
-  override def acknowledge(request: AcknowledgeRequest)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    sequencer.acknowledge(request.member, request.timestamp)
-
   override def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, Unit] =
-    sequencer.acknowledgeSigned(request)
+  ): EitherT[FutureUnlessShutdown, String, Boolean] =
+    sequencer
+      .acknowledgeSigned(request)
+      .map { _ => true }
+      .mapK(FutureUnlessShutdown.outcomeK)
+
+  override def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] = {
+    sequencer
+      .getTrafficStateAt(request.member, request.timestamp)
+      .map { trafficStateO =>
+        GetTrafficStateForMemberResponse(trafficStateO, protocolVersion)
+      }
+      .leftMap(_.toString)
+  }
 
   override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
@@ -152,19 +154,6 @@ class DirectSequencerClientTransport(
     }
   }
 
-  override def subscribeUnauthenticated[E](
-      request: SubscriptionRequest,
-      handler: SerializedEventHandler[E],
-  )(implicit traceContext: TraceContext): SequencerSubscription[E] =
-    unsupportedUnauthenticatedSubscription
-
-  private def unsupportedUnauthenticatedSubscription(implicit traceContext: TraceContext): Nothing =
-    ErrorUtil.internalError(
-      new UnsupportedOperationException(
-        "Direct client does not support unauthenticated subscriptions"
-      )
-    )
-
   override def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
     // unlikely there will be any errors with this direct transport implementation
     SubscriptionErrorRetryPolicy.never
@@ -207,22 +196,9 @@ class DirectSequencerClientTransport(
     SequencerSubscriptionPekko(source, health)
   }
 
-  override def subscribeUnauthenticated(request: SubscriptionRequest)(implicit
-      traceContext: TraceContext
-  ): SequencerSubscriptionPekko[SubscriptionError] =
-    unsupportedUnauthenticatedSubscription
-
   override def subscriptionRetryPolicyPekko: SubscriptionErrorRetryPolicyPekko[SubscriptionError] =
     // unlikely there will be any errors with this direct transport implementation
     SubscriptionErrorRetryPolicyPekko.never
-
-  override def handshake(request: HandshakeRequest)(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, HandshakeRequestError, HandshakeResponse] =
-    // never called - throwing an exception so tests fail if this ever changes
-    throw new UnsupportedOperationException(
-      "handshake is not implemented for DirectSequencerClientTransport"
-    )
 
   override def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
       traceContext: TraceContext

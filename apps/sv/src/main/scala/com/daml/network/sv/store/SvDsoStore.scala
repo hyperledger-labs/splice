@@ -5,7 +5,7 @@ package com.daml.network.sv.store
 
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
@@ -745,7 +745,8 @@ trait SvDsoStore
 
   def getVoteRequest(contractId: splice.dsorules.VoteRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]] =
+  ): Future[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]] = {
+    import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
     lookupVoteRequest(contractId).map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -753,6 +754,7 @@ trait SvDsoStore
           .asRuntimeException()
       )
     )
+  }
 
   def listVoteRequestsByTrackingCid(
       voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],

@@ -3,15 +3,22 @@
 
 package com.digitalasset.canton.metrics
 
-import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 
 object CommonMockMetrics {
 
   private val prefix = MetricName("test")
 
   object sequencerClient
-      extends SequencerClientMetrics(prefix, NoOpMetricsFactory)(MetricsContext.Empty)
-  object dbStorage extends DbStorageMetrics(prefix, NoOpMetricsFactory)(MetricsContext.Empty)
+      extends SequencerClientMetrics(
+        new SequencerClientHistograms(prefix)(new HistogramInventory()),
+        NoOpMetricsFactory,
+      )(MetricsContext.Empty)
+  object dbStorage
+      extends DbStorageMetrics(
+        new DbStorageHistograms(prefix)(new HistogramInventory()),
+        NoOpMetricsFactory,
+      )(MetricsContext.Empty)
 
 }

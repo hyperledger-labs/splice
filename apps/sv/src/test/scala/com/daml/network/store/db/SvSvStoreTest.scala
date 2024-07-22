@@ -1,17 +1,17 @@
 package com.daml.network.store.db
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.codegen.java.splice.validatoronboarding as vo
 import com.daml.network.codegen.java.splice.validatoronboarding.UsedSecret
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
-import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
+import com.daml.network.sv.config.{SvDecentralizedSynchronizerConfig, SvSynchronizerConfig}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 

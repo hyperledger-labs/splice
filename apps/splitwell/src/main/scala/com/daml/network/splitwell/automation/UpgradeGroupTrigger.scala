@@ -13,7 +13,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
-import com.daml.network.util.PrettyInstances.prettyCodegenContractId
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*

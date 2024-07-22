@@ -404,6 +404,11 @@ class SvAppBackendReference(
       httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
     }
 
+  def signDsoPartyToParticipant(domainIdPrefix: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvSoftDomainMigrationPocAppClient.SignDsoPartyToParticipant(domainIdPrefix))
+    }
+
   /** Remote participant this sv app is configured to interact with. */
   lazy val participantClient =
     new ParticipantClientReference(

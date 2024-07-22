@@ -18,15 +18,15 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.Codec
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, Identifier, UniqueIdentifier}
+import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
-  DomainParametersStateX,
-  MediatorDomainStateX,
-  SequencerDomainStateX,
-  SignedTopologyTransactionX,
-  TopologyMappingX,
-  TopologyTransactionX,
+  DomainParametersState,
+  MediatorDomainState,
+  SequencerDomainState,
+  SignedTopologyTransaction,
+  TopologyMapping,
+  TopologyTransaction,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
@@ -131,7 +131,7 @@ class HttpScanSoftDomainMigrationPocHandler(
   ): Future[ScanSoftDomainMigrationPocResource.GetSynchronizerBootstrappingTransactionsResponse] = {
     implicit val tc = extracted
     val domainId = DomainId(
-      UniqueIdentifier(Identifier.tryCreate(domainIdPrefix), store.key.dsoParty.uid.namespace)
+      UniqueIdentifier.tryCreate(domainIdPrefix, store.key.dsoParty.uid.namespace)
     )
     for {
       signedTransactionsProposals <- participantAdminConnection
@@ -139,9 +139,9 @@ class HttpScanSoftDomainMigrationPocHandler(
           store = TopologyStoreId.AuthorizedStore,
           proposals = true,
           includeMappings = Set(
-            TopologyMappingX.Code.DomainParametersStateX,
-            TopologyMappingX.Code.SequencerDomainStateX,
-            TopologyMappingX.Code.MediatorDomainStateX,
+            TopologyMapping.Code.DomainParametersState,
+            TopologyMapping.Code.SequencerDomainState,
+            TopologyMapping.Code.MediatorDomainState,
           ),
         )
         .map(_.map(_.transaction))
@@ -150,17 +150,17 @@ class HttpScanSoftDomainMigrationPocHandler(
           store = TopologyStoreId.AuthorizedStore,
           proposals = false,
           includeMappings = Set(
-            TopologyMappingX.Code.DomainParametersStateX,
-            TopologyMappingX.Code.SequencerDomainStateX,
-            TopologyMappingX.Code.MediatorDomainStateX,
+            TopologyMapping.Code.DomainParametersState,
+            TopologyMapping.Code.SequencerDomainState,
+            TopologyMapping.Code.MediatorDomainState,
           ),
         )
         .map(_.map(_.transaction))
       signedTransactions = signedTransactionsProposals ++ signedTransactionsNonProposals
       domainParameters = signedTransactions
         .find {
-          case SignedTopologyTransactionX(
-                TopologyTransactionX(_, _, DomainParametersStateX(actualDomainId, _)),
+          case SignedTopologyTransaction(
+                TopologyTransaction(_, _, DomainParametersState(actualDomainId, _)),
                 _,
                 _,
               ) if actualDomainId == domainId =>
@@ -174,8 +174,8 @@ class HttpScanSoftDomainMigrationPocHandler(
         )
       sequencerDomainState = signedTransactions
         .find {
-          case SignedTopologyTransactionX(
-                TopologyTransactionX(_, _, SequencerDomainStateX(actualDomainId, _, _, _)),
+          case SignedTopologyTransaction(
+                TopologyTransaction(_, _, SequencerDomainState(actualDomainId, _, _, _)),
                 _,
                 _,
               ) if actualDomainId == domainId =>
@@ -189,8 +189,8 @@ class HttpScanSoftDomainMigrationPocHandler(
         )
       mediatorDomainState = signedTransactions
         .find {
-          case SignedTopologyTransactionX(
-                TopologyTransactionX(_, _, MediatorDomainStateX(actualDomainId, _, _, _, _)),
+          case SignedTopologyTransaction(
+                TopologyTransaction(_, _, MediatorDomainState(actualDomainId, _, _, _, _)),
                 _,
                 _,
               ) if actualDomainId == domainId =>

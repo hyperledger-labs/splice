@@ -8,9 +8,26 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.{
+  CounterParticipantInfo,
+  DomainTimeRange,
+  GetConfigForSlowCounterParticipants,
+  GetIntervalsBehindForCounterParticipants,
+  LookupReceivedAcsCommitments,
+  LookupSentAcsCommitments,
+  ReceivedAcsCmt,
+  SentAcsCmt,
+  SetConfigForSlowCounterParticipants,
+  SlowCounterParticipantDomainConfig,
+}
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Pruning.{
+  GetNoWaitCommitmentsFrom,
   GetParticipantScheduleCommand,
+  NoWaitCommitments,
+  SetNoWaitCommitmentsFrom,
   SetParticipantScheduleCommand,
+  SetWaitCommitmentsFrom,
+  WaitCommitments,
 }
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Resources.{
   GetResourceLimits,
@@ -25,7 +42,7 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{DomainTimeTrackerConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
@@ -40,17 +57,22 @@ import com.digitalasset.canton.console.{
   Helpful,
   LedgerApiCommandRunner,
   ParticipantReference,
-  SequencerNodeReference,
+  SequencerReference,
 }
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.admin.data.ParticipantStatus
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.participant.ParticipantNodeCommon
+import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.admin.ResourceLimits
 import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
+  ReceivedCmtState,
+  SentCmtState,
+}
 import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -61,8 +83,8 @@ import com.digitalasset.canton.protocol.{LfCommittedTransaction, SerializableCon
 import com.digitalasset.canton.sequencing.{
   PossiblyIgnoredProtocolEvent,
   SequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnections,
+  SequencerConnectionValidation,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -71,10 +93,11 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
-import com.digitalasset.canton.{DiscardOps, DomainAlias, SequencerAlias, config}
+import com.digitalasset.canton.{config, DomainAlias, SequencerAlias}
 import com.google.protobuf.ByteString
 
 import java.time.Instant
+import scala.annotation.nowarn
 import scala.concurrent.duration.Duration
 
 sealed trait DomainChoice
@@ -100,12 +123,22 @@ private[console] object ParticipantCommands {
           .UploadDar(Some(path), vetAllPackages, synchronizeVetting, logger, darDataO)
       )
 
+    def validate(
+        runner: AdminCommandRunner,
+        path: String,
+        logger: TracedLogger,
+    ): ConsoleCommandResult[String] =
+      runner.adminCommand(
+        ParticipantAdminCommands.Package
+          .ValidateDar(Some(path), logger)
+      )
+
   }
 
   object domains {
 
     def reference_to_config(
-        domain: NonEmpty[Map[SequencerAlias, SequencerNodeReference]],
+        domain: NonEmpty[Map[SequencerAlias, SequencerReference]],
         domainAlias: DomainAlias,
         manualConnect: Boolean = false,
         maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
@@ -331,7 +364,7 @@ class ParticipantTestingGroup(
 }
 
 class LocalParticipantTestingGroup(
-    participantRef: ParticipantReference with BaseInspection[ParticipantNodeCommon],
+    participantRef: ParticipantReference with BaseInspection[ParticipantNode],
     consoleEnvironment: ConsoleEnvironment,
     loggerFactory: NamedLoggerFactory,
 ) extends ParticipantTestingGroup(participantRef, consoleEnvironment, loggerFactory)
@@ -400,6 +433,7 @@ class LocalParticipantTestingGroup(
        This is because the combined event log isn't guaranteed to have increasing timestamps.
     """
   )
+  @nowarn("msg=usage being removed as part of fusing MultiDomainEventLog and Ledger API Indexer")
   def event_search(
       domain: Option[DomainAlias] = None,
       from: Option[Instant] = None,
@@ -431,6 +465,7 @@ class LocalParticipantTestingGroup(
        Note that if the domain is left blank, the values of `from` and `to` cannot be set.
        This is because the combined event log isn't guaranteed to have increasing timestamps.
     """)
+  @nowarn("msg=usage being removed as part of fusing MultiDomainEventLog and Ledger API Indexer")
   def transaction_search(
       domain: Option[DomainAlias] = None,
       from: Option[Instant] = None,
@@ -668,7 +703,7 @@ class ParticipantPruningAdministrationGroup(
 }
 
 class LocalCommitmentsAdministrationGroup(
-    runner: AdminCommandRunner with BaseInspection[ParticipantNodeCommon],
+    runner: AdminCommandRunner with BaseInspection[ParticipantNode],
     val consoleEnvironment: ConsoleEnvironment,
     val loggerFactory: NamedLoggerFactory,
 ) extends FeatureFlagFilter
@@ -746,6 +781,295 @@ class LocalCommitmentsAdministrationGroup(
       )
     }
 
+  // TODO(#18451) R5
+  @Help.Summary(
+    "List the counter-participants of a participant and the ACS commitments received from them together with" +
+      "the commitment state."
+  )
+  @Help.Description(
+    """Optional filtering through the arguments:
+      | domainTimeRanges: Lists commitments received on the given domains whose period overlaps with any of the given
+      |  time ranges per domain.
+      |  If the list is empty, considers all domains the participant is connected to.
+      |  For domains with an empty time range, considers the latest period the participant knows of for that domain.
+      |  Domains can appear multiple times in the list with various time ranges, in which case we consider the
+      |  union of the time ranges.
+      |counterParticipants: Lists commitments received only from the given counter-participants. If a counter-participant
+      |  is not a counter-participant on some domain, no commitments appear in the reply from that counter-participant
+      |  on that domain.
+      |commitmentState: Lists commitments that are in one of the given states. By default considers all states:
+      |   - MATCH: the remote commitment matches the local commitment
+      |   - MISMATCH: the remote commitment does not match the local commitment
+      |   - BUFFERED: the remote commitment is buffered because the corresponding local commitment has not been computed yet
+      |   - OUTSTANDING: we expect a remote commitment that has not yet been received
+      |verboseMode: If false, the reply does not contain the commitment bytes. If true, the reply contains:
+      |   - In case of a mismatch, the reply contains both the received and the locally computed commitment that do not match.
+      |   - In case of outstanding, the reply does not contain any commitment.
+      |   - In all other cases (match and buffered), the reply contains the received commitment.
+           """
+  )
+  def lookup_received_acs_commitments(
+      domainTimeRanges: Seq[DomainTimeRange],
+      counterParticipants: Seq[ParticipantId],
+      commitmentState: Seq[ReceivedCmtState],
+      verboseMode: Boolean,
+  ): Map[DomainId, Seq[ReceivedAcsCmt]] =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        LookupReceivedAcsCommitments(
+          domainTimeRanges,
+          counterParticipants,
+          commitmentState,
+          verboseMode,
+        )
+      )
+    )
+
+  // TODO(#18451) R5
+  @Help.Summary(
+    "List the counter-participants of a participant and the ACS commitments that the participant computed and sent to" +
+      "them, together with the commitment state."
+  )
+  @Help.Description(
+    """Optional filtering through the arguments:
+          | domainTimeRanges: Lists commitments received on the given domains whose period overlap with any of the
+          |  given time ranges per domain.
+          |  If the list is empty, considers all domains the participant is connected to.
+          |  For domains with an empty time range, considers the latest period the participant knows of for that domain.
+          |  Domains can appear multiple times in the list with various time ranges, in which case we consider the
+          |  union of the time ranges.
+          |counterParticipants: Lists commitments sent only to the given counter-participants. If a counter-participant
+          |  is not a counter-participant on some domain, no commitments appear in the reply for that counter-participant
+          |  on that domain.
+          |commitmentState: Lists sent commitments that are in one of the given states. By default considers all states:
+          |   - MATCH: the local commitment matches the remote commitment
+          |   - MISMATCH: the local commitment does not match the remote commitment
+          |   - NOT_COMPARED: the local commitment has been computed and sent but no corresponding remote commitment has
+          |     been received
+          |verboseMode: If false, the reply does not contain the commitment bytes. If true, the reply contains:
+          |   - In case of a mismatch, the reply contains both the received and the locally computed commitment that
+          |     do not match.
+          |   - In all other cases (match and not compared), the reply contains the sent commitment.
+           """
+  )
+  def lookup_sent_acs_commitments(
+      domainTimeRanges: Seq[DomainTimeRange],
+      counterParticipants: Seq[ParticipantId],
+      commitmentState: Seq[SentCmtState],
+      verboseMode: Boolean,
+  ): Map[DomainId, Seq[SentAcsCmt]] =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        LookupSentAcsCommitments(
+          domainTimeRanges,
+          counterParticipants,
+          commitmentState,
+          verboseMode,
+        )
+      )
+    )
+
+  // TODO(#18453) R6: The code below should be sufficient.
+  @Help.Summary(
+    "Disable waiting for commitments from the given counter-participants."
+  )
+  @Help.Description(
+    """Disabling waiting for commitments disregards these counter-participants w.r.t. pruning,
+      |which gives up non-repudiation for those counter-participants, but increases pruning resilience
+      |to failures and slowdowns of those counter-participants and/or the network.
+      |The command returns a map of counter-participants and the domains for which the setting was changed.
+      |Returns an error if `startingAt` does not translate to an existing offset.
+      |If the participant set is empty, the command does nothing."""
+  )
+  def set_no_wait_commitments_from(
+      counterParticipants: Seq[ParticipantId],
+      domainIds: Seq[DomainId],
+      startingAt: Either[Instant, ParticipantOffset],
+  ): Map[ParticipantId, Seq[DomainId]] = {
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SetNoWaitCommitmentsFrom(
+          counterParticipants,
+          domainIds,
+          startingAt,
+        )
+      )
+    )
+  }
+
+  // TODO(#18453) R6: The code below should be sufficient.
+  @Help.Summary(
+    "Enable waiting for commitments from the given counter-participants. This is the default behavior; enabling waiting" +
+      "for commitments is only necessary if it was previously disabled."
+  )
+  @Help.Description(
+    """Enables waiting for commitments, which blocks pruning at offsets where commitments from these counter-participants
+      |are missing.
+      |The command returns a map of counter-participants and the domains for which the setting was changed.
+      |If the participant set is empty or the domain set is empty, the command does nothing."""
+  )
+  def set_wait_commitments_from(
+      counterParticipants: Seq[ParticipantId],
+      domainIds: Seq[DomainId],
+  ): Map[ParticipantId, Seq[DomainId]] = {
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SetWaitCommitmentsFrom(
+          counterParticipants,
+          domainIds,
+        )
+      )
+    )
+  }
+
+  // TODO(#18453) R6: The code below should be sufficient.
+  @Help.Summary(
+    "Retrieves the latest (i.e., w.r.t. the query execution time) configuration of waiting for commitments from counter-participants."
+  )
+  @Help.Description(
+    """The configuration for waiting for commitments from counter-participants is returned as two sets:
+      |a set of ignored counter-participants, the domains and the timestamp, and a set of not-ignored
+      |counter-participants and the domains.
+      |Filters by the specified counter-participants and domains. If the counter-participant and / or
+      |domains are empty, it considers all domains and participants known to the participant, regardless of
+      |whether they share contracts with the participant.
+      |Even if some participants may not be connected to some domains at the time the query executes, the response still
+      |includes them if they are known to the participant or specified in the arguments."""
+  )
+  def get_no_wait_commitments_from(
+      domains: Seq[DomainId],
+      counterParticipants: Seq[ParticipantId],
+  ): (Seq[NoWaitCommitments], Seq[WaitCommitments]) =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        GetNoWaitCommitmentsFrom(
+          domains,
+          counterParticipants,
+        )
+      )
+    )
+
+  // TODO(#10436) R7: The code below should be sufficient.
+  @Help.Summary(
+    "Configure metrics for slow counter-participants (i.e., that are behind in sending commitments) and" +
+      "configure thresholds for when a counter-participant is deemed slow."
+  )
+  @Help.Description("""The configurations are per domain or set of domains and concern the following metrics
+        |issued per domain:
+        | - The maximum number of intervals that a distinguished participant falls
+        | behind. All participants that are not in the distinguished group are automatically part of the default group
+        | - The maximum number of intervals that a participant in the default groups falls behind
+        | - The number of participants in the distinguished group that are behind by at least `thresholdDistinguished`
+        | reconciliation intervals.
+        | - The number of participants not in the distinguished group that are behind by at least `thresholdDefault`
+        | reconciliation intervals.
+        | - Separate metric for each participant in `individualMetrics` argument tracking how many intervals that
+        |participant is behind""")
+  def set_config_for_slow_counter_participants(
+      configs: Seq[SlowCounterParticipantDomainConfig]
+  ): Unit = {
+    consoleEnvironment.run(
+      runner.adminCommand(
+        SetConfigForSlowCounterParticipants(
+          configs
+        )
+      )
+    )
+  }
+
+  // TODO(#10436) R7
+  def add_config_for_slow_counter_participants(
+      counterParticipantsDistinguished: Seq[ParticipantId],
+      domains: Seq[DomainId],
+  ) = ???
+
+  // TODO(#10436) R7
+  def remove_config_for_slow_counter_participants(
+      counterParticipantsDistinguished: Seq[ParticipantId],
+      domains: Seq[DomainId],
+  ) = ???
+
+  // TODO(#10436) R7
+  def add_participant_to_individual_metrics(
+      individualMetrics: Seq[ParticipantId],
+      domains: Seq[DomainId],
+  ) = ???
+
+  // TODO(#10436) R7
+  def remove_participant_from_individual_metrics(
+      individualMetrics: Seq[ParticipantId],
+      domains: Seq[DomainId],
+  ) = ???
+
+  // TODO(#10436) R7: The code below should be sufficient.
+  @Help.Summary(
+    "Lists for the given domains the configuration of metrics for slow counter-participants (i.e., that" +
+      "are behind in sending commitments)"
+  )
+  @Help.Description("""Lists the following config per domain. If `domains` is empty, the command lists config for all
+                       domains:
+      "| - The participants in the distinguished group, which have two metrics:
+      the maximum number of intervals that a participant is behind, and the number of participants that are behind
+      by at least `thresholdDistinguished` reconciliation intervals
+      | - The participants not in the distinguished group, which have two metrics: the maximum number of intervals that a participant
+      | is behind, and the number of participants that are behind by at least `thresholdDefault` reconciliation intervals
+      | - Parameters `thresholdDistinguished` and `thresholdDefault`
+      | - The participants in `individualMetrics`, which have individual metrics per participant showing how many
+      reconciliation intervals that participant is behind""")
+  def get_config_for_slow_counter_participants(
+      domains: Seq[DomainId]
+  ): Seq[SlowCounterParticipantDomainConfig] = {
+    consoleEnvironment.run(
+      runner.adminCommand(
+        GetConfigForSlowCounterParticipants(
+          domains
+        )
+      )
+    )
+  }
+
+  case class SlowCounterParticipantInfo(
+      domains: Seq[DomainId],
+      distinguished: Seq[ParticipantId],
+      default: Seq[ParticipantId],
+      individualMetrics: Seq[ParticipantId],
+      thresholdDistinguished: NonNegativeInt,
+      thresholdDefault: NonNegativeInt,
+  )
+
+  // TODO(#10436) R7: Return the slow counter participant config for the given domains and counterParticipants
+  //  Filter the gRPC response of `getConfigForSlowCounterParticipants` with `counterParticipants`
+  def get_config_for_slow_counter_participant(
+      domains: Seq[DomainId],
+      counterParticipants: Seq[ParticipantId],
+  ): Seq[SlowCounterParticipantInfo] = Seq.empty
+
+  // TODO(#10436) R7: The code below should be sufficient.
+  @Help.Summary(
+    "Lists for every participant and domain the number of intervals that the participant is behind in sending commitments" +
+      "if that participant is behind by at least threshold intervals."
+  )
+  @Help.Description("""If `counterParticipants` is empty, the command considers all counter-participants.
+      |If `domains` is empty, the command considers all domains.
+      |If `threshold` is not set, the command considers 0.
+      |Counter-participants that never sent a commitment appear in the output only if they're explicitly given in
+      |`counterParticipants`. For such counter-participant that never sent a commitment, the output shows they are
+      |behind by MaxInt""")
+  def get_intervals_behind_for_counter_participants(
+      counterParticipants: Seq[ParticipantId],
+      domains: Seq[DomainId],
+      threshold: Option[NonNegativeInt],
+  ): Seq[CounterParticipantInfo] = {
+    consoleEnvironment.run(
+      runner.adminCommand(
+        GetIntervalsBehindForCounterParticipants(
+          counterParticipants,
+          domains,
+          threshold.getOrElse(NonNegativeInt.zero),
+        )
+      )
+    )
+  }
 }
 
 class ParticipantReplicationAdministrationGroup(
@@ -755,9 +1079,9 @@ class ParticipantReplicationAdministrationGroup(
 
   @Help.Summary("Set the participant replica to passive")
   @Help.Description(
-    "Trigger a graceful fail-over from this active replica to another passive replica."
+    "Trigger a graceful fail-over from this active replica to another passive replica. Returns true if another replica became active."
   )
-  def set_passive(): Unit = {
+  def set_passive(): Boolean = {
     consoleEnvironment.run {
       runner.adminCommand(
         ParticipantAdminCommands.Replication.SetPassiveCommand()
@@ -877,12 +1201,23 @@ trait ParticipantAdministration extends FeatureFlagFilter {
       }
       if (synchronizeVetting && vetAllPackages) {
         packages.synchronize_vetting()
-        synchronize.foreach { timeout =>
-          ConsoleMacros.utils.synchronize_topology(Some(timeout))(consoleEnvironment)
-        }
       }
       res
     }
+
+    @Help.Summary("Validate DARs against the current participants' state")
+    @Help.Description(
+      """Performs the same DAR and Daml package validation checks that the upload call performs,
+         but with no effects on the target participants: the DAR is not persisted or vetted."""
+    )
+    def validate(path: String): String =
+      consoleEnvironment.runE {
+        for {
+          hash <- ParticipantCommands.dars
+            .validate(runner, path, logger)
+            .toEither
+        } yield hash
+      }
 
     @Help.Summary("Downloads the DAR file with the given hash to the given directory")
     def download(darHash: String, directory: String): Unit = {
@@ -1027,7 +1362,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def active(domainAlias: DomainAlias): Boolean = {
       list_connected().exists(r => {
         // TODO(#14053): Filter out participants that are not permissioned on the domain. The TODO is because the daml 2.x
-        //  also asks the domain whether the participant is permissioned, i.e. do we need to for a ParticipantDomainPermissionX?
+        //  also asks the domain whether the participant is permissioned, i.e. do we need to for a ParticipantDomainPermission?
         r.domainAlias == domainAlias &&
         r.healthy &&
         participantIsActiveOnDomain(r.domainId, id)
@@ -1053,7 +1388,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
     def connect_local(
-        domain: SequencerNodeReference,
+        domain: SequencerReference,
         alias: DomainAlias,
         manualConnect: Boolean = false,
         maxRetryDelayMillis: Option[Long] = None,
@@ -1087,7 +1422,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           validation - Whether to validate the connectivity and ids of the given sequencers (default All)
         """)
     def register(
-        domain: SequencerNodeReference,
+        domain: SequencerReference,
         alias: DomainAlias,
         handshakeOnly: Boolean = false,
         maxRetryDelayMillis: Option[Long] = None,
@@ -1144,7 +1479,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     }
 
     def connect_local_bft(
-        domain: NonEmpty[Map[SequencerAlias, SequencerNodeReference]],
+        domain: NonEmpty[Map[SequencerAlias, SequencerReference]],
         alias: DomainAlias,
         manualConnect: Boolean = false,
         maxRetryDelayMillis: Option[Long] = None,
@@ -1197,12 +1532,12 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         if (!config.manualConnect) {
           reconnect(config.domain.unwrap, retry = false).discard
           // now update the domain settings to auto-connect
-          modify(config.domain.unwrap, _.copy(manualConnect = false))
+          modify(config.domain.unwrap, _.copy(manualConnect = false), validation)
         }
         // architecture-handbook-entry-end: OnboardParticipantConnect
       } else if (!config.manualConnect) {
         reconnect(config.domain, retry = false).discard
-        modify(config.domain.unwrap, _.copy(manualConnect = false))
+        modify(config.domain.unwrap, _.copy(manualConnect = false), validation)
       }
       synchronize.foreach { timeout =>
         ConsoleMacros.utils.synchronize_topology(Some(timeout))(consoleEnvironment)
@@ -1219,7 +1554,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |that the participant reconnects to the domain.
         |""")
     def connect(
-        instance: SequencerNodeReference,
+        instance: SequencerReference,
         domainAlias: DomainAlias,
     ): Unit =
       connect_by_config(
@@ -1355,7 +1690,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
     def reconnect_local(
-        ref: SequencerNodeReference
+        ref: SequencerReference
     ): Boolean = reconnect(ref.name)
 
     @Help.Summary("Reconnect this participant to the given local domain")
@@ -1501,26 +1836,26 @@ trait ParticipantAdministration extends FeatureFlagFilter {
       """While a resource limit is attained or exceeded, the participant will reject any additional submission with GRPC status ABORTED.
         |Most importantly, a submission will be rejected **before** it consumes a significant amount of resources.
         |
-        |There are three kinds of limits: `maxDirtyRequests`,  `maxRate` and `maxBurstFactor`.
-        |The number of dirty requests of a participant P covers (1) requests initiated by P as well as
+        |There are three kinds of limits: `maxInflightValidationRequests`,  `maxSubmissionRate` and `maxSubmissionBurstFactor`.
+        |The number of inflight validation requests of a participant P covers (1) requests initiated by P as well as
         |(2) requests initiated by participants other than P that need to be validated by P.
-        |Compared to the maximum rate, the maximum number of dirty requests reflects the load on the participant more accurately.
-        |However, the maximum number of dirty requests alone does not protect the system from "bursts":
-        |If an application submits a huge number of commands at once, the maximum number of dirty requests will likely
-        |be exceeded, as the system is registering dirty requests only during validation and not already during
+        |Compared to the maximum rate, the maximum number of inflight validation requests reflects the load on the participant more accurately.
+        |However, the maximum number of inflight validation requests alone does not protect the system from "bursts":
+        |If an application submits a huge number of commands at once, the maximum number of inflight validation requests will likely
+        |be exceeded, as the system is registering inflight validation requests only during validation and not already during
         |submission.
         |
-        |The maximum rate is a hard limit on the rate of commands submitted to this participant through the ledger API.
+        |The maximum rate is a hard limit on the rate of commands submitted to this participant through the Ledger API.
         |As the rate of commands is checked and updated immediately after receiving a new command submission,
         |an application cannot exceed the maximum rate.
         |
-        |The `maxBurstFactor` parameter (positive, default 0.5) allows to configure how permissive the rate limitation should be
-        |with respect to bursts. The rate limiting will be enforced strictly after having observed `max_burst` * `max_rate` commands.
+        |The `maxSubmissionBurstFactor` parameter (positive, default 0.5) allows to configure how permissive the rate limitation should be
+        |with respect to bursts. The rate limiting will be enforced strictly after having observed `max_burst` * `max_submission_rate` commands.
         |
         |For the sake of illustration, let's assume the configured rate limit is ``100 commands/s`` with a burst ratio of 0.5.
         |If an application submits 100 commands within a single second, waiting exactly 10 milliseconds between consecutive commands,
         |then the participant will accept all commands.
-        |With a `maxBurstFactor` of 0.5, the participant will accept the first 50 commands and reject the remaining 50.
+        |With a `maxSubmissionBurstFactor` of 0.5, the participant will accept the first 50 commands and reject the remaining 50.
         |If the application then waits another 500 ms, it may submit another burst of 50 commands. If it waits 250 ms,
         |it may submit only a burst of 25 commands.
         |
@@ -1539,7 +1874,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
 }
 
 trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
-  this: HealthAdministrationCommon[ParticipantStatus] =>
+  this: HealthAdministration[ParticipantStatus] =>
 
   protected def runner: AdminCommandRunner
 
@@ -1602,11 +1937,11 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
   }
 }
 
-class ParticipantHealthAdministrationX(
+class ParticipantHealthAdministration(
     val runner: AdminCommandRunner,
     val consoleEnvironment: ConsoleEnvironment,
     override val loggerFactory: NamedLoggerFactory,
-) extends HealthAdministrationX(
+) extends HealthAdministration(
       runner,
       consoleEnvironment,
       ParticipantStatus.fromProtoV30,

@@ -12,13 +12,10 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
-import com.daml.lf.data.Ref
-import com.daml.lf.ledger.EventId
-import com.daml.lf.transaction.NodeId
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawAssignEvent,
@@ -32,6 +29,9 @@ import com.digitalasset.canton.platform.store.dao.{
 }
 import com.digitalasset.canton.platform.store.serialization.Compression
 import com.digitalasset.canton.platform.{Party, TemplatePartiesFilter}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.ledger.EventId
+import com.digitalasset.daml.lf.transaction.NodeId
 import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Span
 import org.apache.pekko.stream.scaladsl.Source
@@ -59,7 +59,7 @@ private[dao] final class TransactionsReader(
     dispatcher: DbDispatcher,
     queryValidRange: QueryValidRange,
     eventStorageBackend: EventStorageBackend,
-    metrics: Metrics,
+    metrics: LedgerApiServerMetrics,
     acsReader: ACSReader,
 )(implicit executionContext: ExecutionContext)
     extends LedgerDaoTransactionsReader {
@@ -96,7 +96,7 @@ private[dao] final class TransactionsReader(
       requestingParties = requestingParties,
       eventProjectionProperties = EventProjectionProperties(
         verbose = true,
-        wildcardWitnesses = requestingParties.map(_.toString),
+        templateWildcardWitnesses = Some(requestingParties.map(_.toString)),
       ),
     )
   }
@@ -112,7 +112,7 @@ private[dao] final class TransactionsReader(
       requestingParties = requestingParties,
       eventProjectionProperties = EventProjectionProperties(
         verbose = true,
-        wildcardWitnesses = requestingParties.map(_.toString),
+        templateWildcardWitnesses = Some(requestingParties.map(_.toString)),
       ),
     )
   }
@@ -120,7 +120,7 @@ private[dao] final class TransactionsReader(
   override def getTransactionTrees(
       startExclusive: Offset,
       endInclusive: Offset,
-      requestingParties: Set[Party],
+      requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace

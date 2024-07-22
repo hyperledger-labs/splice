@@ -3,7 +3,7 @@
 
 package com.daml.network.environment
 
-import com.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules

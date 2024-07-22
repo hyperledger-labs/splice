@@ -9,6 +9,7 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.ClockErrorGroup
 import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
@@ -18,7 +19,7 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.Clock.SystemClockRunningBackwards
 import com.digitalasset.canton.topology.admin.v30.{
   CurrentTimeRequest,
-  IdentityInitializationXServiceGrpc,
+  IdentityInitializationServiceGrpc,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -394,7 +395,7 @@ class RemoteClock(
     noTracingLogger,
   )
   private val channel = ClientChannelBuilder.createChannelToTrustedServer(config)
-  private val service = IdentityInitializationXServiceGrpc.stub(channel)
+  private val service = IdentityInitializationServiceGrpc.stub(channel)
 
   private def getCurrentRemoteTime(): Future[Timestamp] =
     service.currentTime(CurrentTimeRequest()).map(_.getCurrentTime)

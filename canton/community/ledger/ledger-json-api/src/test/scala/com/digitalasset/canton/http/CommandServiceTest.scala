@@ -4,7 +4,11 @@
 package com.digitalasset.canton.http
 
 import com.daml.ledger.api.v2 as lav2
-import lav2.command_service.{SubmitAndWaitForTransactionResponse, SubmitAndWaitForTransactionTreeResponse, SubmitAndWaitRequest}
+import lav2.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitRequest,
+}
 import lav2.transaction.{Transaction, TransactionTree}
 import com.digitalasset.canton.http.util.Logging as HLogging
 import com.daml.logging.LoggingContextOf
@@ -12,7 +16,13 @@ import LoggingContextOf.{label, newLoggingContext}
 import com.daml.jwt.JwtSigner
 import com.daml.jwt.domain.{DecodedJwt, Jwt}
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.ledger.api.auth.{AuthServiceJWTCodec, AuthServiceJWTPayload, StandardJWTPayload, StandardJWTTokenFormat}
+import com.digitalasset.canton.ledger.api.auth.{
+  AuthServiceJWTCodec,
+  AuthServiceJWTPayload,
+  StandardJWTPayload,
+  StandardJWTTokenFormat,
+}
+import com.digitalasset.canton.tracing.NoTracing
 import org.scalatest.Inside
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -21,14 +31,14 @@ import scalaz.syntax.foldable.*
 import scalaz.syntax.tag.*
 import spray.json.*
 import scalaz.syntax.show.*
-import java.util.concurrent.CopyOnWriteArrayList
 
+import java.util.concurrent.CopyOnWriteArrayList
 import scala.collection as sc
 import scala.concurrent.{Future, ExecutionContext as EC}
 import scala.jdk.CollectionConverters.*
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-class CommandServiceTest extends AsyncWordSpec with Matchers with Inside {
+class CommandServiceTest extends AsyncWordSpec with Matchers with Inside with NoTracing {
   import CommandServiceTest.*
 
   "create" should {
@@ -129,20 +139,21 @@ object CommandServiceTest extends BaseTest {
       new CommandService(
         submitAndWaitForTransaction = (_, req) =>
           _ =>
-            Future {
-              txns.add(req)
-              import lav2.event.{CreatedEvent, Event}, Event.Event.Created
-              import com.digitalasset.canton.fetchcontracts.util.IdentifierConverters.apiIdentifier
-              val creation = Event(
-                Created(
-                  CreatedEvent(
-                    templateId = Some(apiIdentifier(tplId)),
-                    createArguments = Some(lav2.value.Record()),
+            _ =>
+              Future {
+                txns.add(req)
+                import lav2.event.{CreatedEvent, Event}, Event.Event.Created
+                import com.digitalasset.canton.fetchcontracts.util.IdentifierConverters.apiIdentifier
+                val creation = Event(
+                  Created(
+                    CreatedEvent(
+                      templateId = Some(apiIdentifier(tplId)),
+                      createArguments = Some(lav2.value.Record()),
+                    )
                   )
                 )
-              )
-              \/-(SubmitAndWaitForTransactionResponse(Some(Transaction(events = Seq(creation)))))
-            },
+                \/-(SubmitAndWaitForTransactionResponse(Some(Transaction(events = Seq(creation)))))
+              },
         submitAndWaitForTransactionTree = (_, req) =>
           _ =>
             Future {

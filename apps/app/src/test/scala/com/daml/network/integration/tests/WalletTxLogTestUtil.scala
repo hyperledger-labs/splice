@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.lf.data.Numeric
+import com.digitalasset.daml.lf.data.Numeric
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.store.Limit

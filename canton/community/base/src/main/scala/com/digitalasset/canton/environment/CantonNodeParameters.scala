@@ -9,11 +9,11 @@ import com.digitalasset.canton.config.{
   LoggingConfig,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
+  WatchdogConfig,
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
-import com.digitalasset.canton.version.ProtocolVersion
 
 trait CantonNodeParameters extends CantonNodeParameters.General with CantonNodeParameters.Protocol
 
@@ -31,9 +31,9 @@ object CantonNodeParameters {
     def batchingConfig: BatchingConfig
     def nonStandardConfig: Boolean
     def dbMigrateAndStart: Boolean
-    def useNewTrafficControl: Boolean
     def exitOnFatalFailures: Boolean
     def useUnifiedSequencer: Boolean
+    def watchdog: Option[WatchdogConfig]
   }
   object General {
     final case class Impl(
@@ -49,24 +49,22 @@ object CantonNodeParameters {
         batchingConfig: BatchingConfig,
         nonStandardConfig: Boolean,
         dbMigrateAndStart: Boolean,
-        useNewTrafficControl: Boolean,
         exitOnFatalFailures: Boolean,
         useUnifiedSequencer: Boolean,
+        watchdog: Option[WatchdogConfig],
     ) extends CantonNodeParameters.General
   }
   trait Protocol {
-    def devVersionSupport: Boolean
+    def alphaVersionSupport: Boolean
+    def betaVersionSupport: Boolean
     def dontWarnOnDeprecatedPV: Boolean
-
-    /** The initial protocol version before connected to any domain, e.g., when creating the initial topology transactions. */
-    def initialProtocolVersion: ProtocolVersion
-
   }
+
   object Protocol {
     final case class Impl(
-        devVersionSupport: Boolean,
+        alphaVersionSupport: Boolean,
+        betaVersionSupport: Boolean,
         dontWarnOnDeprecatedPV: Boolean,
-        initialProtocolVersion: ProtocolVersion,
     ) extends CantonNodeParameters.Protocol
   }
 }
@@ -88,18 +86,16 @@ trait HasGeneralCantonNodeParameters extends CantonNodeParameters.General {
   override def batchingConfig: BatchingConfig = general.batchingConfig
   override def nonStandardConfig: Boolean = general.nonStandardConfig
   override def dbMigrateAndStart: Boolean = general.dbMigrateAndStart
-  override def useNewTrafficControl: Boolean = general.useNewTrafficControl
   override def exitOnFatalFailures: Boolean = general.exitOnFatalFailures
   override def useUnifiedSequencer: Boolean = general.useUnifiedSequencer
-
+  override def watchdog: Option[WatchdogConfig] = general.watchdog
 }
 
 trait HasProtocolCantonNodeParameters extends CantonNodeParameters.Protocol {
 
   protected def protocol: CantonNodeParameters.Protocol
 
-  def devVersionSupport: Boolean = protocol.devVersionSupport
+  def alphaVersionSupport: Boolean = protocol.alphaVersionSupport
+  def betaVersionSupport: Boolean = protocol.betaVersionSupport
   def dontWarnOnDeprecatedPV: Boolean = protocol.dontWarnOnDeprecatedPV
-  def initialProtocolVersion: ProtocolVersion = protocol.initialProtocolVersion
-
 }

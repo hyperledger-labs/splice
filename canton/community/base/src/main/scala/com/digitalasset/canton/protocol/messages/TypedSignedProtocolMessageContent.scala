@@ -65,7 +65,7 @@ object TypedSignedProtocolMessageContent
 
   override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v30
+      ProtocolVersion.v31
     )(v30.TypedSignedProtocolMessageContent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
@@ -107,8 +107,10 @@ object TypedSignedProtocolMessageContent
           )
         case Sm.AcsCommitment(acsCommitmentBytes) =>
           AcsCommitment.fromByteString(expectedProtocolVersion)(acsCommitmentBytes)
-        case Sm.SetTrafficBalance(setTrafficBalanceBytes) =>
-          SetTrafficBalanceMessage.fromByteString(expectedProtocolVersion)(setTrafficBalanceBytes)
+        case Sm.SetTrafficPurchased(setTrafficPurchasedBytes) =>
+          SetTrafficPurchasedMessage.fromByteString(expectedProtocolVersion)(
+            setTrafficPurchasedBytes
+          )
         case Sm.Empty =>
           Left(OtherError("Deserialization of a SignedMessage failed due to a missing message"))
       }): ParsingResult[SignedProtocolMessageContent]

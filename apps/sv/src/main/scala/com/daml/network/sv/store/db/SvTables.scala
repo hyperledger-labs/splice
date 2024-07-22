@@ -3,7 +3,7 @@
 
 package com.daml.network.sv.store.db
 
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.Contract
 

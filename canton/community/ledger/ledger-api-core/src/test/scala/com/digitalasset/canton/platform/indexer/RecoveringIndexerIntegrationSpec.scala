@@ -4,11 +4,9 @@
 package com.digitalasset.canton.platform.indexer
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.lf.data.Ref.{Party, SubmissionId}
-import com.daml.lf.data.{Ref, Time}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.health.HealthStatus
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.{
+import com.digitalasset.canton.ledger.participant.state.{
   InternalStateServiceProviderImpl,
   ReadService,
   SubmissionResult,
@@ -22,8 +20,9 @@ import com.digitalasset.canton.logging.{
   SuppressingLogger,
   SuppressionRule,
 }
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.LedgerApiServer
+import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IndexServiceConfig,
@@ -39,9 +38,12 @@ import com.digitalasset.canton.platform.store.DbSupport.{
   ParticipantDataSourceConfig,
 }
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
+import com.digitalasset.canton.platform.store.interning.{MockStringInterning, StringInterningView}
 import com.digitalasset.canton.tracing.TraceContext.{withNewTraceContext, wrapWithNewTraceContext}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, Traced}
 import com.digitalasset.canton.{HasExecutionContext, config}
+import com.digitalasset.daml.lf.data.Ref.{Party, SubmissionId}
+import com.digitalasset.daml.lf.data.{Ref, Time}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
@@ -241,7 +243,7 @@ class RecoveringIndexerIntegrationSpec
     val participantId = Ref.ParticipantId.assertFromString(s"participant-$testId")
     val jdbcUrl =
       s"jdbc:h2:mem:${getClass.getSimpleName.toLowerCase()}-$testId;db_close_delay=-1;db_close_on_exit=false"
-    val metrics = Metrics.ForTesting
+    val metrics = LedgerApiServerMetrics.ForTesting
     val participantDataSourceConfig = ParticipantDataSourceConfig(jdbcUrl)
     val indexerConfig = IndexerConfig(restartDelay = restartDelay)
     for {
@@ -251,16 +253,19 @@ class RecoveringIndexerIntegrationSpec
       servicesExecutionContext <- ResourceOwner
         .forExecutorService(() => Executors.newWorkStealingPool())
         .map(ExecutionContext.fromExecutorService)
+      mutableLedgerEndCache = MutableLedgerEndCache()
+      stringInterningView = new StringInterningView(loggerFactory)
       (inMemoryState, inMemoryStateUpdaterFlow) <-
         LedgerApiServer
           .createInMemoryStateAndUpdater(
+            commandProgressTracker = CommandProgressTracker.NoOp,
             IndexServiceConfig(),
             CommandServiceConfig.DefaultMaxCommandsInFlight,
             metrics,
             parallelExecutionContext,
             tracer,
             loggerFactory,
-          )
+          )(mutableLedgerEndCache, stringInterningView)
       dbSupport <- DbSupport
         .owner(
           serverRole = ServerRole.Testing(getClass),
@@ -291,6 +296,7 @@ class RecoveringIndexerIntegrationSpec
         ),
         highAvailability = HaConfig(),
         indexServiceDbDispatcher = Some(dbSupport.dbDispatcher),
+        excludedPackageIds = Set.empty,
       )(materializer, traceContext)
     } yield (participantState._2, dbSupport)
   }
@@ -298,11 +304,12 @@ class RecoveringIndexerIntegrationSpec
   private def eventuallyPartiesShouldBe(dbSupport: DbSupport, partyNames: String*)(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Unit] = {
-    val metrics = Metrics.ForTesting
+    val metrics = LedgerApiServerMetrics.ForTesting
     val ledgerEndCache = MutableLedgerEndCache()
     val storageBackendFactory = dbSupport.storageBackendFactory
     val partyStorageBacked = storageBackendFactory.createPartyStorageBackend(ledgerEndCache)
-    val parameterStorageBackend = storageBackendFactory.createParameterStorageBackend
+    val parameterStorageBackend =
+      storageBackendFactory.createParameterStorageBackend(new MockStringInterning)
     val dbDispatcher = dbSupport.dbDispatcher
 
     eventually {
@@ -311,7 +318,9 @@ class RecoveringIndexerIntegrationSpec
           .executeSql(metrics.index.db.getLedgerEnd)(parameterStorageBackend.ledgerEnd)
         _ = ledgerEndCache.set(ledgerEnd.lastOffset -> ledgerEnd.lastEventSeqId)
         knownParties <- dbDispatcher
-          .executeSql(metrics.index.db.loadAllParties)(partyStorageBacked.knownParties)
+          .executeSql(metrics.index.db.loadAllParties)(
+            partyStorageBacked.knownParties(None, 10)
+          )
       } yield {
         knownParties.map(_.displayName) shouldBe partyNames.map(Some(_))
         ()

@@ -12,7 +12,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.topology.transaction.DomainParametersStateX
+import com.digitalasset.canton.topology.transaction.DomainParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -94,7 +94,7 @@ class AcsExporter(
 
   private def waitForMediatorAndParticipantResponseTime(
       domainId: DomainId,
-      domainParamsTopology: TopologyResult[DomainParametersStateX],
+      domainParamsTopology: TopologyResult[DomainParametersState],
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,

@@ -5,7 +5,7 @@ package com.daml.network.console
 
 import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
-import com.daml.lf.archive.DarParser
+import com.digitalasset.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{SpliceBackendConfig, NetworkAppClientConfig}
@@ -15,9 +15,9 @@ import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
-  HealthAdministrationX,
+  HealthAdministration,
   KeyAdministrationGroup,
-  PartiesAdministrationGroupX,
+  PartiesAdministrationGroup,
   TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
@@ -61,7 +61,7 @@ trait AppReference extends InstanceReference {
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
-    new HealthAdministrationX[SimpleStatus](
+    new HealthAdministration[SimpleStatus](
       this,
       consoleEnvironment,
       SimpleStatus.fromProtoV30,
@@ -70,14 +70,20 @@ trait AppReference extends InstanceReference {
   // clear_cache exists to invalidate topology caches which we don't have in our apps.
   override def clear_cache(): Unit = ()
 
-  // Doesn't make sense for Splice
-  override def topology: TopologyAdministrationGroup = ???
+  override def topology: TopologyAdministrationGroup = new TopologyAdministrationGroup(
+    this,
+    // Doesn't make sense for Splice
+    None,
+    consoleEnvironment,
+    loggerFactory,
+  )
 
   // Doesn't make sense for Splice
-  override def parties: PartiesAdministrationGroupX = ???
+  override def parties: PartiesAdministrationGroup = ???
 
   // Doesn't make sense for Splice
   override def id: NodeIdentity = ???
+  override def maybeId: Option[NodeIdentity] = None
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(

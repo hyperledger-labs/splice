@@ -3,16 +3,21 @@
 
 package com.daml.network.config
 
-import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, LocalNodeParametersConfig}
+import com.digitalasset.canton.config.{
+  BatchingConfig,
+  CachingConfigs,
+  LocalNodeParametersConfig,
+  WatchdogConfig,
+}
 
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
 ) extends LocalNodeParametersConfig {
-  override val useNewTrafficControl: Boolean =
-    false // irrelevant for Splice, as this is an impl. config for Canton nodes only
+  override def alphaVersionSupport: Boolean = false
+
+  override def watchdog: Option[WatchdogConfig] = None
 
   override def useUnifiedSequencer: Boolean = false
 
-  override def devVersionSupport: Boolean = false
 }

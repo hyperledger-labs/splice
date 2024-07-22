@@ -4,22 +4,17 @@
 package com.digitalasset.canton.platform.indexer.parallel
 
 import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.data.{ImmArray, Ref, Time}
-import com.daml.lf.transaction.TransactionNodeStatistics.EmptyActions
-import com.daml.lf.transaction.{
-  CommittedTransaction,
-  TransactionNodeStatistics,
-  TransactionVersion,
-  VersionedTransaction,
-}
 import com.daml.metrics.DatabaseMetrics
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.Update
-import com.digitalasset.canton.ledger.participant.state.v2 as state
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.{
+  DomainIndex,
+  RequestIndex,
+  SequencerIndex,
+  Update,
+}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.indexer.ha.TestConnection
 import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.Batch
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
@@ -27,6 +22,15 @@ import com.digitalasset.canton.platform.store.backend.{DbDto, ParameterStorageBa
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
+import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.transaction.{
+  CommittedTransaction,
+  TransactionVersion,
+  VersionedTransaction,
+}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
@@ -53,17 +57,21 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     is_local = Some(true),
   )
 
+  private val someDomainId: DomainId = DomainId.tryFromString("x::domainid")
+  private val someDomainId2: DomainId = DomainId.tryFromString("x::domainid2")
+
   private val someTime = Instant.now
 
-  private val somePackageUploadRejected = state.Update.PublicPackageUploadRejected(
+  private val somePartyAllocationRejected = state.Update.PartyAllocationRejected(
     submissionId = Ref.SubmissionId.assertFromString("abc"),
+    participantId = Ref.ParticipantId.assertFromString("participant"),
     recordTime = Timestamp.assertFromInstant(someTime),
     rejectionReason = "reason",
   )
 
-  private def offset(s: String): Offset = Offset.fromHexString(Ref.HexString.assertFromString(s))
+  private def offset(l: Long): Offset = Offset.fromLong(l)
 
-  private val metrics = Metrics.ForTesting
+  private val metrics = LedgerApiServerMetrics.ForTesting
 
   private val someEventCreated = DbDto.EventCreate(
     event_offset = "",
@@ -78,6 +86,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     contract_id = "1",
     template_id = "",
     package_name = "",
+    package_version = None,
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
     create_argument = Array.empty,
@@ -135,6 +144,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     contract_id = "",
     template_id = "",
     package_name = "",
+    package_version = None,
     flat_event_witnesses = Set.empty,
     create_argument = Array.empty,
     create_signatories = Set.empty,
@@ -176,15 +186,15 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
   )
 
   private val offsetsAndUpdates =
-    Vector("00", "01", "02")
+    Vector(1L, 2L, 3L)
       .map(offset)
       .zip(
         Vector(
-          somePackageUploadRejected,
-          somePackageUploadRejected
-            .copy(recordTime = somePackageUploadRejected.recordTime.addMicros(1000)),
-          somePackageUploadRejected
-            .copy(recordTime = somePackageUploadRejected.recordTime.addMicros(2000)),
+          somePartyAllocationRejected,
+          somePartyAllocationRejected
+            .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(1000)),
+          somePartyAllocationRejected
+            .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(2000)),
         ).map(Traced[Update])
       )
 
@@ -198,13 +208,13 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       logger,
     )(
       List(
-        Offset.fromHexString(Ref.HexString.assertFromString("00")),
-        Offset.fromHexString(Ref.HexString.assertFromString("01")),
-        Offset.fromHexString(Ref.HexString.assertFromString("02")),
+        Offset.fromLong(1),
+        Offset.fromLong(2),
+        Offset.fromLong(3),
       ).zip(offsetsAndUpdates.map(_._2))
     )
     val expected = Batch[Vector[DbDto]](
-      lastOffset = offset("02"),
+      lastOffset = offset(3),
       lastSeqEventId = 0,
       lastStringInterningId = 0,
       lastRecordTime = someTime.plusMillis(2).toEpochMilli,
@@ -231,14 +241,10 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
 
     val timestamp: Long = 12345
     val offset = Ref.HexString.assertFromString("02")
-    val statistics = TransactionNodeStatistics(
-      EmptyActions.copy(creates = 2),
-      EmptyActions.copy(consumingExercisesByCid = 1),
-    )
-
     val someHash = Hash.hashPrivateKey("p0")
 
-    val someRecordTime = Time.Timestamp.assertFromString("2000-01-01T00:00:00.000000Z")
+    val someRecordTime =
+      Time.Timestamp.assertFromInstant(Instant.parse("2000-01-01T00:00:00.000000Z"))
 
     val someCompletionInfo = state.CompletionInfo(
       actAs = Nil,
@@ -246,7 +252,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       commandId = Ref.CommandId.assertFromString("c0"),
       optDeduplicationPeriod = None,
       submissionId = None,
-      statistics = Some(statistics),
+      messageUuid = None,
     )
     val someTransactionMeta = state.TransactionMeta(
       ledgerEffectiveTime = Time.Timestamp.assertFromLong(2),
@@ -270,12 +276,17 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       hostedWitnesses = Nil,
       contractMetadata = Map.empty,
       domainId = DomainId.tryFromString("da::default"),
+      Some(
+        DomainIndex.of(
+          RequestIndex(RequestCounter(1), Some(SequencerCounter(1)), CantonTimestamp.now())
+        )
+      ),
     )
 
     val expected: Vector[DbDto.TransactionMetering] = Vector(
       DbDto.TransactionMetering(
         application_id = applicationId,
-        action_count = statistics.committed.actions + statistics.rolledBack.actions,
+        action_count = 0,
         metering_timestamp = timestamp,
         ledger_offset = offset,
       )
@@ -323,7 +334,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     )(
       previous = ParallelIndexerSubscription.seqMapperZero(15, 26),
       current = Batch(
-        lastOffset = offset("02"),
+        lastOffset = offset(2),
         lastSeqEventId = 0,
         lastStringInterningId = 0,
         lastRecordTime = someTime.toEpochMilli,
@@ -339,20 +350,20 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
           DbDto.IdFilterNonConsumingInformee(0L, ""),
           someEventCreated,
           someEventCreated,
-          DbDto.TransactionMeta("", "", 0L, 0L),
+          DbDto.TransactionMeta("", "", 0L, "x::sourcedomain", 0L, 0L),
           someParty,
           someEventExercise,
-          DbDto.TransactionMeta("", "", 0L, 0L),
+          DbDto.TransactionMeta("", "", 0L, "x::sourcedomain", 0L, 0L),
           someParty,
           someEventAssign,
           DbDto.IdFilterAssignStakeholder(0L, "", ""),
           DbDto.IdFilterAssignStakeholder(0L, "", ""),
-          DbDto.TransactionMeta("", "", 0L, 0L),
+          DbDto.TransactionMeta("", "", 0L, "x::sourcedomain", 0L, 0L),
           someParty,
           someEventUnassign,
           DbDto.IdFilterUnassignStakeholder(0L, "", ""),
           DbDto.IdFilterUnassignStakeholder(0L, "", ""),
-          DbDto.TransactionMeta("", "", 0L, 0L),
+          DbDto.TransactionMeta("", "", 0L, "x::sourcedomain", 0L, 0L),
           someParty,
         ),
         batchSize = 3,
@@ -414,7 +425,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     val result = ParallelIndexerSubscription.seqMapper(_ => Nil, metrics)(
       ParallelIndexerSubscription.seqMapperZero(15, 25),
       Batch(
-        lastOffset = offset("02"),
+        lastOffset = offset(2),
         lastSeqEventId = 0,
         lastStringInterningId = 0,
         lastRecordTime = someTime.toEpochMilli,
@@ -440,7 +451,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       batchF = _ => "bumm"
     )(
       Batch(
-        lastOffset = offset("02"),
+        lastOffset = offset(2),
         lastSeqEventId = 0,
         lastRecordTime = someTime.toEpochMilli,
         lastStringInterningId = 0,
@@ -456,7 +467,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       )
     )
     result shouldBe Batch(
-      lastOffset = offset("02"),
+      lastOffset = offset(2),
       lastSeqEventId = 0,
       lastStringInterningId = 0,
       lastRecordTime = someTime.toEpochMilli,
@@ -492,7 +503,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     }
 
     val inBatch = Batch(
-      lastOffset = offset("05"),
+      lastOffset = offset(2),
       lastSeqEventId = 2000,
       lastStringInterningId = 300,
       lastRecordTime = someTime.toEpochMilli,
@@ -512,7 +523,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
 
     outBatch shouldBe
       Batch(
-        lastOffset = offset("05"),
+        lastOffset = offset(2),
         lastSeqEventId = 2000,
         lastStringInterningId = 300,
         lastRecordTime = someTime.toEpochMilli,
@@ -526,37 +537,20 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
   behavior of "ingestTail"
 
   it should "apply ingestTailFunction on the last batch and forward the batch of batches" in {
-    val connection = new TestConnection
-    val dbDispatcher = new DbDispatcher {
-
-      override def executeSql[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
-          loggingContext: LoggingContextWithTrace
-      ): Future[T] =
-        Future.successful(sql(connection))
-
-      override val executor = new QueueAwareExecutor with NamedExecutor {
-        override def queueSize: Long = 0
-        override def name: String = "test"
-      }
-    }
-
     val ledgerEnd = ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset("05"),
+      lastOffset = offset(5),
       lastEventSeqId = 2000,
       lastStringInterningId = 300,
     )
 
     val secondBatchLedgerEnd = ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset("06"),
+      lastOffset = offset(6),
       lastEventSeqId = 3000,
       lastStringInterningId = 400,
     )
 
-    val ingestTailFunction: LedgerEnd => Connection => Unit = {
-      case `secondBatchLedgerEnd` => {
-        case `connection` => ()
-        case otherConnection => fail(s"Unexpected connection: $otherConnection")
-      }
+    val storeLedgerEndF: (LedgerEnd, Map[DomainId, DomainIndex]) => Future[Unit] = {
+      case (`secondBatchLedgerEnd`, _) => Future.unit
       case otherLedgerEnd => fail(s"Unexpected ledger end: $otherLedgerEnd")
     }
 
@@ -581,7 +575,10 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
     )
 
     val outBatchF =
-      ParallelIndexerSubscription.ingestTail(ingestTailFunction, dbDispatcher, metrics, logger)(
+      ParallelIndexerSubscription.ingestTail(
+        storeLedgerEndF,
+        logger,
+      )(
         traceContext
       )(batchOfBatches)
 
@@ -594,7 +591,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
   it should "populate correct ledger-end from batch in happy path case" in {
     ParallelIndexerSubscription.ledgerEndFrom(
       Batch(
-        lastOffset = offset("05"),
+        lastOffset = offset(5),
         lastSeqEventId = 2000,
         lastStringInterningId = 300,
         lastRecordTime = someTime.toEpochMilli,
@@ -604,9 +601,96 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
         offsetsUpdates = Vector.empty,
       )
     ) shouldBe ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset("05"),
+      lastOffset = offset(5),
       lastEventSeqId = 2000,
       lastStringInterningId = 300,
+    )
+  }
+
+  behavior of "domainLedgerEndFromBatch"
+
+  private val someSequencerIndex1 = SequencerIndex(
+    counter = SequencerCounter(11),
+    timestamp = CantonTimestamp.ofEpochMicro(123),
+  )
+  private val someSequencerIndex2 = SequencerIndex(
+    counter = SequencerCounter(20),
+    timestamp = CantonTimestamp.ofEpochMicro(256),
+  )
+  private val someRequestIndex1 = RequestIndex(
+    counter = RequestCounter(5),
+    sequencerCounter = Some(SequencerCounter(15)),
+    timestamp = CantonTimestamp.ofEpochMicro(153),
+  )
+  private val someRequestIndex2 = RequestIndex(
+    counter = RequestCounter(6),
+    sequencerCounter = None,
+    timestamp = CantonTimestamp.ofEpochMicro(156),
+  )
+
+  it should "populate correct ledger-end from batches for a sequencer counter moved" in {
+    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+      Vector(someDomainId -> DomainIndex.of(someSequencerIndex1))
+    ) shouldBe Map(
+      someDomainId -> DomainIndex.of(someSequencerIndex1)
+    )
+  }
+
+  it should "populate correct ledger-end from batches for a request counter moved" in {
+    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+      Vector(someDomainId -> DomainIndex.of(someRequestIndex1))
+    ) shouldBe Map(
+      someDomainId -> DomainIndex.of(someRequestIndex1)
+    )
+  }
+
+  it should "populate correct ledger-end from batches for a mixed batch" in {
+    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+      Vector(
+        someDomainId -> DomainIndex.of(someSequencerIndex1),
+        someDomainId -> DomainIndex.of(someSequencerIndex2),
+        someDomainId2 -> DomainIndex.of(someRequestIndex1),
+        someDomainId2 -> DomainIndex.of(someRequestIndex2),
+      )
+    ) shouldBe Map(
+      someDomainId -> DomainIndex(
+        None,
+        Some(someSequencerIndex2),
+      ),
+      someDomainId2 -> DomainIndex(
+        Some(someRequestIndex2),
+        Some(
+          SequencerIndex(
+            counter = SequencerCounter(15),
+            timestamp = CantonTimestamp.ofEpochMicro(153),
+          )
+        ),
+      ),
+    )
+  }
+
+  it should "populate correct ledger-end from batches for a mixed batch 2" in {
+    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+      Vector(
+        someDomainId -> DomainIndex.of(someSequencerIndex1),
+        someDomainId -> DomainIndex.of(someRequestIndex1),
+        someDomainId2 -> DomainIndex.of(someSequencerIndex1),
+        someDomainId2 -> DomainIndex.of(someRequestIndex2),
+      )
+    ) shouldBe Map(
+      someDomainId -> DomainIndex(
+        Some(someRequestIndex1),
+        Some(
+          SequencerIndex(
+            counter = SequencerCounter(15),
+            timestamp = CantonTimestamp.ofEpochMicro(153),
+          )
+        ),
+      ),
+      someDomainId2 -> DomainIndex(
+        Some(someRequestIndex2),
+        Some(someSequencerIndex1),
+      ),
     )
   }
 

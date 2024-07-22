@@ -47,16 +47,9 @@ trait BaseSequencerDriverApiTest[ConfigType]
 
   protected final def domainId: DomainId = DefaultTestIdentities.domainId
 
-  protected final def mediatorId: MediatorId = DefaultTestIdentities.mediator
+  protected final def mediatorId: MediatorId = DefaultTestIdentities.daMediator
 
-  protected final def topologyClientMember: Member = DefaultTestIdentities.sequencerId
-
-  private val topologyFactory =
-    new TestingIdentityFactoryX(
-      topology = TestingTopologyX(),
-      loggerFactory,
-      List.empty,
-    )
+  private val topologyFactory = TestingTopology().build(loggerFactory)
   private val topologyClient =
     topologyFactory.forOwnerAndDomain(owner = mediatorId, domainId)
 
@@ -72,7 +65,6 @@ trait BaseSequencerDriverApiTest[ConfigType]
   protected def createDriver(
       timeProvider: TimeProvider = timeProvider,
       firstBlockHeight: Option[Long] = None,
-      domainTopologyManagerId: String = "da::tluafed",
       topologyClient: DomainSyncCryptoClient = topologyClient,
   ): SequencerDriver
 }

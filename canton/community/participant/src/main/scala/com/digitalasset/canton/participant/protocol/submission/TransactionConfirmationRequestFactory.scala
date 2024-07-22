@@ -13,7 +13,8 @@ import com.digitalasset.canton.config.LoggingConfig
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.data.*
-import com.digitalasset.canton.ledger.participant.state.v2.SubmitterInfo
+import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
@@ -29,13 +30,12 @@ import com.digitalasset.canton.participant.protocol.validation.{
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.sequencing.protocol.{MediatorsOfDomain, OpenEnvelope}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, OpenEnvelope}
 import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -66,11 +66,10 @@ class TransactionConfirmationRequestFactory(
     */
   def createConfirmationRequest(
       wfTransaction: WellFormedTransaction[WithoutSuffixes],
-      confirmationPolicy: ConfirmationPolicy,
       submitterInfo: SubmitterInfo,
       workflowId: Option[WorkflowId],
       keyResolver: LfKeyResolver,
-      mediator: MediatorsOfDomain,
+      mediator: MediatorGroupRecipient,
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
       contractInstanceOfId: SerializableContractOfId,
@@ -80,7 +79,7 @@ class TransactionConfirmationRequestFactory(
   )(implicit
       traceContext: TraceContext
   ): EitherT[
-    Future,
+    FutureUnlessShutdown,
     TransactionConfirmationRequestCreationError,
     TransactionConfirmationRequest,
   ] = {
@@ -90,7 +89,9 @@ class TransactionConfirmationRequestFactory(
     val keySeed = optKeySeed.getOrElse(createDefaultSeed(cryptoSnapshot.pureCrypto))
 
     for {
-      _ <- assertSubmittersNodeAuthorization(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot)
+      _ <- assertSubmittersNodeAuthorization(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
 
       // Starting with Daml 1.6.0, the daml engine performs authorization validation.
 
@@ -100,7 +101,6 @@ class TransactionConfirmationRequestFactory(
         .createTransactionTree(
           wfTransaction,
           submitterInfo,
-          confirmationPolicy,
           workflowId,
           mediator,
           transactionSeed,
@@ -115,7 +115,7 @@ class TransactionConfirmationRequestFactory(
 
       rootViews = transactionTree.rootViews.unblindedElements.toList
       inputContracts = ExtractUsedContractsFromRootViews(rootViews)
-      _ <- EitherT.fromEither[Future](
+      _ <- EitherT.fromEither[FutureUnlessShutdown](
         ContractConsistencyChecker
           .assertInputContractsInPast(inputContracts, ledgerTime)
           .leftMap(errs => ContractConsistencyError(errs))
@@ -144,7 +144,11 @@ class TransactionConfirmationRequestFactory(
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionConfirmationRequestCreationError, TransactionConfirmationRequest] =
+  ): EitherT[
+    FutureUnlessShutdown,
+    TransactionConfirmationRequestCreationError,
+    TransactionConfirmationRequest,
+  ] =
     for {
       transactionViewEnvelopes <- createTransactionViewEnvelopes(
         transactionTree,
@@ -212,7 +216,7 @@ class TransactionConfirmationRequestFactory(
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionConfirmationRequestCreationError, List[
+  ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, List[
     OpenEnvelope[TransactionViewMessage]
   ]] = {
     val pureCrypto = cryptoSnapshot.pureCrypto
@@ -221,7 +225,7 @@ class TransactionConfirmationRequestFactory(
         vt: LightTransactionViewTree,
         seed: SecureRandomness,
         witnesses: Witnesses,
-    ): EitherT[Future, TransactionConfirmationRequestCreationError, OpenEnvelope[
+    ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, OpenEnvelope[
       TransactionViewMessage
     ]] =
       for {
@@ -239,12 +243,13 @@ class TransactionConfirmationRequestFactory(
           .leftMap[TransactionConfirmationRequestCreationError](e =>
             RecipientsCreationError(e.message)
           )
+          .mapK(FutureUnlessShutdown.outcomeK)
       } yield OpenEnvelope(viewMessage, recipients)(protocolVersion)
 
     for {
-      lightTreesWithMetadata <- EitherT.fromEither[Future](
+      lightTreesWithMetadata <- EitherT.fromEither[FutureUnlessShutdown](
         transactionTree
-          .allLightTransactionViewTreesWithWitnessesAndSeeds(keySeed, pureCrypto)
+          .allLightTransactionViewTreesWithWitnessesAndSeeds(keySeed, pureCrypto, protocolVersion)
           .leftMap(KeySeedError)
       )
 

@@ -10,6 +10,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ViewType
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.RecipientsInfo
 import com.digitalasset.canton.protocol.messages.{EncryptedView, EncryptedViewMessage}
@@ -18,9 +19,7 @@ import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
-import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -35,7 +34,7 @@ object EncryptedViewMessageFactory {
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] = {
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] = {
 
     val cryptoPureApi = cryptoSnapshot.pureCrypto
 
@@ -45,12 +44,17 @@ object EncryptedViewMessageFactory {
     val randomness: SecureRandomness =
       optRandomness.getOrElse(cryptoPureApi.generateSecureRandomness(randomnessLength))
 
-    val informeeParties = viewTree.informees.map(_.party).toList
+    val informeeParties = viewTree.informees.toList
 
     def eitherT[B](
         value: Either[EncryptedViewMessageCreationError, B]
     ): EitherT[Future, EncryptedViewMessageCreationError, B] =
       EitherT.fromEither[Future](value)
+
+    def eitherTUS[B](
+        value: Either[EncryptedViewMessageCreationError, B]
+    ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, B] =
+      EitherT.fromEither[FutureUnlessShutdown](value)
 
     def getRecipientInfo: EitherT[Future, UnableToDetermineParticipant, RecipientsInfo] = {
       for {
@@ -60,10 +64,7 @@ object EncryptedViewMessageFactory {
         partiesWithGroupAddressing <- EitherT.right(
           cryptoSnapshot.ipsSnapshot.partiesWithGroupAddressing(informeeParties)
         )
-      } yield RecipientsInfo(
-        informeeParticipants = informeeParticipants,
-        doNotEncrypt = partiesWithGroupAddressing.nonEmpty,
-      )
+      } yield RecipientsInfo(informeeParticipants = informeeParticipants)
     }
 
     def generateAndEncryptSessionKeyRandomness(
@@ -167,45 +168,25 @@ object EncryptedViewMessageFactory {
         signature: Option[Signature],
         encryptedView: EncryptedView[VT],
     ): EitherT[Future, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] =
-      (if (!recipientsInfo.doNotEncrypt) {
-         for {
-           sessionKeyAndRandomnessMap <- getSessionKey(recipientsInfo)
-           (sessionKey, sessionKeyRandomnessMap) = sessionKeyAndRandomnessMap
-           sessionKeyRandomnessMapNE <- EitherT.fromEither[Future](
-             NonEmpty
-               .from(sessionKeyRandomnessMap)
-               .toRight(
-                 UnableToDetermineSessionKeyRandomness(
-                   "The session key randomness map is empty"
-                 )
-               )
-           )
-           encryptedSessionKeyInfo <- encryptRandomnessWithSessionKey(sessionKey).map(
-             encryptedRandomness => (encryptedRandomness, sessionKeyRandomnessMapNE)
-           )
-         } yield encryptedSessionKeyInfo
-       } else {
-         val encryptedRandomness = Encrypted.fromByteString[SecureRandomness](randomness.unwrap)
-         eitherT(
-           Right(
-             (
-               encryptedRandomness,
-               NonEmpty(
-                 Seq,
-                 AsymmetricEncrypted[SecureRandomness](
-                   ByteString.EMPTY,
-                   AsymmetricEncrypted.noEncryptionFingerprint,
-                 ),
-               ),
-             )
-           )
-         )
-       }).map { case (randomnessV2, sessionKeyMap) =>
+      for {
+        sessionKeyAndRandomnessMap <- getSessionKey(recipientsInfo)
+        (sessionKey, sessionKeyRandomnessMap) = sessionKeyAndRandomnessMap
+        sessionKeyRandomnessMapNE <- EitherT.fromEither[Future](
+          NonEmpty
+            .from(sessionKeyRandomnessMap)
+            .toRight(
+              UnableToDetermineSessionKeyRandomness(
+                "The session key randomness map is empty"
+              )
+            )
+        )
+        encryptedRandomness <- encryptRandomnessWithSessionKey(sessionKey)
+      } yield {
         EncryptedViewMessage[VT](
           signature,
           viewTree.viewHash,
-          randomnessV2,
-          sessionKeyMap,
+          encryptedRandomness,
+          sessionKeyRandomnessMapNE,
           encryptedView,
           viewTree.domainId,
           viewEncryptionScheme,
@@ -215,7 +196,9 @@ object EncryptedViewMessageFactory {
 
     def encryptRandomnessWithSessionKey(
         sessionKey: SymmetricKey
-    ): EitherT[Future, EncryptedViewMessageCreationError, Encrypted[SecureRandomness]] =
+    ): EitherT[Future, EncryptedViewMessageCreationError, Encrypted[
+      SecureRandomness
+    ]] =
       eitherT(
         cryptoPureApi
           .encryptWith(randomness, sessionKey, protocolVersion)
@@ -223,27 +206,29 @@ object EncryptedViewMessageFactory {
       )
 
     for {
-      symmetricViewKeyRandomness <- eitherT(
+      symmetricViewKeyRandomness <- eitherTUS(
         cryptoPureApi
           .computeHkdf(randomness.unwrap, viewKeyLength, HkdfInfo.ViewKey)
           .leftMap(FailedToExpandKey)
       )
-      symmetricViewKey <- eitherT(
+      symmetricViewKey <- eitherTUS(
         cryptoPureApi
           .createSymmetricKey(symmetricViewKeyRandomness, viewEncryptionScheme)
           .leftMap(FailedToCreateEncryptionKey)
       )
-      recipientsInfo <- getRecipientInfo
+      recipientsInfo <- getRecipientInfo.mapK(FutureUnlessShutdown.outcomeK)
       signature <- viewTree.toBeSigned
         .parTraverse(rootHash =>
           cryptoSnapshot.sign(rootHash.unwrap).leftMap(FailedToSignViewMessage)
         )
-      encryptedView <- eitherT(
+      encryptedView <- eitherTUS(
         EncryptedView
-          .compressed[VT](cryptoPureApi, symmetricViewKey, viewType, protocolVersion)(viewTree)
+          .compressed[VT](cryptoPureApi, symmetricViewKey, viewType)(viewTree)
           .leftMap(FailedToEncryptViewMessage)
       )
-      message <- createEncryptedViewMessage(recipientsInfo, signature, encryptedView)
+      message <- createEncryptedViewMessage(recipientsInfo, signature, encryptedView).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
     } yield message
   }
 
@@ -268,7 +253,6 @@ object EncryptedViewMessageFactory {
           cryptoSnapshot.domainId,
         ): EncryptedViewMessageCreationError
       }
-      .map(_.toMap)
 
   sealed trait EncryptedViewMessageCreationError
       extends Product

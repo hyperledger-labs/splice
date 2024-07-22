@@ -3,18 +3,18 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import com.daml.lf.transaction.Versioned
-import com.daml.lf.value.Value
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{Salt, TestSalt}
 import com.digitalasset.canton.data.{CantonTimestamp, ViewPosition}
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
-import com.digitalasset.canton.util.LfTransactionBuilder.defaultTemplateId
+import com.digitalasset.canton.util.LfTransactionBuilder.{defaultPackageName, defaultTemplateId}
 import com.digitalasset.canton.{BaseTest, LfPackageName, LfPartyId, protocol}
+import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.value.Value
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -39,7 +39,9 @@ class SerializableContractAuthenticatorImplTest extends AnyWordSpec with BaseTes
           val nonAuthenticatedContractId = ExampleTransactionFactory.suffixedId(1, 2)
           contractAuthenticator.authenticate(
             contract.copy(contractId = nonAuthenticatedContractId)
-          ) shouldBe Right(())
+          ) shouldBe Left(
+            "Unsupported contract authentication id scheme: Suffix 0002 does not start with one of the supported prefixes: Bytes(ca10)"
+          )
         }
       }
 
@@ -170,6 +172,7 @@ class SerializableContractAuthenticatorImplTest extends AnyWordSpec with BaseTes
             key = LfGlobalKey.assertBuild(
               defaultTemplateId,
               Value.ValueInt64(0),
+              defaultPackageName,
             ),
             maintainers = maintainers,
           )
@@ -229,7 +232,8 @@ class SerializableContractAuthenticatorImplTest extends AnyWordSpec with BaseTes
 class WithContractAuthenticator(contractIdVersion: CantonContractIdVersion) extends BaseTest {
   protected lazy val unicumGenerator = new UnicumGenerator(new SymbolicPureCrypto())
   protected lazy val contractAuthenticator = new SerializableContractAuthenticatorImpl(
-    unicumGenerator
+    unicumGenerator,
+    false,
   )
 
   protected lazy val contractInstance = ExampleTransactionFactory.contractInstance()
@@ -244,7 +248,7 @@ class WithContractAuthenticator(contractIdVersion: CantonContractIdVersion) exte
     ContractMetadata.tryCreate(signatories, signatories ++ observers, Some(contractKey))
   protected lazy val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
     domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::da")),
-    mediator = MediatorsOfDomain(MediatorGroupIndex.one),
+    mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
     transactionUuid = new UUID(1L, 1L),
     viewPosition = ViewPosition(List.empty),
     viewParticipantDataSalt = TestSalt.generateSalt(1),
@@ -277,7 +281,9 @@ class WithContractAuthenticator(contractIdVersion: CantonContractIdVersion) exte
         ExampleTransactionFactory.asSerializableRaw(contractInstance),
       testedSignatories: Set[LfPartyId] = signatories,
       testedObservers: Set[LfPartyId] = observers,
-      testedContractKey: Option[Versioned[protocol.LfGlobalKeyWithMaintainers]] = Some(contractKey),
+      testedContractKey: Option[Versioned[protocol.LfGlobalKeyWithMaintainers]] = Some(
+        contractKey
+      ),
   ): Assertion = {
     val recomputedUnicum = unicumGenerator
       .recomputeUnicum(

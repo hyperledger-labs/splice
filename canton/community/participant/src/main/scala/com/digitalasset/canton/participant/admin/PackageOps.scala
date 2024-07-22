@@ -5,8 +5,8 @@ package com.digitalasset.canton.participant.admin
 
 import cats.data.EitherT
 import cats.implicits.toBifunctorOps
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import com.daml.lf.data.Ref.PackageId
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -22,22 +22,20 @@ import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerEr
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.IdentityManagerParentError
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.{
-  AuthorizedTopologyManagerX,
-  ParticipantId,
-  UniqueIdentifier,
-}
+import com.digitalasset.canton.topology.{AuthorizedTopologyManager, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.daml.lf.data.Ref.PackageId
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageOps extends NamedLogging {
   def isPackageVetted(packageId: PackageId)(implicit
       tc: TraceContext
-  ): EitherT[Future, CantonError, Boolean]
+  ): EitherT[FutureUnlessShutdown, CantonError, Boolean]
 
   def checkPackageUnused(packageId: PackageId)(implicit
       tc: TraceContext
@@ -45,7 +43,7 @@ trait PackageOps extends NamedLogging {
 
   def vetPackages(
       packages: Seq[PackageId],
-      synchronize: Boolean,
+      synchronizeVetting: PackageVettingSynchronization,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit]
@@ -59,13 +57,19 @@ trait PackageOps extends NamedLogging {
   ): EitherT[FutureUnlessShutdown, CantonError, Unit]
 }
 
-abstract class PackageOpsCommon(
-    participantId: ParticipantId,
-    headAuthorizedTopologySnapshot: TopologySnapshot,
+class PackageOpsImpl(
+    val participantId: ParticipantId,
+    val headAuthorizedTopologySnapshot: TopologySnapshot,
     stateManager: SyncDomainPersistentStateManager,
-)(implicit
-    val ec: ExecutionContext
-) extends PackageOps {
+    topologyManager: AuthorizedTopologyManager,
+    nodeId: UniqueIdentifier,
+    initialProtocolVersion: ProtocolVersion,
+    val loggerFactory: NamedLoggerFactory,
+    val timeouts: ProcessingTimeout,
+)(implicit val ec: ExecutionContext)
+    extends PackageOps
+    with FlagCloseable {
+
   override def checkPackageUnused(packageId: PackageId)(implicit
       tc: TraceContext
   ): EitherT[Future, PackageInUse, Unit] =
@@ -83,9 +87,10 @@ abstract class PackageOpsCommon(
         )
       }
 
+  /** @return true if the authorized snapshot, or any domain snapshot has the package vetted */
   override def isPackageVetted(
       packageId: PackageId
-  )(implicit tc: TraceContext): EitherT[Future, CantonError, Boolean] = {
+  )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, CantonError, Boolean] = {
     // Use the aliasManager to query all domains, even those that are currently disconnected
     val snapshotsForDomains: List[TopologySnapshot] =
       stateManager.getAll.view.keys
@@ -97,39 +102,32 @@ abstract class PackageOpsCommon(
       .parTraverse { snapshot =>
         snapshot
           .findUnvettedPackagesOrDependencies(participantId, Set(packageId))
-          .map { pkgId =>
-            val isVetted = pkgId.isEmpty
-            isVetted
-          }
+          .map(_.isEmpty)
       }
 
     packageIsVettedOn.bimap(PackageMissingDependencies.Reject(packageId, _), _.contains(true))
   }
-}
 
-// TODO(#15161) collapse with PackageOpsCommon
-class PackageOpsX(
-    val participantId: ParticipantId,
-    val headAuthorizedTopologySnapshot: TopologySnapshot,
-    manager: SyncDomainPersistentStateManager,
-    topologyManager: AuthorizedTopologyManagerX,
-    nodeId: UniqueIdentifier,
-    initialProtocolVersion: ProtocolVersion,
-    val loggerFactory: NamedLoggerFactory,
-    val timeouts: ProcessingTimeout,
-)(implicit override val ec: ExecutionContext)
-    extends PackageOpsCommon(participantId, headAuthorizedTopologySnapshot, manager)
-    with FlagCloseable {
-
-  override def vetPackages(packages: Seq[PackageId], synchronize: Boolean)(implicit
+  override def vetPackages(
+      packages: Seq[PackageId],
+      synchronizeVetting: PackageVettingSynchronization,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
-    modifyVettedPackages { existingPackages =>
-      // Keep deterministic order for testing and keep optimal O(n)
-      val existingPackagesSet = existingPackages.toSet
-      val packagesToBeAdded = packages.filterNot(existingPackagesSet)
-      existingPackages ++ packagesToBeAdded
-    }
+    val packagesToBeAdded = new AtomicReference[Seq[PackageId]](List.empty)
+    for {
+      newVettedPackagesCreated <- modifyVettedPackages { existingPackages =>
+        // Keep deterministic order for testing and keep optimal O(n)
+        val existingPackagesSet = existingPackages.toSet
+        packagesToBeAdded.set(packages.filterNot(existingPackagesSet))
+        existingPackages ++ packagesToBeAdded.get
+      }
+      // only synchronize with the connected domains if a new VettedPackages transaction was actually issued
+      _ <- EitherTUtil.ifThenET(newVettedPackagesCreated) {
+        synchronizeVetting.sync(packagesToBeAdded.get.toSet)
+      }
+    } yield ()
+
   }
 
   override def revokeVettingForPackages(
@@ -139,14 +137,15 @@ class PackageOpsX(
   )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, CantonError, Unit] = {
     val packagesToUnvet = packages.toSet
 
-    modifyVettedPackages(_.filterNot(packagesToUnvet)).leftWiden
+    modifyVettedPackages(_.filterNot(packagesToUnvet)).leftWiden[CantonError].void
   }
 
+  /** Returns true if a new VettedPackages transaction was authorized. */
   def modifyVettedPackages(
       action: Seq[LfPackageId] => Seq[LfPackageId]
   )(implicit
       tc: TraceContext
-  ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Boolean] = {
     // TODO(#14069) this vetting extension might fail on concurrent requests
 
     for {
@@ -157,13 +156,13 @@ class PackageOpsX(
               asOf = CantonTimestamp.MaxValue,
               asOfInclusive = true,
               isProposal = false,
-              types = Seq(VettedPackagesX.code),
+              types = Seq(VettedPackages.code),
               filterUid = Some(Seq(nodeId)),
               filterNamespace = None,
             )
             .map { result =>
               result
-                .collectOfMapping[VettedPackagesX]
+                .collectOfMapping[VettedPackages]
                 .result
                 .lastOption
             }
@@ -178,15 +177,15 @@ class PackageOpsX(
         performUnlessClosingEitherUSF(functionFullName)(
           topologyManager
             .proposeAndAuthorize(
-              op = TopologyChangeOpX.Replace,
-              mapping = VettedPackagesX(
+              op = TopologyChangeOp.Replace,
+              mapping = VettedPackages(
                 participantId = participantId,
                 domainId = None,
                 newVettedPackagesState,
               ),
               serial = nextSerial,
               // TODO(#12390) auto-determine signing keys
-              signingKeys = Seq(participantId.uid.namespace.fingerprint),
+              signingKeys = Seq(participantId.fingerprint),
               protocolVersion = initialProtocolVersion,
               expectFullAuthorization = true,
             )
@@ -194,6 +193,6 @@ class PackageOpsX(
             .map(_ => ())
         )
       }
-    } yield ()
+    } yield newVettedPackagesState != currentPackages
   }
 }

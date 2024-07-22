@@ -9,7 +9,12 @@ import org.scalatest.wordspec.AsyncWordSpec
 class SequencerStoreTestInMemory extends AsyncWordSpec with BaseTest with SequencerStoreTest {
   "InMemorySequencerStore" should {
     behave like sequencerStore(() =>
-      new InMemorySequencerStore(testedProtocolVersion, loggerFactory)
+      new InMemorySequencerStore(
+        protocolVersion = testedProtocolVersion,
+        sequencerMember = sequencerMember,
+        unifiedSequencer = testedUseUnifiedSequencer,
+        loggerFactory = loggerFactory,
+      )
     )
   }
 }

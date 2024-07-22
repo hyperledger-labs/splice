@@ -13,7 +13,7 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.client.*
-import com.digitalasset.canton.topology.store.{TopologyStoreId, TopologyStoreX}
+import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, MemberCode, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -23,20 +23,24 @@ import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
 
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class GrpcTopologyAggregationServiceCommon[
-    Store <: TopologyStoreX[TopologyStoreId.DomainStore]
-](
-    stores: => Seq[Store],
+class GrpcTopologyAggregationService(
+    stores: => Seq[TopologyStore[TopologyStoreId.DomainStore]],
     ips: IdentityProvidingServiceClient,
     val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends v30.TopologyAggregationServiceGrpc.TopologyAggregationService
     with NamedLogging {
 
-  protected def getTopologySnapshot(
+  private def getTopologySnapshot(
       asOf: CantonTimestamp,
-      store: Store,
-  ): TopologySnapshotLoader
+      store: TopologyStore[TopologyStoreId.DomainStore],
+  ): TopologySnapshotLoader =
+    new StoreBasedTopologySnapshot(
+      asOf,
+      store,
+      StoreBasedDomainTopologyClient.NoPackageDependencies,
+      loggerFactory,
+    )
 
   private def snapshots(filterStore: String, asOf: Option[ProtoTimestamp])(implicit
       traceContext: TraceContext
@@ -127,7 +131,7 @@ abstract class GrpcTopologyAggregationServiceCommon[
             party = partyId.toProtoPrimitive,
             participants = participants.map { case (participantId, domains) =>
               v30.ListPartiesResponse.Result.ParticipantDomains(
-                participant = participantId.toProtoPrimitive,
+                participantUid = participantId.uid.toProtoPrimitive,
                 domains = domains.map { case (domainId, permission) =>
                   v30.ListPartiesResponse.Result.ParticipantDomains.DomainPermissions(
                     domain = domainId.toProtoPrimitive,
@@ -180,26 +184,4 @@ abstract class GrpcTopologyAggregationServiceCommon[
     }
     CantonGrpcUtil.mapErrNew(res)
   }
-}
-
-class GrpcTopologyAggregationServiceX(
-    stores: => Seq[TopologyStoreX[TopologyStoreId.DomainStore]],
-    ips: IdentityProvidingServiceClient,
-    loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext)
-    extends GrpcTopologyAggregationServiceCommon[TopologyStoreX[TopologyStoreId.DomainStore]](
-      stores,
-      ips,
-      loggerFactory,
-    ) {
-  override protected def getTopologySnapshot(
-      asOf: CantonTimestamp,
-      store: TopologyStoreX[TopologyStoreId.DomainStore],
-  ): TopologySnapshotLoader =
-    new StoreBasedTopologySnapshotX(
-      asOf,
-      store,
-      StoreBasedDomainTopologyClient.NoPackageDependencies,
-      loggerFactory,
-    )
 }

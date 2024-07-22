@@ -11,7 +11,7 @@ import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.protocol.CanSubmitTransfer
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.TransferProcessorError
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.sequencing.protocol.{MediatorsOfDomain, TimeProof}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, TimeProof}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,7 +37,7 @@ final case class TransferOutRequest(
     contract: SerializableContract,
     sourceDomain: SourceDomainId,
     sourceProtocolVersion: SourceProtocolVersion,
-    sourceMediator: MediatorsOfDomain,
+    sourceMediator: MediatorGroupRecipient,
     targetDomain: TargetDomainId,
     targetProtocolVersion: TargetProtocolVersion,
     targetTimeProof: TimeProof,
@@ -68,8 +68,8 @@ final case class TransferOutRequest(
     val view = TransferOutView
       .create(hashOps)(
         viewSalt,
-        creatingTransactionId,
         contract,
+        creatingTransactionId,
         targetDomain,
         targetTimeProof,
         sourceProtocolVersion,
@@ -77,7 +77,7 @@ final case class TransferOutRequest(
         transferCounter,
       )
 
-    FullTransferOutTree(TransferOutViewTree(commonData, view, sourceProtocolVersion.v, hashOps))
+    FullTransferOutTree(TransferOutViewTree(commonData, view, sourceProtocolVersion, hashOps))
   }
 }
 
@@ -92,7 +92,7 @@ object TransferOutRequest {
       stakeholders: Set[LfPartyId],
       sourceDomain: SourceDomainId,
       sourceProtocolVersion: SourceProtocolVersion,
-      sourceMediator: MediatorsOfDomain,
+      sourceMediator: MediatorGroupRecipient,
       targetDomain: TargetDomainId,
       targetProtocolVersion: TargetProtocolVersion,
       sourceTopology: TopologySnapshot,

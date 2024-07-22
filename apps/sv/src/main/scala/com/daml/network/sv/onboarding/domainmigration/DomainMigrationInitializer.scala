@@ -9,9 +9,11 @@ import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   BaseLedgerConnection,
   SpliceLedgerClient,
+  MediatorAdminConnection,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  StatusAdminConnection,
 }
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions as http
@@ -26,13 +28,14 @@ import com.daml.network.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboard
 import com.daml.network.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
 import com.daml.network.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil, SetupUtil}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
-  SynchronizerNodeInitializer,
   loadDomainMigrationDump,
+  SynchronizerNodeInitializer,
 }
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -150,7 +153,7 @@ class DomainMigrationInitializer(
         ledgerClient,
       )
       _ <- SetupUtil
-        .grantSvUserRightReadAsDso(
+        .grantSvUserRightActAsDso(
           svAutomation.connection,
           config.ledgerApiUser,
           svStore.key.dsoParty,
@@ -240,6 +243,9 @@ class DomainMigrationInitializer(
     } yield {}
   }
 
+  private val mediatorAdminConnection: MediatorAdminConnection =
+    localSynchronizerNode.mediatorAdminConnection
+
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,
       genesisState: ByteString,
@@ -270,7 +276,7 @@ class DomainMigrationInitializer(
           sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
             TopologyStoreId.DomainStore(nodeIdentities.domainId)
           )
-          mediatorTopology <- localSynchronizerNode.mediatorAdminConnection.listAllTransactions(
+          mediatorTopology <- mediatorAdminConnection.listAllTransactions(
             TopologyStoreId.DomainStore(nodeIdentities.domainId)
           )
         } yield {
@@ -306,14 +312,24 @@ class DomainMigrationInitializer(
             _ = logger.info(
               s"Restoring sequencer topology from genesis state"
             )
-            _ <- localSynchronizerNode.sequencerAdminConnection
-              .initializeFromGenesisState(
-                genesisState,
-                localSynchronizerNode.staticDomainParameters,
-              )
+            _ = waitForNodeReadyToInitialize(
+              localSynchronizerNode.sequencerAdminConnection,
+              identity,
+            )
+            _ <- retryProvider.retry(
+              RetryFor.ClientCalls,
+              "init_sequencer_genesis",
+              s"Initialize sequencer ${identity.id} from genesis state",
+              localSynchronizerNode.sequencerAdminConnection
+                .initializeFromGenesisState(
+                  genesisState,
+                  localSynchronizerNode.staticDomainParameters,
+                ),
+              logger,
+            )
             _ <- retryProvider.waitUntil(
               RetryFor.ClientCalls,
-              "init_sequencer",
+              "sequencer_initialized",
               "sequencer is initialized",
               localSynchronizerNode.sequencerAdminConnection.isNodeInitialized().map {
                 initialized =>
@@ -331,7 +347,7 @@ class DomainMigrationInitializer(
       .flatMap { _ =>
         retryProvider.waitUntil(
           RetryFor.ClientCalls,
-          "sequencer_initialized",
+          "sequencer_initialized_id",
           "sequencer is initialized with restored id",
           localSynchronizerNode.sequencerAdminConnection.getSequencerId.map { id =>
             if (id != identity.id) {
@@ -343,6 +359,36 @@ class DomainMigrationInitializer(
           loggerFactory.getTracedLogger(getClass),
         )
       }
+  }
+
+  private def waitForNodeReadyToInitialize(
+      connection: StatusAdminConnection,
+      identityDump: NodeIdentitiesDump,
+  ) = {
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "sequencer_genesis",
+      s"Sequencer ${identityDump.id} is ready to be initialized with the genesis state",
+      connection.getStatus.map {
+        case NodeStatus.Failure(msg) =>
+          throw Status.FAILED_PRECONDITION
+            .withDescription("Sequencer is in failure state: " + msg)
+            .asRuntimeException()
+        case NodeStatus.NotInitialized(_, Some(WaitingForInitialization)) =>
+          logger.info(
+            "Sequencer is in waiting for initialization state, proceeding with genesis import"
+          )
+          ()
+        case NodeStatus.NotInitialized(_, other) =>
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Sequencer is waiting for $other, we can initialize it only when it's ready."
+            )
+            .asRuntimeException()
+        case NodeStatus.Success(_) => ()
+      },
+      logger,
+    )
   }
 
   private def initializeMediator(
@@ -357,22 +403,30 @@ class DomainMigrationInitializer(
         if (isMediatorInitialized) {
           logger.info(s"Mediator is already initialized with id ${identity.id}")
           Future.unit
-        } else
-          synchronizerNodeInitiaizer.mediatorInitializer
-            .initializeFromDump(identity)
-            .flatMap(_ =>
-              localSynchronizerNode.mediatorAdminConnection
+        } else {
+          for {
+            _ <-
+              synchronizerNodeInitiaizer.mediatorInitializer
+                .initializeFromDump(identity)
+            _ <- waitForNodeReadyToInitialize(mediatorAdminConnection, identity)
+            _ <- retryProvider.retry(
+              RetryFor.ClientCalls,
+              "init_mediator",
+              s"Initialize the mediator ${identity.id}",
+              mediatorAdminConnection
                 .initialize(
                   domainId,
-                  localSynchronizerNode.staticDomainParameters,
                   localSynchronizerNode.sequencerConnection,
-                )
+                ),
+              logger,
             )
+          } yield ()
+        }
       _ <- retryProvider.waitUntil(
         RetryFor.ClientCalls,
         "init_mediator",
         "mediator is initialized as expected",
-        localSynchronizerNode.mediatorAdminConnection.getMediatorId.map { id =>
+        mediatorAdminConnection.getMediatorId.map { id =>
           if (id != identity.id) {
             throw Status.INVALID_ARGUMENT
               .withDescription("Mediator is not initialized with dump id")

@@ -3,17 +3,12 @@
 
 package com.digitalasset.canton.platform.store.cache
 
+import cats.data.NonEmptyVector
 import com.daml.ledger.resources.Resource
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.Ref.IdString
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.data.{ImmArray, Ref}
-import com.daml.lf.transaction.{GlobalKey, TransactionVersion, Versioned}
-import com.daml.lf.value.Value.{ContractInstance, ValueRecord, ValueText}
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.ContractState
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.index.ContractState
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStoreSpec.*
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
@@ -22,6 +17,12 @@ import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReade
   KeyUnassigned,
 }
 import com.digitalasset.canton.{HasExecutionContext, TestEssentials}
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref.IdString
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{ImmArray, Ref}
+import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion, Versioned}
+import com.digitalasset.daml.lf.value.Value.{ContractInstance, ValueRecord, ValueText}
 import org.mockito.MockitoSugar
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -42,7 +43,7 @@ class MutableCacheBackedContractStoreSpec
     "update the contract state caches" in {
       val contractStateCaches = mock[ContractStateCaches]
       val contractStore = new MutableCacheBackedContractStore(
-        metrics = Metrics.ForTesting,
+        metrics = LedgerApiServerMetrics.ForTesting,
         contractsReader = mock[LedgerDaoContractsReader],
         contractStateCaches = contractStateCaches,
         loggerFactory = loggerFactory,
@@ -56,7 +57,7 @@ class MutableCacheBackedContractStoreSpec
         eventSequentialId = 1L,
       )
       val event2 = event1.copy(eventSequentialId = 2L)
-      val updateBatch = Vector(event1, event2)
+      val updateBatch = NonEmptyVector.of(event1, event2)
 
       contractStore.contractStateCaches.push(updateBatch)
       verify(contractStateCaches).push(updateBatch)
@@ -300,7 +301,7 @@ object MutableCacheBackedContractStoreSpec {
       loggerFactory: NamedLoggerFactory,
       readerFixture: LedgerDaoContractsReader = ContractsReaderFixture(),
   )(implicit ec: ExecutionContext) = {
-    val metrics = Metrics.ForTesting
+    val metrics = LedgerApiServerMetrics.ForTesting
     val startIndexExclusive: Offset = offset0
     val contractStore = new MutableCacheBackedContractStore(
       metrics,
@@ -397,6 +398,7 @@ object MutableCacheBackedContractStoreSpec {
     GlobalKey.assertBuild(
       Identifier.assertFromString(s"some:template:$desc"),
       ValueText(desc),
+      Ref.PackageName.assertFromString("pkg-name"),
     )
 
   private def offset(idx: Long) = Offset.fromByteArray(BigInt(idx).toByteArray)

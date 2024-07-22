@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.codegen.java.splice.dsorules.{DsoRules_AddSv, SynchronizerUpgradeSchedule}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
@@ -61,7 +62,7 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.automation.ExpireTransferOfferTrigger
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   ClientConfig,
@@ -72,9 +73,9 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture

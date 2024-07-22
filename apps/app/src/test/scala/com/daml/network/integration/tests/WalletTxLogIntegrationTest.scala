@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.lf.data.Numeric
+import com.digitalasset.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen

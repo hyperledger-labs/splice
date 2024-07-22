@@ -10,7 +10,8 @@ val iouId = bootstrap.domain(
   iouAlias,
   sequencers = Seq(iou_sequencer),
   mediators = Seq(iou_mediator),
-  domainOwners = Seq(iouDomainOwner)
+  domainOwners = Seq(iouDomainOwner),
+  staticDomainParameters = StaticDomainParameters.defaultsWithoutKMS(ProtocolVersion.latest),
 )
 
 val paintDomainOwner = paint_sequencer
@@ -18,7 +19,8 @@ val paintId = bootstrap.domain(
   paintAlias,
   sequencers = Seq(paint_sequencer),
   mediators = Seq(paint_mediator),
-  domainOwners = Seq(paintDomainOwner)
+  domainOwners = Seq(paintDomainOwner),
+  staticDomainParameters = StaticDomainParameters.defaultsWithoutKMS(ProtocolVersion.latest),
 )
 
 // update parameters
@@ -42,6 +44,12 @@ participant5.domains.connect_local(iou_sequencer, alias = iouAlias)
 val Bank = participant1.parties.enable("Bank")
 val HouseOwner = participant2.parties.enable("House Owner")
 val Painter = participant3.parties.enable("Painter", waitForDomain = DomainChoice.All)
+
+// Wait until the party enabling has taken effect and has been observed at the participants
+val initialPartyAssignment = Set(Bank -> participant1, HouseOwner -> participant2, Painter -> participant3)
+participant1.parties.await_topology_observed(initialPartyAssignment)
+participant2.parties.await_topology_observed(initialPartyAssignment)
+participant3.parties.await_topology_observed(initialPartyAssignment)
 
 // Enable the house owner on participant 5 and the painter on participant 4
 // This works here because the parties are fresh, i.e., they do not have any contracts yet.
@@ -73,7 +81,7 @@ import com.digitalasset.canton.BigDecimalImplicits._
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.examples.java.paint.{OfferToPaintHouseByOwner, PaintHouse}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil.decodeAllCreated
-import com.digitalasset.canton.protocol.ContractIdSyntax._
+import com.digitalasset.canton.participant.util.JavaCodegenUtil.ContractIdSyntax
 
 import scala.jdk.CollectionConverters._
 

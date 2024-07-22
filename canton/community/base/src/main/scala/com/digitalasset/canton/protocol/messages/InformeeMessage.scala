@@ -3,13 +3,17 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{HashOps, Signature}
-import com.digitalasset.canton.data.{FullInformeeTree, Informee, ViewPosition, ViewType}
+import com.digitalasset.canton.data.{
+  FullInformeeTree,
+  ViewConfirmationParameters,
+  ViewPosition,
+  ViewType,
+}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.{RootHash, v30}
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
@@ -54,10 +58,10 @@ case class InformeeMessage(
 
   override def domainId: DomainId = fullInformeeTree.domainId
 
-  override def mediator: MediatorsOfDomain = fullInformeeTree.mediator
+  override def mediator: MediatorGroupRecipient = fullInformeeTree.mediator
 
-  override def informeesAndThresholdByViewPosition
-      : Map[ViewPosition, (Set[Informee], NonNegativeInt)] =
+  override def informeesAndConfirmationParamsByViewPosition
+      : Map[ViewPosition, ViewConfirmationParameters] =
     fullInformeeTree.informeesAndThresholdByViewPosition
 
   // Implementing a `toProto<version>` method allows us to compose serializable classes.
@@ -66,15 +70,11 @@ case class InformeeMessage(
   def toProtoV30: v30.InformeeMessage =
     v30.InformeeMessage(
       fullInformeeTree = Some(fullInformeeTree.toProtoV30),
-      protocolVersion = protocolVersion.toProtoPrimitive,
       submittingParticipantSignature = Some(submittingParticipantSignature.toProtoV30),
     )
 
   override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
     v30.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
-
-  override def minimumThreshold(informees: Set[Informee]): NonNegativeInt =
-    fullInformeeTree.confirmationPolicy.minimumThreshold(informees)
 
   override def rootHash: RootHash = fullInformeeTree.transactionId.toRootHash
 
@@ -91,7 +91,7 @@ object InformeeMessage
     extends HasProtocolVersionedWithContextCompanion[InformeeMessage, (HashOps, ProtocolVersion)] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.InformeeMessage)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.InformeeMessage)(
       supportedProtoVersion(_)((hashOps, proto) => fromProtoV30(hashOps)(proto)),
       _.toProtoV30.toByteString,
     )
@@ -110,11 +110,12 @@ object InformeeMessage
   private[messages] def fromProtoV30(
       context: (HashOps, ProtocolVersion)
   )(informeeMessageP: v30.InformeeMessage): ParsingResult[InformeeMessage] = {
+    val (_, protocolVersion) = context
+
     // Use pattern matching to access the fields of v0.InformeeMessage,
     // because this will break if a field is forgotten.
     val v30.InformeeMessage(
       maybeFullInformeeTreeP,
-      protocolVersionP,
       submittingParticipantSignaturePO,
     ) = informeeMessageP
     for {
@@ -124,7 +125,6 @@ object InformeeMessage
         maybeFullInformeeTreeP,
       )
       fullInformeeTree <- FullInformeeTree.fromProtoV30(context, fullInformeeTreeP)
-      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
       submittingParticipantSignature <- ProtoConverter
         .required(
           "InformeeMessage.submittingParticipantSignature",

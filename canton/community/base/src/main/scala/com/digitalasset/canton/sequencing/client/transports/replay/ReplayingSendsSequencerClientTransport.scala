@@ -7,9 +7,12 @@ import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext.withEmptyMetricsContext
 import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.{MetricValue, SequencerClientMetrics}
@@ -20,7 +23,6 @@ import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransportCommon,
   SequencerClientTransportPekko,
 }
-import com.digitalasset.canton.sequencing.handshake.HandshakeRequestError
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{
   OrdinarySerializedEvent,
@@ -28,13 +30,12 @@ import com.digitalasset.canton.sequencing.{
   SerializedEventHandler,
 }
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, OptionUtil, PekkoUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DiscardOps, SequencerCounter}
 import io.opentelemetry.sdk.metrics.data.MetricData
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -74,21 +75,31 @@ trait ReplayingSendsSequencerClientTransport extends SequencerClientTransportCom
 }
 
 object ReplayingSendsSequencerClientTransport {
-  final case class SendReplayReport(successful: Int = 0, overloaded: Int = 0, errors: Int = 0)(
+  final case class SendReplayReport(
+      successful: Int = 0,
+      overloaded: Int = 0,
+      errors: Int = 0,
+      shutdowns: Int = 0,
+  )(
       sendDuration: => Option[java.time.Duration]
   ) {
-    def update(result: Either[SendAsyncClientError, Unit]): SendReplayReport = result match {
-      case Left(SendAsyncClientError.RequestRefused(_: SendAsyncError.Overloaded)) =>
-        copy(overloaded = overloaded + 1)
-      case Left(_) => copy(errors = errors + 1)
-      case Right(_) => copy(successful = successful + 1)
-    }
+    def update(
+        result: UnlessShutdown[Either[SendAsyncClientError, Unit]]
+    ): SendReplayReport =
+      result match {
+        case Outcome(Left(SendAsyncClientError.RequestRefused(_: SendAsyncError.Overloaded))) =>
+          copy(overloaded = overloaded + 1)
+        case Outcome(Left(_)) => copy(errors = errors + 1)
+        case Outcome(Right(_)) => copy(successful = successful + 1)
+        case AbortedDueToShutdown => copy(shutdowns = shutdowns + 1)
+      }
 
     def copy(
         successful: Int = this.successful,
         overloaded: Int = this.overloaded,
         errors: Int = this.errors,
-    ): SendReplayReport = SendReplayReport(successful, overloaded, errors)(sendDuration)
+        shutdowns: Int = this.shutdowns,
+    ): SendReplayReport = SendReplayReport(successful, overloaded, errors, shutdowns)(sendDuration)
 
     lazy val total: Int = successful + overloaded + errors
 
@@ -129,7 +140,6 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
   private val pendingSends = TrieMap[MessageId, CantonTimestamp]()
   private val firstSend = new AtomicReference[Option[CantonTimestamp]](None)
   private val lastSend = new AtomicReference[Option[CantonTimestamp]](None)
-  private val lastReceivedEvent = new AtomicReference[Option[CantonTimestamp]](None)
 
   private val submissionRequests: List[SubmissionRequest] = withNewTraceContext {
     implicit traceContext =>
@@ -150,7 +160,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
 
   private def replaySubmit(
       submission: SubmissionRequest
-  ): Future[Either[SendAsyncClientError, Unit]] = {
+  ): FutureUnlessShutdown[Either[SendAsyncClientError, Unit]] = {
     val startedAt = CantonTimestamp.now()
     // we'll correlate received events by looking at their message-id and calculate the
     // latency of the send by comparing now to the time the event eventually arrives
@@ -194,22 +204,20 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
       item
     }
 
-    TraceContext.withNewTraceContext { traceContext =>
+    TraceContext.withNewTraceContext { implicit traceContext =>
       val withExtendedMst = extendMaxSequencingTime(submission)
       val sendET = for {
         // We need a new signature because we've modified the max sequencing time.
         signedRequest <- requestSigner
-          .signRequest(withExtendedMst, HashPurpose.SubmissionRequestSignature)(
-            implicitly,
-            traceContext,
-          )
+          .signRequest(withExtendedMst, HashPurpose.SubmissionRequestSignature)
           .leftMap(error =>
             SendAsyncClientError.RequestRefused(SendAsyncError.RequestRefused(error))
           )
-        _ <- underlyingTransport.sendAsyncSigned(
-          signedRequest,
-          replaySendsConfig.sendTimeout.toScala,
-        )(traceContext)
+        _ <- underlyingTransport
+          .sendAsyncSigned(
+            signedRequest,
+            replaySendsConfig.sendTimeout.toScala,
+          )
       } yield ()
 
       sendET.value
@@ -218,16 +226,16 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     }
   }
 
-  override def replay(sendParallelism: Int): Future[SendReplayReport] = withNewTraceContext {
-    implicit traceContext =>
+  override def replay(sendParallelism: Int): Future[SendReplayReport] =
+    withNewTraceContext { implicit traceContext =>
       logger.info(s"Replaying ${submissionRequests.size} sends")
 
       val submissionReplay = Source(submissionRequests)
-        .mapAsyncUnordered(sendParallelism)(replaySubmit)
+        .mapAsyncUnordered(sendParallelism)(replaySubmit(_).unwrap)
         .toMat(Sink.fold(SendReplayReport()(sendDuration))(_.update(_)))(Keep.right)
 
       PekkoUtil.runSupervised(logger.error("Failed to run submission replay", _), submissionReplay)
-  }
+    }
 
   override def waitForIdle(
       duration: FiniteDuration,
@@ -287,7 +295,8 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
 
     private def scheduleCheck(): Unit = {
       performUnlessClosing(functionFullName) {
-        val nextCheckDuration = idlenessDuration.toJava.minus(elapsed(stateRef.get()))
+        val nextCheckDuration =
+          idlenessDuration.toJava.minus(durationFromLastEventToNow(stateRef.get()))
         val _ = materializer.scheduleOnce(nextCheckDuration.toScala, () => checkIfIdle())
       }.onShutdown(())
     }
@@ -306,25 +315,35 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
 
     private def checkIfIdle(): Unit = {
       val stateSnapshot = stateRef.get()
-      val elapsedDuration = elapsed(stateSnapshot)
-      val isIdle = elapsedDuration.compareTo(idlenessDuration.toJava) >= 0
+      val lastEventTime = stateSnapshot.lastEventAt.getOrElse(stateSnapshot.startedAt).toInstant
+      val elapsedDuration =
+        java.time.Duration.between(stateSnapshot.startedAt.toInstant, lastEventTime)
+      val isIdle = durationFromLastEventToNow(stateSnapshot).compareTo(idlenessDuration.toJava) >= 0
 
       if (isIdle) {
-        idleP
-          .trySuccess(
-            EventsReceivedReport(
-              elapsedDuration.toScala,
-              totalEventsReceived = stateSnapshot.eventCounter,
-              finishedAtCounter = stateSnapshot.lastCounter,
+        if (pendingSends.sizeIs > 0) {
+          idleP
+            .tryFailure(
+              new IllegalStateException(s"There are ${pendingSends.size} pending send requests")
             )
-          )
-          .discard
+            .discard
+        } else {
+          idleP
+            .trySuccess(
+              EventsReceivedReport(
+                elapsedDuration.toScala,
+                totalEventsReceived = stateSnapshot.eventCounter,
+                finishedAtCounter = stateSnapshot.lastCounter,
+              )
+            )
+            .discard
+        }
       } else {
         scheduleCheck() // schedule the next check
       }
     }
 
-    private def elapsed(stateSnapshot: State) = {
+    private def durationFromLastEventToNow(stateSnapshot: State) = {
       val from = stateSnapshot.lastEventAt.getOrElse(stateSnapshot.startedAt)
       java.time.Duration.between(from.toInstant, Instant.now())
     }
@@ -332,8 +351,8 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     private def updateMetrics(event: SequencedEvent[ClosedEnvelope]): Unit =
       withEmptyMetricsContext { implicit metricsContext =>
         val messageIdO: Option[MessageId] = event match {
-          case Deliver(_, _, _, messageId, _, _) => messageId
-          case DeliverError(_, _, _, messageId, _) => Some(messageId)
+          case Deliver(_, _, _, messageId, _, _, _) => messageId
+          case DeliverError(_, _, _, messageId, _, _) => Some(messageId)
           case _ => None
         }
 
@@ -341,7 +360,6 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
           val latency = java.time.Duration.between(sentAt.toInstant, Instant.now())
           metrics.submissions.inFlight.dec()
           metrics.submissions.sequencingTime.update(latency)
-          lastReceivedEvent.set(Some(CantonTimestamp.now()))
         }
       }
 
@@ -369,35 +387,25 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
   override def sendAsyncSigned(
       request: SignedContent[SubmissionRequest],
       timeout: Duration,
-  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientResponseError, Unit] =
-    EitherT.rightT(())
-
-  /** We're replaying sends so shouldn't allow the app to send any new ones */
-  override def sendAsyncUnauthenticatedVersioned(
-      request: SubmissionRequest,
-      timeout: Duration,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SendAsyncClientResponseError, Unit] = EitherT.rightT(())
-
-  override def acknowledge(request: AcknowledgeRequest)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = Future.unit
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
+    EitherT.rightT(())
 
   override def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, Unit] =
-    EitherT.rightT(())
+  ): EitherT[FutureUnlessShutdown, String, Boolean] =
+    EitherT.rightT(true)
 
-  override def handshake(request: HandshakeRequest)(implicit
+  override def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, HandshakeRequestError, HandshakeResponse] =
-    EitherT.rightT(HandshakeResponse.Success(protocolVersion))
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] =
+    EitherT.pure(GetTrafficStateForMemberResponse(None, protocolVersion))
 
   override def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
       traceContext: TraceContext
   ): EitherT[Future, String, TopologyStateForInitResponse] =
-    EitherT.rightT(TopologyStateForInitResponse(Traced(StoredTopologyTransactionsX.empty)))
+    EitherT.rightT(TopologyStateForInitResponse(Traced(StoredTopologyTransactions.empty)))
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
     SyncCloseable("underlying-transport", underlyingTransport.close())
@@ -443,11 +451,6 @@ class ReplayingSendsSequencerClientTransportImpl(
     ): Unit = closeReasonPromise.trySuccess(reason).discard[Boolean]
   }
 
-  override def subscribeUnauthenticated[E](
-      request: SubscriptionRequest,
-      handler: SerializedEventHandler[E],
-  )(implicit traceContext: TraceContext): SequencerSubscription[E] = subscribe(request, handler)
-
   override def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
     SubscriptionErrorRetryPolicy.never
 
@@ -462,11 +465,6 @@ class ReplayingSendsSequencerClientTransportImpl(
   override def subscribe(request: SubscriptionRequest)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] = underlyingTransport.subscribe(request)
-
-  override def subscribeUnauthenticated(request: SubscriptionRequest)(implicit
-      traceContext: TraceContext
-  ): SequencerSubscriptionPekko[SubscriptionError] =
-    underlyingTransport.subscribeUnauthenticated(request)
 
   override def subscriptionRetryPolicyPekko: SubscriptionErrorRetryPolicyPekko[SubscriptionError] =
     SubscriptionErrorRetryPolicyPekko.never

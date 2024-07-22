@@ -22,6 +22,7 @@ object SequencerValidations {
         s"Sender is unknown: ${submission.sender}"
       ): SendAsyncError,
     )
+    // TODO(#19476): Why we don't check group recipients here?
     unregisteredRecipients = submission.batch.allMembers.toList.filterNot(isRegistered)
     _ <- Either.cond(
       unregisteredRecipients.isEmpty,
@@ -53,13 +54,7 @@ object SequencerValidations {
       _ <- Either.cond(
         eligibleSenders.contains(sender),
         (),
-        "Sender is not eligible according to the aggregation rule",
-      )
-      unauthenticatedEligibleSenders = eligibleSenders.filterNot(_.isAuthenticated)
-      _ <- Either.cond(
-        unauthenticatedEligibleSenders.isEmpty,
-        (),
-        s"Eligible senders in aggregation rule must be authenticated, but found unauthenticated members $unauthenticatedEligibleSenders",
+        s"Sender [$sender] is not eligible according to the aggregation rule",
       )
     } yield ()
   }

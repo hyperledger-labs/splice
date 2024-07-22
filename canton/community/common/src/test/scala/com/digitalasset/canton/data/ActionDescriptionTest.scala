@@ -3,25 +3,25 @@
 
 package com.digitalasset.canton.data
 
-import com.daml.lf.value.Value
-import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.ActionDescription.*
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.util.LfTransactionBuilder
 import com.digitalasset.canton.util.LfTransactionBuilder.defaultTemplateId
 import com.digitalasset.canton.version.RepresentativeProtocolVersion
+import com.digitalasset.canton.{BaseTest, LfPackageName, LfVersioned}
+import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
 class ActionDescriptionTest extends AnyWordSpec with BaseTest {
 
   private val suffixedId: LfContractId = ExampleTransactionFactory.suffixedId(0, 0)
   private val seed: LfHash = ExampleTransactionFactory.lfHash(5)
-  private val testTxVersion: LfTransactionVersion = ExampleTransactionFactory.transactionVersion
   private val globalKey: LfGlobalKey =
     LfGlobalKey
       .build(
         LfTransactionBuilder.defaultTemplateId,
         Value.ValueInt64(10L),
+        LfPackageName.assertFromString("package-name"),
       )
       .value
   private val choiceName: LfChoiceName = LfChoiceName.assertFromString("choice")
@@ -34,15 +34,14 @@ class ActionDescriptionTest extends AnyWordSpec with BaseTest {
       "the choice argument cannot be serialized" in {
         ExerciseActionDescription.create(
           suffixedId,
-          templateId = Some(defaultTemplateId),
+          templateId = defaultTemplateId,
           choiceName,
           None,
           Set.empty,
-          ExampleTransactionFactory.veryDeepValue,
+          ExampleTransactionFactory.veryDeepVersionedValue,
           Set(ExampleTransactionFactory.submitter),
           byKey = true,
           seed,
-          testTxVersion,
           failed = false,
           representativePV,
         ) shouldBe Left(
@@ -54,13 +53,16 @@ class ActionDescriptionTest extends AnyWordSpec with BaseTest {
 
       "the key value cannot be serialized" in {
         LookupByKeyActionDescription.create(
-          LfGlobalKey
-            .build(
-              LfTransactionBuilder.defaultTemplateId,
-              ExampleTransactionFactory.veryDeepValue,
-            )
-            .value,
-          testTxVersion,
+          LfVersioned(
+            ExampleTransactionFactory.transactionVersion,
+            LfGlobalKey
+              .build(
+                LfTransactionBuilder.defaultTemplateId,
+                ExampleTransactionFactory.veryDeepValue,
+                ExampleTransactionFactory.packageName,
+              )
+              .value,
+          ),
           representativePV,
         ) shouldBe Left(
           InvalidActionDescription(

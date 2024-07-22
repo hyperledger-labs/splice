@@ -3,12 +3,12 @@
 
 package com.digitalasset
 
-import com.daml.lf.command.ReplayCommand
-import com.daml.lf.data.{IdString, Ref, Time}
-import com.daml.lf.transaction.{ContractStateMachine, Versioned}
-import com.daml.lf.value.Value
 import com.digitalasset.canton.data.{Counter, CounterCompanion}
 import com.digitalasset.canton.serialization.DeterministicEncoding.encodeLong
+import com.digitalasset.daml.lf.command.ReplayCommand
+import com.digitalasset.daml.lf.data.{IdString, Ref, Time}
+import com.digitalasset.daml.lf.transaction.{ContractStateMachine, Versioned}
+import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
 
 package object canton {
@@ -123,12 +123,6 @@ package object canton {
 
   /** Wrap a method call with this method to document that the caller is sure that the callee's preconditions are met. */
   def checked[A](x: => A): A = x
-
-  /** Evaluate the expression and discard the result. */
-  implicit final class DiscardOps[A](private val a: A) extends AnyVal {
-    @inline
-    def discard[B](implicit ev: A =:= B): Unit = ()
-  }
 
   implicit val lfPartyOrdering: Ordering[LfPartyId] =
     IdString.`Party order instance`.toScalaOrdering

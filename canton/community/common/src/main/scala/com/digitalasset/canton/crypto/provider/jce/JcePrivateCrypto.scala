@@ -4,10 +4,10 @@
 package com.digitalasset.canton.crypto.provider.jce
 
 import cats.data.EitherT
-import cats.instances.future.*
 import cats.syntax.either.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreExtended
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.crypto.tink.subtle.EllipticCurves.CurveType
 import com.google.crypto.tink.subtle.{Ed25519Sign, EllipticCurves}
@@ -15,12 +15,12 @@ import com.google.protobuf.ByteString
 
 import java.security.spec.{ECGenParameterSpec, RSAKeyGenParameterSpec}
 import java.security.{GeneralSecurityException, KeyPair as JKeyPair, KeyPairGenerator}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class JcePrivateCrypto(
     pureCrypto: JcePureCrypto,
     override val defaultSigningKeyScheme: SigningKeyScheme,
-    override val defaultEncryptionKeyScheme: EncryptionKeyScheme,
+    override val defaultEncryptionKeySpec: EncryptionKeySpec,
     override protected val store: CryptoPrivateStoreExtended,
 )(override implicit val ec: ExecutionContext)
     extends CryptoPrivateStoreApi {
@@ -31,9 +31,6 @@ class JcePrivateCrypto(
   // Internal case class to ensure we don't mix up the private and public key bytestrings
   private case class RawKeyPair(id: Fingerprint, publicKey: ByteString, privateKey: ByteString)
 
-  private def fingerprint(publicKey: ByteString): Fingerprint =
-    Fingerprint.create(publicKey)
-
   private def fromJavaKeyPair(javaKeyPair: JKeyPair): RawKeyPair = {
     // Encode public key as X509 subject public key info in DER
     val publicKey = ByteString.copyFrom(javaKeyPair.getPublic.getEncoded)
@@ -41,7 +38,7 @@ class JcePrivateCrypto(
     // Encode private key as PKCS8 in DER
     val privateKey = ByteString.copyFrom(javaKeyPair.getPrivate.getEncoded)
 
-    val keyId = fingerprint(publicKey)
+    val keyId = Fingerprint.create(publicKey)
 
     RawKeyPair(keyId, publicKey, privateKey)
   }
@@ -52,7 +49,6 @@ class JcePrivateCrypto(
   ): SigningKeyPair = {
     val rawKeyPair = fromJavaKeyPair(javaKeyPair)
     SigningKeyPair.create(
-      id = rawKeyPair.id,
       format = CryptoKeyFormat.Der,
       publicKeyBytes = rawKeyPair.publicKey,
       privateKeyBytes = rawKeyPair.privateKey,
@@ -70,32 +66,25 @@ class JcePrivateCrypto(
         .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError)
     } yield fromJavaSigningKeyPair(javaKeyPair, scheme)
 
-  override protected[crypto] def generateEncryptionKeypair(scheme: EncryptionKeyScheme)(implicit
+  override protected[crypto] def generateEncryptionKeypair(keySpec: EncryptionKeySpec)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, EncryptionKeyGenerationError, EncryptionKeyPair] = {
+  ): EitherT[FutureUnlessShutdown, EncryptionKeyGenerationError, EncryptionKeyPair] = {
 
     def convertJavaKeyPair(
         javaKeyPair: JKeyPair
     ): EncryptionKeyPair = {
       val rawKeyPair = fromJavaKeyPair(javaKeyPair)
       EncryptionKeyPair.create(
-        id = rawKeyPair.id,
         format = CryptoKeyFormat.Der,
         publicKeyBytes = rawKeyPair.publicKey,
         privateKeyBytes = rawKeyPair.privateKey,
-        scheme = scheme,
+        keySpec = keySpec,
       )
     }
 
     EitherT.fromEither {
-      (scheme match {
-        case EncryptionKeyScheme.EciesP256HkdfHmacSha256Aes128Gcm =>
-          Either
-            .catchOnly[GeneralSecurityException](
-              EllipticCurves.generateKeyPair(CurveType.NIST_P256)
-            )
-            .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError)
-        case EncryptionKeyScheme.EciesP256HmacSha256Aes128Cbc =>
+      (keySpec match {
+        case EncryptionKeySpec.EcP256 =>
           Either
             .catchOnly[GeneralSecurityException](
               {
@@ -105,7 +94,7 @@ class JcePrivateCrypto(
               }
             )
             .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError)
-        case EncryptionKeyScheme.Rsa2048OaepSha256 =>
+        case EncryptionKeySpec.Rsa2048 =>
           Either
             .catchOnly[GeneralSecurityException](
               {
@@ -121,19 +110,17 @@ class JcePrivateCrypto(
 
   override protected[crypto] def generateSigningKeypair(scheme: SigningKeyScheme)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SigningKeyGenerationError, SigningKeyPair] = scheme match {
+  ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningKeyPair] = scheme match {
     case SigningKeyScheme.Ed25519 =>
       for {
         rawKeyPair <- Either
           .catchOnly[GeneralSecurityException](Ed25519Sign.KeyPair.newKeyPair())
           .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError)
-          .toEitherT
+          .toEitherT[FutureUnlessShutdown]
         publicKey = ByteString.copyFrom(rawKeyPair.getPublicKey)
         privateKey = ByteString.copyFrom(rawKeyPair.getPrivateKey)
-        id = fingerprint(publicKey)
         keyPair = SigningKeyPair
           .create(
-            id = id,
             format = CryptoKeyFormat.Raw,
             publicKeyBytes = publicKey,
             privateKeyBytes = privateKey,

@@ -4,13 +4,19 @@
 package com.digitalasset.canton.version
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.version.ProtocolVersion.{deleted, deprecated, supported, unstable}
+import com.digitalasset.canton.version.ProtocolVersion.{
+  alpha,
+  beta,
+  deleted,
+  deprecated,
+  stable,
+  supported,
+}
 import pureconfig.error.FailureReason
 import pureconfig.{ConfigReader, ConfigWriter}
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
@@ -32,11 +38,11 @@ import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
   *
   * How to add a new protocol version `N`:
   *  - Define a new constant `v<N>` in the [[ProtocolVersion$]] object via
-  *    {{{lazy val v<N>: ProtocolVersionWithStatus[Unstable] = ProtocolVersion.unstable(<N>)}}}
+  *    {{{lazy val v<N>: ProtocolVersionWithStatus[Alpha] = ProtocolVersion.alpha(<N>)}}}
   *
-  *  - The new protocol version should be declared as unstable until it is released:
-  *    Define it with type argument [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Unstable]]
-  *    and add it to the list in [[com.digitalasset.canton.version.ProtocolVersion.unstable]].
+  *  - The new protocol version should be declared as alpha until it is released:
+  *    Define it with type argument [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Alpha]]
+  *    and add it to the list in [[com.digitalasset.canton.version.ProtocolVersion.alpha]].
   *
   *  - Add a new test job for the protocol version `N` to the canton_build workflow.
   *    Make a sensible decision how often it should run.
@@ -45,11 +51,17 @@ import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
   *
   * How to release a protocol version `N`:
   *  - Switch the type parameter of the protocol version constant `v<N>` from
-  *    [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Unstable]] to [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Stable]]
+  *    [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Alpha]] to [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Stable]]
   *    As a result, you may have to modify a couple of protobuf definitions and mark them as stable as well.
   *
-  *  - Remove `v<N>` from [[com.digitalasset.canton.version.ProtocolVersion.unstable]]
-  *    and add it to [[com.digitalasset.canton.buildinfo.BuildInfo.protocolVersions]].
+  *  - Remove `v<N>` from [[com.digitalasset.canton.version.ProtocolVersion.alpha]]
+  *    and add it to [[com.digitalasset.canton.buildinfo.BuildInfo.stableProtocolVersions]].
+  *
+  * How to release a protocol version `N` as Beta:
+  *  - Switch the type parameter of the protocol version constant `v<N>` from
+  *    [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Alpha]] to [[com.digitalasset.canton.version.ProtocolVersionAnnotation.Beta]]
+  *  - Remove `v<N>` from [[com.digitalasset.canton.version.ProtocolVersion.alpha]]
+  *    and add it to [[com.digitalasset.canton.buildinfo.BuildInfo.betaProtocolVersions]].
   *
   *  - Check the test jobs for protocol versions:
   *    Likely `N` will become the default protocol version used by the `test` job,
@@ -67,8 +79,11 @@ sealed case class ProtocolVersion private[version] (v: Int)
 
   def isDeprecated: Boolean = deprecated.contains(this)
 
-  def isUnstable: Boolean = unstable.contains(this)
-  def isStable: Boolean = !isUnstable
+  def isUnstable: Boolean = alpha.contains(this)
+
+  def isBeta: Boolean = beta.contains(this)
+
+  def isStable: Boolean = stable.contains(this)
 
   def isDeleted: Boolean = deleted.contains(this)
 
@@ -81,8 +96,7 @@ sealed case class ProtocolVersion private[version] (v: Int)
 
   def toProtoPrimitive: Int = v
 
-  // We keep the .0.0 so that old binaries can still decode it
-  def toProtoPrimitiveS: String = s"$v.0.0"
+  def toProtoPrimitiveS: String = v.toString
 
   override def compare(that: ProtocolVersion): Int = v.compare(that.v)
 }
@@ -92,12 +106,19 @@ object ProtocolVersion {
     type Status = S
   }
 
-  private[version] def stable(v: Int): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
-    createWithStatus[ProtocolVersionAnnotation.Stable](v)
-  private[version] def unstable(
+  private[version] def createStable(
       v: Int
-  ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
-    createWithStatus[ProtocolVersionAnnotation.Unstable](v)
+  ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
+    createWithStatus[ProtocolVersionAnnotation.Stable](v)
+
+  private[version] def createAlpha(
+      v: Int
+  ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
+    createWithStatus[ProtocolVersionAnnotation.Alpha](v)
+  private[version] def createBeta(
+      v: Int
+  ): ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta] =
+    createWithStatus[ProtocolVersionAnnotation.Beta](v)
 
   private def createWithStatus[S <: ProtocolVersionAnnotation.Status](
       v: Int
@@ -119,64 +140,13 @@ object ProtocolVersion {
   implicit val setParameterProtocolVersion: SetParameter[ProtocolVersion] =
     (pv: ProtocolVersion, pp: PositionedParameters) => pp >> pv.v
 
-  /** Try to parse a semver version.
-    * Return:
-    *
-    * - None if `rawVersion` does not satisfy the semver regexp
-    * - Some(Left(_)) if `rawVersion` satisfies the regex but if an error is found
-    *   (e.g., if minor!=0).
-    * - Some(Right(ProtocolVersion(_))) in case of success
-    */
-  private def parseSemver(rawVersion: String): Option[Either[String, ProtocolVersion]] = {
-    val regex = raw"([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,4})".r
-
-    rawVersion match {
-      case regex(rawMajor, rawMinor, rawPatch) =>
-        val parsedDigits = List(rawMajor, rawMinor, rawPatch).traverse(raw =>
-          raw.toIntOption.toRight(s"Couldn't parse number $raw")
-        )
-
-        parsedDigits match {
-          case Left(error) => Some(Left(error))
-
-          case Right(List(major, minor, patch)) =>
-            Some(
-              Either.cond(
-                minor == 0 && patch == 0,
-                ProtocolVersion(major),
-                s"Protocol version should consist of a single number; but `$rawVersion` found",
-              )
-            )
-
-          case _ => Some(Left(s"Unexpected error while parsing version $rawVersion"))
-        }
-
-      case _ => None
-    }
-  }
-
-  private def parseDev(rawVersion: String): Option[ProtocolVersion] = {
-    // ignore case for dev version ... scala regex doesn't know case insensitivity ...
-    val devRegex = "^[dD][eE][vV]$".r
-    val devFull = ProtocolVersion.dev.toProtoPrimitiveS
-
-    rawVersion match {
-      // Since dev uses Int.MaxValue, it does not satisfy the regex above
-      case `devFull` | devRegex() => Some(ProtocolVersion.dev)
-      case _ => None
-    }
-  }
-
   private[version] def unsupportedErrorMessage(
       pv: ProtocolVersion,
       includeDeleted: Boolean = false,
   ) = {
-    val supportedStablePVs = stableAndSupported.map(_.toString)
+    val deleted = Option.when(includeDeleted)(ProtocolVersion.deleted.forgetNE).getOrElse(Nil)
 
-    val supportedPVs = if (includeDeleted) {
-      val deletedPVs = deleted.map(pv => s"(${pv.toString})")
-      supportedStablePVs ++ deletedPVs
-    } else supportedStablePVs
+    val supportedPVs: NonEmpty[List[String]] = (supported ++ deleted).map(_.toString)
 
     s"Protocol version $pv is not supported. The supported versions are ${supportedPVs.mkString(", ")}."
   }
@@ -196,9 +166,12 @@ object ProtocolVersion {
       case Some(value) => Right(ProtocolVersion(value))
 
       case None =>
-        parseSemver(rawVersion)
-          .orElse(parseDev(rawVersion).map(Right(_)))
-          .getOrElse(Left(s"Unable to convert string `$rawVersion` to a protocol version."))
+        Option
+          .when(rawVersion.toLowerCase() == "dev")(ProtocolVersion.dev)
+          .map(Right(_))
+          .getOrElse {
+            Left(s"Unable to convert string `$rawVersion` to a protocol version.")
+          }
     }
   }
 
@@ -226,33 +199,33 @@ object ProtocolVersion {
 
   /** Like [[create]] ensures a supported protocol version; tailored to (de-)serialization purposes.
     */
-  def fromProtoPrimitive(rawVersion: Int): ParsingResult[ProtocolVersion] = {
+  def fromProtoPrimitive(
+      rawVersion: Int,
+      allowDeleted: Boolean = false,
+  ): ParsingResult[ProtocolVersion] = {
     val pv = ProtocolVersion(rawVersion)
-    Either.cond(pv.isSupported, pv, OtherError(unsupportedErrorMessage(pv)))
+    val isSupported = pv.isSupported || (allowDeleted && pv.isDeleted)
+
+    Either.cond(isSupported, pv, OtherError(unsupportedErrorMessage(pv)))
   }
 
   /** Like [[create]] ensures a supported protocol version; tailored to (de-)serialization purposes.
+    * For handshake, we want to use a string as the primitive type and not an int because that is
+    * an endpoint that should never change. Using string allows us to evolve the scheme if needed.
     */
-  def fromProtoPrimitiveS(rawVersion: String): ParsingResult[ProtocolVersion] = {
+  def fromProtoPrimitiveHandshake(rawVersion: String): ParsingResult[ProtocolVersion] = {
     ProtocolVersion.create(rawVersion).leftMap(OtherError)
   }
 
   final case class InvalidProtocolVersion(override val description: String) extends FailureReason
 
   // All stable protocol versions supported by this release
-  val stableAndSupported: NonEmpty[List[ProtocolVersion]] =
-    NonEmpty
-      .from(
-        BuildInfo.protocolVersions
-          .map(parseUnchecked)
-          .map(_.valueOr(sys.error))
-          .toList
-      )
-      .getOrElse(
-        sys.error("Release needs to support at least one protocol version")
-      )
+  // TODO(#15561) Switch to non-empty again
+  val stable: List[ProtocolVersion] =
+    parseFromBuildInfo(BuildInfo.stableProtocolVersions.toSeq)
 
   private val deprecated: Seq[ProtocolVersion] = Seq()
+
   private val deleted: NonEmpty[Seq[ProtocolVersion]] =
     NonEmpty(
       Seq,
@@ -261,26 +234,42 @@ object ProtocolVersion {
       ProtocolVersion(4),
       ProtocolVersion(5),
       ProtocolVersion(6),
+      ProtocolVersion(30),
     )
 
-  val unstable: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable]]] =
+  val alpha: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha]]] =
     NonEmpty.mk(List, ProtocolVersion.v31, ProtocolVersion.dev)
 
-  val supported: NonEmpty[List[ProtocolVersion]] = (unstable ++ stableAndSupported).sorted
+  val beta: List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta]] =
+    parseFromBuildInfo(BuildInfo.betaProtocolVersions.toSeq)
+      .map(pv => ProtocolVersion.createBeta(pv.v))
 
-  val latest: ProtocolVersion = stableAndSupported.max1
+  val supported: NonEmpty[List[ProtocolVersion]] = (alpha ++ beta ++ stable).sorted
 
-  lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
-    ProtocolVersion.unstable(Int.MaxValue)
+  private val allProtocolVersions = deprecated ++ deleted ++ alpha ++ beta ++ stable
 
-  lazy val v30: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
-    ProtocolVersion.stable(30)
+  require(
+    allProtocolVersions.sizeCompare(allProtocolVersions.distinct) == 0,
+    s"All the protocol versions should be distinct." +
+      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted, "alpha" -> alpha, "stable" -> stable)}",
+  )
 
-  lazy val v31: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Unstable] =
-    ProtocolVersion.unstable(31)
+  // TODO(i15561): change back to `stableAndSupported.max1` once there is a stable Daml 3 protocol version
+  val latest: ProtocolVersion = stable.lastOption.getOrElse(alpha.head1)
+
+  lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
+    ProtocolVersion.createAlpha(Int.MaxValue)
+
+  lazy val v31: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
+    ProtocolVersion.createAlpha(31)
 
   // Minimum stable protocol version introduced
-  lazy val minimum: ProtocolVersion = v30
+  lazy val minimum: ProtocolVersion = v31
+
+  private def parseFromBuildInfo(pv: Seq[String]): List[ProtocolVersion] =
+    pv.map(parseUnchecked)
+      .map(_.valueOr(sys.error))
+      .toList
 }
 
 /*

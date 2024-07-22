@@ -8,7 +8,7 @@ import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.RetryProvider
@@ -32,7 +32,7 @@ import com.daml.network.util.{
   Trees,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M, String3}
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -54,7 +54,7 @@ import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import io.circe.Json
 
 import scala.collection.mutable
@@ -90,7 +90,7 @@ final class DbMultiDomainAcsStore[TXE](
   import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
 
-  override protected def metricsFactory: CantonLabeledMetricsFactory = retryProvider.metricsFactory
+  override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
 
   private val state = new AtomicReference[State](State.empty())
 

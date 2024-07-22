@@ -9,11 +9,6 @@ import com.daml.ledger.api.v2.commands.{
   DisclosedContract as ProtoDisclosedContract,
 }
 import com.daml.ledger.api.v2.value.Identifier as ProtoIdentifier
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.daml.lf.transaction.*
-import com.daml.lf.value.Value.{ContractId, ValueRecord}
-import com.daml.lf.value.Value as Lf
 import com.digitalasset.canton.LfValue
 import com.digitalasset.canton.ledger.api.domain.DisclosedContract
 import com.digitalasset.canton.ledger.api.validation.ValidateDisclosedContractsTest.{
@@ -21,6 +16,11 @@ import com.digitalasset.canton.ledger.api.validation.ValidateDisclosedContractsT
   lf,
   validateDisclosedContracts,
 }
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.transaction.*
+import com.digitalasset.daml.lf.value.Value.{ContractId, ValueRecord}
+import com.digitalasset.daml.lf.value.Value as Lf
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.scalatest.EitherValues
@@ -162,7 +162,7 @@ class ValidateDisclosedContractsTest
       ),
       code = Status.Code.INVALID_ARGUMENT,
       description =
-        s"INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Mismatch between DisclosedContract.contract_id ($otherContractId) and contract_id from decoded DisclosedContract.created_event_blob (${lf.lfContractId.coid})",
+        s"INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Mismatch between DisclosedContract.contract_id ($otherContractId) and contract_id from decoded DisclosedContract.created_event_blob (${lf.lfContractId.coid})",
       metadata = Map.empty,
     )
   }
@@ -184,7 +184,7 @@ class ValidateDisclosedContractsTest
       ),
       code = Status.Code.INVALID_ARGUMENT,
       description =
-        "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Mismatch between DisclosedContract.template_id (otherPkgId:otherModule:otherEntity) and template_id from decoded DisclosedContract.created_event_blob (package:module:entity)",
+        "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Mismatch between DisclosedContract.template_id (otherPkgId:otherModule:otherEntity) and template_id from decoded DisclosedContract.created_event_blob (package:module:entity)",
       metadata = Map.empty,
     )
   }
@@ -203,14 +203,14 @@ class ValidateDisclosedContractsTest
       ),
       code = Status.Code.INVALID_ARGUMENT,
       description =
-        "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Unable to decode disclosed contract event payload: DecodeError(exception com.google.protobuf.InvalidProtocolBufferException: Protocol message contained an invalid tag (zero). while decoding the versioned object)",
+        "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Unable to decode disclosed contract event payload: DecodeError(exception com.google.protobuf.InvalidProtocolBufferException: Protocol message contained an invalid tag (zero). while decoding the versioned object)",
       metadata = Map.empty,
     )
   }
 }
 
 object ValidateDisclosedContractsTest {
-
+  // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
   private val testTxVersion = TransactionVersion.maxVersion
 
   private val validateDisclosedContracts = new ValidateDisclosedContracts
@@ -219,6 +219,7 @@ object ValidateDisclosedContractsTest {
     val templateId: ProtoIdentifier =
       ProtoIdentifier("package", moduleName = "module", entityName = "entity")
     val packageName: String = "pkg-name"
+    val packageVersion: String = "0.1.2"
     val contractId: String = "00" + "00" * 31 + "ef"
     val alice: Ref.Party = Ref.Party.assertFromString("alice")
     private val bob: Ref.Party = Ref.Party.assertFromString("bob")
@@ -253,6 +254,8 @@ object ValidateDisclosedContractsTest {
       ),
     )
     private val packageName: Ref.PackageName = Ref.PackageName.assertFromString(api.packageName)
+    private val packageVersion: Ref.PackageVersion =
+      Ref.PackageVersion.assertFromString(api.packageVersion)
     private val createArg: ValueRecord = ValueRecord(
       tycon = Some(templateId),
       fields = ImmArray(Some(Ref.Name.assertFromString("something")) -> Lf.ValueTrue),
@@ -275,6 +278,7 @@ object ValidateDisclosedContractsTest {
         ),
       ),
       api.keyMaintainers,
+      Ref.PackageName.assertFromString(api.packageName),
     )
 
     private val keyHash: Hash = keyWithMaintainers.globalKey.hash
@@ -284,6 +288,7 @@ object ValidateDisclosedContractsTest {
         coid = lf.lfContractId,
         templateId = lf.templateId,
         packageName = lf.packageName,
+        packageVersion = Some(lf.packageVersion),
         arg = lf.createArg,
         signatories = api.signatories,
         stakeholders = api.stakeholders,
@@ -296,9 +301,10 @@ object ValidateDisclosedContractsTest {
 
     val expectedDisclosedContracts: ImmArray[DisclosedContract] = ImmArray(
       DisclosedContract(
-        templateId,
-        packageName,
-        lfContractId,
+        templateId = templateId,
+        packageName = packageName,
+        packageVersion = Some(packageVersion),
+        contractId = lfContractId,
         argument = createArgWithoutLabels,
         createdAt = Time.Timestamp.assertFromLong(api.createdAtSeconds * 1000000L),
         keyHash = Some(keyHash),
@@ -307,6 +313,7 @@ object ValidateDisclosedContractsTest {
         keyValue = Some(keyWithMaintainers.value),
         signatories = api.signatories,
         stakeholders = api.stakeholders,
+        transactionVersion = testTxVersion,
       )
     )
   }

@@ -20,7 +20,6 @@ final case class IndexerConfig(
     inputMappingParallelism: NonNegativeInt =
       NonNegativeInt.tryCreate(DefaultInputMappingParallelism),
     maxInputBufferSize: NonNegativeInt = NonNegativeInt.tryCreate(DefaultMaxInputBufferSize),
-    packageMetadataView: PackageMetadataViewConfig = DefaultPackageMetadataViewConfig,
     restartDelay: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(DefaultRestartDelay.toSeconds),
     submissionBatchSize: Long = DefaultSubmissionBatchSize,
@@ -63,6 +62,4 @@ object IndexerConfig {
   val DefaultEnableCompression: Boolean = false
   val DefaultMaxOutputBatchedBufferSize: Int = 16
   val DefaultMaxTailerBatchSize: Int = 10
-  val DefaultPackageMetadataViewConfig: PackageMetadataViewConfig =
-    PackageMetadataViewConfig.Default
 }

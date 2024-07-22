@@ -3,7 +3,7 @@ build-options:
 - --enable-interfaces=yes
 name: carbonv1-tests
 source: .
-version: 3.0.0
+version: 3.1.0
 dependencies:
 - daml-prim
 - daml-stdlib

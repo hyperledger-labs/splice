@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.store.dao
 
-import com.daml.daml_lf_dev.DamlLf.Archive
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
@@ -13,23 +12,20 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.domain.ParticipantId
 import com.digitalasset.canton.ledger.api.health.ReportsHealth
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
-import com.digitalasset.canton.ledger.participant.state.index.v2.{
-  IndexerPartyDetails,
-  PackageDetails,
-}
-import com.digitalasset.canton.ledger.participant.state.v2 as state
+import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
-import com.digitalasset.canton.platform.store.entries.{PackageLedgerEntry, PartyLedgerEntry}
+import com.digitalasset.canton.platform.store.entries.PartyLedgerEntry
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -51,7 +47,7 @@ private[platform] trait LedgerDaoTransactionsReader {
   def getTransactionTrees(
       startExclusive: Offset,
       endInclusive: Offset,
-      requestingParties: Set[Party],
+      requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -89,7 +85,7 @@ private[platform] trait LedgerDaoEventsReader {
 
   // TODO(i16065): Re-enable getEventsByContractKey tests
 //  def getEventsByContractKey(
-//      contractKey: com.daml.lf.value.Value,
+//      contractKey: com.digitalasset.daml.lf.value.Value,
 //      templateId: Ref.Identifier,
 //      requestingParties: Set[Party],
 //      endExclusiveSeqId: Option[Long],
@@ -120,7 +116,10 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
   ): Future[List[IndexerPartyDetails]]
 
   /** Returns a list of all known parties. */
-  def listKnownParties()(implicit
+  def listKnownParties(
+      fromExcl: Option[Party],
+      maxResults: Int,
+  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[List[IndexerPartyDetails]]
 
@@ -128,24 +127,6 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
       startExclusive: Offset,
       endInclusive: Offset,
   )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, PartyLedgerEntry), NotUsed]
-
-  /** Returns a list of all known Daml-LF packages */
-  def listLfPackages()(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[Map[PackageId, PackageDetails]]
-
-  /** Returns the given Daml-LF archive */
-  def getLfArchive(packageId: PackageId)(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[Option[Archive]]
-
-  /** Returns a stream of package upload entries.
-    * @return a stream of package entries tupled with their offset
-    */
-  def getPackageEntries(
-      startExclusive: Offset,
-      endInclusive: Offset,
-  )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, PackageLedgerEntry), NotUsed]
 
   /** Prunes participant events and completions in archived history and remembers largest
     * pruning offset processed thus far.
@@ -213,16 +194,6 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
     * @return Ok when the operation was successful otherwise a Duplicate
     */
   def storePartyEntry(offset: Offset, partyEntry: PartyLedgerEntry)(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[PersistenceResponse]
-
-  /** Store a Daml-LF package upload result.
-    */
-  def storePackageEntry(
-      offset: Offset,
-      packages: List[(Archive, PackageDetails)],
-      optEntry: Option[PackageLedgerEntry],
-  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse]
 

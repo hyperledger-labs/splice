@@ -1,4 +1,4 @@
-import com.daml.lf.value.Value.ContractId
+import com.digitalasset.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.splice.{splitwell => splitwellCodegen}
 import com.daml.network.console.{AnsExternalAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._

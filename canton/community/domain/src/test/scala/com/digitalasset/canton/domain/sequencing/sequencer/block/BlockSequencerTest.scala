@@ -16,26 +16,26 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.BlockSequencerStateManager.ChunkState
 import com.digitalasset.canton.domain.block.data.memory.InMemorySequencerBlockStore
 import com.digitalasset.canton.domain.block.data.{BlockEphemeralState, BlockInfo, EphemeralState}
+import com.digitalasset.canton.domain.block.update.{
+  BlockUpdate,
+  BlockUpdateGenerator,
+  OrderedBlockUpdate,
+  SignedChunkEvents,
+}
 import com.digitalasset.canton.domain.block.{
   BlockEvents,
   BlockSequencerStateManager,
   BlockSequencerStateManagerBase,
-  BlockUpdate,
-  BlockUpdateGenerator,
-  OrderedBlockUpdate,
   RawLedgerBlock,
   SequencerDriverHealthStatus,
-  SignedChunkEvents,
 }
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
+import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.domain.sequencing.sequencer.SequencerIntegration
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
-  RegisterMemberError,
-  SequencerWriteError,
-}
 import com.digitalasset.canton.domain.sequencing.traffic.RateLimitManagerTesting
-import com.digitalasset.canton.domain.sequencing.traffic.store.memory.InMemoryTrafficBalanceStore
-import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
+import com.digitalasset.canton.domain.sequencing.traffic.store.memory.InMemoryTrafficPurchasedStore
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.resource.MemoryStorage
@@ -43,23 +43,19 @@ import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   SendAsyncError,
   SignedContent,
-  SubmissionRequest,
 }
 import com.digitalasset.canton.time.{Clock, SimClock}
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.topology.client.{
-  StoreBasedDomainTopologyClient,
-  StoreBasedDomainTopologyClientX,
-}
+import com.digitalasset.canton.topology.client.StoreBasedDomainTopologyClient
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
   EffectiveTime,
   SequencedTime,
-  TopologyTransactionTestFactoryX,
+  TopologyTransactionTestFactory,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
-import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX
-import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStoreX
+import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction
+import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
 import org.apache.pekko.NotUsed
@@ -79,12 +75,12 @@ class BlockSequencerTest
 
   "BlockSequencer" should {
     "process a lot of blocks during catch up" in withEnv { implicit env =>
-      env.fakeBlockSequencerOps.completed.future.map(_ => succeed)
+      env.fakeBlockOrderer.completed.future.map(_ => succeed)
     }
   }
 
   private val topologyTransactionFactory =
-    new TopologyTransactionTestFactoryX(loggerFactory, executorService)
+    new TopologyTransactionTestFactory(loggerFactory, executorService)
 
   private val N = 1_000_000
 
@@ -102,7 +98,7 @@ class BlockSequencerTest
     private val domainId = topologyTransactionFactory.domainId1
     private val sequencer1 = topologyTransactionFactory.sequencer1
     private val topologyStore =
-      new InMemoryTopologyStoreX(DomainStore(domainId), loggerFactory, timeouts)
+      new InMemoryTopologyStore(DomainStore(domainId), loggerFactory, timeouts)
 
     topologyStore
       .update(
@@ -114,12 +110,12 @@ class BlockSequencerTest
           topologyTransactionFactory.ns1k1_k1,
           topologyTransactionFactory.okmS1k7_k1,
           topologyTransactionFactory.dmp1_k1,
-          topologyTransactionFactory.okm1bk5_k1, // this one to allow verification of the sender's signature
-        ).map(ValidatedTopologyTransactionX(_, rejectionReason = None)),
+          topologyTransactionFactory.okm1bk5k1E_k1, // this one to allow verification of the sender's signature
+        ).map(ValidatedTopologyTransaction(_, rejectionReason = None)),
       )
       .futureValue
 
-    private val topologyClient = new StoreBasedDomainTopologyClientX(
+    private val topologyClient = new StoreBasedDomainTopologyClient(
       mock[Clock],
       domainId,
       testedProtocolVersion,
@@ -141,6 +137,7 @@ class BlockSequencerTest
       // This works even though the crypto owner is the domain manager!!!
       topologyTransactionFactory.cryptoApi.crypto,
       CachingConfigs.testing,
+      defaultStaticDomainParameters,
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
       loggerFactory,
@@ -149,14 +146,14 @@ class BlockSequencerTest
     private val store =
       new InMemorySequencerBlockStore(None, loggerFactory)
 
-    private val balanceStore = new InMemoryTrafficBalanceStore(loggerFactory)
+    private val balanceStore = new InMemoryTrafficPurchasedStore(loggerFactory)
 
-    val fakeBlockSequencerOps = new FakeBlockSequencerOps(N)
+    val fakeBlockOrderer = new FakeBlockOrderer(N)
     private val fakeBlockSequencerStateManager = new FakeBlockSequencerStateManager
     private val storage = new MemoryStorage(loggerFactory, timeouts)
     private val blockSequencer =
       new BlockSequencer(
-        fakeBlockSequencerOps,
+        fakeBlockOrderer,
         name = "test",
         domainId,
         cryptoApi,
@@ -180,6 +177,7 @@ class BlockSequencerTest
         SequencerMetrics.noop(this.getClass.getName),
         loggerFactory,
         unifiedSequencer = testedUseUnifiedSequencer,
+        runtimeReady = FutureUnlessShutdown.unit,
       )
 
     override def close(): Unit = {
@@ -192,7 +190,7 @@ class BlockSequencerTest
     }
   }
 
-  class FakeBlockSequencerOps(n: Int) extends BlockSequencerOps {
+  class FakeBlockOrderer(n: Int) extends BlockOrderer {
 
     val completed: Promise[Unit] = Promise()
 
@@ -216,17 +214,18 @@ class BlockSequencerTest
     override def close(): Unit = ()
 
     // No need to implement these methods for the test
-    override def send(signedSubmission: SignedContent[SubmissionRequest])(implicit
+    override def send(signedSubmission: SignedOrderingRequest)(implicit
         traceContext: TraceContext
     ): EitherT[Future, SendAsyncError, Unit] = ???
-    override def register(member: Member)(implicit
-        traceContext: TraceContext
-    ): EitherT[Future, SequencerWriteError[RegisterMemberError], Unit] = ???
     override def health(implicit traceContext: TraceContext): Future[SequencerDriverHealthStatus] =
       ???
     override def acknowledge(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(implicit
         traceContext: TraceContext
     ): Future[Unit] = ???
+
+    override def firstBlockHeight: Long = ???
+
+    override def orderingTimeFixMode: OrderingTimeFixMode = ???
   }
 
   class FakeBlockSequencerStateManager extends BlockSequencerStateManagerBase {
@@ -238,8 +237,9 @@ class BlockSequencerTest
     ): Flow[BlockEvents, Traced[OrderedBlockUpdate[SignedChunkEvents]], NotUsed] =
       Flow[BlockEvents].mapConcat(_ => Seq.empty)
 
-    override def applyBlockUpdate
-        : Flow[Traced[BlockUpdate[SignedChunkEvents]], Traced[CantonTimestamp], NotUsed] =
+    override def applyBlockUpdate(
+        dbSequencerIntegration: SequencerIntegration
+    ): Flow[Traced[BlockUpdate[SignedChunkEvents]], Traced[CantonTimestamp], NotUsed] =
       Flow[Traced[BlockUpdate[SignedChunkEvents]]].map(_.map(_ => CantonTimestamp.MinValue))
 
     override def getHeadState: BlockSequencerStateManager.HeadState =

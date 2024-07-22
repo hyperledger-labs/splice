@@ -4,17 +4,17 @@
 package com.digitalasset.canton.platform.store.interfaces
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.Bytes
-import com.daml.lf.data.Ref.{PackageName, Party}
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.ledger.EventId
-import com.daml.lf.transaction.GlobalKey
-import com.daml.lf.value.Value as LfValue
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.v2.ReassignmentInfo
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.ReassignmentInfo
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStore.EventSequentialId
 import com.digitalasset.canton.platform.{ContractId, Identifier}
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref.{PackageName, Party}
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.ledger.EventId
+import com.digitalasset.daml.lf.transaction.GlobalKey
+import com.digitalasset.daml.lf.value.Value as LfValue
 
 /** Generic ledger update event.
   *
@@ -44,7 +44,7 @@ object TransactionLogUpdate {
       offset: Offset,
       events: Vector[Event],
       completionDetails: Option[CompletionDetails],
-      domainId: Option[String],
+      domainId: String,
       recordTime: Timestamp,
   ) extends TransactionLogUpdate
 
@@ -73,7 +73,7 @@ object TransactionLogUpdate {
     sealed trait Reassignment
     final case class Assigned(createdEvent: CreatedEvent) extends Reassignment
     final case class Unassigned(
-        unassign: com.digitalasset.canton.ledger.participant.state.v2.Reassignment.Unassign
+        unassign: com.digitalasset.canton.ledger.participant.state.Reassignment.Unassign
     ) extends Reassignment
   }
 
@@ -113,6 +113,7 @@ object TransactionLogUpdate {
       ledgerEffectiveTime: Timestamp,
       templateId: Identifier,
       packageName: PackageName,
+      packageVersion: Option[Ref.PackageVersion],
       commandId: String,
       workflowId: String,
       contractKey: Option[LfValue.VersionedValue],

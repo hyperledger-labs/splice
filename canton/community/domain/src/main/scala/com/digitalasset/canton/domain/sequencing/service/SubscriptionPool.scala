@@ -5,6 +5,7 @@ package com.digitalasset.canton.domain.sequencing.service
 
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.service.SubscriptionPool.{
   PoolClosed,
@@ -43,7 +44,7 @@ class SubscriptionPool[Subscription <: ManagedSubscription](
   // as the subscriptions are mutable, any access or modifications to this pool are expected to be synchronized
   private val pool = TrieMap[Member, mutable.Buffer[Subscription]]()
 
-  private val subscribersGauge = metrics.subscriptionsGauge
+  private val subscribersGauge = metrics.publicApi.subscriptionsGauge
 
   def activeSubscriptions(): Seq[Subscription] = pool.values.flatten.toSeq
 

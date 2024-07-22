@@ -4,8 +4,8 @@
 package com.digitalasset.canton.http.endpoints
 
 import com.daml.ledger.api.v2.admin.metering_report_service
-import com.daml.lf.data.Ref.ApplicationId
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Ref.ApplicationId
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.struct
 import com.google.protobuf.struct.Struct
 import org.scalatest.freespec.AnyFreeSpec
@@ -13,11 +13,11 @@ import org.scalatest.matchers.should.Matchers
 import scalaz.\/-
 import spray.json.enrichAny
 
-import java.time.LocalDate
+import java.time.{Instant, LocalDate}
 
 class MeteringReportEndpointTest extends AnyFreeSpec with Matchers {
 
-  import MeteringReportEndpoint._
+  import MeteringReportEndpoint.*
 
   "MeteringReportEndpoint" - {
 
@@ -35,13 +35,13 @@ class MeteringReportEndpointTest extends AnyFreeSpec with Matchers {
     }
 
     "should convert to timestamp to protobuf timestamp" in {
-      val expected = Timestamp.assertFromString("2022-02-03T00:00:00Z")
+      val expected = Timestamp.assertFromInstant(Instant.parse("2022-02-03T00:00:00Z"))
       val actual = toTimestamp(LocalDate.of(2022, 2, 3))
       actual shouldBe expected
     }
 
     "should convert to protobuf request" in {
-      import request._
+      import request.*
       val expected = metering_report_service.GetMeteringReportRequest(
         Some(toPbTimestamp(toTimestamp(from))),
         to.map(toTimestamp).map(toPbTimestamp),

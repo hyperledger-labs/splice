@@ -3,7 +3,7 @@
 
 package com.daml.network.splitwell.store.db
 
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice.wallet.payment.AppPaymentRequest
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.Contract

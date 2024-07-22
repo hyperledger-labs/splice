@@ -4,14 +4,21 @@
 package com.daml.network.setup
 
 import cats.implicits.{showInterpolator, toFoldableOps}
-import com.daml.network.environment.{RetryFor, RetryProvider, TopologyAdminConnection}
+import com.daml.network.environment.{
+  RetryFor,
+  RetryProvider,
+  StatusAdminConnection,
+  TopologyAdminConnection,
+}
 import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.util.PrettyInstances.prettyString
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -19,7 +26,7 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 
 class NodeInitializer(
-    connection: TopologyAdminConnection,
+    connection: TopologyAdminConnection & StatusAdminConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
@@ -82,6 +89,21 @@ class NodeInitializer(
           importBootstrapTxs(bootstrapTxs, dump.id.uid)
         }
       }
+      // the id must be initialized before we can import the snapshot
+      _ <- retryProvider.ensureThat(
+        RetryFor.WaitingOnInitDependency,
+        "node_init",
+        s"node is initialized with id $expectedId",
+        connection.getStatus.map[Either[String, Unit]] {
+          case NodeStatus.Failure(msg) => Left(s"Node is in failure state: $msg")
+          // the first step in the canton init process
+          case NodeStatus.NotInitialized(_, Some(WaitingForId)) => Left("Node is waiting for an ID")
+          case NodeStatus.NotInitialized(_, _) => Right(())
+          case NodeStatus.Success(_) => Right(())
+        },
+        (_: String) => connection.initId(expectedId).map(_ => ()),
+        logger,
+      )(implicitly, implicitly, prettyString, implicitly, implicitly)
       _ <- dump.authorizedStoreSnapshot.traverse_ { snapshot =>
         importAuthorizedStoreSnapshot(snapshot)
       }
@@ -107,10 +129,6 @@ class NodeInitializer(
             }
           }
         } else Future.unit
-      _ <- {
-        logger.info(s"Triggering node initialization for node with ID $expectedId")
-        connection.initId(expectedId)
-      }
     } yield ()
   }
 
@@ -126,7 +144,7 @@ class NodeInitializer(
   }
 
   private def importBootstrapTxs(
-      bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
+      bootstrapTxs: Seq[GenericSignedTopologyTransaction],
       uid: UniqueIdentifier,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = for {
     uploadedBootstrapTxs <- connection.getIdentityTransactions(uid, TopologyStoreId.AuthorizedStore)

@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.sequencing.client
 
+import cats.data.EitherT
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.store.SequencerCounterTrackerStore
@@ -31,8 +33,8 @@ import scala.jdk.DurationConverters.*
 class PeriodicAcknowledgements(
     isHealthy: => Boolean,
     interval: FiniteDuration,
-    fetchLatestCleanTimestamp: TraceContext => Future[Option[CantonTimestamp]],
-    acknowledge: Traced[CantonTimestamp] => Future[Unit],
+    fetchLatestCleanTimestamp: TraceContext => FutureUnlessShutdown[Option[CantonTimestamp]],
+    acknowledge: Traced[CantonTimestamp] => EitherT[FutureUnlessShutdown, String, Boolean],
     clock: Clock,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -44,25 +46,43 @@ class PeriodicAcknowledgements(
 
   private def update(): Unit =
     withNewTraceContext { implicit traceContext =>
-      def ackIfChanged(timestamp: CantonTimestamp): Future[Unit] = {
+      def ackIfChanged(
+          timestamp: CantonTimestamp
+      ): EitherT[FutureUnlessShutdown, String, Boolean] = {
         val priorAck = priorAckRef.getAndSet(Some(timestamp))
         val changed = !priorAck.contains(timestamp)
         if (changed) {
           logger.debug(s"Acknowledging clean timestamp: $timestamp")
           acknowledge(Traced(timestamp))
-        } else Future.unit
+        } else EitherT.rightT(true)
       }
 
       if (isHealthy) {
-        val updateF = performUnlessClosingF(functionFullName) {
-          for {
-            latestClean <- fetchLatestCleanTimestamp(traceContext)
-            _ <- latestClean.fold(Future.unit)(ackIfChanged)
-          } yield ()
-        }.onShutdown(
-          logger.debug("Acknowledging sequencer timestamp skipped due to shutdown")
+        val updateET: EitherT[Future, String, Boolean] =
+          performUnlessClosingEitherUSF(functionFullName) {
+            for {
+              latestClean <- EitherT
+                .right(fetchLatestCleanTimestamp(traceContext))
+              result <- latestClean.fold(EitherT.rightT[FutureUnlessShutdown, String](true))(
+                ackIfChanged
+              )
+            } yield result
+          }.onShutdown {
+            logger.debug("Acknowledging sequencer timestamp skipped due to shutdown")
+            Right(false)
+          }
+        // only log on future.failed
+        addToFlushAndLogError("periodic acknowledgement")(
+          updateET.value.map {
+            case Right(true) => // logged in sequencer client
+            case Right(false) =>
+              logger.info("Failed to acknowledge clean timestamp as sequencer was not available")
+            case Left(str) =>
+              logger.warn(
+                s"Failed to acknowledge clean timestamp (usually because sequencer is down): $str"
+              )
+          }
         )
-        addToFlushAndLogError("periodic acknowledgement")(updateF)
       } else {
         logger.debug("Skipping periodic acknowledgement because sequencer client is not healthy")
       }
@@ -84,8 +104,8 @@ class PeriodicAcknowledgements(
 }
 
 object PeriodicAcknowledgements {
-  type FetchCleanTimestamp = TraceContext => Future[Option[CantonTimestamp]]
-  val noAcknowledgements: FetchCleanTimestamp = _ => Future.successful(None)
+  type FetchCleanTimestamp = TraceContext => FutureUnlessShutdown[Option[CantonTimestamp]]
+  val noAcknowledgements: FetchCleanTimestamp = _ => FutureUnlessShutdown.pure(None)
 
   def create(
       interval: FiniteDuration,
@@ -103,7 +123,10 @@ object PeriodicAcknowledgements {
       Traced.lift((ts, tc) =>
         client
           .acknowledgeSigned(ts)(tc)
-          .valueOr(e => if (!client.isClosing) throw new RuntimeException(e))
+          .leftFlatMap(e =>
+            if (!client.isClosing) EitherT.leftT(e)
+            else EitherT.rightT(false)
+          )
       ),
       clock,
       timeouts,
@@ -116,7 +139,9 @@ object PeriodicAcknowledgements {
   )(implicit executionContext: ExecutionContext): FetchCleanTimestamp =
     traceContext =>
       for {
-        cursorO <- counterTrackerStore.preheadSequencerCounter(traceContext)
+        cursorO <- FutureUnlessShutdown.outcomeF(
+          counterTrackerStore.preheadSequencerCounter(traceContext)
+        )
         timestampO = cursorO.map(_.timestamp)
       } yield timestampO
 }

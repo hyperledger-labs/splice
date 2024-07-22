@@ -23,7 +23,7 @@ import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
@@ -231,7 +231,7 @@ object HttpSvAppClient {
   }
 
   case class SequencerSnapshot(
-      topologySnapshot: GenericStoredTopologyTransactionsX,
+      topologySnapshot: GenericStoredTopologyTransactions,
       sequencerSnapshot: CantonSequencerSnapshot,
   )
 

@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.store.memory
 
 import cats.Id
 import cats.data.{EitherT, OptionT}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.protocol.*
@@ -73,10 +74,9 @@ class InMemoryContractStore(protected val loggerFactory: NamedLoggerFactory)(
   }
 
   override def storeCreatedContracts(
-      requestCounter: RequestCounter,
-      creations: Seq[WithTransactionId[SerializableContract]],
+      creations: Seq[(WithTransactionId[SerializableContract], RequestCounter)]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    creations.foreach { case WithTransactionId(creation, transactionId) =>
+    creations.foreach { case (WithTransactionId(creation, transactionId), requestCounter) =>
       store(StoredContract.fromCreatedContract(creation, requestCounter, transactionId))
     }
     Future.unit

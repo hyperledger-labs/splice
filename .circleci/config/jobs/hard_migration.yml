@@ -43,6 +43,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -90,14 +93,17 @@ jobs:
 
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
-
+            echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
@@ -147,6 +153,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -202,9 +211,12 @@ jobs:
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:

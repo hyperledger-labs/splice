@@ -6,13 +6,13 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
-import com.daml.lf.data.Ref.HexString
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Ref.HexString
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
 import io.circe.parser.parse as circeParse

@@ -15,12 +15,12 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Identifier, ParticipantId, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
-  PartyToParticipantX,
+  PartyToParticipant,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -122,7 +122,7 @@ class ParticipantPartyMigrator(
   }
 
   private def toPartyId(partyHint: String, participantId: ParticipantId) = PartyId(
-    UniqueIdentifier(Identifier.tryCreate(partyHint), participantId.uid.namespace)
+    UniqueIdentifier.tryCreate(partyHint, participantId.uid.namespace)
   )
 
   private def ensurePartiesMigrated(
@@ -134,7 +134,7 @@ class ParticipantPartyMigrator(
       .traverse(partyIds) { partyId =>
         for {
           domainId <- participantAdminConnection.getDomainId(domainAlias)
-          _ <- participantAdminConnection.ensureTopologyMapping[PartyToParticipantX](
+          _ <- participantAdminConnection.ensureTopologyMapping[PartyToParticipant](
             store = TopologyStoreId.DomainStore(domainId),
             s"Party $partyId is hosted on participant $participantId",
             EitherT {
@@ -158,7 +158,7 @@ class ParticipantPartyMigrator(
             },
             _ =>
               Right(
-                PartyToParticipantX(
+                PartyToParticipant.tryCreate(
                   partyId = partyId,
                   domainId = None,
                   threshold = PositiveInt.one,

@@ -5,7 +5,7 @@ package com.daml.network.environment
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.http.v0.{definitions as jsonV0}
+import com.daml.network.http.v0.definitions as jsonV0
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.health.ComponentStatus
@@ -67,7 +67,7 @@ object SpliceStatus {
     status match {
       case NodeStatus.Success(status) =>
         jsonV0.SuccessStatusResponse(SpliceStatus.fromStatus(status).toHttp)
-      case NodeStatus.NotInitialized(active) =>
+      case NodeStatus.NotInitialized(active, _) =>
         jsonV0.NotInitializedStatusResponse(jsonV0.NotInitialized(active))
       case NodeStatus.Failure(msg) =>
         jsonV0.FailureStatusResponse(jsonV0.ErrorResponse(msg))
@@ -81,7 +81,7 @@ object SpliceStatus {
         deserialize(success).map(NodeStatus.Success(_))
       case jsonV0.NodeStatus.members
             .NotInitializedStatusResponse(jsonV0.NotInitializedStatusResponse(notInitialized)) =>
-        Right(NodeStatus.NotInitialized(notInitialized.active))
+        Right(NodeStatus.NotInitialized(notInitialized.active, None))
       case jsonV0.NodeStatus.members.FailureStatusResponse(jsonV0.FailureStatusResponse(failure)) =>
         Left(failure.error)
     }
@@ -92,10 +92,10 @@ object SpliceStatus {
         .fromProtoPrimitive(json.id, "Status.id")
         .leftMap(_ => "Failed to deserialize UID")
       ports <- json.ports.toList
-        .traverse { case (json, i) =>
+        .traverse { case (json, port) =>
           Port
-            .create(i)
-            .leftMap(InvariantViolation.toProtoDeserializationError)
+            .create(port)
+            .leftMap(InvariantViolation.toProtoDeserializationError(port.toString, _))
             .map(p => (json, p))
         }
         .map(_.toMap)

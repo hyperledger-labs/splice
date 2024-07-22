@@ -3,11 +3,10 @@
 
 package com.digitalasset.canton.participant.ledger.api
 
+import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.lf.engine.Engine
 import com.daml.tracing.DefaultOpenTelemetry
-import com.digitalasset.canton.LedgerParticipantId
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -18,17 +17,18 @@ import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.MutablePackageNameMapResolver
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.platform.apiserver.*
 import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReportKey
 import com.digitalasset.canton.platform.indexer.IndexerConfig
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
-import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
+import com.digitalasset.canton.{LedgerParticipantId, LfPackageId}
+import com.digitalasset.daml.lf.engine.Engine
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 
 import scala.util.{Failure, Success}
@@ -40,21 +40,21 @@ object CantonLedgerApiServerWrapper extends NoTracing {
 
   /** Config for ledger API server and indexer
     *
-    * @param serverConfig             ledger API server configuration
-    * @param jsonApiConfig            JSON API configuration
-    * @param indexerConfig            indexer configuration
-    * @param indexerLockIds           Optional lock IDs to be used for indexer HA
-    * @param participantId            unique participant id used e.g. for a unique ledger API server index db name
-    * @param engine                   daml engine shared with Canton for performance reasons
-    * @param syncService              canton sync service implementing both read and write services
-    * @param storageConfig            canton storage config so that indexer can share the participant db
-    * @param cantonParameterConfig    configurations meant to be overridden primarily in tests (applying to all participants)
-    * @param testingTimeService       an optional service during testing for advancing time, participant-specific
-    * @param adminToken               canton admin token for ledger api auth
-    * @param loggerFactory            canton logger factory
-    * @param tracerProvider           tracer provider for open telemetry grpc injection
-    * @param metrics                  upstream metrics module
-    * @param maxDeduplicationDuration maximum time window during which commands can be deduplicated.
+    * @param serverConfig          ledger API server configuration
+    * @param jsonApiConfig         JSON API configuration
+    * @param indexerConfig         indexer configuration
+    * @param indexerHaConfig       configuration for indexer HA
+    * @param participantId         unique participant id used e.g. for a unique ledger API server index db name
+    * @param engine                daml engine shared with Canton for performance reasons
+    * @param syncService           canton sync service implementing both read and write services
+    * @param storageConfig         canton storage config so that indexer can share the participant db
+    * @param cantonParameterConfig configurations meant to be overridden primarily in tests (applying to all participants)
+    * @param testingTimeService    an optional service during testing for advancing time, participant-specific
+    * @param adminToken            canton admin token for ledger api auth
+    * @param enableCommandInspection     whether canton should support inspection service or not
+    * @param loggerFactory         canton logger factory
+    * @param tracerProvider        tracer provider for open telemetry grpc injection
+    * @param metrics               upstream metrics module
     */
   final case class Config(
       serverConfig: LedgerApiServerConfig,
@@ -68,9 +68,10 @@ object CantonLedgerApiServerWrapper extends NoTracing {
       cantonParameterConfig: ParticipantNodeParameters,
       testingTimeService: Option[TimeServiceBackend],
       adminToken: CantonAdminToken,
+      enableCommandInspection: Boolean,
       override val loggerFactory: NamedLoggerFactory,
       tracerProvider: TracerProvider,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       jsonApiMetrics: HttpApiMetrics,
       meteringReportKey: MeteringReportKey,
       maxDeduplicationDuration: NonNegativeFiniteDuration,
@@ -88,79 +89,56 @@ object CantonLedgerApiServerWrapper extends NoTracing {
     */
   def initialize(
       config: Config,
+      parameters: ParticipantNodeParameters,
       startLedgerApiServer: Boolean,
       futureSupervisor: FutureSupervisor,
-      packageNameMapResolver: MutablePackageNameMapResolver,
+      excludedPackageIds: Set[LfPackageId],
+      ledgerApiStore: Eval[LedgerApiStore],
   )(implicit
       ec: ExecutionContextIdlenessExecutorService,
       actorSystem: ActorSystem,
   ): EitherT[FutureUnlessShutdown, LedgerApiServerError, LedgerApiServerState] = {
+    implicit val tracer: Tracer = config.tracerProvider.tracer
 
-    val ledgerApiStorageE = LedgerApiStorage.fromStorageConfig(
-      config.storageConfig,
-      config.participantId,
-    )
+    val startableStoppableLedgerApiServer =
+      new StartableStoppableLedgerApiServer(
+        config = config,
+        telemetry = new DefaultOpenTelemetry(config.tracerProvider.openTelemetry),
+        futureSupervisor = futureSupervisor,
+        parameters = parameters,
+        commandProgressTracker = config.syncService.commandProgressTracker,
+        excludedPackageIds = excludedPackageIds,
+        ledgerApiStore = ledgerApiStore,
+      )
+    val startFUS = for {
+      _ <-
+        if (startLedgerApiServer) startableStoppableLedgerApiServer.start()
+        else FutureUnlessShutdown.unit
+    } yield ()
 
-    EitherT
-      .fromEither[FutureUnlessShutdown](ledgerApiStorageE)
-      .flatMap { ledgerApiStorage =>
-        val connectionPoolConfig = DbSupport.ConnectionPoolConfig(
-          connectionPoolSize = config.storageConfig.numConnectionsLedgerApiServer.unwrap,
-          connectionTimeout = config.serverConfig.databaseConnectionTimeout.underlying,
-        )
-
-        val dbConfig = DbSupport.DbConfig(
-          jdbcUrl = ledgerApiStorage.jdbcUrl,
-          connectionPool = connectionPoolConfig,
-          postgres = config.serverConfig.postgresDataSource,
-        )
-
-        val participantDataSourceConfig =
-          DbSupport.ParticipantDataSourceConfig(ledgerApiStorage.jdbcUrl)
-
-        implicit val tracer = config.tracerProvider.tracer
-
-        val startableStoppableLedgerApiServer =
-          new StartableStoppableLedgerApiServer(
-            config = config,
-            participantDataSourceConfig = participantDataSourceConfig,
-            dbConfig = dbConfig,
-            telemetry = new DefaultOpenTelemetry(config.tracerProvider.openTelemetry),
-            futureSupervisor = futureSupervisor,
-            packageNameMapResolver = packageNameMapResolver,
-          )
-        val startFUS = for {
-          _ <-
-            if (startLedgerApiServer) startableStoppableLedgerApiServer.start()
-            else FutureUnlessShutdown.unit
-        } yield ()
-
-        EitherT(startFUS.transformWith {
-          case Success(_) =>
-            FutureUnlessShutdown.pure(
-              Either.right(
-                LedgerApiServerState(
-                  ledgerApiStorage,
-                  startableStoppableLedgerApiServer,
-                  config.logger,
-                  config.cantonParameterConfig.processingTimeouts,
-                )
-              )
+    EitherT(startFUS.transformWith {
+      case Success(_) =>
+        FutureUnlessShutdown.pure(
+          Either.right(
+            LedgerApiServerState(
+              startableStoppableLedgerApiServer,
+              config.logger,
+              config.cantonParameterConfig.processingTimeouts,
             )
-          case Failure(e) => FutureUnlessShutdown.pure(Left(FailedToStartLedgerApiServer(e)))
-        })
-      }
+          )
+        )
+      case Failure(e) => FutureUnlessShutdown.pure(Left(FailedToStartLedgerApiServer(e)))
+    })
   }
 
   final case class LedgerApiServerState(
-      ledgerApiStorage: LedgerApiStorage,
       startableStoppableLedgerApi: StartableStoppableLedgerApiServer,
       override protected val logger: TracedLogger,
       protected override val timeouts: ProcessingTimeout,
   ) extends FlagCloseable {
 
     override protected def onClosed(): Unit =
-      Lifecycle.close(startableStoppableLedgerApi, ledgerApiStorage)(logger)
+      Lifecycle.close(startableStoppableLedgerApi)(logger)
 
     override def toString: String = getClass.getSimpleName
   }

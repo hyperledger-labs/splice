@@ -11,9 +11,8 @@ import com.digitalasset.canton.crypto.{
   RandomTest,
   SigningTest,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.scalatest.wordspec.AsyncWordSpec
-
-import scala.concurrent.Future
 
 class SymbolicCryptoTest
     extends AsyncWordSpec
@@ -25,8 +24,8 @@ class SymbolicCryptoTest
 
   "SymbolicCrypto" can {
 
-    def symbolicCrypto(): Future[Crypto] =
-      Future.successful(
+    def symbolicCrypto(): FutureUnlessShutdown[Crypto] =
+      FutureUnlessShutdown.pure(
         SymbolicCrypto.create(
           testedReleaseProtocolVersion,
           timeouts,
@@ -36,13 +35,13 @@ class SymbolicCryptoTest
 
     behave like signingProvider(SymbolicCryptoProvider.supportedSigningKeySchemes, symbolicCrypto())
     behave like encryptionProvider(
-      SymbolicCryptoProvider.supportedEncryptionKeySchemes,
+      SymbolicCryptoProvider.supportedEncryptionSpecs.algorithms.forgetNE,
       SymbolicCryptoProvider.supportedSymmetricKeySchemes,
       symbolicCrypto(),
     )
     behave like privateKeySerializerProvider(
       SymbolicCryptoProvider.supportedSigningKeySchemes,
-      SymbolicCryptoProvider.supportedEncryptionKeySchemes,
+      SymbolicCryptoProvider.supportedEncryptionSpecs.keys.forgetNE,
       symbolicCrypto(),
     )
     behave like randomnessProvider(symbolicCrypto().map(_.pureCrypto))

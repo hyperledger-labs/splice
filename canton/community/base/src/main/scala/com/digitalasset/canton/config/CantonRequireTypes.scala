@@ -76,7 +76,7 @@ object CantonRequireTypes {
       */
     def maxLength: Int
     // optionally give a name for the type of String you are attempting to validate for nicer error messages
-    def name: Option[String] = None
+    protected def name: Option[String] = None
 
     // overwriting equals here to improve console UX - see e.g. issue i7071 for context
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
@@ -179,13 +179,6 @@ object CantonRequireTypes {
         errorMsg(str, maxLength, name),
       )
     }
-    def fromProtoPrimitive(
-        str: String,
-        name: Option[String] = None,
-    ): ParsingResult[LengthLimitedString] =
-      LengthLimitedString
-        .create(str, defaultMaxLength, name)
-        .leftMap(e => ProtoInvariantViolation(e))
 
     // Should be used rarely - most of the time SetParameter[String255] etc.
     // (defined through LengthLimitedStringCompanion) should be used
@@ -291,11 +284,11 @@ object CantonRequireTypes {
       new String100(str)(name)
   }
 
-  /** Limit used by [[com.digitalasset.canton.topology.Identifier]].
+  /** Limit used by [[com.digitalasset.canton.topology.UniqueIdentifier]].
     *
     * @see com.digitalasset.canton.topology.Identifier for documentation on its origin
     */
-  final case class String185(str: String)(override val name: Option[String] = None)
+  final case class String185(str: String)(override protected val name: Option[String] = None)
       extends LengthLimitedString {
     override def maxLength: Int = String185.maxLength
   }
@@ -348,11 +341,11 @@ object CantonRequireTypes {
 
   /** Length limitation for an [[com.digitalasset.canton.protocol.LfTemplateId]].
     * A [[com.digitalasset.canton.protocol.LfTemplateId]] consists of
-    * - The module name ([[com.daml.lf.data.Ref.DottedName]])
-    * - The template name ([[com.daml.lf.data.Ref.DottedName]])
+    * - The module name ([[com.digitalasset.daml.lf.data.Ref.DottedName]])
+    * - The template name ([[com.digitalasset.daml.lf.data.Ref.DottedName]])
     * - The package ID
     * - Two separating dots
-    * Each [[com.daml.lf.data.Ref.DottedName]] can have 1000 chars ([[com.daml.lf.data.Ref.DottedName.maxLength]]).
+    * Each [[com.digitalasset.daml.lf.data.Ref.DottedName]] can have 1000 chars ([[com.digitalasset.daml.lf.data.Ref.DottedName.maxLength]]).
     * So a [[com.digitalasset.canton.protocol.LfTemplateId]] serializes to 1000 + 1000 + 64 + 2 = 2066 chars.
     *
     * 2066 is beyond the string size for Oracle's `NVARCHAR2` column type unless `max_string_size` is set to `extended`.
@@ -425,7 +418,7 @@ object CantonRequireTypes {
       factoryMethod(str)(name)
 
     def fromProtoPrimitive(str: String, name: String): ParsingResult[A] =
-      create(str, Some(name)).leftMap(e => ProtoInvariantViolation(e))
+      create(str, Some(name)).leftMap(e => ProtoInvariantViolation(field = Some(name), error = e))
 
     implicit val lengthLimitedStringOrder: Order[A] =
       Order.by[A, String](_.str)

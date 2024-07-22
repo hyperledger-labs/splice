@@ -4,26 +4,28 @@
 package com.digitalasset.canton.logging.pretty
 
 import cats.Show.Shown
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.ParticipantBoundary
-import com.daml.ledger.javaapi.data.Party
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
-import com.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
-import com.daml.lf.transaction.TransactionErrors.*
-import com.daml.lf.value.Value
+import com.daml.error.utils.DecodedCantonError
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.RequireTypes.{Port, RefinedNumeric}
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
-import com.digitalasset.canton.ledger.offset
-import com.digitalasset.canton.ledger.participant.state.v2.ChangeId
+import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.HashLength
 import com.digitalasset.canton.util.{ErrorUtil, HexString}
-import com.digitalasset.canton.{LedgerApplicationId, LfPartyId, LfTimestamp, Uninhabited}
+import com.digitalasset.canton.{
+  LedgerApplicationId,
+  LfPartyId,
+  LfTimestamp,
+  LfVersioned,
+  Uninhabited,
+}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
+import com.digitalasset.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
+import com.digitalasset.daml.lf.transaction.TransactionErrors.*
+import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus
@@ -60,6 +62,8 @@ trait PrettyInstances {
   implicit def prettyInt: Pretty[Int] = prettyOfString(_.toString)
 
   implicit def prettyLong: Pretty[Long] = prettyOfString(_.toString)
+
+  implicit def prettyBigDecimal: Pretty[BigDecimal] = prettyOfString(_.toString)
 
   implicit def prettyJLong: Pretty[JLong] = prettyOfString(_.toString)
 
@@ -144,27 +148,6 @@ trait PrettyInstances {
 
   implicit def prettyLedgerString: Pretty[Ref.LedgerString] = prettyOfString(id => id: String)
 
-  implicit val prettyLedgerBoundary: Pretty[ParticipantBoundary] = {
-    case ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN =>
-      Tree.Literal("PARTICIPANT_BOUNDARY_BEGIN")
-    case ParticipantBoundary.PARTICIPANT_BOUNDARY_END => Tree.Literal("PARTICIPANT_BOUNDARY_END")
-    case ParticipantBoundary.Unrecognized(value) => Tree.Literal(s"Unrecognized($value)")
-  }
-
-  implicit val prettyLedgerOffset: Pretty[ParticipantOffset] = {
-    case ParticipantOffset(ParticipantOffset.Value.Absolute(absolute)) =>
-      Tree.Apply("AbsoluteOffset", Iterator(Tree.Literal(absolute)))
-    case ParticipantOffset(ParticipantOffset.Value.Boundary(boundary)) =>
-      Tree.Apply("Boundary", Iterator(boundary.toTree))
-    case ParticipantOffset(ParticipantOffset.Value.Empty) => Tree.Literal("Empty")
-  }
-
-  implicit val prettyReadServiceOffset: Pretty[offset.Offset] = prettyOfString(
-    // Do not use `toReadableHash` because this is not a hash but a hex-encoded string
-    // whose end contains the most important information
-    _.toHexString
-  )
-
   implicit def prettyLfParticipantId: Pretty[Ref.ParticipantId] = prettyOfString(prettyUidString(_))
 
   implicit def prettyLedgerApplicationId: Pretty[LedgerApplicationId] = prettyOfString(
@@ -179,22 +162,13 @@ trait PrettyInstances {
 
   implicit val prettyNodeId: Pretty[LfNodeId] = prettyOfParam(_.index)
 
-  implicit def prettyPrimitiveParty: Pretty[Party] =
-    prettyOfString(party => prettyUidString(party.getValue))
-
-  private def prettyUidString(partyStr: String): String =
+  protected def prettyUidString(partyStr: String): String =
     UniqueIdentifier.fromProtoPrimitive_(partyStr) match {
       case Right(uid) => uid.show
       case Left(_) => partyStr
     }
 
   implicit def prettyPackageId: Pretty[PackageId] = prettyOfString(id => show"${id.readableHash}")
-
-  implicit def prettyChangeId: Pretty[ChangeId] = prettyOfClass(
-    param("application Id", _.applicationId),
-    param("command Id", _.commandId),
-    param("act as", _.actAs),
-  )
 
   implicit def prettyLfDottedName: Pretty[DottedName] = prettyOfString { dottedName =>
     val segments = dottedName.segments
@@ -208,10 +182,10 @@ trait PrettyInstances {
   implicit def prettyLfQualifiedName: Pretty[QualifiedName] =
     prettyOfString(qname => show"${qname.module}:${qname.name}")
 
-  implicit def prettyLfIdentifier: Pretty[com.daml.lf.data.Ref.Identifier] =
+  implicit def prettyLfIdentifier: Pretty[com.digitalasset.daml.lf.data.Ref.Identifier] =
     prettyOfString(id => show"${id.packageId}:${id.qualifiedName}")
 
-  implicit def prettyLfPackageName: Pretty[com.daml.lf.data.Ref.PackageName] =
+  implicit def prettyLfPackageName: Pretty[com.digitalasset.daml.lf.data.Ref.PackageName] =
     prettyOfString(packageName => show"${packageName.toString}")
 
   implicit def prettyLfContractId: Pretty[LfContractId] = prettyOfString {
@@ -235,16 +209,8 @@ trait PrettyInstances {
     _.protoValue
   )
 
-  implicit def prettyContractId: Pretty[ContractId[_]] = prettyOfString { coid =>
-    val coidStr = coid.contractId
-    val tokens = coidStr.split(':')
-    if (tokens.lengthCompare(2) == 0) {
-      tokens(0).readableHash.toString + ":" + tokens(1).readableHash.toString
-    } else {
-      // Don't abbreviate anything for unusual contract ids
-      coidStr
-    }
-  }
+  implicit def prettyLfVersioned[A: Pretty]: Pretty[LfVersioned[A]] =
+    prettyOfClass[Versioned[A]](unnamedParam(_.unversioned), param("version", _.version))
 
   implicit def prettyLfGlobalKey: Pretty[LfGlobalKey] = prettyOfClass(
     param("templateId", _.templateId),
@@ -259,19 +225,40 @@ trait PrettyInstances {
         s"(offset=${dedupOffset.offset})"
     }
 
-  implicit def prettyCompletionV2: Pretty[com.daml.ledger.api.v2.completion.Completion] =
-    prettyOfClass(
-      unnamedParamIfDefined(_.status),
-      param("commandId", _.commandId.singleQuoted),
-      param("updateId", _.updateId.singleQuoted, _.updateId.nonEmpty),
-    )
+  implicit def prettyDecodedCantonError: Pretty[DecodedCantonError] = prettyOfClass(
+    param("code", _.code.id.singleQuoted),
+    param("category", _.code.category.toString.unquoted),
+    param("cause", _.cause.doubleQuoted),
+    paramIfDefined("correlationId", _.correlationId.map(_.singleQuoted)),
+    paramIfDefined("traceId", _.traceId.map(_.singleQuoted)),
+    paramIfNonEmpty(
+      "context",
+      _.context
+        // these fields are repetitive
+        .filter { case (k, _) => k != "tid" && k != "category" }
+        .map { case (k, v) => s"$k=>$v".singleQuoted }
+        .toSeq,
+    ),
+    paramIfNonEmpty(
+      "resources",
+      _.resources.map { case (k, v) => s"${k.asString}=>$v".singleQuoted }.toSeq,
+    ),
+  )
 
   implicit def prettyRpcStatus: Pretty[com.google.rpc.status.Status] =
-    prettyOfClass(
-      customParam(rpcStatus => Status.fromCodeValue(rpcStatus.code).getCode.toString),
-      customParam(_.message),
-      paramIfNonEmpty("details", _.details.map(_.toString.unquoted)),
-    )
+    new Pretty[com.google.rpc.status.Status] {
+      // This is a fallback pretty-printer for `com.google.rpc.status.Status` that is used when
+      // the status is not a proper decoded canton error
+      private val fallback = prettyOfClass[com.google.rpc.status.Status](
+        customParam(rpcStatus => Status.fromCodeValue(rpcStatus.code).getCode.toString),
+        customParam(_.message),
+        paramIfNonEmpty("details", _.details.map(_.toString.unquoted)),
+      )
+      override def treeOf(t: com.google.rpc.status.Status): Tree =
+        DecodedCantonError
+          .fromGrpcStatus(t)
+          .fold(_ => fallback.treeOf(t), decoded => prettyDecodedCantonError.treeOf(decoded))
+    }
 
   implicit def prettyGrpcStatus: Pretty[io.grpc.Status] =
     prettyOfClass(

@@ -8,7 +8,6 @@ import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TracingConfig
-import com.digitalasset.canton.version.ProtocolVersion
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
@@ -56,16 +55,18 @@ case class SharedSpliceAppParameters(
     override val enablePreviewFeatures: Boolean,
     override val nonStandardConfig: Boolean,
     override val sequencerClient: SequencerClientConfig,
-    override val devVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
-    override val initialProtocolVersion: ProtocolVersion,
     override val dbMigrateAndStart: Boolean,
     override val batchingConfig: BatchingConfig,
 ) extends CantonNodeParameters {
+  override def alphaVersionSupport: Boolean = false
+  override def betaVersionSupport: Boolean = false
+
   override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
-  override val useNewTrafficControl: Boolean =
-    false // irrelevant for Splice, as this is an impl. config for Canton nodes only
+
   override val exitOnFatalFailures: Boolean = true
 
   override def useUnifiedSequencer: Boolean = false
+
+  override def watchdog: Option[WatchdogConfig] = None
 }

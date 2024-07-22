@@ -4,6 +4,10 @@
 package com.daml.network.environment
 
 import com.daml.network.admin.api.client.GrpcClientMetrics
+import com.daml.network.environment.ParticipantAdminConnection.{
+  HasParticipantId,
+  IMPORT_ACS_WORKFLOW_ID_PREFIX,
+}
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
@@ -16,12 +20,15 @@ import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
-import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -29,9 +36,6 @@ import io.opentelemetry.api.trace.Tracer
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
-import ParticipantAdminConnection.{HasParticipantId, IMPORT_ACS_WORKFLOW_ID_PREFIX}
-import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -50,8 +54,14 @@ class ParticipantAdminConnection(
       grpcClientMetrics,
       retryProvider,
     )
-    with HasParticipantId {
+    with HasParticipantId
+    with StatusAdminConnection {
   override val serviceName = "Canton Participant Admin API"
+
+  override protected type Status = ParticipantStatus
+
+  override protected def getStatusRequest: StatusAdminCommands.GetStatus[ParticipantStatus] =
+    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV30)
 
   private val hashOps = new HashOps {
     override def defaultHashAlgorithm = HashAlgorithm.Sha256
@@ -69,7 +79,7 @@ class ParticipantAdminConnection(
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] =
     runCmd(participantStatusCommand).map {
       case NodeStatus.Failure(_) => false
-      case NodeStatus.NotInitialized(_) => false
+      case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
     }
 
@@ -241,7 +251,7 @@ class ParticipantAdminConnection(
 
   def getParticipantTrafficState(
       domainId: DomainId
-  )(implicit traceContext: TraceContext): Future[MemberTrafficStatus] = {
+  )(implicit traceContext: TraceContext): Future[TrafficState] = {
     runCmd(
       ParticipantAdminCommands.TrafficControl.GetTrafficControlState(domainId)
     )

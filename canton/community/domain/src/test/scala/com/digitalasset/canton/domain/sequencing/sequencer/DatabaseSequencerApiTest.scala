@@ -6,23 +6,23 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
-import com.digitalasset.canton.domain.sequencing.sequencer.store.NonBftDomainSequencerApiTest
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.*
 import org.apache.pekko.stream.Materializer
 
-// TODO(#14392) reenable this test once DB sequencer works with implicit member registration
-abstract class DatabaseSequencerApiTest extends NonBftDomainSequencerApiTest {
+// TODO(#18423) reenable this test once DB sequencer works with implicit member registration
+abstract class DatabaseSequencerApiTest extends SequencerApiTest {
 
   def createSequencer(
       crypto: DomainSyncCryptoClient
   )(implicit materializer: Materializer): CantonSequencer = {
     val clock = new SimClock(loggerFactory = loggerFactory)
-    val crypto = TestingIdentityFactoryX(
-      TestingTopologyX(),
+    val crypto = TestingIdentityFactory(
+      TestingTopology(),
       loggerFactory,
       DynamicDomainParameters.initialValues(clock, testedProtocolVersion),
     ).forOwnerAndDomain(owner = mediatorId, domainId)
@@ -46,9 +46,12 @@ abstract class DatabaseSequencerApiTest extends NonBftDomainSequencerApiTest {
       metrics,
       loggerFactory,
       unifiedSequencer = testedUseUnifiedSequencer,
+      runtimeReady = FutureUnlessShutdown.unit,
     )(executorService, tracer, materializer)
   }
 
   // TODO(#12405) Set to true
   override protected def supportAggregation: Boolean = false
+
+  "DB sequencer" when runSequencerApiTests()
 }

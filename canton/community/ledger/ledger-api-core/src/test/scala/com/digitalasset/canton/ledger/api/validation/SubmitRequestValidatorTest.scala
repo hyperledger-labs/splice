@@ -13,22 +13,23 @@ import com.daml.ledger.api.v2.value.{
   TextMap as ApiTextMap,
   *,
 }
-import com.daml.lf.command.{ApiCommand as LfCommand, ApiCommands as LfCommands}
-import com.daml.lf.data.Ref.TypeConRef
-import com.daml.lf.data.*
-import com.daml.lf.value.Value.ValueRecord
-import com.daml.lf.value.Value as Lf
+import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
 import com.digitalasset.canton.ledger.api.DomainMocks.{
   applicationId,
   commandId,
   submissionId,
   workflowId,
 }
-import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands}
+import com.digitalasset.canton.ledger.api.domain.Commands as ApiCommands
 import com.digitalasset.canton.ledger.api.util.{DurationConversion, TimestampConversion}
-import com.digitalasset.canton.ledger.api.{DeduplicationPeriod, DomainMocks, domain}
+import com.digitalasset.canton.ledger.api.{DomainMocks, domain}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.daml.lf.command.{ApiCommand as LfCommand, ApiCommands as LfCommands}
+import com.digitalasset.daml.lf.data.Ref.TypeConRef
+import com.digitalasset.daml.lf.data.*
+import com.digitalasset.daml.lf.transaction.TransactionVersion
+import com.digitalasset.daml.lf.value.Value.ValueRecord
+import com.digitalasset.daml.lf.value.Value as Lf
 import com.google.protobuf.duration.Duration
 import com.google.protobuf.empty.Empty
 import io.grpc.Status.Code.INVALID_ARGUMENT
@@ -121,10 +122,12 @@ class SubmitRequestValidatorTest
         keyHash = None,
         driverMetadata = Bytes.Empty,
         packageName = Ref.PackageName.assertFromString("package"),
+        packageVersion = Some(Ref.PackageVersion.assertFromString("1.0.0")),
         signatories = Set(Ref.Party.assertFromString("party")),
         stakeholders = Set(Ref.Party.assertFromString("party")),
         keyMaintainers = None,
         keyValue = None,
+        transactionVersion = TransactionVersion.maxVersion,
       )
     )
 
@@ -179,7 +182,7 @@ class SubmitRequestValidatorTest
       .thenReturn(Right(internal.disclosedContracts))
 
     new CommandsValidator(
-      validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.UpgradingDisabled,
+      validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty,
       validateDisclosedContracts = validateDisclosedContractsMock,
     )
   }
@@ -463,7 +466,8 @@ class SubmitRequestValidatorTest
           )
 
         val failingDisclosedContractsValidator = new CommandsValidator(
-          validateDisclosedContracts = validateDisclosedContractsMock
+          validateDisclosedContracts = validateDisclosedContractsMock,
+          validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty,
         )
 
         requestMustFailWith(
@@ -487,7 +491,8 @@ class SubmitRequestValidatorTest
         when(validateDisclosedContractsMock(any[Commands])(any[ContextualizedErrorLogger]))
           .thenReturn(Right(internal.disclosedContracts))
 
-        val packageMap = Map(packageId -> (packageName, Ref.PackageVersion.assertFromString("1.0")))
+        val packageMap =
+          Map(packageId -> (packageName, Ref.PackageVersion.assertFromString("1.0.0")))
         val validateUpgradingPackageResolutions = new ValidateUpgradingPackageResolutions {
           override def apply(userPackageIdPreferences: Seq[String])(implicit
               contextualizedErrorLogger: ContextualizedErrorLogger
@@ -565,7 +570,7 @@ class SubmitRequestValidatorTest
           request = testedValueValidator.validateValue(DomainMocks.values.invalidApiParty),
           code = INVALID_ARGUMENT,
           description =
-            """INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
+            """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
           metadata = Map.empty,
         )
       }
@@ -620,7 +625,7 @@ class SubmitRequestValidatorTest
               request = testedValueValidator.validateValue(input),
               code = INVALID_ARGUMENT,
               description =
-                s"""INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Could not read Numeric string "$s"""",
+                s"""INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Could not read Numeric string "$s"""",
               metadata = Map.empty,
             )
           }
@@ -651,7 +656,7 @@ class SubmitRequestValidatorTest
               request = testedValueValidator.validateValue(input),
               code = INVALID_ARGUMENT,
               description =
-                s"""INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Could not read Numeric string "$s"""",
+                s"""INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Could not read Numeric string "$s"""",
               metadata = Map.empty,
             )
           }
@@ -704,7 +709,7 @@ class SubmitRequestValidatorTest
             request = testedValueValidator.validateValue(input),
             code = INVALID_ARGUMENT,
             description =
-              s"INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: cannot convert long $long into Timestamp:out of bound Timestamp $long",
+              s"INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: cannot convert long $long into Timestamp:out of bound Timestamp $long",
             metadata = Map.empty,
           )
         }
@@ -742,7 +747,7 @@ class SubmitRequestValidatorTest
             request = testedValueValidator.validateValue(input),
             code = INVALID_ARGUMENT,
             description =
-              s"INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: out of bound Date $int",
+              s"INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: out of bound Date $int",
             metadata = Map.empty,
           )
         }
@@ -879,7 +884,7 @@ class SubmitRequestValidatorTest
           request = testedValueValidator.validateValue(input),
           code = INVALID_ARGUMENT,
           description =
-            """INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
+            """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
           metadata = Map.empty,
         )
       }
@@ -905,7 +910,7 @@ class SubmitRequestValidatorTest
           request = testedValueValidator.validateValue(input),
           code = INVALID_ARGUMENT,
           description =
-            """INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
+            """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
           metadata = Map.empty,
         )
       }
@@ -949,7 +954,7 @@ class SubmitRequestValidatorTest
           request = testedValueValidator.validateValue(input),
           code = INVALID_ARGUMENT,
           description =
-            "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: key 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b duplicated when trying to build map",
+            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: key 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b duplicated when trying to build map",
           metadata = Map.empty,
         )
       }
@@ -965,7 +970,7 @@ class SubmitRequestValidatorTest
           request = testedValueValidator.validateValue(input),
           code = INVALID_ARGUMENT,
           description =
-            """INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
+            """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
           metadata = Map.empty,
         )
       }

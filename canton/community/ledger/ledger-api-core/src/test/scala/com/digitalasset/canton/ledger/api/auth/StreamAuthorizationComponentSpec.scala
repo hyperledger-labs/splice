@@ -9,7 +9,6 @@ import com.daml.ledger.api.v2.transaction_filter.{Filters, TransactionFilter}
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.{UpdateService, UpdateServiceStub}
 import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
-import com.daml.lf.data.Ref
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor
@@ -21,9 +20,10 @@ import com.digitalasset.canton.ledger.localstore.InMemoryUserManagementStore
 import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.logging.SuppressionRule.{FullSuppression, LoggerNameContains}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, GrpcServer}
 import com.digitalasset.canton.{BaseTest, UniquePortGenerator}
+import com.digitalasset.daml.lf.data.Ref
 import io.grpc.*
 import io.grpc.netty.NettyChannelBuilder
 import io.grpc.stub.StreamObserver
@@ -52,7 +52,7 @@ class StreamAuthorizationComponentSpec
 
   behavior of s"Stream authorization"
 
-  it should "be successfull in the happy path, and client cancellation tears down server side gRPC and pekko-streams too" in test {
+  it should "be successful in the happy path, and client cancellation tears down server side gRPC and pekko-streams too" in test {
     fixture =>
       // this stream takes 10 elements (takes 2 seconds to produce), then it is closed (user side cancellation).
       // after one second a scheduled user right check will commence, this check expected to be successful
@@ -289,7 +289,7 @@ class StreamAuthorizationComponentSpec
       maxInboundMessageSize = ApiServiceOwner.DefaultMaxInboundMessageSize,
       sslContext = None,
       interceptors = List(authorizationClaimSetFixtureInterceptor),
-      metrics = Metrics.ForTesting,
+      metrics = LedgerApiServerMetrics.ForTesting,
       servicesExecutor = ec,
       services = List(bindableService),
       loggerFactory = loggerFactory,

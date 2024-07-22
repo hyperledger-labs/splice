@@ -4,12 +4,12 @@
 package com.digitalasset.canton.data
 
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import com.digitalasset.canton.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{v30, *}
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
@@ -21,6 +21,9 @@ import monocle.Lens
 import java.util.UUID
 
 /** Wraps a [[GenTransactionTree]] that is also a full informee tree.
+  *
+  * The `CommonMetadata` is unblinded, the `ParticipantMetadata` and `SubmitterMetadata` are blinded.
+  * Every `TransactionView` and `ViewCommonData` is unblinded, but every `ViewParticipantData` is blinded.
   */
 // private constructor, because object invariants are checked by factory methods
 final case class FullInformeeTree private (tree: GenTransactionTree)(
@@ -39,24 +42,17 @@ final case class FullInformeeTree private (tree: GenTransactionTree)(
 
   private lazy val commonMetadata: CommonMetadata = checked(tree.commonMetadata.tryUnwrap)
   lazy val domainId: DomainId = commonMetadata.domainId
-  lazy val mediator: MediatorsOfDomain = commonMetadata.mediator
+  lazy val mediator: MediatorGroupRecipient = commonMetadata.mediator
 
-  lazy val informeesAndThresholdByViewPosition: Map[ViewPosition, (Set[Informee], NonNegativeInt)] =
-    FullInformeeTree.viewCommonDataByViewPosition(tree).map { case (position, viewCommonData) =>
-      position -> ((viewCommonData.informees, viewCommonData.threshold))
-    }
+  lazy val informeesAndThresholdByViewPosition: Map[ViewPosition, ViewConfirmationParameters] =
+    FullInformeeTree.viewCommonDataByViewPosition(tree).fmap(_.viewConfirmationParameters)
 
   lazy val allInformees: Set[LfPartyId] = FullInformeeTree
     .viewCommonDataByViewPosition(tree)
-    .flatMap { case (_, viewCommonData) => viewCommonData.informees }
-    .map(_.party)
+    .flatMap { case (_, viewCommonData) => viewCommonData.viewConfirmationParameters.informees }
     .toSet
 
   lazy val transactionUuid: UUID = checked(tree.commonMetadata.tryUnwrap).uuid
-
-  lazy val confirmationPolicy: ConfirmationPolicy = checked(
-    tree.commonMetadata.tryUnwrap
-  ).confirmationPolicy
 
   lazy val submittingParticipant: ParticipantId =
     tree.submitterMetadata.tryUnwrap.submittingParticipant
@@ -72,7 +68,7 @@ object FullInformeeTree
   override val name: String = "FullInformeeTree"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.FullInformeeTree)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.FullInformeeTree)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

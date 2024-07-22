@@ -3,7 +3,7 @@
 
 package com.daml.network.sv.store.db
 
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.dsorules.VoteRequest
 import com.daml.network.codegen.java.splice.wallet.subscriptions as sub

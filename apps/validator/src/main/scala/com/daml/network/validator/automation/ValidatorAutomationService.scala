@@ -64,6 +64,7 @@ class ValidatorAutomationService(
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
+    supportsSoftDomainMigrationPoc: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -163,24 +164,26 @@ class ValidatorAutomationService(
     )
   )
 
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      store,
-      connection,
-      store.key.validatorParty,
-      implicit tc =>
-        scanConnection.getAmuletRulesWithState().flatMap { amuletRulesCWS =>
-          amuletRulesCWS.toAssignedContract
-            .map { amuletRules =>
-              store
-                .listAmuletRulesTransferFollowers(amuletRules)
-                .map(_ map (FollowTask(amuletRules, _)))
-            }
-            .getOrElse(Future successful Seq.empty)
-        },
+  if (!supportsSoftDomainMigrationPoc) {
+    registerTrigger(
+      new TransferFollowTrigger(
+        triggerContext,
+        store,
+        connection,
+        store.key.validatorParty,
+        implicit tc =>
+          scanConnection.getAmuletRulesWithState().flatMap { amuletRulesCWS =>
+            amuletRulesCWS.toAssignedContract
+              .map { amuletRules =>
+                store
+                  .listAmuletRulesTransferFollowers(amuletRules)
+                  .map(_ map (FollowTask(amuletRules, _)))
+              }
+              .getOrElse(Future successful Seq.empty)
+          },
+      )
     )
-  )
+  }
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
   if (sequencerConnectionFromScan)
     registerTrigger(

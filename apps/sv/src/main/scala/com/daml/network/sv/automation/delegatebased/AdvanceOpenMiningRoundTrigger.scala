@@ -110,6 +110,7 @@ object AdvanceOpenMiningRoundTrigger {
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*
+    import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("amuletRulesId", _.amuletRulesId), param("openRounds", _.openRounds))

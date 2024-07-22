@@ -12,7 +12,7 @@ import com.digitalasset.canton.crypto.store.{
   CryptoPublicStore,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.serialization.DeserializationError
@@ -31,7 +31,6 @@ class Crypto(
     val privateCrypto: CryptoPrivateApi,
     val cryptoPrivateStore: CryptoPrivateStore,
     val cryptoPublicStore: CryptoPublicStore,
-    val javaKeyConverter: JavaKeyConverter,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -44,28 +43,22 @@ class Crypto(
       name: Option[KeyName] = None,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SigningKeyGenerationError, SigningPublicKey] =
+  ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningPublicKey] =
     for {
       publicKey <- privateCrypto.generateSigningKey(scheme, name)
-      _ <- cryptoPublicStore
-        .storeSigningKey(publicKey, name)
-        .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.SigningPublicStoreError)
+      _ <- EitherT.right(cryptoPublicStore.storeSigningKey(publicKey, name))
     } yield publicKey
 
   /** Helper method to generate a new encryption key pair and store the public key in the public store as well. */
   def generateEncryptionKey(
-      scheme: EncryptionKeyScheme = privateCrypto.defaultEncryptionKeyScheme,
+      keySpec: EncryptionKeySpec = privateCrypto.defaultEncryptionKeySpec,
       name: Option[KeyName] = None,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, EncryptionKeyGenerationError, EncryptionPublicKey] =
+  ): EitherT[FutureUnlessShutdown, EncryptionKeyGenerationError, EncryptionPublicKey] =
     for {
-      publicKey <- privateCrypto.generateEncryptionKey(scheme, name)
-      _ <- cryptoPublicStore
-        .storeEncryptionKey(publicKey, name)
-        .leftMap[EncryptionKeyGenerationError](
-          EncryptionKeyGenerationError.EncryptionPublicStoreError
-        )
+      publicKey <- privateCrypto.generateEncryptionKey(keySpec, name)
+      _ <- EitherT.right(cryptoPublicStore.storeEncryptionKey(publicKey, name))
     } yield publicKey
 
   override def onClosed(): Unit =
@@ -145,12 +138,14 @@ trait SyncCryptoApi {
   /** Signs the given hash using the private signing key. */
   def sign(hash: Hash)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SyncCryptoError, Signature]
+  ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature]
 
-  /** Decrypts a message using the private key of the public key given as the fingerprint. */
+  /** Decrypts a message using the private key of the public key identified by the fingerprint
+    * in the AsymmetricEncrypted object.
+    */
   def decrypt[M](encryptedMessage: AsymmetricEncrypted[M])(
       deserialize: ByteString => Either[DeserializationError, M]
-  )(implicit traceContext: TraceContext): EitherT[Future, SyncCryptoError, M]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SyncCryptoError, M]
 
   /** Verify signature of a given owner
     *

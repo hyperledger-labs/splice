@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.0.0-snapshot.20240327.12947.0.vdef6b798"
+  val version: String = "3.1.0-snapshot.20240708.13168.0.v7ed18470"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -40,24 +40,24 @@ object CantonDependencies {
 
   lazy val pureconfig_version = "0.14.0"
 
-  lazy val circe_version = "0.13.0"
+  lazy val circe_version = "0.14.2"
 
   lazy val scalatest_version = "3.2.11"
   lazy val scalacheck_version = "1.15.4"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.97.Final"
+  lazy val netty_version = "4.1.108.Final"
 
-  lazy val reflections = "org.reflections" % "reflections" % "0.9.12"
+  lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
   lazy val pureconfig_cats = "com.github.pureconfig" %% "pureconfig-cats" % pureconfig_version
 
   lazy val scala_collection_contrib =
-    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.2"
+    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.3.0"
   lazy val scala_reflect = "org.scala-lang" % "scala-reflect" % scala_version
-  lazy val shapeless = "com.chuusai" %% "shapeless" % "2.3.6"
+  lazy val shapeless = "com.chuusai" %% "shapeless" % "2.3.12"
 
-  lazy val monocle_version = "3.1.0"
+  lazy val monocle_version = "3.2.0"
   lazy val monocle_core = "dev.optics" %% "monocle-core" % monocle_version
   lazy val monocle_macro = "dev.optics" %% "monocle-macro" % monocle_version
 
@@ -67,8 +67,10 @@ object CantonDependencies {
 
   lazy val hikaricp = "com.zaxxer" % "HikariCP" % "3.2.0"
   lazy val h2 = "com.h2database" % "h2" % "2.1.210"
-  lazy val postgres = "org.postgresql" % "postgresql" % "42.2.25"
-  lazy val flyway = "org.flywaydb" % "flyway-core" % "8.4.0"
+  lazy val postgres = "org.postgresql" % "postgresql" % "42.7.3"
+  private val flyway_version = "10.12.0"
+  lazy val flyway = "org.flywaydb" % "flyway-core" % flyway_version
+  lazy val flyway_postgresql = "org.flywaydb" % "flyway-database-postgresql" % flyway_version
   lazy val oracle = "com.oracle.database.jdbc" % "ojdbc8" % "19.13.0.0.1"
 
   // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
@@ -99,7 +101,7 @@ object CantonDependencies {
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
     "com.daml" %% "contextualized-logging" % daml_libraries_version
-  lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
+  lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_pekko_http_metrics = "com.daml" %% "pekko-http-metrics" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
@@ -108,6 +110,12 @@ object CantonDependencies {
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
+  lazy val daml_ledger_api_value_proto =
+    "com.daml" % "ledger-api-value-proto" % daml_libraries_version
+  lazy val daml_ledger_api_value_scalapb =
+    "com.daml" %% "ledger-api-value-scalapb" % daml_libraries_version
+  lazy val daml_ledger_api_value_java =
+    "com.daml" % "ledger-api-value-java-proto" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
   lazy val daml_rs_grpc_testing_utils =
@@ -125,7 +133,7 @@ object CantonDependencies {
   lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.46.Final"
+  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.61.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.0.1"
@@ -185,7 +193,7 @@ object CantonDependencies {
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
 
   lazy val guava = "com.google.guava" % "guava" % "31.1-jre"
-  lazy val tink = "com.google.crypto.tink" % "tink" % "1.3.0" excludeAll (
+  lazy val tink = "com.google.crypto.tink" % "tink" % "1.12.0" excludeAll (
     ExclusionRule(organization = "com.google.guava", name = "guava-jdk5"),
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
@@ -220,10 +228,15 @@ object CantonDependencies {
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
   lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
 
-  lazy val sttp_version = "3.1.7"
+  lazy val sttp_version = "3.8.16"
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version
   lazy val sttp_okhttp = "com.softwaremill.sttp.client3" %% "okhttp-backend" % sttp_version
   lazy val sttp_circe = "com.softwaremill.sttp.client3" %% "circe" % sttp_version
+
+  lazy val tapir_version = "1.8.5"
+  lazy val tapir_json_circe = "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapir_version
+  lazy val tapir_pekko_http_server =
+    "com.softwaremill.sttp.tapir" %% "tapir-pekko-http-server" % tapir_version
 
   lazy val toxiproxy_java = "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4"
 
@@ -239,9 +252,6 @@ object CantonDependencies {
     "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
   lazy val fasterjackson_core = "com.fasterxml.jackson.core" % "jackson-core" % "2.14.3"
   lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
-
-  lazy val spray_json_derived_codecs =
-    "io.github.paoloboni" %% "spray-json-derived-codecs" % "2.3.10"
 
   lazy val junit_jupiter_api = "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2"
   lazy val junit_jupiter_engine = "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2"

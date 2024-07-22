@@ -5,7 +5,7 @@ package com.daml.network.splitwell.automation
 
 import org.apache.pekko.stream.Materializer
 import cats.syntax.apply.*
-import com.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,

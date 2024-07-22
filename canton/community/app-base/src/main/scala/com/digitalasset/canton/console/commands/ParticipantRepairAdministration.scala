@@ -4,17 +4,14 @@
 package com.digitalasset.canton.console.commands
 
 import better.files.File
-import com.digitalasset.canton.admin.api.client.commands.{
-  GrpcAdminCommand,
-  ParticipantAdminCommands,
-}
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsRequest, ExportAcsResponse}
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
+import com.digitalasset.canton.admin.participant.v30.ExportAcsResponse
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
-  CommandErrors,
-  CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   FeatureFlag,
@@ -23,23 +20,22 @@ import com.digitalasset.canton.console.{
   Helpful,
 }
 import com.digitalasset.canton.data.RepairContract
+import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.networking.grpc.GrpcError
-import com.digitalasset.canton.participant.ParticipantNodeCommon
+import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DiscardOps, DomainAlias, SequencerCounter}
+import com.digitalasset.canton.{DomainAlias, SequencerCounter}
 import com.google.protobuf.ByteString
-import io.grpc.Context.CancellableContext
-import io.grpc.StatusRuntimeException
+import io.grpc.Context
 
 import java.time.Instant
 import java.util.UUID
-import scala.concurrent.{Await, Promise, TimeoutException}
 
 class ParticipantRepairAdministration(
     val consoleEnvironment: ConsoleEnvironment,
@@ -48,6 +44,7 @@ class ParticipantRepairAdministration(
 ) extends FeatureFlagFilter
     with NoTracing
     with Helpful {
+  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
 
   @Help.Summary("Purge contracts with specified Contract IDs from local participant.")
   @Help.Description(
@@ -56,6 +53,7 @@ class ParticipantRepairAdministration(
       |stakeholders are no longer available to agree to their archival. The participant needs to be disconnected from
       |the domain on which the contracts with "contractIds" reside at the time of the call, and as of now the domain
       |cannot have had any inflight requests.
+      |The effects of the command will take affect upon reconnecting to the sync domain.
       |The "ignoreAlreadyPurged" flag makes it possible to invoke the command multiple times with the same
       |parameters in case an earlier command invocation has failed.
       |As repair commands are powerful tools to recover from unforeseen data corruption, but dangerous under normal
@@ -80,23 +78,32 @@ class ParticipantRepairAdministration(
 
   @Help.Summary("Migrate contracts from one domain to another one.")
   @Help.Description(
-    """This method can be used to migrate all the contracts associated with a domain to a new domain connection.
-         This method will register the new domain, connect to it and then re-associate all contracts on the source
-         domain to the target domain. Please note that this migration needs to be done by all participants
-         at the same time. The domain should only be used once all participants have finished their migration.
-
-         The arguments are:
-         source: the domain alias of the source domain
-         target: the configuration for the target domain
-         """
+    """Migrates all contracts associated with a domain to a new domain.
+        |This method will register the new domain, connect to it and then re-associate all contracts from the source
+        |domain to the target domain. Please note that this migration needs to be done by all participants
+        |at the same time. The target domain should only be used once all participants have finished their migration.
+        |
+        |WARNING: The migration does not start in case of in-flight transactions on the source domain. Forcing the
+        |migration may lead to a ledger fork! Instead of forcing the migration, ensure the source domain has no
+        |in-flight transactions by reconnecting all participants to the source domain, halting activity on these
+        |participants and waiting for the in-flight transactions to complete or time out.
+        |Forcing a migration is intended for disaster recovery when a source domain cannot be recovered anymore.
+        |
+        |The arguments are:
+        |source: the domain alias of the source domain
+        |target: the configuration for the target domain
+        |force: if true, migration is forced ignoring in-flight transactions. Defaults to false.
+        """
   )
   def migrate_domain(
       source: DomainAlias,
       target: DomainConnectionConfig,
+      force: Boolean = false,
   ): Unit = {
     consoleEnvironment.run {
       runner.adminCommand(
-        ParticipantAdminCommands.ParticipantRepairManagement.MigrateDomain(source, target)
+        ParticipantAdminCommands.ParticipantRepairManagement
+          .MigrateDomain(source, target, force = force)
       )
     }
   }
@@ -118,11 +125,9 @@ class ParticipantRepairAdministration(
         |- filterDomainId: restrict the export to a given domain
         |- timestamp: optionally a timestamp for which we should take the state (useful to reconcile states of a domain)
         |- contractDomainRenames: As part of the export, allow to rename the associated domain id of contracts from one domain to another based on the mapping.
-        |- force: if is set to true, some validations are skipped:
-        |    - Check that the timestamp is clean
-        |      For this option to yield a consistent snapshot, you need to wait at least
-        |      confirmationResponseTimeout + mediatorReactionTimeout after the last submitted request.
-        |    - Check that the protocol version in contractDomainRenames is correct.
+        |- force: if is set to true, then the check that the timestamp is clean will not be done.
+        |         For this option to yield a consistent snapshot, you need to wait at least
+        |         confirmationResponseTimeout + mediatorReactionTimeout after the last submitted request.
         """
   )
   def export_acs(
@@ -133,70 +138,34 @@ class ParticipantRepairAdministration(
       timestamp: Option[Instant] = None,
       contractDomainRenames: Map[DomainId, (DomainId, ProtocolVersion)] = Map.empty,
       force: Boolean = false,
+      timeout: NonNegativeDuration = timeouts.unbounded,
   ): Unit = {
     check(FeatureFlag.Repair) {
-      val collector = AcsSnapshotFileCollector[ExportAcsRequest, ExportAcsResponse](outputFile)
-      val command = ParticipantAdminCommands.ParticipantRepairManagement
-        .ExportAcs(
-          parties,
-          partiesOffboarding = partiesOffboarding,
-          filterDomainId,
-          timestamp,
-          collector.observer,
-          contractDomainRenames,
-          force = force,
-        )
-      collector.materializeFile(command)
-    }
-  }
-
-  private case class AcsSnapshotFileCollector[
-      Req,
-      Resp <: GrpcByteChunksToFileObserver.ByteStringChunk,
-  ](outputFile: String) {
-    private val target = File(outputFile)
-    private val requestComplete = Promise[String]()
-    val observer = new GrpcByteChunksToFileObserver[Resp](
-      target,
-      requestComplete,
-    )
-    private val timeout = consoleEnvironment.commandTimeouts.ledgerCommand
-
-    def materializeFile(
-        command: GrpcAdminCommand[
-          Req,
-          CancellableContext,
-          CancellableContext,
-        ]
-    ): Unit = {
       consoleEnvironment.run {
+        val file = File(outputFile)
+        val responseObserver = new FileStreamObserver[ExportAcsResponse](file, _.chunk)
 
-        def call = consoleEnvironment.run {
+        def call: ConsoleCommandResult[Context.CancellableContext] =
           runner.adminCommand(
-            command
+            ParticipantAdminCommands.ParticipantRepairManagement
+              .ExportAcs(
+                parties,
+                partiesOffboarding = partiesOffboarding,
+                filterDomainId,
+                timestamp,
+                responseObserver,
+                contractDomainRenames,
+                force = force,
+              )
           )
-        }
 
-        try {
-          ResourceUtil.withResource(call) { _ =>
-            CommandSuccessful(
-              Await
-                .result(
-                  requestComplete.future,
-                  timeout.duration,
-                )
-                .discard
-            )
-          }
-        } catch {
-          case sre: StatusRuntimeException =>
-            GenericCommandError(
-              GrpcError("Generating acs snapshot file", "download_acs_snapshot", sre).toString
-            )
-          case _: TimeoutException =>
-            target.delete(swallowIOExceptions = true)
-            CommandErrors.ConsoleTimeout.Error(timeout.asJavaApproximation)
-        }
+        processResult(
+          call,
+          responseObserver.result,
+          timeout,
+          request = "exporting Acs",
+          cleanupOnError = () => file.delete(),
+        )
       }
     }
   }
@@ -245,6 +214,136 @@ class ParticipantRepairAdministration(
     }
   }
 
+  @Help.Summary("Add specified contracts to a specific domain on the participant.")
+  @Help.Description(
+    """This is a last resort command to recover from data corruption, e.g. in scenarios in which participant
+        |contracts have somehow gotten out of sync and need to be manually created. The participant needs to be
+        |disconnected from the specified "domain" at the time of the call, and as of now the domain cannot have had
+        |any inflight requests.
+        |The effects of the command will take affect upon reconnecting to the sync domain.
+        |As repair commands are powerful tools to recover from unforeseen data corruption, but dangerous under normal
+        |operation, use of this command requires (temporarily) enabling the "features.enable-repair-commands"
+        |configuration. In addition repair commands can run for an unbounded time depending on the number of
+        |contracts passed in. Be sure to not connect the participant to the domain until the call returns.
+        |
+        The arguments are:
+        - domainId: the id of the domain to which to add the contract
+        - protocolVersion: to protocol version used by the domain
+        - contracts: list of contracts to add with witness information
+        """
+  )
+  def add(
+      domainId: DomainId,
+      protocolVersion: ProtocolVersion,
+      contracts: Seq[RepairContract],
+      allowContractIdSuffixRecomputation: Boolean = false,
+  ): Map[LfContractId, LfContractId] = {
+
+    val temporaryFile = File.newTemporaryFile(suffix = ".gz")
+    val outputStream = temporaryFile.newGzipOutputStream()
+
+    ResourceUtil.withResource(outputStream) { outputStream =>
+      contracts
+        .traverse_ { repairContract =>
+          val activeContract = ActiveContract
+            .create(domainId, repairContract.contract, repairContract.transferCounter)(
+              protocolVersion
+            )
+          activeContract.writeDelimitedTo(outputStream).map(_ => outputStream.flush())
+        }
+        .valueOr(err => throw new RuntimeException(s"Unable to add contract data to stream: $err"))
+    }
+
+    val bytes = ByteString.copyFrom(temporaryFile.loadBytes)
+    temporaryFile.delete(swallowIOExceptions = true)
+
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
+            bytes,
+            workflowIdPrefix = s"import-${UUID.randomUUID}",
+            allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
+          )
+        )
+      }
+    }
+  }
+
+  @Help.Summary("Purge select data of a deactivated domain.")
+  @Help.Description(
+    """This command deletes selected domain data and helps to ensure that stale data in the specified, deactivated domain
+       |is not acted upon anymore. The specified domain needs to be in the `Inactive` status for purging to occur.
+       |Purging a deactivated domain is typically performed automatically as part of a hard domain migration via
+       |``repair.migrate_domain``."""
+  )
+  def purge_deactivated_domain(domain: DomainAlias): Unit = {
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement.PurgeDeactivatedDomain(domain)
+        )
+      }
+    }
+  }
+
+  @Help.Summary("Mark sequenced events as ignored.")
+  @Help.Description(
+    """This is the last resort to ignore events that the participant is unable to process.
+      |Ignoring events may lead to subsequent failures, e.g., if the event creating a contract is ignored and
+      |that contract is subsequently used. It may also lead to ledger forks if other participants still process
+      |the ignored events.
+      |It is possible to mark events as ignored that the participant has not yet received.
+      |
+      |The command will fail, if marking events between `fromInclusive` and `toInclusive` as ignored would result in a gap in sequencer counters,
+      |namely if `from <= to` and `from` is greater than `maxSequencerCounter + 1`,
+      |where `maxSequencerCounter` is the greatest sequencer counter of a sequenced event stored by the underlying participant.
+      |
+      |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
+      |that has been marked as clean.
+      |(Ignoring such events would normally have no effect, as they have already been processed.)"""
+  )
+  def ignore_events(
+      domainId: DomainId,
+      fromInclusive: SequencerCounter,
+      toInclusive: SequencerCounter,
+      force: Boolean = false,
+  ): Unit =
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .IgnoreEvents(domainId, fromInclusive, toInclusive, force)
+        )
+      }
+    }
+
+  @Help.Summary("Remove the ignored status from sequenced events.")
+  @Help.Description(
+    """This command has no effect on ordinary (i.e., not ignored) events and on events that do not exist.
+      |
+      |The command will fail, if marking events between `fromInclusive` and `toInclusive` as unignored would result in a gap in sequencer counters,
+      |namely if there is one empty ignored event with sequencer counter between `from` and `to` and
+      |another empty ignored event with sequencer counter greater than `to`.
+      |An empty ignored event is an event that has been marked as ignored and not yet received by the participant.
+      |
+      |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
+      |that has been marked as clean.
+      |(Unignoring such events would normally have no effect, as they have already been processed.)"""
+  )
+  def unignore_events(
+      domainId: DomainId,
+      fromInclusive: SequencerCounter,
+      toInclusive: SequencerCounter,
+      force: Boolean = false,
+  ): Unit = check(FeatureFlag.Repair) {
+    consoleEnvironment.run {
+      runner.adminCommand(
+        ParticipantAdminCommands.ParticipantRepairManagement
+          .UnignoreEvents(domainId, fromInclusive, toInclusive, force)
+      )
+    }
+  }
 }
 
 abstract class LocalParticipantRepairAdministration(
@@ -257,47 +356,7 @@ abstract class LocalParticipantRepairAdministration(
       loggerFactory = loggerFactory,
     ) {
 
-  protected def access[T](handler: ParticipantNodeCommon => T): T
-
-  @Help.Summary("Add specified contracts to specific domain on local participant.")
-  @Help.Description(
-    """This is a last resort command to recover from data corruption, e.g. in scenarios in which participant
-        |contracts have somehow gotten out of sync and need to be manually created. The participant needs to be
-        |disconnected from the specified "domain" at the time of the call, and as of now the domain cannot have had
-        |any inflight requests.
-        |For each "contractsToAdd", specify "witnesses", local parties, in case no local party is a stakeholder.
-        |The "ignoreAlreadyAdded" flag makes it possible to invoke the command multiple times with the same
-        |parameters in case an earlier command invocation has failed.
-        |
-        |As repair commands are powerful tools to recover from unforeseen data corruption, but dangerous under normal
-        |operation, use of this command requires (temporarily) enabling the "features.enable-repair-commands"
-        |configuration. In addition repair commands can run for an unbounded time depending on the number of
-        |contracts passed in. Be sure to not connect the participant to the domain until the call returns.
-        |
-        The arguments are:
-        - domain: the alias of the domain to which to add the contract
-        - contractsToAdd: list of contracts to add with witness information
-        - ignoreAlreadyAdded: (default true) if set to true, it will ignore contracts that already exist on the target domain.
-        - ignoreStakeholderCheck: (default false) if set to true, add will work for contracts that don't have a local party (useful for party migration).
-        """
-  )
-  def add(
-      domain: DomainAlias,
-      contractsToAdd: Seq[RepairContract],
-      ignoreAlreadyAdded: Boolean = true,
-      ignoreStakeholderCheck: Boolean = false,
-  ): Unit =
-    runRepairCommand(tc =>
-      access(
-        _.sync.repairService
-          .addContracts(
-            domain,
-            contractsToAdd,
-            ignoreAlreadyAdded,
-            ignoreStakeholderCheck,
-          )(tc)
-      )
-    )
+  protected def access[T](handler: ParticipantNode => T): T
 
   private def runRepairCommand[T](command: TraceContext => Either[String, T]): T =
     check(FeatureFlag.Repair) {
@@ -347,59 +406,6 @@ abstract class LocalParticipantRepairAdministration(
           PositiveInt.tryCreate(batchSize),
         )(tc)
       )
-    )
-
-  @Help.Summary("Mark sequenced events as ignored.")
-  @Help.Description(
-    """This is the last resort to ignore events that the participant is unable to process.
-      |Ignoring events may lead to subsequent failures, e.g., if the event creating a contract is ignored and
-      |that contract is subsequently used. It may also lead to ledger forks if other participants still process
-      |the ignored events.
-      |It is possible to mark events as ignored that the participant has not yet received.
-      |
-      |The command will fail, if marking events between `from` and `to` as ignored would result in a gap in sequencer counters,
-      |namely if `from <= to` and `from` is greater than `maxSequencerCounter + 1`,
-      |where `maxSequencerCounter` is the greatest sequencer counter of a sequenced event stored by the underlying participant.
-      |
-      |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
-      |that has been marked as clean.
-      |(Ignoring such events would normally have no effect, as they have already been processed.)"""
-  )
-  def ignore_events(
-      domainId: DomainId,
-      from: SequencerCounter,
-      to: SequencerCounter,
-      force: Boolean = false,
-  ): Unit =
-    runRepairCommand(tc =>
-      access {
-        _.sync.repairService.ignoreEvents(domainId, from, to, force)(tc)
-      }
-    )
-
-  @Help.Summary("Remove the ignored status from sequenced events.")
-  @Help.Description(
-    """This command has no effect on ordinary (i.e., not ignored) events and on events that do not exist.
-      |
-      |The command will fail, if marking events between `from` and `to` as unignored would result in a gap in sequencer counters,
-      |namely if there is one empty ignored event with sequencer counter between `from` and `to` and
-      |another empty ignored event with sequencer counter greater than `to`.
-      |An empty ignored event is an event that has been marked as ignored and not yet received by the participant.
-      |
-      |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
-      |that has been marked as clean.
-      |(Unignoring such events would normally have no effect, as they have already been processed.)"""
-  )
-  def unignore_events(
-      domainId: DomainId,
-      from: SequencerCounter,
-      to: SequencerCounter,
-      force: Boolean = false,
-  ): Unit =
-    runRepairCommand(tc =>
-      access {
-        _.sync.repairService.unignoreEvents(domainId, from, to, force)(tc)
-      }
     )
 }
 

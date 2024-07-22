@@ -50,7 +50,7 @@ object Verdict
 
   val supportedProtoVersions: protocol.messages.Verdict.SupportedProtoVersions =
     SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.Verdict)(
+      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.Verdict)(
         supportedProtoVersion(_)(fromProtoV30),
         _.toProtoV30.toByteString,
       )
@@ -186,7 +186,7 @@ object Verdict
         reasons <- reasonsP.traverse(fromProtoReasonV30)
         reasonsNE <- NonEmpty
           .from(reasons.toList)
-          .toRight(InvariantViolation("Field reasons must not be empty!"))
+          .toRight(InvariantViolation("reasons", "must not be empty!"))
       } yield ParticipantReject(reasonsNE)(pv)
 
     def fromProtoV30(
@@ -226,7 +226,7 @@ object Verdict
       localReject <- localVerdict match {
         case localReject: LocalReject => Right(localReject)
         case LocalApprove() =>
-          Left(InvariantViolation("RejectionReason.reject must not be approve."))
+          Left(InvariantViolation("reject", "must not be approve"))
       }
     } yield (parties, localReject)
   }

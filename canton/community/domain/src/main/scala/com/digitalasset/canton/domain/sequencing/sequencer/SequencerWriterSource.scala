@@ -26,6 +26,8 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.sequencing.protocol.{
+  Batch,
+  ClosedEnvelope,
   SendAsyncError,
   SequencerErrors,
   SubmissionRequest,
@@ -133,8 +135,20 @@ class SequencerWriterQueues private[sequencer] (
   def send(
       submission: SubmissionRequest
   )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] =
+    writeInternal(Left(submission))
+
+  def blockSequencerWrite(
+      outcome: DeliverableSubmissionOutcome
+  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] =
+    writeInternal(Right(outcome))
+
+  /** Accepts both submission requests (DBS flow) as `Left` and submission outcomes (BS flow) as `Right`.
+    */
+  private def writeInternal(
+      submissionOrOutcome: Either[SubmissionRequest, DeliverableSubmissionOutcome]
+  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] = {
     for {
-      event <- eventGenerator.generate(submission)
+      event <- eventGenerator.generate(submissionOrOutcome)
       enqueueResult = deliverEventQueue.offer(event)
       _ <- EitherT.fromEither[Future](enqueueResult match {
         case QueueOfferResult.Enqueued => Right(())
@@ -146,6 +160,7 @@ class SequencerWriterQueues private[sequencer] (
           Right(())
       })
     } yield ()
+  }
 
   def complete(): Unit = {
     implicit val tc: TraceContext = TraceContext.empty
@@ -232,6 +247,9 @@ object SequencerWriterSource {
 
     mergedEventsSource
       .via(
+        AssertMonotonicBlockSequencerTimestampsFlow(loggerFactory)
+      )
+      .via(
         SequenceWritesFlow(
           writerConfig,
           store,
@@ -263,9 +281,12 @@ class SendEventGenerator(
 )(implicit
     executionContext: ExecutionContext
 ) {
-  def generate(submission: SubmissionRequest)(implicit
+  def generate(
+      submissionOrOutcome: Either[SubmissionRequest, DeliverableSubmissionOutcome]
+  )(implicit
       traceContext: TraceContext
   ): EitherT[Future, SendAsyncError, Presequenced[StoreEvent[Payload]]] = {
+    val submission = submissionOrOutcome.map(_.submission).merge
     def lookupSender: EitherT[Future, SendAsyncError, SequencerMemberId] = EitherT(
       store
         .lookupMember(submission.sender)
@@ -284,22 +305,30 @@ class SendEventGenerator(
         memberIdO = registeredMember.map(_.memberId)
       } yield memberIdO.toRight(member).toValidated
 
-    def validateRecipients: Future[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
+    def validateRecipients(
+        recipients: Set[Member]
+    ): Future[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
       for {
         // TODO(#12363) Support group addresses in the DB Sequencer
-        validatedSeq <- submission.batch.allMembers.toSeq
+        // TODO(#18394) Implement batch db check for member registration and id retrieval
+        validatedSeq <- recipients.toSeq
           .parTraverse(validateRecipient)
         validated = validatedSeq.traverse(_.leftMap(NonEmpty(Seq, _)))
       } yield validated.map(_.toSet)
 
-    def validateAndGenerateEvent(senderId: SequencerMemberId): Future[StoreEvent[Payload]] = {
-      def deliverError(unknownRecipients: NonEmpty[Seq[Member]]): DeliverErrorStoreEvent = {
+    def validateAndGenerateEvent(
+        senderId: SequencerMemberId,
+        batch: Batch[ClosedEnvelope],
+    ): Future[StoreEvent[Payload]] = {
+      def unknownRecipientsDeliverError(
+          unknownRecipients: NonEmpty[Seq[Member]]
+      ): DeliverErrorStoreEvent = {
         val error = SequencerErrors.UnknownRecipients(unknownRecipients)
 
         DeliverErrorStoreEvent(
           senderId,
           submission.messageId,
-          error,
+          error.rpcStatusWithoutLoggingContext(),
           protocolVersion,
           traceContext,
         )
@@ -308,8 +337,12 @@ class SendEventGenerator(
       def deliver(recipientIds: Set[SequencerMemberId]): StoreEvent[Payload] = {
         val payload =
           Payload(
-            payloadIdGenerator(),
-            submission.batch.toByteString,
+            submissionOrOutcome.fold(
+              _ => payloadIdGenerator(),
+              // in case of unified sequencer, we use the sequencing time as the payload id
+              outcome => PayloadId(outcome.sequencingTime),
+            ),
+            batch.toByteString,
           )
         DeliverStoreEvent.ensureSenderReceivesEvent(
           senderId,
@@ -320,15 +353,93 @@ class SendEventGenerator(
         )
       }
 
+      val recipients = submissionOrOutcome.fold(
+        _.batch.allMembers,
+        _.deliverToMembers,
+      )
       for {
-        validatedRecipients <- validateRecipients
-      } yield validatedRecipients.fold(deliverError, deliver)
+        validatedRecipients <- validateRecipients(recipients)
+      } yield validatedRecipients.fold(unknownRecipientsDeliverError, deliver)
     }
 
     for {
-      senderId <- lookupSender
-      event <- EitherT.right(validateAndGenerateEvent(senderId))
-    } yield Presequenced.withMaxSequencingTime(event, submission.maxSequencingTime)
+      senderId <- lookupSender // could return a sync error on the api in the DBS, not for US
+      event <- EitherT.right(
+        submissionOrOutcome match {
+          case Left(submission) =>
+            validateAndGenerateEvent(senderId, submission.batch)
+          case Right(outcome: SubmissionOutcome.Deliver) =>
+            validateAndGenerateEvent(senderId, outcome.batch) // possibly an aggregated batch
+          case Right(_: SubmissionOutcome.DeliverReceipt) =>
+            Future.successful(
+              ReceiptStoreEvent(
+                senderId,
+                submission.messageId,
+                submission.topologyTimestamp,
+                traceContext,
+              )
+            )
+          case Right(reject: SubmissionOutcome.Reject) =>
+            Future.successful(
+              DeliverErrorStoreEvent(
+                senderId,
+                submission.messageId,
+                reject.error,
+                protocolVersion,
+                traceContext,
+              )
+            )
+        }
+      )
+    } yield Presequenced.withMaxSequencingTime(
+      event,
+      submission.maxSequencingTime,
+      blockSequencerTimestampO = submissionOrOutcome
+        .fold(
+          _ => None,
+          outcome => Some(outcome.sequencingTime),
+        ),
+    )
+  }
+}
+
+// Akka flow that asserts that event timestamp is monotonically increasing
+@SuppressWarnings(Array("org.wartremover.warts.Var"))
+object AssertMonotonicBlockSequencerTimestampsFlow {
+  def apply(
+      loggerFactory: NamedLoggerFactory
+  )(implicit
+      traceContext: TraceContext
+  ): Flow[Write, Write, NotUsed] = {
+    val logger = TracedLogger(WritePayloadsFlow.getClass, loggerFactory)
+
+    Flow[Write]
+      .statefulMapConcat { () =>
+        var lastTimestamp: Option[CantonTimestamp] = None
+        write =>
+          {
+            val timestampO = write match {
+              case Write.Event(event) =>
+                event.blockSequencerTimestampO
+              case Write.KeepAlive =>
+                None
+            }
+
+            timestampO match {
+              case Some(blockSequencerTimestamp) =>
+                if (lastTimestamp.exists(_ > blockSequencerTimestamp)) {
+                  logger.warn(
+                    s"Block sequencer timestamp is not monotonically increasing: " +
+                      s"lastTimestamp=${lastTimestamp}, blockSequencerTimestamp=$blockSequencerTimestamp"
+                  )
+                }
+                lastTimestamp = Some(blockSequencerTimestamp)
+              case None =>
+            }
+          }
+
+          Seq(write)
+      }
   }
 }
 
@@ -368,9 +479,15 @@ object SequenceWritesFlow {
         case Write.KeepAlive => SequencedWrite.KeepAlive(timestamp)
         // if we opt not to write the event as we're past the max-sequencing-time, just replace with a keep alive as we're still alive
         case Write.Event(event) =>
-          sequenceEvent(timestamp, event)
+          // TODO(#18401): Explode if a unified sequencer flow has an empty blockSequencerTimestampO
+          val sequencingTimestamp = event.blockSequencerTimestampO match {
+            case Some(blockSequencerTimestamp) => blockSequencerTimestamp
+            case None => timestamp
+          }
+
+          sequenceEvent(sequencingTimestamp, event)
             .map(SequencedWrite.Event)
-            .getOrElse[SequencedWrite](SequencedWrite.KeepAlive(timestamp))
+            .getOrElse[SequencedWrite](SequencedWrite.KeepAlive(sequencingTimestamp))
       }
     }
 
@@ -400,7 +517,14 @@ object SequenceWritesFlow {
       ): Presequenced[StoreEvent[PayloadId]] =
         event.map {
           // we only do this validation for deliver events that specify a signing timestamp
-          case deliver @ DeliverStoreEvent(sender, messageId, _, _, Some(topologyTimestamp), _) =>
+          case deliver @ DeliverStoreEvent(
+                sender,
+                messageId,
+                _,
+                _,
+                Some(topologyTimestamp),
+                _,
+              ) =>
             // We only check that the signing timestamp is at most the assigned timestamp.
             // The lower bound will be checked only when reading the event
             // because only then we know the topology state at the signing timestamp,
@@ -419,7 +543,7 @@ object SequenceWritesFlow {
               DeliverErrorStoreEvent(
                 sender,
                 messageId,
-                reason,
+                reason.rpcStatusWithoutLoggingContext(),
                 protocolVersion,
                 event.traceContext,
               )
@@ -433,7 +557,7 @@ object SequenceWritesFlow {
         presequencedEvent match {
           // we only need to check deliver events for payloads
           // the only reason why
-          case presequencedDeliver @ Presequenced(deliver: DeliverStoreEvent[PayloadId], _) =>
+          case presequencedDeliver @ Presequenced(deliver: DeliverStoreEvent[PayloadId], _, _) =>
             val payloadTs = deliver.payload.unwrap
             val bound = writerConfig.payloadToEventMargin
             val maxAllowableEventTime = payloadTs.add(bound.asJava)
@@ -531,8 +655,9 @@ object WritePayloadsFlow {
     }
 
     def dropPayloadContent(event: StoreEvent[Payload]): StoreEvent[PayloadId] = event match {
-      case deliver: DeliverStoreEvent[Payload] => deliver.mapPayload(_.id)
+      case deliver: DeliverStoreEvent[Payload] => deliver.map(_.id)
       case error: DeliverErrorStoreEvent => error
+      case receipt: ReceiptStoreEvent => receipt
     }
 
     Flow[Presequenced[StoreEvent[Payload]]]
@@ -540,7 +665,9 @@ object WritePayloadsFlow {
         writerConfig.payloadWriteBatchMaxSize,
         writerConfig.payloadWriteBatchMaxDuration.underlying,
       )
-      .mapAsyncUnordered(writerConfig.payloadWriteMaxConcurrency)(writePayloads(_))
+      .mapAsync(writerConfig.payloadWriteMaxConcurrency)(
+        writePayloads(_)
+      ) // TODO(#18394): make a switch with the flag for .mapAsyncUnordered, if this affects performance
       .mapConcat(identity)
       .named("writePayloads")
   }

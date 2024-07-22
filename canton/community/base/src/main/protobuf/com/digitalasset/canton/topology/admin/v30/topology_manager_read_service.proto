@@ -36,21 +36,9 @@ service TopologyManagerReadService {
   rpc ListAvailableStores(ListAvailableStoresRequest) returns (ListAvailableStoresResponse);
   rpc ListAll(ListAllRequest) returns (ListAllResponse);
   rpc ExportTopologySnapshot(ExportTopologySnapshotRequest) returns (ExportTopologySnapshotResponse);
-
-  rpc ListTrafficState(ListTrafficStateRequest) returns (ListTrafficStateResponse);
-}
-
-message ListTrafficStateRequest {
-  BaseQuery base_query = 1;
-  string filter_member = 2;
-}
-
-message ListTrafficStateResponse {
-  message Result {
-    BaseResult context = 1;
-    com.digitalasset.canton.protocol.v30.TrafficControlState item = 2;
-  }
-  repeated Result results = 1;
+  // Fetch the genesis topology state.
+  // The returned bytestring can be used directly to initialize a sequencer.
+  rpc GenesisState(GenesisStateRequest) returns (stream GenesisStateResponse);
 }
 
 message BaseQuery {
@@ -61,9 +49,7 @@ message BaseQuery {
 
   com.digitalasset.canton.protocol.v30.Enums.TopologyChangeOp operation = 3;
 
-  // TODO(#14048) Decide whether the filter_operation flag is necessary on top of the optional operation field, if not remove
-  // if true, then we'll filter the results according to above defined operation
-  bool filter_operation = 4;
+  reserved 4;
 
   message TimeRange {
     google.protobuf.Timestamp from = 1;
@@ -76,7 +62,7 @@ message BaseQuery {
     TimeRange range = 7;
   }
   string filter_signed_key = 8;
-  google.protobuf.StringValue protocol_version = 9;
+  google.protobuf.Int32Value protocol_version = 9;
 }
 
 message Store {
@@ -313,4 +299,16 @@ message ListAllResponse {
 
 message ExportTopologySnapshotResponse {
   bytes result = 1;
+}
+
+message GenesisStateRequest {
+  // Must be specified if the genesis state is requested from a participant node.
+  Store filter_domain_store = 1;
+  // Optional - the effective time used to fetch the topology transactions. If not provided the effective time of the last topology transaction is used.
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message GenesisStateResponse {
+  // versioned stored topology transactions
+  bytes chunk = 1;
 }

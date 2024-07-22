@@ -52,19 +52,17 @@ object CommunityConfigValidations
   type Validation = CantonCommunityConfig => Validated[NonEmpty[Seq[String]], Unit]
 
   override protected val validations: List[Validation] =
-    List[Validation](noDuplicateStorage, atLeastOneNode) ++ genericValidations[
-      CantonCommunityConfig
-    ]
+    List[Validation](noDuplicateStorage, atLeastOneNode) ++
+      genericValidations[CantonCommunityConfig]
 
   /** Validations applied to all community and enterprise Canton configurations. */
   private[config] def genericValidations[C <: CantonConfig]
-      : List[C => Validated[NonEmpty[Seq[String]], Unit]] = {
+      : List[C => Validated[NonEmpty[Seq[String]], Unit]] =
     List(
       developmentProtocolSafetyCheck,
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
     )
-  }
 
   /** Group node configs by db access to find matching db storage configs.
     * Overcomplicated types used are to work around that at this point nodes could have conflicting names so we can't just
@@ -186,14 +184,14 @@ object CommunityConfigValidations
         name: String,
         nodeTypeName: String,
         nonStandardConfig: Boolean,
-        devVersionSupport: Boolean,
+        alphaVersionSupport: Boolean,
     ): Validated[NonEmpty[Seq[String]], Unit] = {
       Validated.cond(
-        nonStandardConfig || !devVersionSupport,
+        nonStandardConfig || !alphaVersionSupport,
         (),
         NonEmpty(
           Seq,
-          s"Enabling dev-version-support for $nodeTypeName $name requires you to explicitly set canton.parameters.non-standard-config = yes",
+          s"Enabling alpha-version-support for $nodeTypeName $name requires you to explicitly set canton.parameters.non-standard-config = yes",
         ),
       )
     }
@@ -203,22 +201,25 @@ object CommunityConfigValidations
         name = name.unwrap,
         nodeTypeName = nodeConfig.nodeTypeName,
         nonStandardConfig = config.parameters.nonStandardConfig,
-        devVersionSupport = nodeConfig.parameters.devVersionSupport,
+        alphaVersionSupport = nodeConfig.parameters.alphaVersionSupport,
       )
     }
+
   }
 
   private def warnIfUnsafeMinProtocolVersion(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    config.participants.toSeq.foreach { case (name, config) =>
+    val errors = config.participants.toSeq.mapFilter { case (name, config) =>
       val minimum = config.parameters.minimumProtocolVersion.map(_.unwrap)
       val isMinimumDeprecatedVersion = minimum.getOrElse(ProtocolVersion.minimum).isDeprecated
 
-      if (isMinimumDeprecatedVersion && !config.parameters.dontWarnOnDeprecatedPV)
-        DeprecatedProtocolVersion.WarnParticipant(name, minimum).discard
+      Option.when(isMinimumDeprecatedVersion && !config.parameters.dontWarnOnDeprecatedPV)(
+        DeprecatedProtocolVersion.WarnParticipant(name, minimum).cause
+      )
     }
-    Validated.valid(())
+
+    NonEmpty.from(errors).map(Validated.invalid).getOrElse(Validated.valid(()))
   }
 
   private def adminTokenSafetyCheckParticipants(

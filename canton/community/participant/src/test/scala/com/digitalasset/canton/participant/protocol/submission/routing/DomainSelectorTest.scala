@@ -4,9 +4,6 @@
 package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
-import com.daml.lf.data.Ref
-import com.daml.lf.transaction.TransactionVersion
-import com.daml.lf.transaction.test.TransactionBuilder.Implicits.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, SuppressingLogger}
 import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.Transactions.{
@@ -29,6 +26,9 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{DamlLfVersionToProtocolVersions, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, LfPackageId, LfPartyId}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.transaction.TransactionVersion
+import com.digitalasset.daml.lf.transaction.test.TransactionBuilder.Implicits.*
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -128,8 +128,9 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
       pickDomain(repair) shouldBe repair
     }
 
-    "take minimum protocol version into account" in {
-      val oldPV = ProtocolVersion.v30
+    // TODO(#15561) Re-enable this test when we have a stable protocol version
+    "take minimum protocol version into account" ignore {
+      val oldPV = ProtocolVersion.v31
 
       val transactionVersion = LfTransactionVersion.VDev
       val newPV = DamlLfVersionToProtocolVersions.damlLfVersionToMinimumProtocolVersions
@@ -364,7 +365,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
 private[routing] object DomainSelectorTest {
   private def createDomainId(alias: String): DomainId = DomainId(
-    UniqueIdentifier(Identifier.tryCreate(alias), DefaultTestIdentities.namespace)
+    UniqueIdentifier.tryCreate(alias, DefaultTestIdentities.namespace)
   )
 
   private lazy val da = createDomainId("da")

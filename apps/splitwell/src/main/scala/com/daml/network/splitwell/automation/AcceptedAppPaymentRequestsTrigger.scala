@@ -16,7 +16,7 @@ import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.{DisclosedContracts, AssignedContract}
-import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status

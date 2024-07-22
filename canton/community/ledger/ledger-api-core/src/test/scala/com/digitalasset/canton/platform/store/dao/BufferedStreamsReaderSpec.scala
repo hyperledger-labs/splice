@@ -4,16 +4,17 @@
 package com.digitalasset.canton.platform.store.dao
 
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
-import com.daml.lf.data.Time.Timestamp
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReaderSpec.*
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, HasExecutorServiceGeneric}
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.{Done, NotUsed}
 import org.scalatest.Assertion
@@ -254,7 +255,7 @@ object BufferedStreamsReaderSpec {
 
     implicit val ec: ExecutionContext = executorService
 
-    val metrics = Metrics.ForTesting
+    val metrics = LedgerApiServerMetrics.ForTesting
     val Seq(offset0, offset1, offset2, offset3) = (0 to 3) map { idx => offset(idx.toLong) }
     val offsetUpdates: Seq[(Offset, Traced[TransactionLogUpdate.TransactionAccepted])] =
       Seq(offset1, offset2, offset3).zip((1 to 3).map(idx => Traced(transaction(s"tx-$idx"))))
@@ -465,6 +466,8 @@ object BufferedStreamsReaderSpec {
     }
   }
 
+  private val someDomainId = DomainId.tryFromString("some::domain-id")
+
   private def transaction(discriminator: String) =
     TransactionLogUpdate.TransactionAccepted(
       transactionId = discriminator,
@@ -474,7 +477,7 @@ object BufferedStreamsReaderSpec {
       offset = Offset.beforeBegin,
       events = Vector(null),
       completionDetails = None,
-      domainId = None,
+      domainId = someDomainId.toProtoPrimitive,
       recordTime = Timestamp.Epoch,
     )
 

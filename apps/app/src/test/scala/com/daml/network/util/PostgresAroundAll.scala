@@ -37,10 +37,7 @@ trait PostgresAroundEach extends BeforeAndAfterEach {
 
   override protected def afterEach(): Unit = {
     super.afterEach()
-    dropAll().fold(
-      err => logger.warn(s"Failed to drop database: $err"),
-      _ => logger.debug("Dropped all databases"),
-    )
+    dropAll()
   }
 
   private def createDb(dbName: String) = {
@@ -52,12 +49,17 @@ trait PostgresAroundEach extends BeforeAndAfterEach {
   }
 
   private def dropAll() = {
-    usesDbs.map(dbName => Try(dropDb(dbName))).sequence
+    usesDbs
+      .traverse(dbName => Try(dropDb(dbName)))
+      .fold(
+        err => logger.warn(s"Failed to drop database: $err"),
+        _ => logger.debug("Dropped all databases"),
+      )
   }
 
   private def dropDb(dbName: String) = {
     executeAdminStatement() { statement =>
-      statement.execute(s"DROP DATABASE \"$dbName\"")
+      statement.execute(s"DROP DATABASE IF EXISTS \"$dbName\" WITH (FORCE)")
     }
     logger.debug(s"Dropped database $dbName")
   }

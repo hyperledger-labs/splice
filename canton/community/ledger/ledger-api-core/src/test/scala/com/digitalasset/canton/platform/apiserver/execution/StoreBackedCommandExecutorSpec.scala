@@ -3,41 +3,43 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.daml.lf.command.{ApiCommands as LfCommands, DisclosedContract as LfDisclosedContract}
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.Ref.{Identifier, ParticipantId, Party}
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.daml.lf.engine.*
-import com.daml.lf.transaction.test.TransactionBuilder
-import com.daml.lf.transaction.{
-  GlobalKeyWithMaintainers,
-  SubmittedTransaction,
-  Transaction,
-  Versioned,
-}
-import com.daml.lf.value.Value
-import com.daml.lf.value.Value.{ContractInstance, ValueTrue}
 import com.daml.logging.LoggingContext
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt, SaltSeed}
+import com.digitalasset.canton.data.DeduplicationPeriod
+import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands}
 import com.digitalasset.canton.ledger.api.util.TimeProvider
-import com.digitalasset.canton.ledger.api.{DeduplicationPeriod, domain}
-import com.digitalasset.canton.ledger.participant.state.index.v2.{
-  ContractState,
-  ContractStore,
-  IndexPackagesService,
-}
+import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.digitalasset.canton.ledger.participant.state.index.{ContractState, ContractStore}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackageName
+import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.InterpretationTimeExceeded
 import com.digitalasset.canton.protocol.{DriverContractMetadata, LfContractId, LfTransactionVersion}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, LfValue}
+import com.digitalasset.daml.lf.command.{
+  ApiCommands as LfCommands,
+  DisclosedContract as LfDisclosedContract,
+}
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref.{Identifier, ParticipantId, Party}
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.engine.*
+import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
+import com.digitalasset.daml.lf.transaction.{
+  GlobalKeyWithMaintainers,
+  SubmittedTransaction,
+  Transaction,
+  Versioned,
+}
+import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.value.Value.{ContractInstance, ValueTrue}
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -59,8 +61,7 @@ class StoreBackedCommandExecutorSpec
   val identifier: Identifier =
     Ref.Identifier(Ref.PackageId.assertFromString("p"), Ref.QualifiedName.assertFromString("m:n"))
   val packageName: PackageName = PackageName.assertFromString("pkg-name")
-  private val processedDisclosedContracts = ImmArray(
-  )
+  private val processedDisclosedContracts = ImmArray()
 
   private val emptyTransactionMetadata = Transaction.Metadata(
     submissionSeed = None,
@@ -81,14 +82,15 @@ class StoreBackedCommandExecutorSpec
     val mockEngine = mock[Engine]
     when(
       mockEngine.submit(
-        submitters = any[Set[Ref.Party]],
-        readAs = any[Set[Ref.Party]],
-        cmds = any[com.daml.lf.command.ApiCommands],
-        participantId = any[ParticipantId],
-        submissionSeed = any[Hash],
-        disclosures = any[ImmArray[LfDisclosedContract]],
         packageMap = any[Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]],
         packagePreference = any[Set[Ref.PackageId]],
+        submitters = any[Set[Ref.Party]],
+        readAs = any[Set[Ref.Party]],
+        cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
+        disclosures = any[ImmArray[LfDisclosedContract]],
+        participantId = any[ParticipantId],
+        submissionSeed = any[Hash],
+        engineLogger = any[Option[EngineLogger]],
       )(any[LoggingContext])
     )
       .thenReturn(result)
@@ -118,11 +120,12 @@ class StoreBackedCommandExecutorSpec
     new StoreBackedCommandExecutor(
       engine,
       Ref.ParticipantId.assertFromString("anId"),
-      mock[IndexPackagesService],
+      mock[WriteService],
       mock[ContractStore],
       AuthorityResolver(),
       authenticateContract = _ => Right(()),
-      metrics = Metrics.ForTesting,
+      metrics = LedgerApiServerMetrics.ForTesting,
+      EngineLoggingConfig(),
       loggerFactory = loggerFactory,
       dynParamGetter = new TestDynamicDomainParameterGetter(tolerance),
       TimeProvider.UTC,
@@ -202,6 +205,7 @@ class StoreBackedCommandExecutorSpec
     val stakeholderContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "03")
     val stakeholderContract = ContractState.Active(
       contractInstance = Versioned(
+        // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
         LfTransactionVersion.maxVersion,
         ContractInstance(packageName = packageName, template = identifier, arg = Value.ValueTrue),
       ),
@@ -223,6 +227,7 @@ class StoreBackedCommandExecutorSpec
     val disclosedContract: domain.DisclosedContract = domain.DisclosedContract(
       templateId = identifier,
       packageName = packageName,
+      packageVersion = None,
       contractId = disclosedContractId,
       argument = ValueTrue,
       createdAt = mock[Timestamp],
@@ -235,6 +240,7 @@ class StoreBackedCommandExecutorSpec
       ),
       keyMaintainers = Some(Set(Ref.Party.assertFromString("unexpectedSig"))),
       keyValue = Some(LfValue.ValueTrue),
+      transactionVersion = LfTransactionVersion.StableVersions.max,
     )
 
     def doTest(
@@ -257,7 +263,12 @@ class StoreBackedCommandExecutorSpec
             observers = Set(Ref.Party.assertFromString("observer")),
             keyOpt = Some(
               GlobalKeyWithMaintainers
-                .assertBuild(identifier, someContractKey(signatory, "some key"), Set(signatory))
+                .assertBuild(
+                  identifier,
+                  someContractKey(signatory, "some key"),
+                  Set(signatory),
+                  packageName,
+                )
             ),
             resume = verdict => {
               ref.set(Some(verdict))
@@ -268,14 +279,15 @@ class StoreBackedCommandExecutorSpec
 
       when(
         mockEngine.submit(
-          submitters = any[Set[Party]],
-          readAs = any[Set[Party]],
-          cmds = any[LfCommands],
-          participantId = any[ParticipantId],
-          submissionSeed = any[Hash],
-          disclosures = any[ImmArray[LfDisclosedContract]],
           packageMap = any[Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]],
           packagePreference = any[Set[Ref.PackageId]],
+          submitters = any[Set[Ref.Party]],
+          readAs = any[Set[Ref.Party]],
+          cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
+          disclosures = any[ImmArray[LfDisclosedContract]],
+          participantId = any[ParticipantId],
+          submissionSeed = any[Hash],
+          engineLogger = any[Option[EngineLogger]],
         )(any[LoggingContext])
       ).thenReturn(engineResult)
 
@@ -319,11 +331,12 @@ class StoreBackedCommandExecutorSpec
       val sut = new StoreBackedCommandExecutor(
         mockEngine,
         Ref.ParticipantId.assertFromString("anId"),
-        mock[IndexPackagesService],
+        mock[WriteService],
         store,
         AuthorityResolver(),
         authenticateContract = _ => authenticationResult,
-        metrics = Metrics.ForTesting,
+        metrics = LedgerApiServerMetrics.ForTesting,
+        EngineLoggingConfig(),
         loggerFactory = loggerFactory,
         dynParamGetter = new TestDynamicDomainParameterGetter(NonNegativeFiniteDuration.Zero),
         TimeProvider.UTC,
@@ -367,7 +380,7 @@ class StoreBackedCommandExecutorSpec
 
     "disallow unauthorized disclosed contracts" in {
       val expected =
-        s"Upgrading contract with $disclosedContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: Set(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, ValueBool(true))) vs Some(GlobalKey(p:m:n, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract with $disclosedContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: Set(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, pkg-name, ValueBool(true))) vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(disclosedContractId),
         Some(Some(expected)),
@@ -378,7 +391,7 @@ class StoreBackedCommandExecutorSpec
     "disallow unauthorized stakeholder contracts" in {
       val errorMessage = "Not authorized"
       val expected =
-        s"Upgrading contract with $stakeholderContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract with $stakeholderContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(stakeholderContractId),
         Some(Some(expected)),

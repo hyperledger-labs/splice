@@ -4,19 +4,17 @@
 package com.digitalasset.canton.participant.protocol.transfer
 
 import cats.data.EitherT
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import com.daml.lf.data.Bytes
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.crypto.{DecryptionError as _, EncryptionError as _, *}
 import com.digitalasset.canton.data.ViewType.TransferInViewType
 import com.digitalasset.canton.data.*
-import com.digitalasset.canton.ledger.participant.state.v2.CompletionInfo
+import com.digitalasset.canton.ledger.participant.state.CompletionInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.RequestOffset
-import com.digitalasset.canton.participant.protocol.ProcessingSteps.PendingRequestData
+import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessCheck,
   ActivenessResult,
@@ -32,14 +30,15 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferInValidatio
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.{
   CanSubmitTransfer,
+  EngineController,
   ProcessingSteps,
-  ProtocolProcessor,
 }
 import com.digitalasset.canton.participant.store.ActiveContractStore.Archived
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, TimestampedEvent}
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.messages.ConfirmationResponse.InvalidConfirmationResponse
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.serialization.DefaultDeserializationError
@@ -56,6 +55,7 @@ import com.digitalasset.canton.{
   TransferCounter,
   checked,
 }
+import com.digitalasset.daml.lf.data.Bytes
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
@@ -66,6 +66,7 @@ private[transfer] class TransferInProcessingSteps(
     val engine: DAMLe,
     transferCoordination: TransferCoordination,
     seedGenerator: SeedGenerator,
+    staticDomainParameters: StaticDomainParameters,
     targetProtocolVersion: TargetProtocolVersion,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -86,8 +87,6 @@ private[transfer] class TransferInProcessingSteps(
 
   override type SubmissionResultArgs = PendingTransferSubmission
 
-  override type PendingDataAndResponseArgs = TransferInProcessingSteps.PendingDataAndResponseArgs
-
   override type RequestType = ProcessingSteps.RequestType.TransferIn
   override val requestType = ProcessingSteps.RequestType.TransferIn
 
@@ -97,6 +96,7 @@ private[transfer] class TransferInProcessingSteps(
 
   private val transferInValidation = new TransferInValidation(
     domainId,
+    staticDomainParameters,
     participantId,
     engine,
     transferCoordination,
@@ -106,9 +106,9 @@ private[transfer] class TransferInProcessingSteps(
   override def submissionIdOfPendingRequest(pendingData: PendingTransferIn): RootHash =
     pendingData.rootHash
 
-  override def prepareSubmission(
-      param: SubmissionParam,
-      mediator: MediatorsOfDomain,
+  override def createSubmission(
+      submissionParam: SubmissionParam,
+      mediator: MediatorGroupRecipient,
       ephemeralState: SyncDomainEphemeralStateLookup,
       recentSnapshot: DomainSnapshotSyncCryptoApi,
   )(implicit
@@ -119,7 +119,7 @@ private[transfer] class TransferInProcessingSteps(
       submitterMetadata,
       transferId,
       sourceProtocolVersion,
-    ) = param
+    ) = submissionParam
     val topologySnapshot = recentSnapshot.ipsSnapshot
     val pureCrypto = recentSnapshot.pureCrypto
     val submitter = submitterMetadata.submitter
@@ -142,11 +142,12 @@ private[transfer] class TransferInProcessingSteps(
       }
     )
 
-    val result = for {
+    for {
       transferData <- ephemeralState.transferLookup
         .lookup(transferId)
         .leftMap(err => NoTransferData(transferId, err))
-      transferOutResult <- EitherT.fromEither[Future](
+        .mapK(FutureUnlessShutdown.outcomeK)
+      transferOutResult <- EitherT.fromEither[FutureUnlessShutdown](
         transferData.transferOutResult.toRight(TransferOutIncomplete(transferId, participantId))
       )
 
@@ -157,17 +158,19 @@ private[transfer] class TransferInProcessingSteps(
         )
 
       stakeholders = transferData.transferOutRequest.stakeholders
-      _ <- condUnitET[Future](
+      _ <- condUnitET[FutureUnlessShutdown](
         stakeholders.contains(submitter),
         SubmittingPartyMustBeStakeholderIn(transferId, submitter, stakeholders),
       )
 
-      _ <- CanSubmitTransfer.transferIn(transferId, topologySnapshot, submitter, participantId)
+      _ <- CanSubmitTransfer
+        .transferIn(transferId, topologySnapshot, submitter, participantId)
+        .mapK(FutureUnlessShutdown.outcomeK)
 
       transferInUuid = seedGenerator.generateUuid()
       seed = seedGenerator.generateSaltSeed()
 
-      fullTree <- EitherT.fromEither[Future](
+      fullTree <- EitherT.fromEither[FutureUnlessShutdown](
         makeFullTransferInTree(
           pureCrypto,
           seed,
@@ -190,8 +193,10 @@ private[transfer] class TransferInProcessingSteps(
         .sign(rootHash.unwrap)
         .leftMap(TransferSigningError)
       mediatorMessage = fullTree.mediatorMessage(submittingParticipantSignature)
-      recipientsSet <- activeParticipantsOfParty(stakeholders.toSeq)
-      recipients <- EitherT.fromEither[Future](
+      recipientsSet <- activeParticipantsOfParty(stakeholders.toSeq).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
+      recipients <- EitherT.fromEither[FutureUnlessShutdown](
         Recipients
           .ofSet(recipientsSet)
           .toRight(NoStakeholders.logAndCreate(transferData.contract.contractId, logger))
@@ -211,6 +216,7 @@ private[transfer] class TransferInProcessingSteps(
           domainId.unwrap,
           targetProtocolVersion.v,
           ViewType.TransferInViewType,
+          recentSnapshot.ipsSnapshot.timestamp,
           EmptyRootHashMessagePayload,
         )
       // Each member gets a message sent to itself and to the mediator
@@ -231,8 +237,6 @@ private[transfer] class TransferInProcessingSteps(
       )
       TransferSubmission(Batch.of(targetProtocolVersion.v, messages*), rootHash)
     }
-
-    result.mapK(FutureUnlessShutdown.outcomeK).widen[Submission]
   }
 
   override def updatePendingSubmissions(
@@ -261,94 +265,60 @@ private[transfer] class TransferInProcessingSteps(
       envelope: OpenEnvelope[EncryptedViewMessage[TransferInViewType]]
   )(implicit
       tc: TraceContext
-  ): EitherT[Future, EncryptedViewMessageError, WithRecipients[
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, WithRecipients[
     FullTransferInTree
   ]] =
     EncryptedViewMessage
       .decryptFor(
+        staticDomainParameters,
         snapshot,
         sessionKeyStore,
         envelope.protocolMessage,
         participantId,
       ) { bytes =>
         FullTransferInTree
-          .fromByteString(snapshot.pureCrypto, targetProtocolVersion.v)(bytes)
+          .fromByteString(snapshot.pureCrypto, targetProtocolVersion)(bytes)
           .leftMap(e => DefaultDeserializationError(e.toString))
       }
       .map(WithRecipients(_, envelope.recipients))
 
-  override def computeActivenessSetAndPendingContracts(
-      ts: CantonTimestamp,
-      rc: RequestCounter,
-      sc: SequencerCounter,
-      fullViewsWithSignatures: NonEmpty[
-        Seq[(WithRecipients[FullTransferInTree], Option[Signature])]
-      ],
-      malformedPayloads: Seq[ProtocolProcessor.MalformedPayload],
-      snapshot: DomainSnapshotSyncCryptoApi,
-      mediator: MediatorsOfDomain,
-      // not actually used here, because it's available in the only fully unblinded view
-      submitterMetadataO: Option[ViewSubmitterMetadata],
+  override def computeActivenessSet(
+      parsedRequest: ParsedTransferRequest[FullTransferInTree]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, CheckActivenessAndWritePendingContracts] = {
-    val correctRootHashes = fullViewsWithSignatures.map { case (rootHashes, _) =>
-      rootHashes.unwrap
-    }
+  ): Either[TransferProcessorError, ActivenessSet] =
     // TODO(i12926): Send a rejection if malformedPayloads is non-empty
-    for {
-      txInRequest <- EitherT.cond[Future](
-        correctRootHashes.toList.sizeCompare(1) == 0,
-        correctRootHashes.head1,
-        ReceivedMultipleRequests(correctRootHashes.map(_.viewHash)): TransferProcessorError,
-      )
-      contractId = txInRequest.contract.contractId
-
-      _ <- condUnitET[Future](
-        txInRequest.targetDomain == domainId,
-        UnexpectedDomain(
-          txInRequest.transferOutResultEvent.transferId,
-          targetDomain = txInRequest.domainId,
-          receivedOn = domainId.unwrap,
-        ),
-      ).leftWiden[TransferProcessorError]
-
-      transferringParticipant = txInRequest.transferOutResultEvent.unwrap.informees
-        .contains(participantId.adminParty.toLf)
-
-      contractIdS = Set(contractId)
-      contractCheck = ActivenessCheck.tryCreate(
+    if (parsedRequest.fullViewTree.targetDomain == domainId) {
+      val contractId = parsedRequest.fullViewTree.contract.contractId
+      val contractCheck = ActivenessCheck.tryCreate(
         checkFresh = Set.empty,
-        checkFree = contractIdS,
+        checkFree = Set(contractId),
         checkActive = Set.empty,
-        lock = contractIdS,
+        lock = Set(contractId),
         needPriorState = Set.empty,
       )
-      activenessSet = ActivenessSet(
+      val activenessSet = ActivenessSet(
         contracts = contractCheck,
         transferIds =
-          if (transferringParticipant) Set(txInRequest.transferOutResultEvent.transferId)
+          if (parsedRequest.transferringParticipant)
+            Set(parsedRequest.fullViewTree.transferOutResultEvent.transferId)
           else Set.empty,
       )
-    } yield CheckActivenessAndWritePendingContracts(
-      activenessSet,
-      PendingDataAndResponseArgs(
-        txInRequest,
-        ts,
-        rc,
-        sc,
-        snapshot,
-        transferringParticipant,
-      ),
-    )
-  }
+      Right(activenessSet)
+    } else
+      Left(
+        UnexpectedDomain(
+          parsedRequest.fullViewTree.transferOutResultEvent.transferId,
+          targetDomain = parsedRequest.fullViewTree.domainId,
+          receivedOn = domainId.unwrap,
+        )
+      )
 
   override def constructPendingDataAndResponse(
-      pendingDataAndResponseArgs: PendingDataAndResponseArgs,
+      parsedRequest: ParsedRequestType,
       transferLookup: TransferLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
-      mediator: MediatorsOfDomain,
-      freshOwnTimelyTx: Boolean,
+      engineController: EngineController,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -357,24 +327,40 @@ private[transfer] class TransferInProcessingSteps(
     StorePendingDataAndSendResponseAndCreateTimeout,
   ] = {
 
-    val PendingDataAndResponseArgs(
-      txInRequest,
-      ts,
+    val ParsedTransferRequest(
       rc,
+      ts,
       sc,
-      targetCrypto,
+      fullViewTree,
+      _,
+      _,
+      _,
+      _,
       transferringParticipant,
-    ) = pendingDataAndResponseArgs
+      _,
+      mediator,
+      targetCrypto,
+      _,
+    ) = parsedRequest
 
-    val transferId = txInRequest.transferOutResultEvent.transferId
+    val requestId = RequestId(ts)
+    val transferId = fullViewTree.transferOutResultEvent.transferId
+
+    // We perform the stakeholders check asynchronously so that we can complete the pending request
+    // in the Phase37Synchronizer without waiting for it, thereby allowing us to concurrently receive a
+    // mediator verdict.
+    val stakeholdersCheckResultET = transferInValidation
+      .checkStakeholders(
+        fullViewTree,
+        getEngineAbortStatus = () => engineController.abortStatus,
+      )
+      .mapK(FutureUnlessShutdown.outcomeK)
 
     for {
-      _ <- transferInValidation.checkStakeholders(txInRequest).mapK(FutureUnlessShutdown.outcomeK)
-
       hostedStks <- EitherT.right[TransferProcessorError](
         FutureUnlessShutdown.outcomeF(
           hostedStakeholders(
-            txInRequest.contract.metadata.stakeholders.toList,
+            fullViewTree.contract.metadata.stakeholders.toList,
             targetCrypto.ipsSnapshot,
           )
         )
@@ -388,7 +374,7 @@ private[transfer] class TransferInProcessingSteps(
       validationResultO <- transferInValidation
         .validateTransferInRequest(
           ts,
-          txInRequest,
+          fullViewTree,
           transferDataO,
           targetCrypto,
           transferringParticipant,
@@ -396,76 +382,35 @@ private[transfer] class TransferInProcessingSteps(
         .mapK(FutureUnlessShutdown.outcomeK)
 
       activenessResult <- EitherT.right[TransferProcessorError](activenessResultFuture)
-      requestId = RequestId(ts)
-
-      responses <- validationResultO match {
-        case None =>
-          EitherT.rightT[FutureUnlessShutdown, TransferProcessorError](Seq.empty)
-        case Some(validationResult) =>
-          val contractResult = activenessResult.contracts
-
-          val localRejectErrorO =
-            if (activenessResult.isSuccessful)
-              None
-            else if (contractResult.notFree.nonEmpty) {
-              contractResult.notFree.toSeq match {
-                case Seq((coid, Archived)) =>
-                  Some(
-                    LocalRejectError.TransferInRejects.ContractAlreadyArchived
-                      .Reject(show"coid=$coid")
-                  )
-                case Seq((coid, _state)) =>
-                  Some(
-                    LocalRejectError.TransferInRejects.ContractAlreadyActive
-                      .Reject(show"coid=$coid")
-                  )
-                case coids =>
-                  throw new RuntimeException(
-                    s"Activeness result for a transfer-in fails for multiple contract IDs $coids"
-                  )
-              }
-            } else if (contractResult.alreadyLocked.nonEmpty)
-              Some(
-                LocalRejectError.TransferInRejects.ContractIsLocked
-                  .Reject("")
-              )
-            else if (activenessResult.inactiveTransfers.nonEmpty)
-              Some(
-                LocalRejectError.TransferInRejects.AlreadyCompleted
-                  .Reject("")
-              )
-            else
-              throw new RuntimeException(
-                withRequestId(requestId, s"Unexpected activeness result $activenessResult")
-              )
-
-          val localVerdict =
-            localRejectErrorO.fold[LocalVerdict](LocalApprove(targetProtocolVersion.v)) { err =>
-              err.logWithContext()
-              err.toLocalReject(targetProtocolVersion.v)
-            }
-
-          EitherT
-            .fromEither[FutureUnlessShutdown](
-              ConfirmationResponse
-                .create(
-                  requestId,
-                  participantId,
-                  Some(ViewPosition.root),
-                  localVerdict,
-                  txInRequest.rootHash,
-                  validationResult.confirmingParties,
-                  domainId.id,
-                  targetProtocolVersion.v,
-                )
-            )
-            .leftMap(e => FailedToCreateResponse(transferId, e): TransferProcessorError)
-            .map(transferResponse => Seq(transferResponse -> Recipients.cc(mediator)))
-      }
     } yield {
-      // We consider that we rejected if at least one of the responses is not "approve'
-      val locallyRejected = responses.exists { case (response, _) =>
-        !response.localVerdict.isApprove
+      val responsesET = for {
+        _ <- stakeholdersCheckResultET
+        transferResponses <- EitherT
+          .fromEither[FutureUnlessShutdown](
+            createConfirmationResponses(
+              requestId,
+              fullViewTree,
+              activenessResult,
+              validationResultO,
+            )
+          )
+          .leftMap(e => FailedToCreateResponse(transferId, e): TransferProcessorError)
+      } yield {
+        transferResponses.map(_ -> Recipients.cc(mediator))
+      }
+
+      // We consider that we rejected if we fail to process or if at least one of the responses is not "approve'
+      val locallyRejectedF = responsesET.value.map(
+        _.fold(
+          _ => true,
+          _.exists { case (response, _) =>
+            !response.localVerdict.isApprove
+          },
+        )
+      )
+      val engineAbortStatusF = stakeholdersCheckResultET.value.map {
+        case Left(ReinterpretationAborted(_, reason)) => EngineAbortStatus.aborted(reason)
+        case _ => EngineAbortStatus.notAborted
       }
 
       // construct pending data and response
@@ -473,21 +418,23 @@ private[transfer] class TransferInProcessingSteps(
         requestId,
         rc,
         sc,
-        txInRequest.tree.rootHash,
-        txInRequest.contract,
-        txInRequest.transferCounter,
-        txInRequest.submitterMetadata,
-        txInRequest.creatingTransactionId,
+        fullViewTree.rootHash,
+        fullViewTree.contract,
+        fullViewTree.transferCounter,
+        fullViewTree.submitterMetadata,
+        fullViewTree.creatingTransactionId,
         transferringParticipant,
         transferId,
         hostedStks.toSet,
         mediator,
-        locallyRejected,
+        locallyRejectedF,
+        engineController.abort,
+        engineAbortStatusF,
       )
 
       StorePendingDataAndSendResponseAndCreateTimeout(
         entry,
-        responses,
+        responsesET,
         RejectionArgs(
           entry,
           LocalRejectError.TimeRejects.LocalTimeout.Reject().toLocalReject(targetProtocolVersion.v),
@@ -495,6 +442,76 @@ private[transfer] class TransferInProcessingSteps(
       )
     }
   }
+
+  private def createConfirmationResponses(
+      requestId: RequestId,
+      txInRequest: FullTransferInTree,
+      activenessResult: ActivenessResult,
+      validationResultO: Option[TransferInValidationResult],
+  )(implicit
+      traceContext: TraceContext
+  ): Either[InvalidConfirmationResponse, Seq[ConfirmationResponse]] =
+    validationResultO match {
+      case None => Right(Seq.empty[ConfirmationResponse])
+
+      case Some(validationResult) =>
+        val contractResult = activenessResult.contracts
+
+        val localRejectErrorO =
+          if (activenessResult.isSuccessful)
+            None
+          else if (contractResult.notFree.nonEmpty) {
+            contractResult.notFree.toSeq match {
+              case Seq((coid, Archived)) =>
+                Some(
+                  LocalRejectError.TransferInRejects.ContractAlreadyArchived
+                    .Reject(show"coid=$coid")
+                )
+              case Seq((coid, _state)) =>
+                Some(
+                  LocalRejectError.TransferInRejects.ContractAlreadyActive
+                    .Reject(show"coid=$coid")
+                )
+              case coids =>
+                throw new RuntimeException(
+                  s"Activeness result for a transfer-in fails for multiple contract IDs $coids"
+                )
+            }
+          } else if (contractResult.alreadyLocked.nonEmpty)
+            Some(
+              LocalRejectError.TransferInRejects.ContractIsLocked
+                .Reject("")
+            )
+          else if (activenessResult.inactiveTransfers.nonEmpty)
+            Some(
+              LocalRejectError.TransferInRejects.AlreadyCompleted
+                .Reject("")
+            )
+          else
+            throw new RuntimeException(
+              withRequestId(requestId, s"Unexpected activeness result $activenessResult")
+            )
+
+        val localVerdict =
+          localRejectErrorO.fold[LocalVerdict](LocalApprove(targetProtocolVersion.v)) { err =>
+            err.logWithContext()
+            err.toLocalReject(targetProtocolVersion.v)
+          }
+
+        ConfirmationResponse
+          .create(
+            requestId,
+            participantId,
+            Some(ViewPosition.root),
+            localVerdict,
+            txInRequest.rootHash,
+            validationResult.confirmingParties,
+            domainId.id,
+            targetProtocolVersion.v,
+          )
+          .map(transferResponse => Seq(transferResponse))
+
+    }
 
   private[this] def withRequestId(requestId: RequestId, message: String) =
     s"Transfer-in $requestId: $message"
@@ -507,7 +524,11 @@ private[transfer] class TransferInProcessingSteps(
       hashOps: HashOps,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, CommitAndStoreContractsAndPublishEvent] = {
+  ): EitherT[
+    FutureUnlessShutdown,
+    TransferProcessorError,
+    CommitAndStoreContractsAndPublishEvent,
+  ] = {
     val PendingTransferIn(
       requestId,
       requestCounter,
@@ -521,7 +542,9 @@ private[transfer] class TransferInProcessingSteps(
       transferId,
       hostedStakeholders,
       _,
-      locallyRejected,
+      _locallyRejectedF,
+      _engineController,
+      _abortedF,
     ) = pendingRequestData
 
     def rejected(
@@ -582,7 +605,7 @@ private[transfer] class TransferInProcessingSteps(
 
       case rejection: Verdict.MediatorReject => rejected(rejection)
     }
-  }
+  }.mapK(FutureUnlessShutdown.outcomeK)
 
   private[transfer] def createTransferredIn(
       contract: SerializableContract,
@@ -635,7 +658,7 @@ private[transfer] class TransferInProcessingSteps(
             commandId = submitterMetadata.commandId,
             optDeduplicationPeriod = None,
             submissionId = submitterMetadata.submissionId,
-            statistics = None,
+            messageUuid = None,
           )
         )
     } yield LedgerSyncEvent.TransferredIn(
@@ -681,10 +704,11 @@ object TransferInProcessingSteps {
       isTransferringParticipant: Boolean,
       transferId: TransferId,
       hostedStakeholders: Set[LfPartyId],
-      mediator: MediatorsOfDomain,
-      override val locallyRejected: Boolean,
-  ) extends PendingTransfer
-      with PendingRequestData {
+      mediator: MediatorGroupRecipient,
+      override val locallyRejectedF: FutureUnlessShutdown[Boolean],
+      override val abortEngine: String => Unit,
+      override val engineAbortStatusF: FutureUnlessShutdown[EngineAbortStatus],
+  ) extends PendingTransfer {
 
     override def rootHashO: Option[RootHash] = Some(rootHash)
   }
@@ -698,7 +722,7 @@ object TransferInProcessingSteps {
       transferCounter: TransferCounter,
       creatingTransactionId: TransactionId,
       targetDomain: TargetDomainId,
-      targetMediator: MediatorsOfDomain,
+      targetMediator: MediatorGroupRecipient,
       transferOutResult: DeliveredTransferOutResult,
       transferInUuid: UUID,
       sourceProtocolVersion: SourceProtocolVersion,
@@ -730,16 +754,7 @@ object TransferInProcessingSteps {
           transferCounter,
         )
         .leftMap(reason => InvalidTransferView(reason))
-      tree = TransferInViewTree(commonData, view)(pureCrypto)
+      tree = TransferInViewTree(commonData, view, targetProtocolVersion, pureCrypto)
     } yield FullTransferInTree(tree)
   }
-
-  final case class PendingDataAndResponseArgs(
-      txInRequest: FullTransferInTree,
-      ts: CantonTimestamp,
-      rc: RequestCounter,
-      sc: SequencerCounter,
-      targetCrypto: DomainSnapshotSyncCryptoApi,
-      transferringParticipant: Boolean,
-  )
 }

@@ -3,7 +3,7 @@ package com.daml.network.store
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time
+import com.digitalasset.daml.lf.data.Time
 import com.daml.network.codegen.java.splice.amulet.AppRewardCoupon
 import com.daml.network.codegen.java.splice.splitwell.*
 import com.daml.network.codegen.java.splice.wallet.payment.AppPaymentRequest
@@ -696,7 +696,7 @@ abstract class MultiDomainAcsStoreTest[
     }
 
     "read assignment-mismatched contracts in a stable order" in {
-      import com.daml.lf.value.Value
+      import com.digitalasset.daml.lf.value.Value
       import com.daml.network.codegen.java.splice.amulet.{FeaturedAppRight, AppRewardCoupon}
       import MultiDomainAcsStore.ConstrainedTemplate
 
@@ -740,8 +740,8 @@ abstract class MultiDomainAcsStoreTest[
 
 private[store] object MultiDomainAcsStoreTest {
   import org.scalacheck.Gen
-  import com.daml.lf.value.Value
-  import com.daml.lf.value.test.ValueGenerators.comparableCoidsGen
+  import com.digitalasset.daml.lf.value.Value
+  import com.digitalasset.daml.lf.value.test.ValueGenerators.comparableCoidsGen
 
   private[this] val coidsGen = comparableCoidsGen match {
     case a +: b +: cs => Gen.oneOf(a, b, cs*)

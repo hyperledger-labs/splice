@@ -24,7 +24,7 @@ parameters:
   # old files don't pollute your build.
   cache-version:
     type: string
-    default: "39"
+    default: "40"
   run-job:
     type: enum
     enum:
@@ -57,7 +57,8 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        preview-changes
+        preview-changes,
+        deploy-hard-migration
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -2129,6 +2130,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -2176,14 +2180,17 @@ jobs:
 
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
-
+            echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
@@ -2233,6 +2240,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -2288,9 +2298,12 @@ jobs:
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
       - when:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
@@ -5489,305 +5502,6 @@ workflows:
             - slack-context
             - artifactory
 
-  deploy_scratchnet:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold_scratchnet:
-          <<: *main-branch-never
-          name: use_scratchneta
-          type: approval
-      - release_hold_set_scratchnet:
-          requires:
-            - use_scratchneta
-      - hold_scratchnet:
-          <<: *main-branch-never
-          name: use_scratchnetb
-          type: approval
-      - release_hold_set_scratchnet:
-          requires:
-            - use_scratchnetb
-      - hold_scratchnet:
-          <<: *main-branch-never
-          name: use_scratchnetc
-          type: approval
-      - release_hold_set_scratchnet:
-          requires:
-            - use_scratchnetc
-      - hold_scratchnet:
-          <<: *main-branch-never
-          name: use_scratchnetd
-          type: approval
-      - release_hold_set_scratchnet:
-          requires:
-            - use_scratchnetd
-      - hold_scratchnet:
-          <<: *main-branch-never
-          name: use_scratchnete
-          type: approval
-      - release_hold_set_scratchnet:
-          requires:
-            - use_scratchnete
-      - hold_set_scratchnet:
-          <<: *main-branch-never
-          type: approval
-      - set_scratchnet:
-          <<: *main-branch-never
-          requires:
-            - hold_set_scratchnet
-      - autoscaler_prevent_scaledown:
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          requires:
-            - set_scratchnet
-      - artifacts_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          silence_deployment_alerts: true
-          cancel_workflow_on_failure: true
-          deploy_retry_count: 0
-          requires:
-            - set_scratchnet
-            - artifacts_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          wait_for_sv: false
-          requires:
-            - artifacts_push
-            - set_scratchnet
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "user-selected-scratchnet"
-          deploy_retry_count: 0
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "user-selected-scratchnet"
-           requires:
-             - deploy_cluster_for_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          deploy_retry_count: 0
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_validator_check:
-          name: "preflight_validator_check_before_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          requires:
-            - deploy_cluster_for_migration
-      - deploy_cluster:
-          name: "prepare_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          silence_deployment_alerts: true
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_active_migration_id: 0
-          global_domain_upgrade_migration_id: 1
-          reset_cluster: false
-          deploy_retry_count: 0
-          requires:
-            - deploy_cluster_for_migration
-      - deploy_sv_runbook:
-          name: "prepare_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "user-selected-scratchnet"
-          requires:
-            - deploy_sv_runbook_for_migration
-          global_domain_active_migration_id: 0
-          global_domain_upgrade_migration_id: 1
-          reset_cluster: false
-          deploy_retry_count: 0
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - preflight_sv_check_before_migration
-            - preflight_validator_check_before_migration
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          silence_deployment_alerts: true
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          deploy_retry_count: 0
-          requires:
-            - trigger_global_domain_migration
-            - prepare_cluster_for_migration
-            - prepare_sv_runbook_for_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "user-selected-scratchnet"
-          requires:
-            - migrate_cluster
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          reset_cluster: false
-          deploy_retry_count: 0
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          requires:
-            - migrate_cluster
-      - deploy_validator_runbook:
-          name: "migrate_validator_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          reset_cluster: false
-          deploy_retry_count: 0
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "user-selected-scratchnet"
-          requires:
-            - migrate_cluster
-      - backup_cluster:
-          name: "backup_cluster_after_migration"
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          namespace_name: "sv-3"
-          migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster_after_migration
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - migrate_sv_runbook
-            - migrate_validator_runbook
-      - autoscaler_allow_scaledown:
-          <<: *main-branch-never
-          cluster: "user-selected-scratchnet"
-          requires:
-            - restore_node_after_migration
-            - migrate_sv_runbook
-            - migrate_validator_runbook
-
-
-  # Simple deployment with no migration
   deploy_scratchnet_basic:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
@@ -6251,6 +5965,217 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+
+  deploy_hard_migration:
+    when:
+      equal: [ deploy-hard-migration, << pipeline.parameters.run-job >> ]
+    jobs:
+      - artifacts_push:
+          context:
+            - artifactory
+      - deploy_cluster:
+          name: "deploy_cluster_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - artifacts_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          wait_for_sv: false
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false
+          requires:
+            - prepare_cluster_for_migration
+            - prepare_sv_runbook_for_migration
+      - hard_migration:
+          name: "prepare_cluster_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "prepare"
+          scope: "core"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
+      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+          name: "prepare_sv_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          action: "prepare"
+          scope: "sv"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
+      - hard_migration:
+          name: "migrate_cluster"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "core"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - prepare_cluster_for_migration
+            - trigger_global_domain_migration
+      - preflight_check:
+          name: "preflight_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+          name: "migrate_sv_runbook"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "sv"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - prepare_sv_runbook_for_migration
+            - migrate_cluster
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      - hard_migration:
+          name: "migrate_validator_runbook"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "validator"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - migrate_cluster
+      - preflight_validator_check:
+          name: "preflight_validator_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          migration_id: 1
+          cluster: << pipeline.parameters.cluster >>
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          cluster: << pipeline.parameters.cluster >>
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
+      - deploy_sv_runbook:
+          name: "deploy_fresh_sv_runbook_after_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.upgrade-version >>
+          global_domain_active_migration_id: 1
+          reset_cluster: true # it's the default, but to make it explicit
+          requires:
+            - restore_node
+      - preflight_sv_check:
+          name: "preflight_sv_check_redeployed"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            # We wait for the runbook to redeploy to make sure we're not testing the original deployment
+            - deploy_fresh_sv_runbook_after_migration
+      - reset_cluster:
+          cluster: << pipeline.parameters.cluster >>
+          is_shared_cluster: true
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_check_redeployed
 
   apply_infra:
     when:

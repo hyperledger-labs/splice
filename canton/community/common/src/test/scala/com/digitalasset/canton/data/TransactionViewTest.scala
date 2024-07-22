@@ -4,13 +4,13 @@
 package com.digitalasset.canton.data
 
 import cats.syntax.either.*
-import com.daml.lf.value.Value
 import com.digitalasset.canton.crypto.{HashOps, Salt, TestSalt}
 import com.digitalasset.canton.data.ViewParticipantData.InvalidViewParticipantData
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.util.LfTransactionBuilder
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{BaseTest, HasExecutionContext}
+import com.digitalasset.canton.{BaseTest, HasExecutionContext, LfVersioned}
+import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
 class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionContext {
@@ -36,6 +36,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
       .build(
         LfTransactionBuilder.defaultTemplateId,
         Value.ValueInt64(100L),
+        LfTransactionBuilder.defaultPackageName,
       )
       .value
 
@@ -95,7 +96,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
         coreInputs: Map[LfContractId, SerializableContract] = Map.empty,
         createdIds: Seq[LfContractId] = Seq(createdId),
         archivedInSubviews: Set[LfContractId] = Set.empty,
-        resolvedKeys: Map[LfGlobalKey, SerializableKeyResolution] = Map.empty,
+        resolvedKeys: Map[LfGlobalKey, LfVersioned[SerializableKeyResolution]] = Map.empty,
     ): Either[String, ViewParticipantData] = {
 
       val created = createdIds.map { id =>
@@ -256,7 +257,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
           archivedInSubviews = Set(otherAbsoluteId),
           resolvedKeys = Map(
             ExampleTransactionFactory.defaultGlobalKey ->
-              AssignedKey(absoluteId)(ExampleTransactionFactory.transactionVersion)
+              LfVersioned(ExampleTransactionFactory.transactionVersion, AssignedKey(absoluteId))
           ),
         ).value
 

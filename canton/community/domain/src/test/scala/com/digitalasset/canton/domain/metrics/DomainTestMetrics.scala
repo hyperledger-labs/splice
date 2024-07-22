@@ -4,13 +4,13 @@
 package com.digitalasset.canton.domain.metrics
 
 import com.daml.metrics.HealthMetrics
-import com.daml.metrics.api.MetricName
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 
 object SequencerTestMetrics
     extends SequencerMetrics(
-      MetricName("test"),
+      new SequencerHistograms(MetricName("test"))(new HistogramInventory),
       NoOpMetricsFactory,
       new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
       new HealthMetrics(NoOpMetricsFactory),
@@ -18,7 +18,7 @@ object SequencerTestMetrics
 
 object MediatorTestMetrics
     extends MediatorMetrics(
-      MetricName("test"),
+      new MediatorHistograms(MetricName("test"))(new HistogramInventory),
       NoOpMetricsFactory,
       new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
       new HealthMetrics(NoOpMetricsFactory),

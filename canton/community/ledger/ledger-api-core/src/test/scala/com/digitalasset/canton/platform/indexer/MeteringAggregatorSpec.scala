@@ -4,16 +4,16 @@
 package com.digitalasset.canton.platform.indexer
 
 import com.daml.executors.executors.QueueAwareExecutionContextExecutorService
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Time.Timestamp
 import com.daml.metrics.DatabaseMetrics
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.{
+import com.digitalasset.canton.TestEssentials
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.{
   ParticipantMetering,
   TransactionMetering,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.{
@@ -22,7 +22,8 @@ import com.digitalasset.canton.platform.store.backend.{
   ParameterStorageBackend,
 }
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
-import com.digitalasset.canton.{DiscardOps, TestEssentials}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.mockito.MockitoSugar
 import org.mockito.captor.ArgCaptor
 import org.scalatest.matchers.should.Matchers
@@ -40,7 +41,7 @@ final class MeteringAggregatorSpec
     with Matchers
     with TestEssentials {
 
-  private val metrics = Metrics.ForTesting
+  private val metrics = LedgerApiServerMetrics.ForTesting
   private def toTS(t: OffsetDateTime): Timestamp = Timestamp.assertFromInstant(t.toInstant)
 
   "MeteringAggregator" should {

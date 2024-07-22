@@ -133,7 +133,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         .party
 
     }
-    val contactPoint = s"${candidate.uid.id}@example.com"
+    val contactPoint = s"${candidate.uid.identifier}@example.com"
     clue("try to onboard with a wrong secret, which should fail") {
       assertThrows[CommandFailure](
         loggerFactory.assertLogs(
@@ -143,7 +143,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     }
     actAndCheck(
       "request to onboard the candidate",
-      sv.onboardValidator(candidate, secret, s"${candidate.uid.id}@example.com"),
+      sv.onboardValidator(candidate, secret, s"${candidate.uid.identifier}@example.com"),
     )(
       "the candidate's secret is marked as used",
       _ => {

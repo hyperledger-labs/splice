@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver
 
-import com.daml.daml_lf_dev.DamlLf
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
@@ -13,46 +12,28 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.{ApplicationId, Party}
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.transaction.GlobalKey
-import com.daml.lf.value.Value
-import com.daml.lf.value.Value.ContractId
 import com.daml.metrics.Timed
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{ParticipantOffset, TransactionId}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
-import com.digitalasset.canton.ledger.participant.state.index.v2.*
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
+import com.digitalasset.canton.ledger.participant.state.index.*
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{ApplicationId, Party}
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.transaction.GlobalKey
+import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.value.Value.ContractId
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.Future
 
-final class TimedIndexService(delegate: IndexService, metrics: Metrics) extends IndexService {
-
-  override def listLfPackages()(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[Map[Ref.PackageId, v2.PackageDetails]] =
-    Timed.future(metrics.services.index.listLfPackages, delegate.listLfPackages())
-
-  override def getLfArchive(packageId: Ref.PackageId)(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[Option[DamlLf.Archive]] =
-    Timed.future(metrics.services.index.getLfArchive, delegate.getLfArchive(packageId))
-
-  override def packageEntries(
-      startExclusive: Option[ParticipantOffset.Absolute]
-  )(implicit loggingContext: LoggingContextWithTrace): Source[domain.PackageEntry, NotUsed] =
-    Timed.source(
-      metrics.services.index.packageEntries,
-      delegate.packageEntries(startExclusive),
-    )
+final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMetrics)
+    extends IndexService {
 
   override def currentLedgerEnd(): Future[ParticipantOffset.Absolute] =
     Timed.future(metrics.services.index.currentLedgerEnd, delegate.currentLedgerEnd())
@@ -153,10 +134,16 @@ final class TimedIndexService(delegate: IndexService, metrics: Metrics) extends 
   ): Future[List[IndexerPartyDetails]] =
     Timed.future(metrics.services.index.getParties, delegate.getParties(parties))
 
-  override def listKnownParties()(implicit
+  override def listKnownParties(
+      fromExcl: Option[Party],
+      maxResults: Int,
+  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[List[IndexerPartyDetails]] =
-    Timed.future(metrics.services.index.listKnownParties, delegate.listKnownParties())
+    Timed.future(
+      metrics.services.index.listKnownParties,
+      delegate.listKnownParties(fromExcl, maxResults),
+    )
 
   override def partyEntries(
       startExclusive: Option[ParticipantOffset.Absolute]
@@ -171,17 +158,6 @@ final class TimedIndexService(delegate: IndexService, metrics: Metrics) extends 
     Timed.future(
       metrics.services.index.prune,
       delegate.prune(pruneUpToInclusive, pruneAllDivulgedContracts, incompletReassignmentOffsets),
-    )
-
-  override def getCompletions(
-      startExclusive: ParticipantOffset,
-      endInclusive: ParticipantOffset,
-      applicationId: Ref.ApplicationId,
-      parties: Set[Party],
-  )(implicit loggingContext: LoggingContextWithTrace): Source[CompletionStreamResponse, NotUsed] =
-    Timed.source(
-      metrics.services.index.getCompletionsLimited,
-      delegate.getCompletions(startExclusive, endInclusive, applicationId, parties),
     )
 
   override def currentHealth(): HealthStatus =

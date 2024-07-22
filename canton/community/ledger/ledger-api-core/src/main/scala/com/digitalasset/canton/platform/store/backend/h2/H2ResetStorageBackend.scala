@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend.h2
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.platform.store.backend.ResetStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 
@@ -14,9 +14,8 @@ object H2ResetStorageBackend extends ResetStorageBackend {
   override def resetAll(connection: Connection): Unit = {
     SQL"""
       set referential_integrity false;
-      truncate table lapi_packages;
-      truncate table lapi_package_entries;
       truncate table lapi_parameters;
+      truncate table lapi_ledger_end_domain_index;
       truncate table lapi_command_completions;
       truncate table lapi_events_create;
       truncate table lapi_events_consuming_exercise;

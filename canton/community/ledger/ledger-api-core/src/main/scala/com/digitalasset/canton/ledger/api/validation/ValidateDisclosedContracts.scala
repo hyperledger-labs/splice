@@ -8,12 +8,12 @@ import com.daml.ledger.api.v2.commands.{
   Commands as ProtoCommands,
   DisclosedContract as ProtoDisclosedContract,
 }
-import com.daml.lf.data.ImmArray
-import com.daml.lf.transaction.TransactionCoder
 import com.digitalasset.canton.ledger.api.domain.DisclosedContract
 import com.digitalasset.canton.ledger.api.validation.FieldValidator.requireContractId
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArgument
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
+import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.daml.lf.transaction.TransactionCoder
 import io.grpc.StatusRuntimeException
 
 import scala.collection.mutable
@@ -91,6 +91,7 @@ class ValidateDisclosedContracts {
           contractId = validatedContractId,
           templateId = templateId,
           packageName = packageName,
+          packageVersion = packageVersion,
           argument = createArg,
           createdAt = createdAt,
           keyHash = contractKeyWithMaintainers.map(_.globalKey.hash),
@@ -99,6 +100,7 @@ class ValidateDisclosedContracts {
           signatories = signatories,
           stakeholders = stakeholders,
           keyValue = contractKeyWithMaintainers.map(_.value),
+          transactionVersion = version,
         )
       }
 }

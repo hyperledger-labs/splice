@@ -3,7 +3,7 @@
 
 package com.daml.network.scan.store.db
 
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.scan.store.{
   AppRewardTxLogEntry,
   BalanceChangeTxLogEntry,

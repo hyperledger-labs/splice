@@ -28,7 +28,7 @@ trait TrafficBalanceService {
     */
   def lookupAvailableTraffic(
       domainId: DomainId
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[NonNegativeLong]]
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]]
 }
 
 object TrafficBalanceService {
@@ -36,7 +36,7 @@ object TrafficBalanceService {
   private trait AvailableTrafficLookupService {
     def lookupAvailableTraffic(
         domainId: DomainId
-    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[NonNegativeLong]]
+    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]]
   }
 
   private class ParticipantAdminConnectionTrafficLookupService(
@@ -44,7 +44,7 @@ object TrafficBalanceService {
   ) extends AvailableTrafficLookupService {
     override def lookupAvailableTraffic(
         domainId: DomainId
-    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[NonNegativeLong]] = {
+    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] = {
       // Ideally we would just throw a NOT_FOUND error here if the traffic state does not exist
       // and have the caller retry it. However, currently the traffic state gets initialized in
       // the participant not when it connects to the sequencer but the first time it receives an
@@ -60,7 +60,7 @@ object TrafficBalanceService {
       participantAdminConnection
         .getParticipantTrafficState(domainId: DomainId)
         .transform {
-          case Success(value) => Success(Some(value.trafficState.extraTrafficRemainder))
+          case Success(value) => Success(Some(value.extraTrafficRemainder))
           case Failure(e: StatusRuntimeException)
               if e.getStatus.getCode == Status.NOT_FOUND.getCode =>
             Success(None)
@@ -79,7 +79,7 @@ object TrafficBalanceService {
 
     private case class CachedTrafficBalance(
         cacheValidUntil: CantonTimestamp,
-        trafficBalance: NonNegativeLong,
+        trafficBalance: Long,
     )
 
     private val trafficBalanceCache: AtomicReference[Option[CachedTrafficBalance]] =
@@ -87,7 +87,7 @@ object TrafficBalanceService {
 
     override def lookupAvailableTraffic(
         domainId: DomainId
-    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[NonNegativeLong]] = {
+    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] = {
       val now = clock.now
       trafficBalanceCache.get() match {
         case Some(CachedTrafficBalance(cacheValidUntil, trafficBalance))
@@ -128,7 +128,7 @@ object TrafficBalanceService {
 
       override def lookupAvailableTraffic(
           domainId: DomainId
-      )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[NonNegativeLong]] =
+      )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] =
         trafficLookupService.lookupAvailableTraffic(domainId)
     }
   }

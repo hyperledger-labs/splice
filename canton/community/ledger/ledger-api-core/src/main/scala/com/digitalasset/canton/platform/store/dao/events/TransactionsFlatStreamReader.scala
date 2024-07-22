@@ -9,11 +9,11 @@ import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
 import com.daml.tracing
 import com.daml.tracing.Spans
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TraceIdentifiers
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.TransactionFlatStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.{
@@ -51,7 +51,7 @@ class TransactionsFlatStreamReader(
     queryValidRange: QueryValidRange,
     eventStorageBackend: EventStorageBackend,
     lfValueTranslation: LfValueTranslation,
-    metrics: Metrics,
+    metrics: LedgerApiServerMetrics,
     tracer: Tracer,
     reassignmentStreamReader: ReassignmentStreamReader,
     val loggerFactory: NamedLoggerFactory,
@@ -153,7 +153,7 @@ class TransactionsFlatStreamReader(
                     eventStorageBackend.transactionStreamingQueries.fetchEventIdsForStakeholder(
                       target = target
                     )(
-                      stakeholder = filter.party,
+                      stakeholderO = filter.party,
                       templateIdO = filter.templateId,
                       startExclusive = state.fromIdExclusive,
                       endInclusive = queryRange.endInclusiveEventSeqId,

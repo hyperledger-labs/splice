@@ -70,6 +70,7 @@ object TraceContextGrpc {
         next: Channel,
     ): ClientCall[ReqT, RespT] =
       new SimpleForwardingClientCall[ReqT, RespT](next.newCall(method, callOptions)) {
+
         override def start(
             responseListener: ClientCall.Listener[RespT],
             headers: Metadata,
@@ -81,7 +82,6 @@ object TraceContextGrpc {
           )
 
           W3CTraceContext.injectIntoGrpcMetadata(traceContext, headers)
-
           super.start(responseListener, headers)
         }
       }

@@ -10,6 +10,11 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.grpc.{GrpcPruningScheduler, HasPruningScheduler}
 import com.digitalasset.canton.admin.participant.v30.*
 import com.digitalasset.canton.admin.pruning.v30
+import com.digitalasset.canton.admin.pruning.v30.{
+  GetNoWaitCommitmentsFrom,
+  ResetNoWaitCommitmentsFrom,
+  SetNoWaitCommitmentsFrom,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.PruningServiceErrorGroup
@@ -94,9 +99,18 @@ class GrpcPruningService(
               EitherT.leftT(
                 PruningServiceError.PruningNotSupportedInCommunityEdition.Error().asGrpcError
               )
-            case e @ (Pruning.LedgerPruningNothingToPrune |
-                Pruning.LedgerPruningOffsetUnsafeDomain(_)) =>
-              // Turn errors indicating that we cannot prune anything to a None.
+            case e @ Pruning.LedgerPruningNothingToPrune(ts, offset) =>
+              // Let the user know that no internal canton data exists prior to the specified
+              // time and offset. Return this condition as an error instead of None, so that
+              // the caller can distinguish this case from LedgerPruningOffsetUnsafeDomain.
+              logger.info(e.message)
+              EitherT.leftT(
+                PruningServiceError.NoInternalParticipantDataBefore
+                  .Error(ts, offset)
+                  .asGrpcError
+              )
+            case e @ Pruning.LedgerPruningOffsetUnsafeDomain(_) =>
+              // Turn error indicating that there is no safe pruning offset to a None.
               logger.info(e.message)
               EitherT.rightT(None)
             case error =>
@@ -165,6 +179,31 @@ class GrpcPruningService(
         )
       case Some(scheduler) => Future.successful(scheduler)
     }
+
+  /** TODO(#18453) R6
+    * Enable or disable waiting for commitments from the given counter-participants
+    * Disabling waiting for commitments disregards these counter-participants w.r.t. pruning, which gives up
+    * non-repudiation for those counter-participants, but increases pruning resilience to failures
+    * and slowdowns of those counter-participants and/or the network
+    */
+  override def setNoWaitCommitmentsFrom(
+      request: SetNoWaitCommitmentsFrom.Request
+  ): Future[SetNoWaitCommitmentsFrom.Response] = ???
+
+  /** TODO(#18453) R6
+    * Retrieve the configuration of waiting for commitments from counter-participants
+    */
+  override def getNoWaitCommitmentsFrom(
+      request: GetNoWaitCommitmentsFrom.Request
+  ): Future[GetNoWaitCommitmentsFrom.Response] = ???
+
+  /** TODO(#18453) R6
+    * Enable waiting for commitments from the given counter-participants
+    * Waiting for commitments is the default behavior; explicitly enabling it is useful if it was explicitly disabled
+    */
+  override def resetNoWaitCommitmentsFrom(
+      request: ResetNoWaitCommitmentsFrom.Request
+  ): Future[ResetNoWaitCommitmentsFrom.Response] = ???
 }
 
 sealed trait PruningServiceError extends CantonError
@@ -217,6 +256,28 @@ object PruningServiceError extends PruningServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"Participant cannot prune at specified offset due to ${_cause}"
+        )
+        with PruningServiceError
+  }
+
+  @Explanation(
+    """The participant does not hold internal ledger state up to and including the specified time and offset."""
+  )
+  @Resolution(
+    """The participant holds no internal ledger data before or at the time and offset specified as parameters to `find_safe_offset`.
+       |Typically this means that the participant has already pruned all internal data up to the specified time and offset.
+       |Accordingly this error indicates that no safe offset to prune could be located prior."""
+  )
+  object NoInternalParticipantDataBefore
+      extends ErrorCode(
+        id = "NO_INTERNAL_PARTICIPANT_DATA_BEFORE",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(beforeOrAt: CantonTimestamp, boundInclusive: GlobalOffset)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = "No internal participant data to prune up to time " +
+            s"${beforeOrAt} and offset ${boundInclusive.unwrap.value}."
         )
         with PruningServiceError
   }

@@ -8,32 +8,31 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.console.{
   LocalInstanceReference,
   LocalMediatorReference,
-  LocalSequencerNodeReference,
+  LocalSequencerReference,
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp
+import com.digitalasset.canton.version.ProtocolVersion
 
 println("Running canton bootstrap script...")
 
 val domainParametersConfig = DomainParametersConfig(
-  protocolVersion = DomainProtocolVersion(ProtocolVersion.v30),
-  devVersionSupport = true,
+  alphaVersionSupport = true
 )
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticDomainParameters(sequencer.config.crypto)
+    .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v31)
     .map(StaticDomainParameters(_))
     .getOrElse(sys.error("whatever"))
 
 def bootstrapOtherDomain(
     name: String,
-    sequencer: LocalSequencerNodeReference,
+    sequencer: LocalSequencerReference,
     mediator: LocalMediatorReference,
 ) = {
   bootstrap.domain(

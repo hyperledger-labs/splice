@@ -4,14 +4,13 @@
 package com.digitalasset.canton.sequencing.client.transports
 
 import cats.data.EitherT
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.{
   SequencerSubscription,
   SubscriptionErrorRetryPolicy,
 }
-import com.digitalasset.canton.sequencing.handshake.SupportsHandshake
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -19,7 +18,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
 /** Implementation dependent operations for a client to write to a domain sequencer. */
-trait SequencerClientTransportCommon extends FlagCloseable with SupportsHandshake {
+trait SequencerClientTransportCommon extends FlagCloseable {
 
   /** Sends a signed submission request to the sequencer.
     * If we failed to make the request, an error will be returned.
@@ -30,25 +29,20 @@ trait SequencerClientTransportCommon extends FlagCloseable with SupportsHandshak
       timeout: Duration,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SendAsyncClientResponseError, Unit]
-
-  def sendAsyncUnauthenticatedVersioned(
-      request: SubmissionRequest,
-      timeout: Duration,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, SendAsyncClientResponseError, Unit]
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit]
 
   /** Acknowledge that we have successfully processed all events up to and including the given timestamp.
     * The client should then never subscribe for events from before this point.
+    *
+    * @return True if acknowledgement succeeded, false if sequencer was unavailable
     */
-  def acknowledge(request: AcknowledgeRequest)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
-
   def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, Unit]
+  ): EitherT[FutureUnlessShutdown, String, Boolean]
+
+  def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse]
 
   def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
       traceContext: TraceContext
@@ -67,10 +61,6 @@ trait SequencerClientTransport extends SequencerClientTransportCommon {
     */
   def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(implicit
       traceContext: TraceContext
-  ): SequencerSubscription[E]
-
-  def subscribeUnauthenticated[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
-      implicit traceContext: TraceContext
   ): SequencerSubscription[E]
 
   /** The transport can decide which errors will cause the sequencer client to not try to reestablish a subscription */

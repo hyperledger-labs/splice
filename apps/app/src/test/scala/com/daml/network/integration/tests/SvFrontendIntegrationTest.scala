@@ -179,7 +179,7 @@ class SvFrontendIntegrationTest
           sv1Backend.onboardValidator(
             newValidatorParty,
             newSecret,
-            s"${newValidatorParty.uid.id}@example.com",
+            s"${newValidatorParty.uid.identifier}@example.com",
           ),
         )(
           "a new validator row is added",

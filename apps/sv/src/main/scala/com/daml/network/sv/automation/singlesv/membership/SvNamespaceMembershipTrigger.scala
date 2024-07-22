@@ -117,7 +117,7 @@ private class NamespaceMembership(
 }
 
 /** Trigger that checks the members of the DSO as defined by the DsoRules members property,
-  * with the members of the dso decentralized namespace as defined by the DecentralizedNamespaceDefinitionX,
+  * with the members of the dso decentralized namespace as defined by the DecentralizedNamespaceDefinition,
   * and adds to the decentralized namespace any members that are missing.
   *
   * Adding the sv to the decentralized namespace only after it's already part of the dso guarantees that party migration has finished

@@ -5,8 +5,6 @@ package com.digitalasset.canton.data
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.lf.transaction.TransactionVersion
-import com.daml.lf.value.{Value, ValueCoder}
 import com.digitalasset.canton.ProtoDeserializationError.{
   FieldNotSet,
   OtherError,
@@ -27,21 +25,15 @@ import com.digitalasset.canton.protocol.{
   LfNodeFetch,
   LfNodeLookupByKey,
   LfTemplateId,
-  LfTransactionVersion,
   RefIdentifierSyntax,
   v30,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.version.{
-  HasProtocolVersionedCompanion,
-  HasProtocolVersionedWrapper,
-  ProtoVersion,
-  ProtocolVersion,
-  RepresentativeProtocolVersion,
-}
+import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfChoiceName, LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
+import com.digitalasset.daml.lf.value.{Value, ValueCoder, ValueOuterClass}
 import com.google.protobuf.ByteString
 
 /** Summarizes the information that is needed in addition to the other fields of [[ViewParticipantData]] for
@@ -59,9 +51,6 @@ sealed trait ActionDescription
   /** The node seed for the root action of a view. Empty for fetch and lookupByKey nodes */
   def seedOption: Option[LfHash]
 
-  /** The lf transaction version of the node */
-  def version: LfTransactionVersion
-
   @transient override protected lazy val companionObj: ActionDescription.type =
     ActionDescription
 
@@ -75,7 +64,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   override lazy val name: String = "ActionDescription"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.ActionDescription)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ActionDescription)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -112,6 +101,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       case LfNodeCreate(
             contractId,
             _packageName,
+            _packageVersion,
             _templateId,
             _arg,
             _agreementText,
@@ -122,7 +112,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           ) =>
         for {
           seed <- seedO.toRight(InvalidActionDescription("No seed for a Create node given"))
-        } yield CreateActionDescription(contractId, seed, version)(
+        } yield CreateActionDescription(contractId, seed)(
           protocolVersionRepresentativeFor(protocolVersion)
         )
 
@@ -149,15 +139,14 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           seed <- seedO.toRight(InvalidActionDescription("No seed for an Exercise node given"))
           actionDescription <- ExerciseActionDescription.create(
             inputContract,
-            Some(templateId),
+            templateId,
             choice,
             interfaceId,
             packagePreference,
-            chosenValue,
+            LfVersioned(version, chosenValue),
             actors,
             byKey,
             seed,
-            version,
             failed = exerciseResult.isEmpty, // absence of exercise result indicates failure
             protocolVersionRepresentativeFor(protocolVersion),
           )
@@ -166,7 +155,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       case LfNodeFetch(
             inputContract,
             _packageName,
-            _templateId,
+            templateId,
             actingParties,
             _signatories,
             _stakeholders,
@@ -185,7 +174,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
             actingParties,
             InvalidActionDescription("Fetch node without acting parties"),
           )
-        } yield FetchActionDescription(inputContract, actors, byKey, version)(
+        } yield FetchActionDescription(inputContract, actors, byKey, templateId)(
           protocolVersionRepresentativeFor(protocolVersion)
         )
 
@@ -197,8 +186,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
             InvalidActionDescription("No seed should be given for a LookupByKey node"),
           )
           actionDescription <- LookupByKeyActionDescription.create(
-            keyWithMaintainers.globalKey,
-            version,
+            LfVersioned(version, keyWithMaintainers.globalKey),
             protocolVersionRepresentativeFor(protocolVersion),
           )
         } yield actionDescription
@@ -208,12 +196,11 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       c: v30.ActionDescription.CreateActionDescription,
       pv: RepresentativeProtocolVersion[ActionDescription.type],
   ): ParsingResult[CreateActionDescription] = {
-    val v30.ActionDescription.CreateActionDescription(contractIdP, seedP, versionP) = c
+    val v30.ActionDescription.CreateActionDescription(contractIdP, seedP) = c
     for {
       contractId <- ProtoConverter.parseLfContractId(contractIdP)
       seed <- LfHash.fromProtoPrimitive("node_seed", seedP)
-      version <- lfVersionFromProtoVersioned(versionP)
-    } yield CreateActionDescription(contractId, seed, version)(pv)
+    } yield CreateActionDescription(contractId, seed)(pv)
   }
 
   private def choiceFromProto(choiceP: String): ParsingResult[LfChoiceName] =
@@ -232,7 +219,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       actorsP,
       byKey,
       seedP,
-      versionP,
       failed,
       interfaceIdP,
       templateIdP,
@@ -240,13 +226,15 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
     ) = e
     for {
       inputContractId <- ProtoConverter.parseLfContractId(inputContractIdP)
-      templateId <- templateIdP.traverse(RefIdentifierSyntax.fromProtoPrimitive)
+      templateId <- RefIdentifierSyntax.fromProtoPrimitive(templateIdP)
       packagePreference <- packagePreferenceP.traverse(ProtoConverter.parsePackageId).map(_.toSet)
       choice <- choiceFromProto(choiceP)
       interfaceId <- interfaceIdP.traverse(RefIdentifierSyntax.fromProtoPrimitive)
-      version <- lfVersionFromProtoVersioned(versionP)
+      chosenValueP <- ProtoConverter.protoParser(ValueOuterClass.VersionedValue.parseFrom)(
+        chosenValueB
+      )
       chosenValue <- ValueCoder
-        .decodeValue(version, chosenValueB)
+        .decodeVersionedValue(chosenValueP)
         .leftMap(err => ValueDeserializationError("chosen_value", err.errorMessage))
       actors <- actorsP.traverse(ProtoConverter.parseLfPartyId).map(_.toSet)
       seed <- LfHash.fromProtoPrimitive("node_seed", seedP)
@@ -261,7 +249,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           actors,
           byKey,
           seed,
-          version,
           failed,
           pv,
         )
@@ -279,7 +266,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
         .required("key", keyP)
         .flatMap(GlobalKeySerialization.fromProtoV30)
       actionDescription <- LookupByKeyActionDescription
-        .create(key.unversioned, key.version, pv)
+        .create(key, pv)
         .leftMap(err => OtherError(err.message))
     } yield actionDescription
   }
@@ -288,12 +275,17 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       f: v30.ActionDescription.FetchActionDescription,
       pv: RepresentativeProtocolVersion[ActionDescription.type],
   ): ParsingResult[FetchActionDescription] = {
-    val v30.ActionDescription.FetchActionDescription(inputContractIdP, actorsP, byKey, versionP) = f
+    val v30.ActionDescription.FetchActionDescription(
+      inputContractIdP,
+      actorsP,
+      byKey,
+      templateIdP,
+    ) = f
     for {
       inputContractId <- ProtoConverter.parseLfContractId(inputContractIdP)
       actors <- actorsP.traverse(ProtoConverter.parseLfPartyId).map(_.toSet)
-      version <- lfVersionFromProtoVersioned(versionP)
-    } yield FetchActionDescription(inputContractId, actors, byKey, version)(pv)
+      templateId <- RefIdentifierSyntax.fromProtoPrimitive(templateIdP)
+    } yield FetchActionDescription(inputContractId, actors, byKey, templateId)(pv)
   }
 
   private[data] def fromProtoV30(
@@ -313,25 +305,17 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
     }
   }
 
-  private def lfVersionFromProtoVersioned(
-      versionP: String
-  ): ParsingResult[LfTransactionVersion] = TransactionVersion.All
-    .find(_.protoValue == versionP)
-    .toRight(s"Unsupported transaction version $versionP")
-    .leftMap(ValueDeserializationError("version", _))
-
   def serializeChosenValue(
-      chosenValue: Value,
-      transactionVersion: LfTransactionVersion,
+      chosenValue: LfVersioned[Value]
   ): Either[String, ByteString] =
     ValueCoder
-      .encodeValue(valueVersion = transactionVersion, v0 = chosenValue)
+      .encodeVersionedValue(chosenValue)
+      .map(_.toByteString)
       .leftMap(_.errorMessage)
 
   final case class CreateActionDescription(
       contractId: LfContractId,
       seed: LfHash,
-      override val version: LfTransactionVersion,
   )(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[
         ActionDescription.type
@@ -346,29 +330,26 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
         v30.ActionDescription.CreateActionDescription(
           contractId = contractId.toProtoPrimitive,
           nodeSeed = seed.toProtoPrimitive,
-          version = version.protoValue,
         )
       )
 
     override def pretty: Pretty[CreateActionDescription] = prettyOfClass(
       param("contract Id", _.contractId),
       param("seed", _.seed),
-      param("version", _.version),
     )
   }
 
   /** @throws InvalidActionDescription if the `chosen_value` cannot be serialized */
   final case class ExerciseActionDescription private (
       inputContractId: LfContractId,
-      templateId: Option[LfTemplateId],
+      templateId: LfTemplateId,
       choice: LfChoiceName,
       interfaceId: Option[LfInterfaceId],
       packagePreference: Set[LfPackageId],
-      chosenValue: Value,
+      chosenValue: LfVersioned[Value],
       actors: Set[LfPartyId],
       override val byKey: Boolean,
       seed: LfHash,
-      override val version: LfTransactionVersion,
       failed: Boolean,
   )(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -376,7 +357,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       ]
   ) extends ActionDescription {
 
-    private val serializedChosenValue: ByteString = serializeChosenValue(chosenValue, version)
+    private val serializedChosenValue: ByteString = serializeChosenValue(chosenValue)
       .valueOr(err => throw InvalidActionDescription(s"Failed to serialize chosen value: $err"))
 
     override def seedOption: Option[LfHash] = Some(seed)
@@ -385,7 +366,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       v30.ActionDescription.Description.Exercise(
         v30.ActionDescription.ExerciseActionDescription(
           inputContractId = inputContractId.toProtoPrimitive,
-          templateId = templateId.map(i => new RefIdentifierSyntax(i).toProtoPrimitive),
+          templateId = new RefIdentifierSyntax(templateId).toProtoPrimitive,
           packagePreference = packagePreference.toSeq,
           choice = choice,
           interfaceId = interfaceId.map(i => new RefIdentifierSyntax(i).toProtoPrimitive),
@@ -393,7 +374,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           actors = actors.toSeq,
           byKey = byKey,
           nodeSeed = seed.toProtoPrimitive,
-          version = version.protoValue,
           failed = failed,
         )
       )
@@ -406,7 +386,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       param("actors", _.actors),
       paramIfTrue("by key", _.byKey),
       param("seed", _.seed),
-      param("version", _.version),
       paramIfTrue("failed", _.failed),
     )
   }
@@ -414,15 +393,14 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   object ExerciseActionDescription {
     def tryCreate(
         inputContractId: LfContractId,
-        templateId: Option[LfTemplateId],
+        templateId: LfTemplateId,
         choice: LfChoiceName,
         interfaceId: Option[LfInterfaceId],
         packagePreference: Set[LfPackageId],
-        chosenValue: Value,
+        chosenValue: LfVersioned[Value],
         actors: Set[LfPartyId],
         byKey: Boolean,
         seed: LfHash,
-        version: LfTransactionVersion,
         failed: Boolean,
         protocolVersion: RepresentativeProtocolVersion[ActionDescription.type],
     ): ExerciseActionDescription = create(
@@ -435,22 +413,20 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       actors,
       byKey,
       seed,
-      version,
       failed,
       protocolVersion,
     ).fold(err => throw err, identity)
 
     def create(
         inputContractId: LfContractId,
-        templateId: Option[LfTemplateId],
+        templateId: LfTemplateId,
         choice: LfChoiceName,
         interfaceId: Option[LfInterfaceId],
         packagePreference: Set[LfPackageId],
-        chosenValue: Value,
+        chosenValue: LfVersioned[Value],
         actors: Set[LfPartyId],
         byKey: Boolean,
         seed: LfHash,
-        version: LfTransactionVersion,
         failed: Boolean,
         protocolVersion: RepresentativeProtocolVersion[ActionDescription.type],
     ): Either[InvalidActionDescription, ExerciseActionDescription] =
@@ -465,7 +441,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           actors,
           byKey,
           seed,
-          version,
           failed,
         )(protocolVersion)
       )
@@ -476,7 +451,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       inputContractId: LfContractId,
       actors: Set[LfPartyId],
       override val byKey: Boolean,
-      override val version: LfTransactionVersion,
+      templateId: LfTemplateId,
   )(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[
         ActionDescription.type
@@ -492,7 +467,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           inputContractId = inputContractId.toProtoPrimitive,
           actors = actors.toSeq,
           byKey = byKey,
-          version = version.protoValue,
+          templateId = new RefIdentifierSyntax(templateId).toProtoPrimitive,
         )
       )
 
@@ -500,13 +475,11 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       param("input contract id", _.inputContractId),
       param("actors", _.actors),
       paramIfTrue("by key", _.byKey),
-      param("version", _.version),
     )
   }
 
   final case class LookupByKeyActionDescription private (
-      key: LfGlobalKey,
-      override val version: LfTransactionVersion,
+      key: LfVersioned[LfGlobalKey]
   )(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[
         ActionDescription.type
@@ -515,7 +488,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
 
     private val serializedKey =
       GlobalKeySerialization
-        .toProto(LfVersioned(version, key))
+        .toProto(key)
         .valueOr(err => throw InvalidActionDescription(s"Failed to serialize key: $err"))
 
     override def byKey: Boolean = true
@@ -530,25 +503,22 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       )
 
     override def pretty: Pretty[LookupByKeyActionDescription] = prettyOfClass(
-      param("key", _.key),
-      param("version", _.version),
+      param("key", _.key)
     )
   }
 
   object LookupByKeyActionDescription {
     def tryCreate(
-        key: LfGlobalKey,
-        version: LfTransactionVersion,
+        key: LfVersioned[LfGlobalKey],
         protocolVersion: RepresentativeProtocolVersion[ActionDescription.type],
     ): LookupByKeyActionDescription =
-      new LookupByKeyActionDescription(key, version)(protocolVersion)
+      new LookupByKeyActionDescription(key)(protocolVersion)
 
     def create(
-        key: LfGlobalKey,
-        version: LfTransactionVersion,
+        key: LfVersioned[LfGlobalKey],
         protocolVersion: RepresentativeProtocolVersion[ActionDescription.type],
     ): Either[InvalidActionDescription, LookupByKeyActionDescription] =
-      Either.catchOnly[InvalidActionDescription](tryCreate(key, version, protocolVersion))
+      Either.catchOnly[InvalidActionDescription](tryCreate(key, protocolVersion))
 
   }
 }

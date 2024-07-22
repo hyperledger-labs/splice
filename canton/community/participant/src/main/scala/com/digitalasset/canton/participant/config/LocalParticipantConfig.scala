@@ -5,13 +5,16 @@ package com.digitalasset.canton.participant.config
 
 import cats.syntax.option.*
 import com.daml.jwt.JwtTimestampLeeway
+import com.daml.tls.{TlsConfiguration, TlsVersion}
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.*
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.http.HttpApiConfig
-import com.digitalasset.canton.ledger.api.tls.{TlsConfiguration, TlsVersion}
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DefaultRateLimit
+import com.digitalasset.canton.participant.sync.CommandProgressTrackerConfig
 import com.digitalasset.canton.platform.apiserver.ApiServiceOwner
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
@@ -19,6 +22,7 @@ import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
   IndexServiceConfig as LedgerIndexServiceConfig,
+  PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
@@ -27,7 +31,6 @@ import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.PrunableByTimeParameters
 import com.digitalasset.canton.time.EnrichedDurations.RichNonNegativeFiniteDurationConfig
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
-import com.digitalasset.canton.{DiscardOps, config}
 import io.netty.handler.ssl.{ClientAuth, SslContext}
 import monocle.macros.syntax.lens.*
 
@@ -92,9 +95,9 @@ object PartyNotificationConfig {
 
 final case class ParticipantProtocolConfig(
     minimumProtocolVersion: Option[ProtocolVersion],
-    override val devVersionSupport: Boolean,
+    override val alphaVersionSupport: Boolean,
+    override val betaVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
-    override val initialProtocolVersion: ProtocolVersion,
 ) extends ProtocolConfig
 
 /** Configuration parameters for a single participant
@@ -169,6 +172,8 @@ final case class RemoteParticipantConfig(
   * @param databaseConnectionTimeout database connection timeout
   * @param additionalMigrationPaths  optional extra paths for the database migrations
   * @param rateLimit                 limit the ledger api server request rates based on system metrics
+  * @param enableExplicitDisclosure  enable usage of explicitly disclosed contracts in command submission and transaction validation.
+  * @param enableCommandInspection   enable command inspection service over the ledger api
   */
 final case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
@@ -179,6 +184,7 @@ final case class LedgerApiServerConfig(
       LedgerApiServerConfig.DefaultInitSyncTimeout,
     commandService: CommandServiceConfig = CommandServiceConfig(),
     userManagementService: UserManagementServiceConfig = UserManagementServiceConfig(),
+    partyManagementService: PartyManagementServiceConfig = PartyManagementServiceConfig(),
     managementServiceTimeout: config.NonNegativeFiniteDuration =
       LedgerApiServerConfig.DefaultManagementServiceTimeout,
     postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
@@ -187,10 +193,8 @@ final case class LedgerApiServerConfig(
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     databaseConnectionTimeout: config.NonNegativeFiniteDuration =
       LedgerApiServerConfig.DefaultDatabaseConnectionTimeout,
-    // TODO(#14529): use a common value for ApiServerConfig's and LedgerIndexServiceConfig's apiStreamShutdownTimeout
-    apiStreamShutdownTimeout: config.NonNegativeFiniteDuration =
-      LedgerApiServerConfig.DefaultApiStreamShutdownTimeout,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
+    enableCommandInspection: Boolean = true,
     adminToken: Option[String] = None,
     identityProviderManagement: IdentityProviderManagementConfig =
       LedgerApiServerConfig.DefaultIdentityProviderManagementConfig,
@@ -216,8 +220,6 @@ object LedgerApiServerConfig {
     config.NonNegativeFiniteDuration.ofMinutes(2L)
   private val DefaultDatabaseConnectionTimeout: config.NonNegativeFiniteDuration =
     config.NonNegativeFiniteDuration.ofSeconds(30)
-  private val DefaultApiStreamShutdownTimeout: config.NonNegativeFiniteDuration =
-    config.NonNegativeFiniteDuration.ofSeconds(5)
   private val DefaultIdentityProviderManagementConfig: IdentityProviderManagementConfig =
     ApiServiceOwner.DefaultIdentityProviderManagementConfig
   val DefaultRateLimit: RateLimitingConfig =
@@ -329,14 +331,16 @@ object TestingTimeServiceConfig {
   *                                             Setting to zero will disable reusing recent time proofs and will instead always fetch a new proof.
   * @param minimumProtocolVersion The minimum protocol version that this participant will speak when connecting to a domain
   * @param initialProtocolVersion The initial protocol version used by the participant (default latest), e.g., used to create the initial topology transactions.
-  * @param devVersionSupport If set to true, will allow the participant to connect to a domain with dev protocol version and will turn on unsafe Daml LF versions.
+  * @param alphaVersionSupport If set to true, will allow the participant to connect to a domain with dev protocol version and will turn on unsafe Daml LF versions.
   * @param dontWarnOnDeprecatedPV If true, then this participant will not emit a warning when connecting to a sequencer using a deprecated protocol version (such as 2.0.0).
   * @param warnIfOverloadedFor If all incoming commands have been rejected due to PARTICIPANT_BACKPRESSURE during this interval, the participant will log a warning.
   * @param excludeInfrastructureTransactions If set, infrastructure transactions (i.e. ping, bong and dar distribution) will be excluded from participant metering.
-  * @param enableEngineStackTraces If true, DAMLe stack traces will be enabled
-  * @param iterationsBetweenInterruptions Number of engine iterations between forced interruptions (outside needs of information).
   * @param journalGarbageCollectionDelay How much time to delay the canton journal garbage collection
   * @param disableUpgradeValidation Disable the package upgrade verification on DAR upload
+  * @param allowForUnauthenticatedContractIds Skip contract id authentication check, if the contract id scheme does not support authentication.
+  *                                           You should enable this only if all participants on a domain mutually trust each other.
+  *                                           Otherwise, an attacker may compromise integrity of the ledger.
+  * @param packageMetadataView Initialization parameters for the package metadata in-memory store.
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -347,26 +351,29 @@ final case class ParticipantNodeParameterConfig(
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
     transferTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
-      ParticipantProtocolVersion(ProtocolVersion.v30)
+      ParticipantProtocolVersion(ProtocolVersion.v31)
     ),
     initialProtocolVersion: ParticipantProtocolVersion = ParticipantProtocolVersion(
       ProtocolVersion.latest
     ),
-    devVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
+    BetaVersionSupport: Boolean = false,
     dontWarnOnDeprecatedPV: Boolean = false,
     warnIfOverloadedFor: Option[config.NonNegativeFiniteDuration] = Some(
       config.NonNegativeFiniteDuration.ofSeconds(20)
     ),
     ledgerApiServer: LedgerApiServerParametersConfig = LedgerApiServerParametersConfig(),
     excludeInfrastructureTransactions: Boolean = true,
-    enableEngineStackTraces: Boolean = false,
-    iterationsBetweenInterruptions: Long =
-      10000, // 10000 is the default value in the engine configuration
+    engine: CantonEngineConfig = CantonEngineConfig(),
     journalGarbageCollectionDelay: config.NonNegativeFiniteDuration =
       config.NonNegativeFiniteDuration.ofSeconds(0),
-    override val useNewTrafficControl: Boolean = false,
     disableUpgradeValidation: Boolean = false,
     override val useUnifiedSequencer: Boolean = false,
+    allowForUnauthenticatedContractIds: Boolean = false,
+    watchdog: Option[WatchdogConfig] = None,
+    packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
+    commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
 ) extends LocalNodeParametersConfig
 
 /** Parameters for the participant node's stores

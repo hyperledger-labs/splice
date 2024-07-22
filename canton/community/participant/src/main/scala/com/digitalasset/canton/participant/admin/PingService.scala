@@ -15,11 +15,11 @@ import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent as JavaCreatedEvent, Identifier}
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.WorkflowId
 import com.digitalasset.canton.ledger.client.{LedgerClient, LedgerClientUtils}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
@@ -219,7 +219,7 @@ object PingService {
 
     override private[admin] def filters: TransactionFilter = {
       // we can't filter by template id as we don't know when the admin workflow package is loaded
-      LedgerConnection.transactionFilterByPartyV2(Map(adminPartyId -> Seq.empty))
+      LedgerConnection.transactionFilterByParty(Map(adminPartyId -> Seq.empty))
     }
 
     private[admin] abstract class ContractWithExpiry(

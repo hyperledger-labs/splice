@@ -13,14 +13,9 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.digitalasset.canton.topology.{
-  DefaultTestIdentities,
-  KeyCollection,
-  TestingOwnerWithKeysX,
-}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.{DefaultTestIdentities, KeyCollection, TestingOwnerWithKeys}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, SequencerCounter, config}
 import org.scalatest.wordspec.AsyncWordSpecLike
@@ -42,11 +37,11 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
 
   private object Fixture {
 
-    val owner = DefaultTestIdentities.sequencerIdX
-    val crypto = new TestingOwnerWithKeysX(owner, loggerFactory, directExecutionContext)
-    val mockTransaction = mock[GenericSignedTopologyTransactionX]
+    val owner = DefaultTestIdentities.sequencerId
+    val crypto = new TestingOwnerWithKeys(owner, loggerFactory, directExecutionContext)
+    val mockTransaction = mock[GenericSignedTopologyTransaction]
 
-    val mockParent = mock[DomainTopologyClientWithInitX]
+    val mockParent = mock[DomainTopologyClientWithInit]
     val mockSnapshot0 = mock[TopologySnapshotLoader]
     val mockSnapshot1 = mock[TopologySnapshotLoader]
     val mockSnapshot2 = mock[TopologySnapshotLoader]
@@ -62,8 +57,7 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
       .thenReturn(Future.successful(KeyCollection(signingKeys = Seq(key2), Seq())))
 
     val cc =
-      new CachingDomainTopologyClientX(
-        mock[Clock],
+      new CachingDomainTopologyClient(
         mockParent,
         CachingConfigs(
           topologySnapshot = CacheConfig(
@@ -95,7 +89,7 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
         any[CantonTimestamp],
         any[CantonTimestamp],
         any[SequencerCounter],
-        anySeq[GenericSignedTopologyTransactionX],
+        anySeq[GenericSignedTopologyTransaction],
       )(any[TraceContext])
     ).thenReturn(FutureUnlessShutdown.unit)
 

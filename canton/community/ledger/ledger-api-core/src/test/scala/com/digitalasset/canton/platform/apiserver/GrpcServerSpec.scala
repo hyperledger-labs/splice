@@ -5,8 +5,8 @@ package com.digitalasset.canton.platform.apiserver
 
 import com.daml.error.{DamlError, ErrorGenerator}
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.metrics.api.MetricName
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
+import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.domain.api.v0
 import com.digitalasset.canton.domain.api.v0.Hello
@@ -23,7 +23,7 @@ import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
   SuppressingLogger,
 }
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.{LedgerApiServerHistograms, LedgerApiServerMetrics}
 import com.digitalasset.canton.platform.apiserver.GrpcServerSpec.*
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.apiserver.ratelimiting.{
@@ -66,7 +66,7 @@ final class GrpcServerSpec
             .hello(v0.Hello.Request("This is some text."))
             .failed
         } yield {
-          exception.getMessage shouldBe "INVALID_ARGUMENT: INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: This is some text."
+          exception.getMessage shouldBe "INVALID_ARGUMENT: INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: This is some text."
         }
       }
     }
@@ -81,7 +81,7 @@ final class GrpcServerSpec
             .hello(v0.Hello.Request(errorMessage))
             .failed
         } yield {
-          exception.getMessage shouldBe s"INVALID_ARGUMENT: INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: $returnedMessage"
+          exception.getMessage shouldBe s"INVALID_ARGUMENT: INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: $returnedMessage"
         }
       }
     }
@@ -102,7 +102,7 @@ final class GrpcServerSpec
         } yield {
           // We don't want to test the exact message content, just that it does indeed contain a
           // large chunk of the response error message, followed by "...".
-          exception.getMessage should fullyMatch regex "INVALID_ARGUMENT: INVALID_ARGUMENT\\(8,0\\): The submitted command has invalid arguments: There was an error. x{400,}\\.\\.\\.".r
+          exception.getMessage should fullyMatch regex "INVALID_ARGUMENT: INVALID_ARGUMENT\\(8,0\\): The submitted request has invalid arguments: There was an error. x{400,}\\.\\.\\.".r
         }
       }
     }
@@ -136,7 +136,11 @@ final class GrpcServerSpec
 
     "install rate limit interceptor" in {
       val metricsFactory = new InMemoryMetricsFactory
-      val metrics = new Metrics(MetricName("test"), metricsFactory)
+      val inventory = new HistogramInventory
+      val metrics = new LedgerApiServerMetrics(
+        new LedgerApiServerHistograms(MetricName("test"))(inventory),
+        metricsFactory,
+      )
       val overLimitRejection = LedgerApiErrors.ThreadpoolOverloaded.Rejection(
         "test",
         "test",
@@ -215,7 +219,7 @@ object GrpcServerSpec {
 
   private def resources(
       loggerFactory: NamedLoggerFactory,
-      metrics: Metrics = Metrics.ForTesting,
+      metrics: LedgerApiServerMetrics = LedgerApiServerMetrics.ForTesting,
       interceptors: List[ServerInterceptor] = List.empty,
       helloService: ExecutionContext => BindableService with HelloService =
         new HelloServiceReferenceImplementation()(_),

@@ -77,8 +77,6 @@ canton.participants.participant_$index = {
 
     parameters {
         dev-version-support = yes
-        initial-protocol-version = 30
-        use-new-traffic-control = true
         # tune the synchronisation protocols contract store cache
         caching {
             contract-store {

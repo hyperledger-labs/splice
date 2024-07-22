@@ -8,8 +8,8 @@ import cats.syntax.either.*
 import com.daml.network.http.v0.definitions as http
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.NodeIdentity
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
@@ -23,7 +23,7 @@ final case class NodeIdentitiesDump(
     keys: Seq[NodeIdentitiesDump.NodeKey],
     authorizedStoreSnapshot: Option[ByteString],
     // TODO(#11594): Deprecated; to be removed in a future version.
-    bootstrapTxs: Option[Seq[GenericSignedTopologyTransactionX]],
+    bootstrapTxs: Option[Seq[GenericSignedTopologyTransaction]],
     version: Option[String],
 ) extends PrettyPrinting {
   def toHttp: http.NodeIdentitiesDump = {
@@ -68,8 +68,8 @@ object NodeIdentitiesDump {
         ),
         bootstrapTxs = response.bootstrapTxs.map(
           _.toSeq.map(t =>
-            SignedTopologyTransactionX
-              .fromByteStringUnsafe(ByteString.copyFrom(Base64.getDecoder.decode(t)))
+            SignedTopologyTransaction
+              .fromTrustedByteString(ByteString.copyFrom(Base64.getDecoder.decode(t)))
               .fold(err => throw new IllegalArgumentException(err.message), identity)
           )
         ),

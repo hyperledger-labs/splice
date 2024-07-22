@@ -18,15 +18,13 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
       s"participant_extra_$dbsSuffix",
       s"participant_splitwell_$dbsSuffix",
     ) ++
-      (1 to 4)
-        .map(index =>
-          Seq(
-            s"participant_sv${index}_${dbsSuffix}",
-            s"sequencer_sv${index}_${dbsSuffix}",
-            s"mediator_sv${index}_${dbsSuffix}",
-          )
+      (1 to 4).flatMap(index =>
+        Seq(
+          s"participant_sv${index}_${dbsSuffix}",
+          s"sequencer_sv${index}_${dbsSuffix}",
+          s"mediator_sv${index}_${dbsSuffix}",
         )
-        .flatten
+      )
   }
 
   def withCantonSvNodes[A](

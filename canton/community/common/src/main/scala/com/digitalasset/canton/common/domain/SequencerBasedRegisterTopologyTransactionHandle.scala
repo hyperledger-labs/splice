@@ -13,9 +13,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.sequencing.{ApplicationHandler, EnvelopeHandler, NoEnvelopeBox}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
@@ -26,21 +25,17 @@ import scala.concurrent.ExecutionContext
 
 // unsealed for testing
 trait RegisterTopologyTransactionHandle extends FlagCloseable {
-  def submit(transactions: Seq[GenericSignedTopologyTransactionX])(implicit
+  def submit(transactions: Seq[GenericSignedTopologyTransaction])(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcastX.State]]
-
-  // we don't need to register a specific message handler, because we use SequencerClientSend's SendTracker
-  val processor: EnvelopeHandler =
-    ApplicationHandler.success[NoEnvelopeBox, DefaultOpenEnvelope]()
+  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcast.State]]
 }
 
-class SequencerBasedRegisterTopologyTransactionHandleX(
+class SequencerBasedRegisterTopologyTransactionHandle(
     sequencerClient: SequencerClient,
     val domainId: DomainId,
     val member: Member,
     clock: Clock,
-    TopologyConfig: TopologyConfig,
+    topologyConfig: TopologyConfig,
     protocolVersion: ProtocolVersion,
     protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -50,25 +45,25 @@ class SequencerBasedRegisterTopologyTransactionHandleX(
     with PrettyPrinting {
 
   private val service =
-    new DomainTopologyServiceX(
+    new DomainTopologyService(
       sequencerClient,
       clock,
-      TopologyConfig,
+      topologyConfig,
       protocolVersion,
       timeouts,
       loggerFactory,
     )
 
   override def submit(
-      transactions: Seq[GenericSignedTopologyTransactionX]
+      transactions: Seq[GenericSignedTopologyTransaction]
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcastX.State]] = {
+  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcast.State]] = {
     service.registerTopologyTransaction(
-      TopologyTransactionsBroadcastX.create(
+      TopologyTransactionsBroadcast.create(
         domainId,
         List(
-          TopologyTransactionsBroadcastX
+          TopologyTransactionsBroadcast
             .Broadcast(String255.tryCreate(UUID.randomUUID().toString), transactions.toList)
         ),
         protocolVersion,
@@ -78,17 +73,17 @@ class SequencerBasedRegisterTopologyTransactionHandleX(
 
   override def onClosed(): Unit = service.close()
 
-  override def pretty: Pretty[SequencerBasedRegisterTopologyTransactionHandleX.this.type] =
+  override def pretty: Pretty[SequencerBasedRegisterTopologyTransactionHandle.this.type] =
     prettyOfClass(
       param("domainId", _.domainId),
       param("member", _.member),
     )
 }
 
-class DomainTopologyServiceX(
+class DomainTopologyService(
     sequencerClient: SequencerClient,
     clock: Clock,
-    TopologyConfig: TopologyConfig,
+    topologyConfig: TopologyConfig,
     protocolVersion: ProtocolVersion,
     protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -97,10 +92,10 @@ class DomainTopologyServiceX(
     with FlagCloseable {
 
   def registerTopologyTransaction(
-      request: TopologyTransactionsBroadcastX
+      request: TopologyTransactionsBroadcast
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcastX.State]] = {
+  ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcast.State]] = {
     val sendCallback = SendCallback.future
 
     performUnlessClosingEitherUSF(
@@ -110,20 +105,20 @@ class DomainTopologyServiceX(
         .biSemiflatMap(
           sendAsyncClientError => {
             logger.error(s"Failed broadcasting topology transactions: $sendAsyncClientError")
-            FutureUnlessShutdown.pure[TopologyTransactionsBroadcastX.State](
-              TopologyTransactionsBroadcastX.State.Failed
+            FutureUnlessShutdown.pure[TopologyTransactionsBroadcast.State](
+              TopologyTransactionsBroadcast.State.Failed
             )
           },
           _result =>
             sendCallback.future
               .map {
                 case SendResult.Success(_) =>
-                  TopologyTransactionsBroadcastX.State.Accepted
+                  TopologyTransactionsBroadcast.State.Accepted
                 case notSequenced @ (_: SendResult.Timeout | _: SendResult.Error) =>
                   logger.info(
                     s"The submitted topology transactions were not sequenced. Error=[$notSequenced]. Transactions=${request.broadcasts}"
                   )
-                  TopologyTransactionsBroadcastX.State.Failed
+                  TopologyTransactionsBroadcast.State.Failed
               },
         )
     ).merge
@@ -131,17 +126,17 @@ class DomainTopologyServiceX(
   }
 
   private def sendRequest(
-      request: TopologyTransactionsBroadcastX,
+      request: TopologyTransactionsBroadcast,
       sendCallback: SendCallback,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
     logger.debug(s"Broadcasting topology transaction: ${request.broadcasts}")
     EitherTUtil.logOnErrorU(
-      sequencerClient.sendAsyncUnauthenticatedOrNot(
+      sequencerClient.sendAsync(
         Batch.of(protocolVersion, (request, Recipients.cc(TopologyBroadcastAddress.recipient))),
         maxSequencingTime =
-          clock.now.add(TopologyConfig.topologyTransactionRegistrationTimeout.toInternal.duration),
+          clock.now.add(topologyConfig.topologyTransactionRegistrationTimeout.toInternal.duration),
         callback = sendCallback,
         // Do not amplify because we are running our own retry loop here anyway
         amplify = false,

@@ -15,22 +15,12 @@ import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.TestingConfigInternal
-import com.digitalasset.canton.console.{
-  ConsoleEnvironment,
-  ConsoleGrpcAdminCommandRunner,
-  ConsoleOutput,
-  GrpcAdminCommandRunner,
-  HealthDumpGenerator,
-}
-import com.digitalasset.canton.domain.mediator.{
-  CommunityMediatorNodeXConfig,
-  MediatorNodeBootstrapX,
-}
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrapX
-import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeXConfig
+import com.digitalasset.canton.console.{ConsoleOutput, GrpcAdminCommandRunner, HealthDumpGenerator}
+import com.digitalasset.canton.domain.mediator.MediatorNodeBootstrap
+import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.{ParticipantNodeBootstrap, ParticipantNodeBootstrapX}
+import com.digitalasset.canton.participant.ParticipantNodeBootstrap
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 
 trait SpliceEnvironment extends Environment {
@@ -38,11 +28,10 @@ trait SpliceEnvironment extends Environment {
   override type Config = SpliceConfig
   override type Console = SpliceConsoleEnvironment
 
-  private val metrics =
-    SpliceMetricsFactory.forConfig(
-      configuredOpenTelemetry.openTelemetry.getMeterProvider,
-      testingConfig.metricsFactoryType,
-    )
+  private lazy val metrics = SpliceMetricsFactory(
+    metricsRegistry,
+    dbStorageHistograms,
+  )
 
   protected def createValidator(
       name: String,
@@ -203,10 +192,9 @@ class EnvironmentImpl(
   logger.info(s"SpliceEnvironment with config = {\n${config.dumpString}\n}")
 
   override def _createConsole(
-      consoleOutput: ConsoleOutput,
-      createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner,
+      consoleOutput: ConsoleOutput
   ): SpliceConsoleEnvironment =
-    new SpliceConsoleEnvironment(this, consoleOutput, createAdminCommandRunner)
+    new SpliceConsoleEnvironment(this, consoleOutput)
 
   override protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
@@ -214,23 +202,23 @@ class EnvironmentImpl(
     new SpliceHealthDumpGenerator(this, commandRunner)
   }
 
-  override protected def participantNodeFactoryX
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrapX] =
-    ParticipantNodeBootstrapX.CommunityParticipantFactory
+  override protected def participantNodeFactory
+      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
+    ParticipantNodeBootstrap.CommunityParticipantFactory
 
   override protected lazy val migrationsFactory: DbMigrationsFactory =
     new CommunityDbMigrationsFactory(loggerFactory)
 
   // createWhateverX copied from canton's CommunityEnvironment:
-  override protected def createMediatorX(
+  override protected def createMediator(
       name: String,
-      mediatorConfig: CommunityMediatorNodeXConfig,
-  ): MediatorNodeBootstrapX = ???
+      mediatorConfig: Config#MediatorNodeConfigType,
+  ): MediatorNodeBootstrap = ???
 
-  override protected def createSequencerX(
+  override protected def createSequencer(
       name: String,
-      sequencerConfig: CommunitySequencerNodeXConfig,
-  ): SequencerNodeBootstrapX = ???
+      sequencerConfig: Config#SequencerNodeConfigType,
+  ): SequencerNodeBootstrap = ???
 
   override def isEnterprise: Boolean = false
 }

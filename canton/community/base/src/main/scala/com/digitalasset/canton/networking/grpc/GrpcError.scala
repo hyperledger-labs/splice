@@ -7,11 +7,12 @@ import com.daml.error.utils.DecodedCantonError
 import com.digitalasset.canton.error.ErrorCodeUtils.errorCategoryFromString
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.{
+  MemberAccessDisabled,
   MissingToken,
-  ParticipantAccessDisabled,
 }
 import com.digitalasset.canton.sequencing.authentication.grpc.Constant
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code.*
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 
@@ -31,12 +32,8 @@ sealed trait GrpcError {
   override def toString: String = {
     val trailersString = (optTrailers, decodedCantonError) match {
       case (_, Some(rpc)) =>
-        val corrIdO = rpc.correlationId.toList.map(s => s"CorrelationId: $s")
-        val traceIdO = rpc.traceId.toList.map(tId => s"TraceId: $tId")
-        val retryIdO = rpc.retryIn.map(s => s"RetryIn: $s").toList
-        val context = Seq(s"Context: ${rpc.context}")
-
-        "\n  " + (corrIdO ++ traceIdO ++ retryIdO ++ context).mkString("\n  ")
+        val decoded = show"$rpc"
+        "\n  " + decoded
       case (Some(trailers), None) if !trailers.keys.isEmpty => s"\n  Trailers: $trailers"
       case _ => ""
     }
@@ -204,7 +201,7 @@ object GrpcError {
       case INVALID_ARGUMENT | UNAUTHENTICATED
           if !checkAuthenticationError(
             optTrailers,
-            Seq(MissingToken.toString, ParticipantAccessDisabled.toString),
+            Seq(MissingToken.toString, MemberAccessDisabled.toString),
           ) =>
         GrpcClientError(request, serverName, status, optTrailers, decodedError)
 

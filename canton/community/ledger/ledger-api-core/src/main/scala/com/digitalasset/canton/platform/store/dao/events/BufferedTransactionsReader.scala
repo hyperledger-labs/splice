@@ -10,10 +10,9 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
-import com.daml.lf.data.Ref.TransactionId
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
@@ -30,6 +29,7 @@ import com.digitalasset.canton.platform.store.dao.{
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.platform.{Party, TemplatePartiesFilter}
 import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.daml.lf.data.Ref.TransactionId
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -42,7 +42,7 @@ private[events] class BufferedTransactionsReader(
       GetUpdatesResponse,
     ],
     bufferedTransactionTreesReader: BufferedStreamsReader[
-      (Set[Party], EventProjectionProperties),
+      (Option[Set[Party]], EventProjectionProperties),
       GetUpdateTreesResponse,
     ],
     bufferedFlatTransactionByIdReader: BufferedTransactionByIdReader[
@@ -70,7 +70,7 @@ private[events] class BufferedTransactionsReader(
         persistenceFetchArgs = (filter, eventProjectionProperties),
         bufferFilter = ToFlatTransaction
           .filter(
-            filter.wildcardParties,
+            filter.templateWildcardParties,
             filter.relation,
             filter.allFilterParties,
           ),
@@ -89,7 +89,7 @@ private[events] class BufferedTransactionsReader(
   override def getTransactionTrees(
       startExclusive: Offset,
       endInclusive: Offset,
-      requestingParties: Set[Party],
+      requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -139,7 +139,7 @@ private[platform] object BufferedTransactionsReader {
       transactionsBuffer: InMemoryFanoutBuffer,
       eventProcessingParallelism: Int,
       lfValueTranslation: LfValueTranslation,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext
@@ -178,18 +178,18 @@ private[platform] object BufferedTransactionsReader {
 
     val transactionTreesStreamReader =
       new BufferedStreamsReader[
-        (Set[Party], EventProjectionProperties),
+        (Option[Set[Party]], EventProjectionProperties),
         GetUpdateTreesResponse,
       ](
         inMemoryFanoutBuffer = transactionsBuffer,
         fetchFromPersistence = new FetchFromPersistence[
-          (Set[Party], EventProjectionProperties),
+          (Option[Set[Party]], EventProjectionProperties),
           GetUpdateTreesResponse,
         ] {
           override def apply(
               startExclusive: Offset,
               endInclusive: Offset,
-              filter: (Set[Party], EventProjectionProperties),
+              filter: (Option[Set[Party]], EventProjectionProperties),
           )(implicit
               loggingContext: LoggingContextWithTrace
           ): Source[(Offset, GetUpdateTreesResponse), NotUsed] = {

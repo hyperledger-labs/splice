@@ -7,11 +7,11 @@ import cats.data.OptionT
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.LedgerTransactionId
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -30,10 +30,6 @@ import com.digitalasset.canton.participant.event.RecordOrderPublisher.{
   PendingPublish,
 }
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
-import com.digitalasset.canton.participant.store.EventLogId.{
-  DomainEventLogId,
-  ParticipantEventLogId,
-}
 import com.digitalasset.canton.participant.store.MultiDomainEventLog.*
 import com.digitalasset.canton.participant.store.{
   EventLogId,
@@ -42,7 +38,7 @@ import com.digitalasset.canton.participant.store.{
   SingleDimensionEventLog,
   TransferStore,
 }
-import com.digitalasset.canton.participant.sync.TimestampedEvent.{EventId, TransactionEventId}
+import com.digitalasset.canton.participant.sync.TimestampedEvent.EventId
 import com.digitalasset.canton.participant.sync.{
   LedgerSyncEvent,
   SyncDomainPersistentStateLookup,
@@ -59,7 +55,6 @@ import com.digitalasset.canton.pekkostreams.dispatcher.SubSource.RangeSource
 import com.digitalasset.canton.protocol.TargetDomainId
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
@@ -376,14 +371,6 @@ class InMemoryMultiDomainEventLog(
       .map(_.toMap)
   }
 
-  override def lookupTransactionDomain(
-      transactionId: LedgerTransactionId
-  )(implicit traceContext: TraceContext): OptionT[Future, DomainId] =
-    byEventId(namedLoggingContext)(TransactionEventId(transactionId)).subflatMap {
-      case (DomainEventLogId(id), _localOffset) => Some(id.item)
-      case (ParticipantEventLogId(_), _localOffset) => None
-    }
-
   override def lastLocalOffsetBeforeOrAt(
       eventLogId: EventLogId,
       upToInclusive: Option[GlobalOffset] = None,
@@ -555,7 +542,7 @@ class InMemoryMultiDomainEventLog(
   override def reportMaxEventAgeMetric(oldestEventTimestamp: Option[CantonTimestamp]): Unit =
     MetricsHelper.updateAgeInHoursGauge(
       clock,
-      metrics.pruning.prune.maxEventAge,
+      metrics.pruning.maxEventAge,
       oldestEventTimestamp,
     )
 }

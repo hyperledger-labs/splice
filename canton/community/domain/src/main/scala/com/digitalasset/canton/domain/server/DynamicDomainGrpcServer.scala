@@ -3,19 +3,20 @@
 
 package com.digitalasset.canton.domain.server
 
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.config.PublicServerConfig
 import com.digitalasset.canton.domain.sequencing.SequencerRuntime
 import com.digitalasset.canton.environment.HasGeneralCantonNodeParameters
 import com.digitalasset.canton.health.{
+  DependenciesHealthService,
   GrpcHealthReporter,
-  HealthService,
   ServiceHealthStatusManager,
 }
 import com.digitalasset.canton.lifecycle.Lifecycle.{CloseableServer, toCloseableServer}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import io.grpc.protobuf.services.ProtoReflectionService
@@ -32,10 +33,10 @@ class DynamicDomainGrpcServer(
     maxRequestSize: MaxRequestSize,
     nodeParameters: HasGeneralCantonNodeParameters,
     serverConfig: PublicServerConfig,
-    metrics: CantonLabeledMetricsFactory,
+    metrics: LabeledMetricsFactory,
     grpcMetrics: GrpcServerMetrics,
     grpcHealthReporter: GrpcHealthReporter,
-    domainHealthService: HealthService,
+    domainHealthService: DependenciesHealthService,
 )(implicit executionContext: ExecutionContextExecutorService)
     extends NamedLogging {
   private lazy val grpcDomainHealthManager =

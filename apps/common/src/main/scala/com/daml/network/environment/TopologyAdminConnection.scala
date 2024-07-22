@@ -5,7 +5,6 @@ package com.daml.network.environment
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.daml.network.config.Thresholds
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
@@ -15,21 +14,19 @@ import com.daml.network.environment.TopologyAdminConnection.{
 }
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.{
   DomainTimeCommands,
-  TopologyAdminCommandsX,
+  TopologyAdminCommands,
   VaultAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.topologyx.{
+import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
   ListOwnerToKeyMappingResult,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.crypto.{Fingerprint, PublicKey, SigningPublicKey}
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
-import com.digitalasset.canton.crypto.SigningPublicKey
-import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -37,26 +34,25 @@ import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
-import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
+import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
+  StoredTopologyTransaction,
   TimeQuery,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.digitalasset.canton.topology.transaction.TopologyMappingX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
-import io.opentelemetry.api.trace.Tracer
 import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
 /** Connection to nodes that expose topology information (sequencer, mediator, participant)
@@ -76,8 +72,7 @@ abstract class TopologyAdminConnection(
     )
     with RetryProvider.Has
     with Spanning {
-  import TopologyAdminConnection.TopologyResult
-  import TopologyAdminConnection.RecreateOnAuthorizedStateChange
+  import TopologyAdminConnection.{RecreateOnAuthorizedStateChange, TopologyResult}
 
   override val serviceName = "Canton Participant Admin API"
 
@@ -92,7 +87,7 @@ abstract class TopologyAdminConnection(
       case None =>
         for {
           memberId <- runCmd(
-            TopologyAdminCommandsX.Init.GetId()
+            TopologyAdminCommands.Init.GetId()
           )
         } yield {
           memberIdO.set(Some(memberId))
@@ -122,15 +117,15 @@ abstract class TopologyAdminConnection(
 
   def listPartyToParticipant(
       filterStore: String = "",
-      operation: Option[TopologyChangeOpX] = None,
+      operation: Option[TopologyChangeOp] = None,
       filterParty: String = "",
       filterParticipant: String = "",
       timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: TopologyTransactionType = AuthorizedState,
-  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] = {
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] = {
     runCmd(
-      TopologyAdminCommandsX.Read.ListPartyToParticipant(
-        BaseQueryX(
+      TopologyAdminCommands.Read.ListPartyToParticipant(
+        BaseQuery(
           filterStore,
           proposals = proposals.proposals,
           timeQuery,
@@ -147,7 +142,7 @@ abstract class TopologyAdminConnection(
   private def findPartyToParticipant(
       domainId: DomainId,
       partyId: PartyId,
-  )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipantX]] =
+  )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
         filterStore = TopologyStoreId.DomainStore(domainId).filterName,
@@ -160,10 +155,10 @@ abstract class TopologyAdminConnection(
   def getPartyToParticipant(
       domainId: DomainId,
       partyId: PartyId,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] =
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
     findPartyToParticipant(domainId, partyId).getOrElse {
       throw Status.NOT_FOUND
-        .withDescription(s"No PartyToParticipantX state for $partyId on domain $domainId")
+        .withDescription(s"No PartyToParticipant state for $partyId on domain $domainId")
         .asRuntimeException
     }
 
@@ -173,7 +168,7 @@ abstract class TopologyAdminConnection(
       proposals: Boolean = false,
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[TopologyResult[SequencerDomainStateX]]] =
+  ): Future[Seq[TopologyResult[SequencerDomainState]]] =
     listSequencerDomainState(
       TopologyStoreId.DomainStore(domainId),
       domainId,
@@ -188,10 +183,10 @@ abstract class TopologyAdminConnection(
       proposals: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[TopologyResult[SequencerDomainStateX]]] =
+  ): Future[Seq[TopologyResult[SequencerDomainState]]] =
     runCmd(
-      TopologyAdminCommandsX.Read.SequencerDomainState(
-        BaseQueryX(
+      TopologyAdminCommands.Read.SequencerDomainState(
+        BaseQuery(
           filterStore = store.filterName,
           proposals = proposals,
           timeQuery = timeQuery,
@@ -207,7 +202,7 @@ abstract class TopologyAdminConnection(
 
   def getSequencerDomainState(domainId: DomainId, proposals: Boolean = false)(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] =
+  ): Future[TopologyResult[SequencerDomainState]] =
     listSequencerDomainState(domainId, HeadState, proposals).map { txs =>
       txs.headOption
         .getOrElse(
@@ -217,15 +212,9 @@ abstract class TopologyAdminConnection(
         )
     }
 
-  def getMediatorDomainStateProposals(domainId: DomainId)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[TopologyResult[MediatorDomainStateX]]] = {
-    listMediatorDomainState(TopologyStoreId.DomainStore(domainId), domainId, proposals = true)
-  }
-
   def getMediatorDomainState(domainId: DomainId)(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[MediatorDomainStateX]] =
+  ): Future[TopologyResult[MediatorDomainState]] =
     listMediatorDomainState(TopologyStoreId.DomainStore(domainId), domainId, proposals = false)
       .map { txs =>
         txs.headOption
@@ -238,10 +227,10 @@ abstract class TopologyAdminConnection(
 
   def listMediatorDomainState(store: TopologyStoreId, domainId: DomainId, proposals: Boolean)(
       implicit traceContext: TraceContext
-  ) = {
+  ): Future[Seq[TopologyResult[MediatorDomainState]]] = {
     runCmd(
-      TopologyAdminCommandsX.Read.MediatorDomainState(
-        BaseQueryX(
+      TopologyAdminCommands.Read.MediatorDomainState(
+        BaseQuery(
           filterStore = store.filterName,
           proposals = proposals,
           timeQuery = TimeQuery.HeadState,
@@ -261,7 +250,7 @@ abstract class TopologyAdminConnection(
       decentralizedNamespace: Namespace,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+  ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
     listDecentralizedNamespaceDefinition(domainId, decentralizedNamespace).map { txs =>
       txs.headOption
         .getOrElse(
@@ -278,10 +267,10 @@ abstract class TopologyAdminConnection(
       decentralizedNamespace: Namespace,
       proposals: TopologyTransactionType = AuthorizedState,
       timeQuery: TimeQuery = TimeQuery.HeadState,
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DecentralizedNamespaceDefinition]]] = {
     runCmd(
-      TopologyAdminCommandsX.Read.ListDecentralizedNamespaceDefinition(
-        BaseQueryX(
+      TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
+        BaseQuery(
           filterStore = TopologyStoreId.DomainStore(domainId).filterName,
           proposals = proposals.proposals,
           timeQuery = timeQuery,
@@ -299,13 +288,13 @@ abstract class TopologyAdminConnection(
   def getIdentityTransactions(
       id: UniqueIdentifier,
       store: TopologyStoreId,
-  )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
+  )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransaction]] =
     listAllTransactions(
       store,
       includeMappings = Set(
-        TopologyMappingX.Code.NamespaceDelegationX,
-        TopologyMappingX.Code.OwnerToKeyMappingX,
-        TopologyMappingX.Code.IdentifierDelegationX,
+        TopologyMapping.Code.NamespaceDelegation,
+        TopologyMapping.Code.OwnerToKeyMapping,
+        TopologyMapping.Code.IdentifierDelegation,
       ),
       filterNamespace = Some(id.namespace),
     ).map(_.map(_.transaction))
@@ -314,14 +303,14 @@ abstract class TopologyAdminConnection(
       store: TopologyStoreId,
       timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: Boolean = false,
-      includeMappings: Set[TopologyMappingX.Code] = Set.empty,
+      includeMappings: Set[TopologyMapping.Code] = Set.empty,
       filterNamespace: Option[Namespace] = None,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]] = {
+  ): Future[Seq[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]]] = {
     runCmd(
-      TopologyAdminCommandsX.Read.ListAll(
-        query = BaseQueryX(
+      TopologyAdminCommands.Read.ListAll(
+        query = BaseQuery(
           filterStore = store.filterName,
           proposals = proposals,
           timeQuery = timeQuery,
@@ -332,7 +321,7 @@ abstract class TopologyAdminConnection(
         filterNamespace = filterNamespace.fold("")(_.filterString),
         excludeMappings =
           if (includeMappings.isEmpty) Seq.empty
-          else TopologyMappingX.Code.all.diff(includeMappings.toSeq).map(_.code),
+          else TopologyMapping.Code.all.diff(includeMappings.toSeq).map(_.code),
       )
     ).map(_.result)
   }
@@ -360,10 +349,10 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, OwnerToKeyMappingX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      OwnerToKeyMappingX(
+      OwnerToKeyMapping(
         member,
         domain = None,
         keys = keys,
@@ -375,10 +364,10 @@ abstract class TopologyAdminConnection(
 
   private def listOwnerToKeyMapping(member: Member)(implicit
       traceContext: TraceContext
-  ): Future[Seq[TopologyResult[OwnerToKeyMappingX]]] =
+  ): Future[Seq[TopologyResult[OwnerToKeyMapping]]] =
     runCmd(
-      TopologyAdminCommandsX.Read.ListOwnerToKeyMapping(
-        BaseQueryX(
+      TopologyAdminCommands.Read.ListOwnerToKeyMapping(
+        BaseQuery(
           filterStore = AuthorizedStore.filterName,
           proposals = false,
           timeQuery = TimeQuery.HeadState,
@@ -398,14 +387,14 @@ abstract class TopologyAdminConnection(
   private def exportTopologySnapshot(
       store: TopologyStoreId,
       proposals: Boolean,
-      excludeMappings: Seq[TopologyMappingX.Code],
+      excludeMappings: Seq[TopologyMapping.Code],
       filterNamespace: String,
   )(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
     runCmd(
-      TopologyAdminCommandsX.Read.ExportTopologySnapshot(
-        BaseQueryX(
+      TopologyAdminCommands.Read.ExportTopologySnapshot(
+        BaseQuery(
           filterStore = store.filterName,
           proposals = proposals,
           timeQuery = TimeQuery.Range(from = None, until = None),
@@ -426,7 +415,7 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      TopologyAdminCommandsX.Write.ImportTopologySnapshot(topologyTransactions, store.filterName)
+      TopologyAdminCommands.Write.ImportTopologySnapshot(topologyTransactions, store.filterName)
     )
   }
 
@@ -438,27 +427,27 @@ abstract class TopologyAdminConnection(
     exportTopologySnapshot(
       TopologyStoreId.AuthorizedStore,
       proposals = false,
-      excludeMappings = TopologyMappingX.Code.all.diff(
+      excludeMappings = TopologyMapping.Code.all.diff(
         Seq(
-          TopologyMappingX.Code.NamespaceDelegationX,
-          TopologyMappingX.Code.OwnerToKeyMappingX,
-          TopologyMappingX.Code.IdentifierDelegationX,
+          TopologyMapping.Code.NamespaceDelegation,
+          TopologyMapping.Code.OwnerToKeyMapping,
+          TopologyMapping.Code.IdentifierDelegation,
           // only relevant for participants
-          TopologyMappingX.Code.VettedPackagesX,
+          TopologyMapping.Code.VettedPackages,
         )
       ),
       filterNamespace = participantId.namespace.filterString,
     )
 
-  def proposeMapping[M <: TopologyMappingX: ClassTag](
+  def proposeMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       mapping: M,
       signedBy: Fingerprint,
       serial: PositiveInt,
       isProposal: Boolean,
-  )(implicit traceContext: TraceContext): Future[SignedTopologyTransactionX[TopologyChangeOpX, M]] =
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
-      TopologyAdminCommandsX.Write.Propose(
+      TopologyAdminCommands.Write.Propose(
         mapping = mapping,
         signedBy = Seq(signedBy),
         store = store.filterName,
@@ -467,13 +456,13 @@ abstract class TopologyAdminConnection(
       )
     )
 
-  private def proposeMapping[M <: TopologyMappingX: ClassTag](
+  private def proposeMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       mapping: Either[String, M],
       signedBy: Fingerprint,
       serial: PositiveInt,
       isProposal: Boolean,
-  )(implicit traceContext: TraceContext): Future[SignedTopologyTransactionX[TopologyChangeOpX, M]] =
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     proposeMapping(
       store,
       mapping.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err")),
@@ -486,7 +475,7 @@ abstract class TopologyAdminConnection(
     * - a new topology transaction is created as a proposal
     * - checks the proposals as well to see if the check holds
     */
-  private def ensureTopologyProposal[M <: TopologyMappingX: ClassTag](
+  private def ensureTopologyProposal[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       description: String,
       check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
@@ -524,7 +513,7 @@ abstract class TopologyAdminConnection(
     *
     *  This type of re-create of the topology transactions is required to ensure that updating the same topology state in parallel will eventually succeed for all the updates
     */
-  def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
+  def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       description: String,
       check: => EitherT[Future, TopologyResult[M], TopologyResult[M]],
@@ -622,7 +611,7 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] = {
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
     proposeInitialPartyToParticipant(store, partyId, Seq(participantId), signedBy)
   }
   def proposeInitialPartyToParticipant(
@@ -630,27 +619,31 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       signedBy: Fingerprint,
+      domainId: Option[DomainId] = None,
+      isProposal: Boolean = false,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
+    val hostingParticipants = participants.map(
+      HostingParticipant(
+        _,
+        ParticipantPermission.Submission,
+      )
+    )
     proposeMapping(
       store,
-      PartyToParticipantX(
+      PartyToParticipant.tryCreate(
         partyId,
-        None,
-        PositiveInt.one,
-        participants.map(
-          HostingParticipant(
-            _,
-            ParticipantPermission.Submission,
-          )
-        ),
+        domainId,
+        Thresholds.partyToParticipantThreshold(hostingParticipants),
+        hostingParticipants,
         groupAddressing = false,
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
-      isProposal = false,
+      isProposal = isProposal,
     )
+  }
 
   def ensurePartyToParticipantRemovalProposal(
       domainId: DomainId,
@@ -659,7 +652,7 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[PartyToParticipantX]] = {
+  ): Future[TopologyResult[PartyToParticipant]] = {
     def removeParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
       participants.filterNot(_.participantId == participantToRemove)
     }
@@ -677,7 +670,7 @@ abstract class TopologyAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
       // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
       // See SvOnboardingPromoteToSubmitterTrigger.
@@ -704,8 +697,8 @@ abstract class TopologyAdminConnection(
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
       signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
-    ensureTopologyMapping[PartyToParticipantX](
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
+    ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.DomainStore(domainId),
       show"Party $party is authorized on $newParticipant",
       EitherT(
@@ -728,7 +721,10 @@ abstract class TopologyAdminConnection(
           )
         )
         Right(
-          previous.copy(
+          PartyToParticipant.tryCreate(
+            previous.partyId,
+            previous.domainId,
+            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds
               .partyToParticipantThreshold(newHostingParticipants),
@@ -751,7 +747,7 @@ abstract class TopologyAdminConnection(
         HostingParticipant
       ], // participantChange must be idempotent
       signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
       topologyTransactionType match {
         case proposals @ (TopologyTransactionType.ProposalSignedBy(_) |
@@ -796,14 +792,17 @@ abstract class TopologyAdminConnection(
       }
     }
 
-    ensureTopologyProposal[PartyToParticipantX](
+    ensureTopologyProposal[PartyToParticipant](
       TopologyStoreId.DomainStore(domainId),
       description,
       queryType => findPartyToParticipant(queryType),
       previous => {
         val newHostingParticipants = participantChange(previous.participants)
         Right(
-          previous.copy(
+          PartyToParticipant.tryCreate(
+            previous.partyId,
+            previous.domainId,
+            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
           )
@@ -820,7 +819,7 @@ abstract class TopologyAdminConnection(
       participantId: ParticipantId,
       signedBy: Fingerprint,
       retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def promoteParticipantToSubmitter(
         participants: Seq[HostingParticipant]
     ): Seq[HostingParticipant] = {
@@ -829,7 +828,7 @@ abstract class TopologyAdminConnection(
       participants.updated(oldIndex, newValue)
     }
 
-    ensureTopologyMapping[PartyToParticipantX](
+    ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.DomainStore(domainId),
       s"Participant $participantId is promoted to have Submission permission for party $party",
       EitherT(getPartyToParticipant(domainId, party).map(result => {
@@ -844,7 +843,10 @@ abstract class TopologyAdminConnection(
         Either.cond(
           previous.participants.exists(_.participantId == participantId), {
             val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
-            previous.copy(
+            PartyToParticipant.tryCreate(
+              previous.partyId,
+              previous.domainId,
+              groupAddressing = previous.groupAddressing,
               participants = newHostingParticipants,
               threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
             )
@@ -860,15 +862,19 @@ abstract class TopologyAdminConnection(
 
   def addTopologyTransactions(
       store: TopologyStoreId,
-      txs: Seq[GenericSignedTopologyTransactionX],
+      txs: Seq[GenericSignedTopologyTransaction],
+      flags: ForceFlag*
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      TopologyAdminCommandsX.Write
+      TopologyAdminCommands.Write
         .AddTransactions(
           txs,
           store.filterName,
+          ForceFlags(
+            flags*
+          ),
         )
     )
 
@@ -879,10 +885,10 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, SequencerDomainStateX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, SequencerDomainState]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      SequencerDomainStateX.create(
+      SequencerDomainState.create(
         domainId,
         PositiveInt.one,
         active,
@@ -900,7 +906,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] = {
+  ): Future[TopologyResult[SequencerDomainState]] = {
     def sequencerChange(sequencers: Seq[SequencerId]): Seq[SequencerId] = {
       val newSequencers = sequencers :+ newActiveSequencer
       newSequencers.distinct
@@ -922,7 +928,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] = {
+  ): Future[TopologyResult[SequencerDomainState]] = {
     def sequencerChange(sequencers: Seq[SequencerId]): Seq[SequencerId] = {
       sequencers.filterNot(_ == sequencerToRemove)
     }
@@ -944,8 +950,8 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] = {
-    ensureTopologyMapping[SequencerDomainStateX](
+  ): Future[TopologyResult[SequencerDomainState]] = {
+    ensureTopologyMapping[SequencerDomainState](
       TopologyStoreId.DomainStore(domainId),
       description,
       EitherT(
@@ -967,7 +973,7 @@ abstract class TopologyAdminConnection(
           s"Applying sequencer change: previous [${previous.active}], wanted [$newSequencers]"
         )
         // The threshold in here is used by Canton traffic control
-        SequencerDomainStateX.create(
+        SequencerDomainState.create(
           previous.domain,
           Thresholds
             .sequencerConnectionsSizeThreshold(newSequencers.size),
@@ -989,10 +995,10 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, MediatorDomainStateX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, MediatorDomainState]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      MediatorDomainStateX.create(
+      MediatorDomainState.create(
         domain = domainId,
         group = group,
         threshold = PositiveInt.one,
@@ -1011,7 +1017,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[MediatorDomainStateX]] = {
+  ): Future[TopologyResult[MediatorDomainState]] = {
     def mediatorChange(mediators: Seq[MediatorId]): Seq[MediatorId] = {
       val newMediators = mediators :+ newActiveMediator
       newMediators.distinct
@@ -1032,7 +1038,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[MediatorDomainStateX]] = {
+  ): Future[TopologyResult[MediatorDomainState]] = {
     def mediatorChange(mediators: Seq[MediatorId]): Seq[MediatorId] = {
       mediators.filterNot(_ == mediatorToRemove)
     }
@@ -1053,8 +1059,8 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[MediatorDomainStateX]] =
-    ensureTopologyMapping[MediatorDomainStateX](
+  ): Future[TopologyResult[MediatorDomainState]] =
+    ensureTopologyMapping[MediatorDomainState](
       TopologyStoreId.DomainStore(domainId),
       description,
       EitherT(
@@ -1073,7 +1079,7 @@ abstract class TopologyAdminConnection(
           s"Applying mediator change: previous [${previous.active}], wanted [$newMediators]"
         )
         // constructor is not exposed so no copy
-        MediatorDomainStateX.create(
+        MediatorDomainState.create(
           previous.domain,
           previous.group,
           Thresholds
@@ -1094,10 +1100,10 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, DecentralizedNamespaceDefinitionX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, DecentralizedNamespaceDefinition]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      DecentralizedNamespaceDefinitionX.create(
+      DecentralizedNamespaceDefinition.create(
         namespace,
         threshold,
         owners,
@@ -1115,7 +1121,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+  ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
     ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       show"Namespace $newOwner is in owners of DecentralizedNamespaceDefinition",
       domainId,
@@ -1133,7 +1139,7 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+  ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
     ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       show"Namespace $ownerToRemove was removed from the decentralized namespace definition",
       domainId,
@@ -1161,15 +1167,15 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
-    ensureTopologyMapping[DecentralizedNamespaceDefinitionX](
+  ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
+    ensureTopologyMapping[DecentralizedNamespaceDefinition](
       TopologyStoreId.DomainStore(domainId),
       description,
       decentralizedNamespaceDefinitionForNamespace(domainId, decentralizedNamespace, ownerChange),
       previous => {
         // constructor is not exposed so no copy
         val newOwners = ownerChange(previous.owners)
-        DecentralizedNamespaceDefinitionX.create(
+        DecentralizedNamespaceDefinition.create(
           previous.namespace,
           Thresholds.decentralizedNamespaceThreshold(
             newOwners.size
@@ -1200,10 +1206,10 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, DomainParametersStateX]] =
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, DomainParametersState]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      DomainParametersStateX(domainId, parameters),
+      DomainParametersState(domainId, parameters),
       signedBy = signedBy,
       serial = PositiveInt.one,
       isProposal = false,
@@ -1215,8 +1221,8 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[DomainParametersStateX]] =
-    ensureTopologyMapping[DomainParametersStateX](
+  ): Future[TopologyResult[DomainParametersState]] =
+    ensureTopologyMapping[DomainParametersState](
       TopologyStoreId.DomainStore(domainId),
       "update dynamic domain parameters",
       EitherT(
@@ -1237,7 +1243,7 @@ abstract class TopologyAdminConnection(
   def getDomainParametersState(
       domainId: DomainId,
       proposals: TopologyTransactionType = AuthorizedState,
-  )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
+  )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersState]] = {
     listDomainParametersState(
       TopologyStoreId.DomainStore(domainId),
       domainId,
@@ -1254,7 +1260,7 @@ abstract class TopologyAdminConnection(
   def listDomainParametersState(
       domainId: DomainId,
       proposals: TopologyTransactionType = AuthorizedState,
-  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersStateX]]] = {
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersState]]] = {
     listDomainParametersState(
       TopologyStoreId.DomainStore(domainId),
       domainId,
@@ -1268,10 +1274,10 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       proposals: TopologyTransactionType,
       timeQuery: TimeQuery,
-  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersStateX]]] = {
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[DomainParametersState]]] = {
     runCmd(
-      TopologyAdminCommandsX.Read.DomainParametersState(
-        BaseQueryX(
+      TopologyAdminCommands.Read.DomainParametersState(
+        BaseQuery(
           storeId.filterName,
           proposals = proposals.proposals,
           timeQuery,
@@ -1281,18 +1287,18 @@ abstract class TopologyAdminConnection(
         ),
         domainId.filterString,
       )
-    ).map(_.map(r => TopologyResult(r.context, DomainParametersStateX(domainId, r.item))))
+    ).map(_.map(r => TopologyResult(r.context, DomainParametersState(domainId, r.item))))
   }
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(TopologyAdminCommandsX.Init.InitId(id.uid.toProtoPrimitive))
+    runCmd(TopologyAdminCommands.Init.InitId(id.uid.toProtoPrimitive))
   }
 
-  def sign(transactions: Seq[GenericSignedTopologyTransactionX], signedBy: Fingerprint)(implicit
+  def sign(transactions: Seq[GenericSignedTopologyTransaction], signedBy: Fingerprint)(implicit
       traceContext: TraceContext
-  ): Future[Seq[GenericSignedTopologyTransactionX]] = {
+  ): Future[Seq[GenericSignedTopologyTransaction]] = {
     runCmd(
-      TopologyAdminCommandsX.Write.SignTransactions(
+      TopologyAdminCommands.Write.SignTransactions(
         transactions = transactions,
         signedBy = Seq(signedBy),
       )
@@ -1373,27 +1379,7 @@ object TopologyAdminConnection {
   final case class AuthorizedStateChanged(baseSerial: PositiveInt)
       extends QuietNonRetryableException(s"Authorized state changed, new base serial $baseSerial")
 
-  def proposeCollectively[T <: TopologyMappingX](
-      connections: NonEmpty[List[TopologyAdminConnection]]
-  )(
-      f: (
-          TopologyAdminConnection,
-          UniqueIdentifier,
-      ) => Future[SignedTopologyTransactionX[TopologyChangeOpX, T]]
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, T]] = {
-    connections.toNEF
-      .traverse { con =>
-        con.getId().flatMap(f(con, _))
-      }
-      .map(_.reduceLeft[SignedTopologyTransactionX[TopologyChangeOpX, T]] { case (a, b) =>
-        a.addSignatures(b.signatures.toSeq)
-      })
-  }
-
-  final case class TopologyResult[M <: TopologyMappingX](
+  final case class TopologyResult[M <: TopologyMapping](
       base: BaseResult,
       mapping: M,
   ) extends PrettyPrinting {

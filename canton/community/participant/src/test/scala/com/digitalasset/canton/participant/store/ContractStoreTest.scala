@@ -4,8 +4,6 @@
 package com.digitalasset.canton.participant.store
 
 import cats.syntax.parallel.*
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.QualifiedName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
   asSerializable,
@@ -22,6 +20,8 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.{BaseTest, LfPartyId, RequestCounter}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.QualifiedName
 import org.scalatest.wordspec.AsyncWordSpec
 
 trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
@@ -143,7 +143,7 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
       val element = WithTransactionId(contract, transactionId1)
 
       for {
-        _ <- store.storeCreatedContracts(rc, Seq(element, element))
+        _ <- store.storeCreatedContracts(Seq((element, rc), (element, rc)))
         _ <- store.storeDivulgedContracts(rc, Seq(contract2, contract2))
       } yield succeed
     }

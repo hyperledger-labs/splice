@@ -1,12 +1,12 @@
 package com.daml.network.unit.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Bytes
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Bytes
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.{AcsJdbcTypes, SplicePostgresTest}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json

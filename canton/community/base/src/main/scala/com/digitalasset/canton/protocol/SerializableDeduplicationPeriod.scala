@@ -3,11 +3,10 @@
 
 package com.digitalasset.canton.protocol
 
-import com.daml.lf.data.Bytes as LfBytes
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
 import com.digitalasset.canton.serialization.ProtoConverter.{DurationConverter, ParsingResult}
+import com.digitalasset.daml.lf.data.Bytes as LfBytes
 
 final case class SerializableDeduplicationPeriod(deduplicationPeriod: DeduplicationPeriod) {
   def toProtoV30: v30.DeduplicationPeriod = deduplicationPeriod match {

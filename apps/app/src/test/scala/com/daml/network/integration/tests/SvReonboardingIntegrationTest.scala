@@ -381,7 +381,7 @@ class SvReonboardingIntegrationTest
         // Canton is slooooooooooooooooooooooooooow
         eventuallySucceeds(timeUntilSuccess = 60.seconds) {
           sv4ReonboardBackend.participantClientWithAdminToken.health.status should (be(
-            NodeStatus.NotInitialized(true)
+            NodeStatus.NotInitialized(true, None)
           ) or be(a[NodeStatus.Success[?]]))
         }
         better.files
@@ -399,7 +399,7 @@ class SvReonboardingIntegrationTest
         val sv4PartyNew = sv4ReonboardBackend.getDsoInfo().svParty
         clue("partyId of re-onboarded sv4 is different") {
           sv4PartyNew should not be sv4Party
-          sv4PartyNew.uid.id.unwrap should startWith("digital-asset-eng-4-reonboard")
+          sv4PartyNew.uid.identifier.unwrap should startWith("digital-asset-eng-4-reonboard")
           sv4PartyNew.uid.namespace should not be sv4Party.uid.namespace
         }
 
@@ -506,7 +506,7 @@ class SvReonboardingIntegrationTest
         )
 
         validatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
-        validatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "validatorLocalNew"
+        validatorLocalBackend.participantClient.id.uid.identifier.unwrap shouldBe "validatorLocalNew"
 
         sv4WalletClient.userStatus().party shouldBe sv4PartyNew.toProtoPrimitive
 

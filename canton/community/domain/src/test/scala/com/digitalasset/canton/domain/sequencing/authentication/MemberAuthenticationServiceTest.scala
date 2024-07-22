@@ -8,9 +8,9 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.{Nonce, Signature}
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.{
+  MemberAccessDisabled,
   MissingToken,
   NonMatchingDomainId,
-  ParticipantAccessDisabled,
 }
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.sequencing.authentication.{AuthenticationToken, MemberAuthentication}
@@ -31,7 +31,7 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest {
 
   val clock: SimClock = new SimClock(loggerFactory = loggerFactory)
 
-  val topology = TestingTopologyX().withSimpleParticipants(participant1).build()
+  val topology = TestingTopology().withSimpleParticipants(participant1).build()
   val syncCrypto = topology.forOwnerAndDomain(participant1, domainId)
 
   def service(
@@ -72,6 +72,7 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest {
         (nonce, fingerprints) = challenge
         signature <- getMemberAuthentication(p1)
           .signDomainNonce(p1, nonce, domainId, fingerprints, syncCrypto.crypto)
+          .failOnShutdown
         tokenAndExpiry <- sut.validateSignature(p1, signature, nonce)
       } yield tokenAndExpiry
 
@@ -130,8 +131,8 @@ class MemberAuthenticationServiceTest extends AsyncWordSpec with BaseTest {
           "token validation should fail"
         )
       } yield {
-        generateNonceError shouldBe ParticipantAccessDisabled(p1)
-        validateSignatureError shouldBe ParticipantAccessDisabled(p1)
+        generateNonceError shouldBe MemberAccessDisabled(p1)
+        validateSignatureError shouldBe MemberAccessDisabled(p1)
         validateTokenError shouldBe MissingToken(p1)
       }
     }

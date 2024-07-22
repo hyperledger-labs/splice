@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend.postgresql
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.platform.store.backend.ResetStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 
@@ -13,9 +13,8 @@ object PostgresResetStorageBackend extends ResetStorageBackend {
 
   override def resetAll(connection: Connection): Unit = {
     SQL"""
-      delete from lapi_packages cascade;
-      delete from lapi_package_entries cascade;
       delete from lapi_parameters cascade;
+      delete from lapi_ledger_end_domain_index cascade;
       delete from lapi_command_completions cascade;
       delete from lapi_events_create cascade;
       delete from lapi_events_consuming_exercise cascade;

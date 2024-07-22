@@ -3,20 +3,23 @@
 
 package com.digitalasset.canton.metrics
 
-import com.daml.metrics.api.opentelemetry.Slf4jMetricExporter
-import com.daml.metrics.api.{MetricName, MetricsContext}
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.opentelemetry.{
+  OpenTelemetryMetricsFactory,
+  QualificationFilteringMetricsFactory,
+}
+import com.daml.metrics.api.{MetricQualification, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
-import com.daml.metrics.{HealthMetrics, HistogramDefinition}
+import com.daml.metrics.{HealthMetrics, HistogramDefinition, MetricsFilterConfig}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.metrics.{MediatorMetrics, SequencerMetrics}
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.CantonOpenTelemetryMetricsFactory
-import com.digitalasset.canton.metrics.MetricsConfig.{JvmMetrics, MetricsFilterConfig}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
 import com.digitalasset.canton.metrics.MetricsReporterConfig.{Csv, Logging, Prometheus}
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.metrics.Meter
@@ -30,23 +33,38 @@ import java.io.File
 import java.util.concurrent.ScheduledExecutorService
 import scala.collection.concurrent.TrieMap
 
+/** Configure metric instrumentiation
+  *
+  * @param reporters which reports should be used to report metric output
+  * @param jvmMetrics if true, then JvmMetrics will be reported
+  * @param histograms customized histogram definitions
+  * @param qualifiers which metric qualifiers to include generally. by default, all except Debug metrics
+  *                   are included. The qualifier filtering takes precedence over the individual reporter filters
+  */
 final case class MetricsConfig(
     reporters: Seq[MetricsReporterConfig] = Seq.empty,
     jvmMetrics: Option[JvmMetrics] = None,
     histograms: Seq[HistogramDefinition] = Seq.empty,
     cardinality: PositiveInt = PositiveInt.tryCreate(MetricStorage.DEFAULT_MAX_CARDINALITY),
-)
+    qualifiers: Seq[MetricQualification] = Seq[MetricQualification](
+      MetricQualification.Errors,
+      MetricQualification.Latency,
+      MetricQualification.Saturation,
+      MetricQualification.Traffic,
+    ),
+) {
+
+  // if empty, no filter, otherwise, the union of all filters
+  val globalFilters: Seq[MetricsFilterConfig] = {
+    if (reporters.exists(_.filters.isEmpty)) Seq.empty
+    else {
+      reporters.flatMap(_.filters).distinct
+    }
+  }
+
+}
 
 object MetricsConfig {
-
-  final case class MetricsFilterConfig(
-      startsWith: String = "",
-      contains: String = "",
-      endsWith: String = "",
-  ) {
-    def matches(name: String): Boolean =
-      name.startsWith(startsWith) && name.contains(contains) && name.endsWith(endsWith)
-  }
 
   /** Control and enable jvm metrics */
   final case class JvmMetrics(
@@ -119,8 +137,13 @@ object MetricsReporterConfig {
 final case class MetricsRegistry(
     meter: Meter,
     factoryType: MetricsFactoryType,
+    testingSupportAdhocMetrics: Boolean,
+    histograms: CantonHistograms,
+    baseFilter: MetricsInfoFilter,
+    loggerFactory: NamedLoggerFactory,
 ) extends AutoCloseable
-    with CantonLabeledMetricsFactory.Generator {
+    with MetricsFactoryProvider
+    with NamedLogging {
 
   private val participants = TrieMap[String, ParticipantMetrics]()
   private val sequencers = TrieMap[String, SequencerMetrics]()
@@ -132,8 +155,8 @@ final case class MetricsRegistry(
         val participantMetricsContext =
           MetricsContext("node" -> name, "component" -> "participant")
         new ParticipantMetrics(
-          MetricsRegistry.prefix,
-          create(
+          histograms.participant,
+          generateMetricsFactory(
             participantMetricsContext
           ),
         )
@@ -146,11 +169,11 @@ final case class MetricsRegistry(
       name, {
         val sequencerMetricsContext =
           MetricsContext("node" -> name, "component" -> "sequencer")
-        val labeledMetricsFactory = create(
+        val labeledMetricsFactory = generateMetricsFactory(
           sequencerMetricsContext
         )
         new SequencerMetrics(
-          MetricsRegistry.prefix,
+          histograms.sequencer,
           labeledMetricsFactory,
           new DamlGrpcServerMetrics(labeledMetricsFactory, "sequencer"),
           new HealthMetrics(labeledMetricsFactory),
@@ -164,9 +187,9 @@ final case class MetricsRegistry(
       name, {
         val mediatorMetricsContext = MetricsContext("node" -> name, "component" -> "mediator")
         val labeledMetricsFactory =
-          create(mediatorMetricsContext)
+          generateMetricsFactory(mediatorMetricsContext)
         new MediatorMetrics(
-          MetricsRegistry.prefix,
+          histograms.mediator,
           labeledMetricsFactory,
           new DamlGrpcServerMetrics(labeledMetricsFactory, "mediator"),
           new HealthMetrics(labeledMetricsFactory),
@@ -175,47 +198,33 @@ final case class MetricsRegistry(
     )
   }
 
-  override def create(
+  override def generateMetricsFactory(
       extraContext: MetricsContext
-  ): CantonLabeledMetricsFactory = {
+  ): LabeledMetricsFactory = {
     factoryType match {
       case MetricsFactoryType.InMemory(provider) =>
-        provider(extraContext)
+        provider.generateMetricsFactory(extraContext)
       case MetricsFactoryType.External =>
-        new CantonOpenTelemetryMetricsFactory(
-          meter,
-          globalMetricsContext = extraContext,
+        new QualificationFilteringMetricsFactory(
+          new OpenTelemetryMetricsFactory(
+            meter,
+            histograms.inventory
+              .registered()
+              .map(_.name.toString())
+              .toSet,
+            onlyLogMissingHistograms =
+              if (testingSupportAdhocMetrics) Some(logger.underlying) else None,
+            globalMetricsContext = extraContext,
+          ),
+          baseFilter,
         )
     }
   }
 
   /** returns the documented metrics by possibly creating fake participants / sequencers / mediators */
   def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item], Seq[MetricDoc.Item]) = {
-    def sorted(lst: Seq[MetricDoc.Item]): Seq[MetricDoc.Item] =
-      lst
-        .groupBy(_.name)
-        .flatMap(_._2.headOption.toList)
-        .toSeq
-        .sortBy(_.name)
-
-    val participantMetrics: ParticipantMetrics =
-      participants.headOption.map(_._2).getOrElse(forParticipant("dummyParticipant"))
-    val participantItems = MetricDoc.getItems(participantMetrics)
-    val clientMetrics =
-      MetricDoc.getItems(participantMetrics.domainMetrics(DomainAlias.tryCreate("<domain>")))
-    val sequencerMetrics = MetricDoc.getItems(
-      sequencers.headOption
-        .map { case (_, sequencerMetrics) => sequencerMetrics }
-        .getOrElse(forSequencer("dummySequencer"))
-    )
-    val mediatorMetrics = MetricDoc.getItems(
-      mediators.headOption
-        .map { case (_, mediatorMetrics) => mediatorMetrics }
-        .getOrElse(forSequencer("dummyMediator"))
-    )
-
-    // the fake instances are fine here as we do this anyway only when we build and export the docs
-    (sorted(participantItems ++ clientMetrics), sorted(sequencerMetrics), sorted(mediatorMetrics))
+    // TODO(#17917) resurrect once the metrics docs have been re-enabled
+    (Seq.empty, Seq.empty, Seq.empty)
   }
 
   override def close(): Unit = ()
@@ -224,19 +233,12 @@ final case class MetricsRegistry(
 
 object MetricsRegistry extends LazyLogging {
 
-  val prefix: MetricName = MetricName.Daml
-
   def registerReporters(
       config: MetricsConfig,
       loggerFactory: NamedLoggerFactory,
   )(
       sdkMeterProviderBuilder: SdkMeterProviderBuilder
   )(implicit scheduledExecutorService: ScheduledExecutorService): SdkMeterProviderBuilder = {
-    if (config.reporters.isEmpty) {
-      logger.info(
-        s"No metrics reporters configured. Not starting metrics collection."
-      )
-    }
     def buildPeriodicReader(
         exporter: MetricExporter,
         interval: NonNegativeFiniteDuration,
@@ -257,14 +259,12 @@ object MetricsRegistry extends LazyLogging {
             .setPort(port.unwrap)
             .build()
         case config: Csv =>
+          logger.info(s"Starting CsvReporter with interval ${config.interval}")
           buildPeriodicReader(new CsvReporter(config, loggerFactory), config.interval)
         case config: Logging =>
-          // TODO(#17917) fix upstream slfjmetricexporer
+          logger.info(s"Starting to log metrics with interval ${config.interval}")
           buildPeriodicReader(
-            new Slf4jMetricExporter(
-              logAsInfo = config.logAsInfo,
-              logger = loggerFactory.getLogger(MetricsRegistry.getClass).underlying,
-            ),
+            new LogReporter(logAsInfo = config.logAsInfo, loggerFactory),
             config.interval,
           )
 

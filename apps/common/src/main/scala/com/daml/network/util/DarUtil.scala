@@ -4,9 +4,9 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.lf.archive.{Dar, DarDecoder, DarParser}
-import com.daml.lf.data.Ref.PackageId
-import com.daml.lf.language.Ast.{Package, PackageMetadata}
+import com.digitalasset.daml.lf.archive.{Dar, DarDecoder, DarParser}
+import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.language.Ast.{Package, PackageMetadata}
 
 import java.io.{File, FileInputStream, InputStream}
 import java.util.zip.ZipInputStream

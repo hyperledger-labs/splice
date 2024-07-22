@@ -24,7 +24,7 @@ import com.digitalasset.canton.console.{
   LedgerApiCommandRunner,
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
+import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -94,7 +94,9 @@ trait LedgerApiExtensions {
             )
           }
           JavaTransactionTree.fromProto(
-            TransactionTree.toJavaProto(ledgerApi.optionallyAwait(tx, tx.updateId, optTimeout))
+            TransactionTree.toJavaProto(
+              ledgerApi.optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+            )
           )
         }
 

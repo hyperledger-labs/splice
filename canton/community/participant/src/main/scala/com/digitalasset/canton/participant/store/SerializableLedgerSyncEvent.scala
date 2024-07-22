@@ -5,56 +5,30 @@ package com.digitalasset.canton.participant.store
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.daml_lf_dev.DamlLf.Archive
-import com.daml.lf.crypto.Hash as LfHash
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.data.{Bytes as LfBytes, ImmArray}
-import com.daml.lf.transaction.{BlindingInfo, TransactionOuterClass}
-import com.daml.lf.value.ValueCoder.DecodeError
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.v2.*
+import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.participant.protocol.{ProcessingSteps, v30}
 import com.digitalasset.canton.participant.store.DamlLfSerializers.*
 import com.digitalasset.canton.participant.sync.LedgerSyncEvent
 import com.digitalasset.canton.protocol.ContractIdSyntax.*
-import com.digitalasset.canton.protocol.{
-  LfActionNode,
-  LfCommittedTransaction,
-  LfNodeCreate,
-  LfNodeExercises,
-  LfNodeId,
-  SerializableDeduplicationPeriod,
-  SourceDomainId,
-  TargetDomainId,
-  TransferId,
-}
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.serialization.ProtoConverter.{
-  ParsingResult,
-  parseLFWorkflowIdO,
-  parseLedgerTransactionId,
-  parseLfPartyId,
-  protoParser,
-  required,
-}
+import com.digitalasset.canton.serialization.ProtoConverter.*
 import com.digitalasset.canton.store.db.{DbDeserializationException, DbSerializationException}
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.version.{
-  HasProtocolVersionedCompanion,
-  HasProtocolVersionedWrapper,
-  ProtoVersion,
-  ProtocolVersion,
-  ProtocolVersionedCompanionDbHelpers,
-  ReleaseProtocolVersion,
-  RepresentativeProtocolVersion,
-}
+import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{
   LfPackageId,
   LfTimestamp,
   ProtoDeserializationError,
   TransferCounter,
 }
+import com.digitalasset.daml.lf.crypto.Hash as LfHash
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{Bytes as LfBytes, ImmArray}
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, TransactionOuterClass}
+import com.digitalasset.daml.lf.value.ValueCoder.DecodeError
 import com.google.protobuf.ByteString
 import com.google.rpc.status.Status as RpcStatus
 
@@ -89,14 +63,6 @@ private[store] final case class SerializableLedgerSyncEvent(event: LedgerSyncEve
         case partyAllocationRejected: LedgerSyncEvent.PartyAllocationRejected =>
           SyncEventP.PartyAllocationRejected(
             SerializablePartyAllocationRejected(partyAllocationRejected).toProtoV30
-          )
-        case publicPackageUpload: LedgerSyncEvent.PublicPackageUpload =>
-          SyncEventP.PublicPackageUpload(
-            SerializablePublicPackageUpload(publicPackageUpload).toProtoV30
-          )
-        case publicPackageUploadRejected: LedgerSyncEvent.PublicPackageUploadRejected =>
-          SyncEventP.PublicPackageUploadRejected(
-            SerializablePublicPackageUploadRejected(publicPackageUploadRejected).toProtoV30
           )
         case transactionAccepted: LedgerSyncEvent.TransactionAccepted =>
           SyncEventP.TransactionAccepted(
@@ -139,7 +105,7 @@ private[store] object SerializableLedgerSyncEvent
   override val supportedProtoVersions: SupportedProtoVersions =
     SupportedProtoVersions(
       ProtoVersion(30) -> VersionedProtoConverter
-        .storage(ReleaseProtocolVersion(ProtocolVersion.v30), v30.LedgerSyncEvent)(
+        .storage(ReleaseProtocolVersion(ProtocolVersion.v31), v30.LedgerSyncEvent)(
           supportedProtoVersion(_)(fromProtoV30),
           _.toProtoV30.toByteString,
         )
@@ -192,10 +158,6 @@ private[store] object SerializableLedgerSyncEvent
         SerializablePartyAddedToParticipant.fromProtoV30(partyAddedToParticipant)
       case SyncEventP.PartyAllocationRejected(partyAllocationRejected) =>
         SerializablePartyAllocationRejected.fromProtoV30(partyAllocationRejected)
-      case SyncEventP.PublicPackageUpload(publicPackageUpload) =>
-        SerializablePublicPackageUpload.fromProtoV30(publicPackageUpload)
-      case SyncEventP.PublicPackageUploadRejected(publicPackageUploadRejected) =>
-        SerializablePublicPackageUploadRejected.fromProtoV30(publicPackageUploadRejected)
       case SyncEventP.TransactionAccepted(transactionAccepted) =>
         SerializableTransactionAccepted.fromProtoV30(transactionAccepted)
       case SyncEventP.CommandRejected(commandRejected) =>
@@ -346,70 +308,6 @@ private[store] object SerializablePartyAllocationRejected {
   }
 }
 
-private[store] final case class SerializablePublicPackageUpload(
-    publicPackageUpload: LedgerSyncEvent.PublicPackageUpload
-) {
-  def toProtoV30: v30.PublicPackageUpload = {
-    val LedgerSyncEvent.PublicPackageUpload(archives, sourceDescription, recordTime, submissionId) =
-      publicPackageUpload
-    v30.PublicPackageUpload(
-      archives.map(_.toByteString),
-      sourceDescription,
-      SerializableLfTimestamp(recordTime).toProtoV30,
-      submissionId.getOrElse(""),
-    )
-  }
-}
-
-private[store] object SerializablePublicPackageUpload {
-  import cats.syntax.traverse.*
-
-  def fromProtoV30(
-      publicPackageUploadP: v30.PublicPackageUpload
-  ): ParsingResult[LedgerSyncEvent.PublicPackageUpload] = {
-    val v30.PublicPackageUpload(archivesP, sourceDescription, recordTimeP, submissionIdP) =
-      publicPackageUploadP
-    for {
-      archives <- archivesP.toList.traverse(protoParser(Archive.parseFrom))
-      recordTime <- SerializableLfTimestamp.fromProtoPrimitive(recordTimeP)
-      // submission id can be empty when the PublicPackageUpload event is sent to non-submitting participants
-      submissionId <- ProtoConverter.parseLFSubmissionIdO(submissionIdP)
-    } yield LedgerSyncEvent.PublicPackageUpload(
-      archives,
-      sourceDescription,
-      recordTime,
-      submissionId,
-    )
-  }
-}
-
-private[store] final case class SerializablePublicPackageUploadRejected(
-    publicPackageUploadRejected: LedgerSyncEvent.PublicPackageUploadRejected
-) {
-  def toProtoV30: v30.PublicPackageUploadRejected = {
-    val LedgerSyncEvent.PublicPackageUploadRejected(submissionId, recordTime, rejectionReason) =
-      publicPackageUploadRejected
-    v30.PublicPackageUploadRejected(
-      submissionId,
-      SerializableLfTimestamp(recordTime).toProtoV30,
-      rejectionReason,
-    )
-  }
-}
-
-private[store] object SerializablePublicPackageUploadRejected {
-  def fromProtoV30(
-      publicPackageUploadRejectedP: v30.PublicPackageUploadRejected
-  ): ParsingResult[LedgerSyncEvent.PublicPackageUploadRejected] = {
-    val v30.PublicPackageUploadRejected(submissionIdP, recordTimeP, rejectionReason) =
-      publicPackageUploadRejectedP
-    for {
-      submissionId <- ProtoConverter.parseLFSubmissionId(submissionIdP)
-      recordTime <- SerializableLfTimestamp.fromProtoPrimitive(recordTimeP)
-    } yield LedgerSyncEvent.PublicPackageUploadRejected(submissionId, recordTime, rejectionReason)
-  }
-}
-
 private[store] final case class SerializableTransactionAccepted(
     transactionAccepted: LedgerSyncEvent.TransactionAccepted
 ) {
@@ -425,6 +323,7 @@ private[store] final case class SerializableTransactionAccepted(
       hostedWitnesses,
       contractMetadata,
       domainId,
+      _,
     ) = transactionAccepted
     val contractMetadataP = contractMetadata.view.map { case (contractId, bytes) =>
       contractId.toProtoPrimitive -> bytes.toByteString
@@ -629,7 +528,14 @@ private[store] final case class SerializableCommandRejected(
     commandRejected: LedgerSyncEvent.CommandRejected
 ) {
   def toProtoV30: v30.CommandRejected = {
-    val LedgerSyncEvent.CommandRejected(recordTime, completionInfo, reason, commandKind, domainId) =
+    val LedgerSyncEvent.CommandRejected(
+      recordTime,
+      completionInfo,
+      reason,
+      commandKind,
+      domainId,
+      _,
+    ) =
       commandRejected
 
     val commandKindP = commandKind match {
@@ -712,13 +618,9 @@ final case class SerializableCompletionInfo(completionInfo: CompletionInfo) {
       commandId,
       deduplicateUntil,
       submissionId,
-      statistics,
+      _,
     ) =
       completionInfo
-    require(
-      statistics.isEmpty,
-      "Statistics are only set before emitting CompletionInfo in CantonSyncService",
-    )
     v30.CompletionInfo(
       actAs,
       applicationId,
@@ -747,7 +649,7 @@ object SerializableCompletionInfo {
       commandId,
       deduplicateUntil,
       submissionId,
-      statistics = None,
+      None,
     )
   }
 }

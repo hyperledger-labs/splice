@@ -5,7 +5,6 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.syntax.flatMap.*
 import cats.syntax.option.*
-import com.daml.metrics.api.{MetricName, MetricsContext}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
@@ -13,19 +12,20 @@ import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{
   AsymmetricEncrypted,
   Encrypted,
+  EncryptionAlgorithmSpec,
   Fingerprint,
   SecureRandomness,
   SymmetricKeyScheme,
   TestHash,
 }
 import com.digitalasset.canton.data.*
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.PrettyUtil
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
+import com.digitalasset.canton.participant.metrics.{ParticipantTestMetrics, SyncDomainMetrics}
 import com.digitalasset.canton.participant.protocol.MessageDispatcher.{AcsCommitment as _, *}
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.{
@@ -35,7 +35,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.EncryptedView.CompressedView
-import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcastX.Broadcast
+import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.Broadcast
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
@@ -48,6 +48,7 @@ import com.digitalasset.canton.protocol.{
   v30 as protocolv30,
 }
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.{TrafficControlProcessor, TrafficReceipt}
 import com.digitalasset.canton.sequencing.{
   HandlerResult,
   PossiblyIgnoredProtocolEvent,
@@ -57,19 +58,12 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.processing.{SequencedTime, TopologyTransactionTestFactoryX}
+import com.digitalasset.canton.topology.processing.{SequencedTime, TopologyTransactionTestFactory}
 import com.digitalasset.canton.tracing.Traced
-import com.digitalasset.canton.traffic.TrafficControlProcessor
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.*
-import com.digitalasset.canton.{
-  BaseTest,
-  DiscardOps,
-  HasExecutorService,
-  RequestCounter,
-  SequencerCounter,
-}
+import com.digitalasset.canton.{BaseTest, HasExecutorService, RequestCounter, SequencerCounter}
 import com.google.protobuf.ByteString
 import org.mockito.ArgumentMatchers.eq as isEq
 import org.scalatest.Assertion
@@ -86,17 +80,25 @@ trait MessageDispatcherTest {
   import MessageDispatcherTest.*
 
   private val domainId = DomainId.tryFromString("messageDispatcher::domain")
+  private val testTopologyTimestamp = CantonTimestamp.Epoch
   private val participantId =
     ParticipantId.tryFromProtoPrimitive("PAR::messageDispatcher::participant")
   private val otherParticipant = ParticipantId.tryFromProtoPrimitive("PAR::other::participant")
-  private val mediatorGroup = MediatorsOfDomain(MediatorGroupIndex.zero)
-  private val mediatorGroup2 = MediatorsOfDomain(MediatorGroupIndex.one)
+  private val mediatorGroup = MediatorGroupRecipient(MediatorGroupIndex.zero)
+  private val mediatorGroup2 = MediatorGroupRecipient(MediatorGroupIndex.one)
+  private val partyId = PartyId.tryFromProtoPrimitive("party::default")
+  private val otherPartyId = PartyId.tryFromProtoPrimitive("party::other")
 
   private val encryptedRandomnessTest =
     Encrypted.fromByteString[SecureRandomness](ByteString.EMPTY)
   private val sessionKeyMapTest = NonEmpty(
     Seq,
-    new AsymmetricEncrypted[SecureRandomness](ByteString.EMPTY, Fingerprint.tryCreate("dummy")),
+    new AsymmetricEncrypted[SecureRandomness](
+      ByteString.EMPTY,
+      // this is only a placeholder, the data is not encrypted
+      EncryptionAlgorithmSpec.RsaOaepSha256,
+      Fingerprint.tryCreate("dummy"),
+    ),
   )
 
   case class Fixture(
@@ -104,11 +106,7 @@ trait MessageDispatcherTest {
       requestTracker: RequestTracker,
       testProcessor: RequestProcessor[TestViewType],
       otherTestProcessor: RequestProcessor[OtherTestViewType],
-      topologyProcessor: (
-          SequencerCounter,
-          SequencedTime,
-          Traced[List[DefaultOpenEnvelope]],
-      ) => HandlerResult,
+      topologyProcessor: ParticipantTopologyProcessor,
       trafficProcessor: TrafficControlProcessor,
       acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
       requestCounterAllocator: RequestCounterAllocator,
@@ -126,7 +124,7 @@ trait MessageDispatcherTest {
             ParticipantId,
             RequestTracker,
             RequestProcessors,
-            (SequencerCounter, SequencedTime, Traced[List[DefaultOpenEnvelope]]) => HandlerResult,
+            ParticipantTopologyProcessor,
             TrafficControlProcessor,
             AcsCommitmentProcessor.ProcessorType,
             RequestCounterAllocator,
@@ -170,14 +168,12 @@ trait MessageDispatcherTest {
       val otherTestViewProcessor = mock[RequestProcessor[OtherTestViewType]]
       mockMethods(otherTestViewProcessor)
 
-      val identityProcessor =
-        mock[
-          (SequencerCounter, SequencedTime, Traced[List[DefaultOpenEnvelope]]) => HandlerResult
-        ]
+      val identityProcessor = mock[ParticipantTopologyProcessor]
       when(
         identityProcessor.apply(
           any[SequencerCounter],
           any[SequencedTime],
+          any[Option[CantonTimestamp]],
           any[Traced[List[DefaultOpenEnvelope]]],
         )
       )
@@ -185,7 +181,7 @@ trait MessageDispatcherTest {
 
       val trafficProcessor = mock[TrafficControlProcessor]
       when(
-        trafficProcessor.processSetTrafficBalanceEnvelopes(
+        trafficProcessor.processSetTrafficPurchasedEnvelopes(
           any[CantonTimestamp],
           any[Option[CantonTimestamp]],
           any[List[DefaultOpenEnvelope]],
@@ -211,7 +207,7 @@ trait MessageDispatcherTest {
           any[SequencerCounter],
           any[CantonTimestamp],
           any[RootHash],
-          any[MediatorsOfDomain],
+          any[MediatorGroupRecipient],
           any[LocalRejectError],
         )(anyTraceContext)
       )
@@ -240,10 +236,7 @@ trait MessageDispatcherTest {
         }
       }
 
-      val syncDomainMetrics = new SyncDomainMetrics(
-        MetricName("test"),
-        NoOpMetricsFactory,
-      )(MetricsContext.Empty)
+      val syncDomainMetrics = ParticipantTestMetrics.domain
 
       val messageDispatcher = mkMd(
         testedProtocolVersion,
@@ -287,7 +280,16 @@ trait MessageDispatcherTest {
       messageId: Option[MessageId] = None,
       topologyTimestampO: Option[CantonTimestamp] = None,
   ): Deliver[DefaultOpenEnvelope] =
-    Deliver.create(sc, ts, domainId, messageId, batch, topologyTimestampO, testedProtocolVersion)
+    Deliver.create(
+      sc,
+      ts,
+      domainId,
+      messageId,
+      batch,
+      topologyTimestampO,
+      testedProtocolVersion,
+      Option.empty[TrafficReceipt],
+    )
 
   private def rootHash(index: Int): RootHash = RootHash(TestHash.digest(index))
 
@@ -364,7 +366,7 @@ trait MessageDispatcherTest {
           ParticipantId,
           RequestTracker,
           RequestProcessors,
-          (SequencerCounter, SequencedTime, Traced[List[DefaultOpenEnvelope]]) => HandlerResult,
+          ParticipantTopologyProcessor,
           TrafficControlProcessor,
           AcsCommitmentProcessor.ProcessorType,
           RequestCounterAllocator,
@@ -386,14 +388,14 @@ trait MessageDispatcherTest {
     ): Fixture =
       Fixture.mk(mkMd, initRc, cleanReplaySequencerCounter)
 
-    val factoryX =
-      new TopologyTransactionTestFactoryX(loggerFactory, initEc = executionContext)
-    val idTx = TopologyTransactionsBroadcastX.create(
+    val factory =
+      new TopologyTransactionTestFactory(loggerFactory, initEc = executionContext)
+    val idTx = TopologyTransactionsBroadcast.create(
       domainId,
       Seq(
         Broadcast(
           String255.tryCreate("some request"),
-          List(factoryX.ns1k1_k1),
+          List(factory.ns1k1_k1),
         )
       ),
       testedProtocolVersion,
@@ -440,6 +442,7 @@ trait MessageDispatcherTest {
       verify(sut.topologyProcessor).apply(
         isEq(sc),
         isEq(SequencedTime(ts)),
+        any[Option[CantonTimestamp]],
         any[Traced[List[DefaultOpenEnvelope]]],
       )
       succeed
@@ -523,7 +526,7 @@ trait MessageDispatcherTest {
     def signAndTrace(
         event: RawProtocolEvent
     ): Traced[Seq[WithOpeningErrors[PossiblyIgnoredProtocolEvent]]] =
-      Traced(Seq(NoOpeningErrors(OrdinarySequencedEvent(signEvent(event), None)(traceContext))))
+      Traced(Seq(NoOpeningErrors(OrdinarySequencedEvent(signEvent(event))(traceContext))))
 
     def handle(sut: Fixture, event: RawProtocolEvent)(checks: => Assertion): Future[Assertion] = {
       for {
@@ -571,8 +574,8 @@ trait MessageDispatcherTest {
       }
 
       "call the topology processor before calling the traffic control processor" in {
-        val setTrafficBalanceMsg = SignedProtocolMessage.from(
-          SetTrafficBalanceMessage(
+        val setTrafficPurchasedMsg = SignedProtocolMessage.from(
+          SetTrafficPurchasedMessage(
             participantId,
             PositiveInt.one,
             NonNegativeLong.tryCreate(1000),
@@ -589,13 +592,13 @@ trait MessageDispatcherTest {
 
         val event =
           mkDeliver(
-            Batch.of(testedProtocolVersion, setTrafficBalanceMsg -> Recipients.cc(participantId)),
+            Batch.of(testedProtocolVersion, setTrafficPurchasedMsg -> Recipients.cc(participantId)),
             sc,
             ts,
           )
 
         when(
-          sut.trafficProcessor.processSetTrafficBalanceEnvelopes(
+          sut.trafficProcessor.processSetTrafficPurchasedEnvelopes(
             any[CantonTimestamp],
             any[Option[CantonTimestamp]],
             any[Seq[DefaultOpenEnvelope]],
@@ -606,7 +609,7 @@ trait MessageDispatcherTest {
         }
 
         handle(sut, event) {
-          verify(sut.trafficProcessor).processSetTrafficBalanceEnvelopes(
+          verify(sut.trafficProcessor).processSetTrafficPurchasedEnvelopes(
             isEq(ts),
             isEq(None),
             any[Seq[DefaultOpenEnvelope]],
@@ -723,6 +726,7 @@ trait MessageDispatcherTest {
           .apply(
             any[SequencerCounter],
             any[SequencedTime],
+            any[Option[CantonTimestamp]],
             any[Traced[List[DefaultOpenEnvelope]]],
           )
       )
@@ -764,6 +768,7 @@ trait MessageDispatcherTest {
           .apply(
             any[SequencerCounter],
             any[SequencedTime],
+            any[Option[CantonTimestamp]],
             any[Traced[List[DefaultOpenEnvelope]]],
           )
       )
@@ -804,6 +809,7 @@ trait MessageDispatcherTest {
           domainId,
           testedProtocolVersion,
           UnknownTestViewType,
+          testTopologyTimestamp,
           SerializedRootHashMessagePayload.empty,
         )
       val event = mkDeliver(
@@ -824,7 +830,7 @@ trait MessageDispatcherTest {
           ),
           _.errorMessage should include("event processing failed."),
         )
-        .futureValue
+        .futureValueUS
 
       error shouldBe a[IllegalArgumentException]
       error.getMessage should include(show"No processor for view type $UnknownTestViewType")
@@ -864,11 +870,51 @@ trait MessageDispatcherTest {
           ),
           _.errorMessage should include("processing failed"),
         )
-        .futureValue
+        .futureValueUS
 
       error shouldBe a[IllegalArgumentException]
       error.getMessage should include(show"No processor for view type $UnknownTestViewType")
 
+    }
+    "ignore protocol messages for foreign domains" in {
+      val sut = mk()
+      val sc = SequencerCounter(1)
+      val ts = CantonTimestamp.ofEpochSecond(1)
+      val txForeignDomain = TopologyTransactionsBroadcast.create(
+        DomainId.tryFromString("foo::bar"),
+        Seq(
+          Broadcast(
+            String255.tryCreate("some request"),
+            List(factory.ns1k1_k1),
+          )
+        ),
+        testedProtocolVersion,
+      )
+      val event =
+        mkDeliver(
+          Batch.of(testedProtocolVersion, txForeignDomain -> Recipients.cc(participantId)),
+          sc,
+          ts,
+        )
+
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        handle(sut, event) {
+          verify(sut.topologyProcessor).apply(
+            isEq(sc),
+            isEq(SequencedTime(ts)),
+            isEq(None),
+            isEq(Traced(List.empty)),
+          )
+
+          checkTicks(sut, sc, ts)
+        }.futureValue,
+        logEntries => {
+          logEntries should not be empty
+          forEvery(logEntries) {
+            _.warningMessage should include("Received messages with wrong domain IDs")
+          }
+        },
+      )
     }
 
     def request(
@@ -890,6 +936,7 @@ trait MessageDispatcherTest {
             domainId,
             testedProtocolVersion,
             viewType,
+            testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
           )
         val event =
@@ -917,6 +964,7 @@ trait MessageDispatcherTest {
             domainId,
             testedProtocolVersion,
             viewType,
+            testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
           )
         // Batch -> expected alarms -> expected reaction
@@ -1031,6 +1079,7 @@ trait MessageDispatcherTest {
             domainId,
             testedProtocolVersion,
             viewType,
+            testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
           )
         val fatalBatches = List(
@@ -1087,8 +1136,38 @@ trait MessageDispatcherTest {
             domainId,
             testedProtocolVersion,
             viewType,
+            testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
           )
+
+        def mkRootHashMessageRecipients(recipients: NonEmpty[Seq[Recipient]]): Recipients =
+          Recipients.recipientGroups(
+            recipients.map(recipient => NonEmpty(Set, recipient, mediatorGroup))
+          )
+
+        val goodBatches = List(
+          Batch.of[ProtocolMessage](
+            testedProtocolVersion,
+            view -> Recipients.cc(participantId),
+            rootHashMessage -> Recipients.cc(MemberRecipient(participantId), mediatorGroup),
+            commitment -> Recipients.cc(participantId),
+          ) -> Seq(),
+          Batch.of[ProtocolMessage](
+            testedProtocolVersion,
+            view -> Recipients.cc(participantId),
+            rootHashMessage -> Recipients.cc(ParticipantsOfParty(partyId), mediatorGroup),
+            commitment -> Recipients.cc(participantId),
+          ) -> Seq(),
+          Batch.of[ProtocolMessage](
+            testedProtocolVersion,
+            view -> Recipients.cc(participantId),
+            rootHashMessage -> mkRootHashMessageRecipients(
+              NonEmpty(Seq, ParticipantsOfParty(partyId), ParticipantsOfParty(otherPartyId))
+            ),
+            commitment -> Recipients.cc(participantId),
+          ) -> Seq(),
+        )
+
         val badBatches = List(
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
@@ -1099,10 +1178,18 @@ trait MessageDispatcherTest {
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
             view -> Recipients.cc(participantId),
-            rootHashMessage -> Recipients.cc(MemberRecipient(participantId), mediatorGroup),
+            rootHashMessage -> mkRootHashMessageRecipients(
+              NonEmpty(
+                Seq,
+                MemberRecipient(participantId),
+                ParticipantsOfParty(partyId),
+                ParticipantsOfParty(otherPartyId),
+              )
+            ),
             commitment -> Recipients.cc(participantId),
-            // We used to include a DomainTopologyTransactionMessage which no longer exist in 3.x
-          ) -> Seq(),
+          ) -> Seq(
+            "The root hash message has more than one recipient group, not all using group addressing."
+          ),
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
             view -> Recipients.cc(participantId),
@@ -1123,13 +1210,15 @@ trait MessageDispatcherTest {
             rootHashMessage -> Recipients
               .cc(MemberRecipient(participantId), MemberRecipient(otherParticipant), mediatorGroup2),
           ) -> Seq(
-            "The root hash message has an invalid recipient group."
+            "The root hash message has invalid recipient groups."
           ),
         )
 
+        val batchesToTest = goodBatches ++ badBatches
+
         // sequentially process the test cases so that the log messages don't interfere
         MonadUtil
-          .sequentialTraverse_(badBatches.zipWithIndex) { case ((batch, alarms), index) =>
+          .sequentialTraverse_(batchesToTest.zipWithIndex) { case ((batch, alarms), index) =>
             val initRc = RequestCounter(index)
             val sut = mk(initRc = initRc)
             val sc = SequencerCounter(index)
@@ -1164,6 +1253,7 @@ trait MessageDispatcherTest {
             domainId,
             testedProtocolVersion,
             viewType,
+            testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
           )
         val event =
@@ -1263,12 +1353,13 @@ trait MessageDispatcherTest {
           CantonTimestamp.ofEpochSecond(3),
           domainId,
           messageId3,
-          SequencerErrors.SubmissionRequestMalformed("invalid batch"),
+          SequencerErrors.SubmissionRequestRefused("invalid batch"),
           testedProtocolVersion,
+          Option.empty[TrafficReceipt],
         )
 
         val sequencedEvents = Seq(deliver1, deliver2, deliver3, deliverError4).map(event =>
-          NoOpeningErrors(OrdinarySequencedEvent(signEvent(event), None)(traceContext))
+          NoOpeningErrors(OrdinarySequencedEvent(signEvent(event))(traceContext))
         )
 
         sut.messageDispatcher
@@ -1322,7 +1413,7 @@ trait MessageDispatcherTest {
         )
 
         val sequencedEvents = Seq(deliver1, deliver2, deliver3).map(event =>
-          NoOpeningErrors(OrdinarySequencedEvent(signEvent(event), None)(traceContext))
+          NoOpeningErrors(OrdinarySequencedEvent(signEvent(event))(traceContext))
         )
 
         loggerFactory
@@ -1363,7 +1454,7 @@ private[protocol] object MessageDispatcherTest {
   )
 
   // The message dispatcher only sees encrypted view trees, so there's no point in implementing the methods.
-  sealed trait MockViewTree extends ViewTree with HasVersionedToByteString
+  sealed trait MockViewTree extends ViewTree with HasToByteString
 
   trait AbstractTestViewType extends ViewTypeTest {
     override type View = MockViewTree

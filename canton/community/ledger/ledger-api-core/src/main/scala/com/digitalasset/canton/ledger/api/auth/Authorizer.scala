@@ -177,11 +177,13 @@ final class Authorizer(
     */
   def requireReadClaimsForAllPartiesOnStream[Req, Res](
       parties: Iterable[String],
+      readAsAnyParty: Boolean,
       call: (Req, StreamObserver[Res]) => Unit,
   ): (Req, StreamObserver[Res]) => Unit =
     authorize(call) { claims =>
       for {
         _ <- valid(claims)
+        _ <- if (readAsAnyParty) claims.canReadAsAnyParty else Right(())
         _ <- requireForAll(parties, party => claims.canReadAs(party))
       } yield {
         ()
@@ -199,7 +201,10 @@ final class Authorizer(
         _ <- authorizationErrorAsGrpc(valid(claims))
         _ <- authorizationErrorAsGrpc(requireForAll(parties, party => claims.canReadAs(party)))
         defaultedApplicationId <- defaultApplicationId(reqApplicationId, claims)
-        _ <- authorizationErrorAsGrpc(claims.validForApplication(defaultedApplicationId))
+        _ <-
+          if (claims.claims.contains(ClaimReadAsAnyParty))
+            Right(())
+          else authorizationErrorAsGrpc(claims.validForApplication(defaultedApplicationId))
       } yield applicationIdL.set(defaultedApplicationId)(req)
     }
 
@@ -245,10 +250,12 @@ final class Authorizer(
   /** Checks whether the current Claims authorize to read data for all parties mentioned in the given transaction filter */
   def requireReadClaimsForTransactionFilterOnStream[Req, Res](
       filter: Option[Map[String, Filters]],
+      readAsAnyParty: Boolean,
       call: (Req, StreamObserver[Res]) => Unit,
   ): (Req, StreamObserver[Res]) => Unit =
     requireReadClaimsForAllPartiesOnStream(
       filter.fold(Set.empty[String])(_.keySet),
+      readAsAnyParty,
       call,
     )
 

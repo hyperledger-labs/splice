@@ -3,31 +3,31 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.daml.lf.command.ApiCommands as LfCommands
-import com.daml.lf.crypto.Hash
-import com.daml.lf.data.Ref.{Identifier, PackageName}
-import com.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.daml.lf.transaction.TransactionVersion
-import com.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
-import com.daml.lf.value.Value
-import com.daml.lf.value.Value.ContractId
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.data.ProcessedDisclosedContract
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod.DeduplicationDuration
+import com.digitalasset.canton.data.{DeduplicationPeriod, ProcessedDisclosedContract}
 import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands}
-import com.digitalasset.canton.ledger.participant.state.index.v2.MaximumLedgerTime
-import com.digitalasset.canton.ledger.participant.state.v2.{SubmitterInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.index.MaximumLedgerTime
+import com.digitalasset.canton.ledger.participant.state.{SubmitterInfo, TransactionMeta}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.LedgerTime
+import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
+import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.transaction.TransactionVersion
+import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
+import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.value.Value.ContractId
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Duration
 import scala.concurrent.Future
+
+import DeduplicationPeriod.DeduplicationDuration
 
 class LedgerTimeAwareCommandExecutorSpec
     extends AsyncWordSpec
@@ -62,6 +62,7 @@ class LedgerTimeAwareCommandExecutorSpec
     ProcessedDisclosedContract(
       templateId = Identifier.assertFromString("some:pkg:identifier"),
       packageName = PackageName.assertFromString("pkg-name"),
+      packageVersion = Some(PackageVersion.assertFromString("1.0.0")),
       contractId = cid,
       argument = Value.ValueNil,
       createdAt = Time.Timestamp.Epoch,
@@ -69,7 +70,8 @@ class LedgerTimeAwareCommandExecutorSpec
       signatories = Set.empty,
       stakeholders = Set.empty,
       keyOpt = None,
-      version = TransactionVersion.StableVersions.max,
+      // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
+      version = TransactionVersion.maxVersion,
     )
   )
 
@@ -151,7 +153,7 @@ class LedgerTimeAwareCommandExecutorSpec
       mockExecutor,
       mockResolveMaximumLedgerTime,
       3,
-      Metrics.ForTesting,
+      LedgerApiServerMetrics.ForTesting,
       loggerFactory,
     )
 

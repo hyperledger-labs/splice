@@ -40,7 +40,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
-import com.daml.lf.data.Numeric
+import com.digitalasset.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.splice.dso.svstate.{SvRewardState, RewardState}
@@ -243,7 +243,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) = {
     val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
     val dummyVersion = "0.1.0"
-    val dummyContactPoint = s"${validator.uid.id}@example.com"
+    val dummyContactPoint = s"${validator.uid.identifier}@example.com"
     val template = new validatorLicenseCodegen.ValidatorLicense(
       validator.toProtoPrimitive,
       sponsor.toProtoPrimitive,

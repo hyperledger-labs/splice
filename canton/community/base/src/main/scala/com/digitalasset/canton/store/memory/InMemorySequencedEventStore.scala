@@ -7,6 +7,7 @@ import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
@@ -128,15 +129,15 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
     counter.get()
   }
 
-  override def ignoreEvents(from: SequencerCounter, to: SequencerCounter)(implicit
+  override def ignoreEvents(fromInclusive: SequencerCounter, toInclusive: SequencerCounter)(implicit
       traceContext: TraceContext
   ): EitherT[Future, ChangeWouldResultInGap, Unit] =
     EitherT.fromEither {
       blocking(lock.synchronized {
         for {
-          _ <- appendEmptyIgnoredEvents(from, to)
+          _ <- appendEmptyIgnoredEvents(fromInclusive, toInclusive)
         } yield {
-          setIgnoreStatus(from, to, ignore = true)
+          setIgnoreStatus(fromInclusive, toInclusive, ignore = true)
         }
       })
     }
@@ -161,7 +162,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
       timestampOfCounter.addAll(timestamps)
 
       val events = timestamps.map { case (sc, ts) =>
-        ts -> IgnoredSequencedEvent(ts, sc, None, None)(traceContext)
+        ts -> IgnoredSequencedEvent(ts, sc, None)(traceContext)
       }
       eventByTimestamp.addAll(events)
 
@@ -186,14 +187,14 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
       eventByTimestamp.addAll(newEvents)
     }
 
-  override def unignoreEvents(from: SequencerCounter, to: SequencerCounter)(implicit
-      traceContext: TraceContext
+  override def unignoreEvents(fromInclusive: SequencerCounter, toInclusive: SequencerCounter)(
+      implicit traceContext: TraceContext
   ): EitherT[Future, ChangeWouldResultInGap, Unit] =
     EitherT.fromEither {
       blocking(lock.synchronized {
         for {
-          _ <- deleteEmptyIgnoredEvents(from, to)
-        } yield setIgnoreStatus(from, to, ignore = false)
+          _ <- deleteEmptyIgnoredEvents(fromInclusive, toInclusive)
+        } yield setIgnoreStatus(fromInclusive, toInclusive, ignore = false)
       })
     }
 

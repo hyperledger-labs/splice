@@ -7,6 +7,7 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.ParticipantCommands
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
@@ -52,6 +53,21 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
       }
       res
     }
+
+    @Help.Summary("Validate DARs against the current participants' state")
+    @Help.Description(
+      """Performs the same DAR and Daml package validation checks that the upload call performs,
+         but with no effects on the target participants: the DAR is not persisted or vetted."""
+    )
+    def validate(darPath: String): Map[ParticipantReference, String] =
+      ConsoleCommandResult.runAll(participants)(
+        ParticipantCommands.dars
+          .validate(
+            _,
+            darPath,
+            logger,
+          )
+      )
   }
 
   @Help.Summary("Manage domain connections on several participants at once")
@@ -120,7 +136,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
     def connect_local(
-        domain: SequencerNodeReference,
+        domain: SequencerReference,
         alias: DomainAlias,
         manualConnect: Boolean = false,
         synchronize: Option[NonNegativeDuration] = Some(
@@ -135,7 +151,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         )
       register(config)
       synchronize.foreach { timeout =>
-        ConsoleMacros.utils.synchronize_topology(Some(timeout))(consoleEnvironment)
+        ConsoleMacros.utils.synchronize_topology(Some(timeout))
       }
     }
   }

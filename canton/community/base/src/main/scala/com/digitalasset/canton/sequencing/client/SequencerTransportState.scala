@@ -5,10 +5,13 @@ package com.digitalasset.canton.sequencing.client
 
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.lifecycle.{FlagCloseable, UnlessShutdown}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.sequencing.client.SequencerClient.{
@@ -25,9 +28,9 @@ import com.digitalasset.canton.sequencing.client.transports.{
 }
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
-import com.digitalasset.canton.{DiscardOps, config}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
@@ -67,6 +70,7 @@ trait SequencerTransportLookup {
 
 class SequencersTransportState(
     initialSequencerTransports: SequencerTransports[?],
+    sequencerTransportSeed: Option[Long],
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -74,7 +78,7 @@ class SequencersTransportState(
     with NamedLogging
     with FlagCloseable {
 
-  private val random: Random = new Random(1L)
+  private val random: Random = sequencerTransportSeed.fold(new Random)(new Random(_))
 
   private val closeReasonPromise = Promise[SequencerClient.CloseReason]()
 
@@ -228,39 +232,46 @@ class SequencersTransportState(
       })
     }.onShutdown(())
 
-  // TODO(#17726) Figure out whether the synchronization is needed for the whole block and if so refactor into a semaphore!
-  @SuppressWarnings(Array("com.digitalasset.canton.SynchronizedFuture"))
   def changeTransport(
       sequencerTransports: SequencerTransports[?]
-  )(implicit traceContext: TraceContext): Future[Unit] = blocking(lock.synchronized {
-    sequencerTrustThreshold.set(sequencerTransports.sequencerTrustThreshold)
-    submissionRequestAmplification.set(sequencerTransports.submissionRequestAmplification)
-    val oldSequencerIds = state.keySet.toSet
-    val newSequencerIds = sequencerTransports.sequencerIdToTransportMap.keySet
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    val transportCloseFutures = Future.fromTry(Try(blocking(lock.synchronized {
+      sequencerTrustThreshold.set(sequencerTransports.sequencerTrustThreshold)
+      submissionRequestAmplification.set(sequencerTransports.submissionRequestAmplification)
+      val oldSequencerIds = state.keySet.toSet
+      val newSequencerIds = sequencerTransports.sequencerIdToTransportMap.keySet
 
-    val newValues: Set[SequencerId] = newSequencerIds.diff(oldSequencerIds)
-    val removedValues: Set[SequencerId] = oldSequencerIds.diff(newSequencerIds)
-    val keptValues: Set[SequencerId] = oldSequencerIds.intersect(newSequencerIds)
+      val newValues: Set[SequencerId] = newSequencerIds.diff(oldSequencerIds)
+      val removedValues: Set[SequencerId] = oldSequencerIds.diff(newSequencerIds)
+      val keptValues: Set[SequencerId] = oldSequencerIds.intersect(newSequencerIds)
 
-    if (newValues.nonEmpty || removedValues.nonEmpty) {
-      ErrorUtil.internalErrorAsync(
-        new IllegalArgumentException(
-          "Adding or removing sequencer subscriptions is not supported at the moment"
+      if (newValues.nonEmpty || removedValues.nonEmpty) {
+        ErrorUtil.internalError(
+          new IllegalArgumentException(
+            "Adding or removing sequencer subscriptions is not supported at the moment"
+          )
         )
-      )
-    } else
-      MonadUtil
-        .sequentialTraverse_(keptValues.toSeq) { sequencerId =>
+      } else {
+        keptValues.toSeq.map(sequencerId =>
           updateTransport(sequencerId, sequencerTransports.sequencerIdToTransportMap(sequencerId))
             .map { transportStateBefore =>
-              transportStateBefore.subscription
-                .map(_.resilientSequencerSubscription.resubscribeOnTransportChange())
-                .getOrElse(Future.unit)
-                .thereafter { _ => transportStateBefore.transport.clientTransport.close() }
+              transportStateBefore.transport -> transportStateBefore.subscription.map(
+                // ResubscribeOnTransportChange synchronously completes the previous subscription
+                // and returns the Future of the close reason. Therefore, it is safe to combine
+                // the futures outside of the synchronized block
+                _.resilientSequencerSubscription.resubscribeOnTransportChange()
+              )
             }
-            .onShutdown(Future.unit)
-        }
-  })
+        )
+      }
+    })))
+
+    transportCloseFutures.flatMap(_.parTraverse_(_.parTraverse_ { case (transport, closeFutureO) =>
+      closeFutureO
+        .getOrElse(Future.unit)
+        .thereafter { _ => transport.clientTransport.close() }
+    }))
+  }
 
   private def closeSubscription(
       sequencerId: SequencerId,
@@ -344,8 +355,10 @@ class SequencersTransportState(
           Right(()) // we don't want to close the sequencer client when changing transport
       }
 
-    def complete(reason: Try[SequencerClient.CloseReason]): Unit =
+    def complete(reason: Try[SequencerClient.CloseReason]): Unit = {
       closeReasonPromise.tryComplete(reason).discard
+      Lifecycle.close(this)(logger)
+    }
 
     lazy val closeReason: Try[SequencerClient.CloseReason] = maybeCloseReason.collect {
       case Left(error) =>

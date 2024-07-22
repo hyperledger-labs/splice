@@ -3,22 +3,17 @@
 
 package com.digitalasset.canton.participant.sync
 
+import cats.Eval
 import cats.data.EitherT
-import cats.implicits.*
-import cats.{Eval, Id}
-import com.daml.lf.data.{ImmArray, Ref}
-import com.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder, TreeTransactionBuilder}
-import com.daml.lf.transaction.{CommittedTransaction, VersionedTransaction}
-import com.daml.lf.value.Value.ValueRecord
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
+import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.v2.ChangeId
+import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.participant.admin.workflows.java.PackageID
+import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.{PackageService, ResourceManagementService}
 import com.digitalasset.canton.participant.domain.{DomainAliasManager, DomainRegistry}
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
@@ -30,31 +25,20 @@ import com.digitalasset.canton.participant.store.memory.{
   InMemoryParticipantEventLog,
   InMemoryParticipantSettingsStore,
 }
-import com.digitalasset.canton.participant.sync.LedgerSyncEvent.TransactionAccepted
 import com.digitalasset.canton.participant.sync.TimestampedEvent.EventId
 import com.digitalasset.canton.participant.topology.{
   LedgerServerPartyNotifier,
-  ParticipantTopologyDispatcherX,
+  ParticipantTopologyDispatcher,
   ParticipantTopologyManagerOps,
 }
 import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.participant.{
-  DefaultParticipantStateValues,
-  ParticipantNodeParameters,
-}
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{
-  BaseTest,
-  DefaultDamlValues,
-  HasExecutionContext,
-  LedgerSubmissionId,
-  LfPartyId,
-}
+import com.digitalasset.canton.{BaseTest, HasExecutionContext, LedgerSubmissionId, LfPartyId}
 import org.apache.pekko.stream.Materializer
 import org.mockito.ArgumentMatchers
 import org.scalatest.Outcome
@@ -77,7 +61,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
     private val packageService = mock[PackageService]
     val topologyManagerOps: ParticipantTopologyManagerOps = mock[ParticipantTopologyManagerOps]
 
-    private val identityPusher = mock[ParticipantTopologyDispatcherX]
+    private val identityPusher = mock[ParticipantTopologyDispatcher]
     val partyNotifier = mock[LedgerServerPartyNotifier]
     private val syncCrypto = mock[SyncCryptoApiProvider]
     private val multiDomainEventLog = mock[MultiDomainEventLog]
@@ -145,13 +129,13 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       Eval.now(participantNodePersistentState),
       participantNodeEphemeralState,
       syncDomainPersistentStateManager,
-      packageService,
+      Eval.now(packageService),
       topologyManagerOps,
       identityPusher,
       partyNotifier,
       syncCrypto,
       pruningProcessor,
-      DAMLe.newEngine(enableLfDev = false, enableStackTraces = false),
+      DAMLe.newEngine(enableLfDev = false, enableLfBeta = false, enableStackTraces = false),
       syncDomainStateFactory,
       new SimClock(loggerFactory = loggerFactory),
       new ResourceManagementService.CommunityResourceManagementService(
@@ -167,6 +151,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       () => true,
       FutureSupervisor.Noop,
       SuppressingLogger(getClass),
+      TestingConfigInternal(),
     )
   }
 
@@ -190,7 +175,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
         .thenReturn(FutureUnlessShutdown.unit)
 
       when(
-        f.partyNotifier.expectPartyAllocationForXNodes(
+        f.partyNotifier.expectPartyAllocationForNodes(
           any[PartyId],
           any[ParticipantId],
           any[String255],
@@ -222,56 +207,12 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
           eqTo(String255.tryCreate(submissionId)),
           eqTo(partyId),
           eqTo(f.participantId),
-          eqTo(testedProtocolVersion),
+          eqTo(ProtocolVersion.latest),
         )(anyTraceContext)
         succeed
       })
 
       result.futureValue
     }
-
-    def stats(sync: CantonSyncService, packageId: String): Option[Int] = {
-
-      import TransactionBuilder.Implicits.*
-
-      val createNode = TestNodeBuilder.create(
-        id = TransactionBuilder.newCid,
-        templateId = Ref.Identifier(packageId, Ref.QualifiedName("M", "D")),
-        argument = ValueRecord(None, ImmArray.Empty),
-        signatories = Seq("Alice"),
-        observers = Seq.empty,
-      )
-
-      val tx: VersionedTransaction = TreeTransactionBuilder.toVersionedTransaction(createNode)
-
-      lazy val event = TransactionAccepted(
-        completionInfoO = DefaultParticipantStateValues.completionInfo(List.empty).some,
-        transactionMeta = DefaultParticipantStateValues.transactionMeta(),
-        transaction = CommittedTransaction.subst[Id](tx),
-        transactionId = DefaultDamlValues.lfTransactionId(1),
-        recordTime = CantonTimestamp.Epoch.toLf,
-        divulgedContracts = List.empty,
-        blindingInfoO = None,
-        hostedWitnesses = Nil,
-        contractMetadata = Map(),
-        domainId = DomainId.tryFromString("da::default"),
-      )
-
-      Option(sync.augmentTransactionStatistics(event))
-        .collect({ case ta: TransactionAccepted => ta })
-        .flatMap(_.completionInfoO)
-        .flatMap(_.statistics)
-        .map(_.committed.actions)
-
-    }
-
-    "populate metering" in { f =>
-      stats(f.sync, "packageX") shouldBe Some(1)
-    }
-
-    "not include ping-pong packages in metering" in { f =>
-      stats(f.sync, PackageID.PingPong) shouldBe Some(0)
-    }
-
   }
 }

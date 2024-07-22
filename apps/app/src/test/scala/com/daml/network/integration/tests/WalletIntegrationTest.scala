@@ -1,10 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.util.SpliceUtil
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
-import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.types.Round
@@ -13,13 +8,17 @@ import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
 import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
+import com.daml.network.util.{SpliceUtil, WalletTestUtil, JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
+import com.digitalasset.canton.{DomainAlias, HasExecutionContext}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.typesafe.config.ConfigFactory
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import org.slf4j.event.Level
 
 import java.time.Duration
@@ -59,7 +58,7 @@ class WalletIntegrationTest
   "A wallet" should {
 
     "tap stupid amount" in { implicit env =>
-      import com.daml.lf.data.Numeric
+      import com.digitalasset.daml.lf.data.Numeric
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val round = sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now)
       val price = round.contract.payload.amuletPrice

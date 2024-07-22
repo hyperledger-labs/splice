@@ -149,6 +149,8 @@ object ReceiveSvRewardCouponTrigger {
       round: OpenMiningRoundContract,
   ) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
+    import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
+
     override def pretty: Pretty[this.type] =
       prettyOfClass(
         param("dsoRulesCid", _.dsoRules.contractId),

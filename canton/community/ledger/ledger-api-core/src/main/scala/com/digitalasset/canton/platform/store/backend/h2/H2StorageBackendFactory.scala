@@ -9,7 +9,7 @@ import com.digitalasset.canton.platform.store.backend.common.{
   CompletionStorageBackendTemplate,
   ContractStorageBackendTemplate,
   IngestionStorageBackendTemplate,
-  PackageStorageBackendTemplate,
+  ParameterStorageBackendImpl,
   PartyStorageBackendTemplate,
 }
 import com.digitalasset.canton.platform.store.backend.localstore.{
@@ -23,7 +23,7 @@ import com.digitalasset.canton.platform.store.backend.{
   DataSourceStorageBackend,
   EventStorageBackend,
   IngestionStorageBackend,
-  PackageStorageBackend,
+  ParameterStorageBackend,
   PartyStorageBackend,
   ResetStorageBackend,
   StorageBackendFactory,
@@ -36,8 +36,10 @@ object H2StorageBackendFactory extends StorageBackendFactory with CommonStorageB
   override val createIngestionStorageBackend: IngestionStorageBackend[_] =
     new IngestionStorageBackendTemplate(H2QueryStrategy, H2Schema.schema)
 
-  override def createPackageStorageBackend(ledgerEndCache: LedgerEndCache): PackageStorageBackend =
-    new PackageStorageBackendTemplate(H2QueryStrategy, ledgerEndCache)
+  override def createParameterStorageBackend(
+      stringInterning: StringInterning
+  ): ParameterStorageBackend =
+    new ParameterStorageBackendImpl(H2QueryStrategy, stringInterning)
 
   override def createPartyStorageBackend(ledgerEndCache: LedgerEndCache): PartyStorageBackend =
     new PartyStorageBackendTemplate(H2QueryStrategy, ledgerEndCache)
@@ -65,6 +67,7 @@ object H2StorageBackendFactory extends StorageBackendFactory with CommonStorageB
     new H2EventStorageBackend(
       ledgerEndCache = ledgerEndCache,
       stringInterning = stringInterning,
+      parameterStorageBackend = createParameterStorageBackend(stringInterning),
       loggerFactory = loggerFactory,
     )
 
@@ -76,4 +79,5 @@ object H2StorageBackendFactory extends StorageBackendFactory with CommonStorageB
 
   override val createResetStorageBackend: ResetStorageBackend =
     H2ResetStorageBackend
+
 }

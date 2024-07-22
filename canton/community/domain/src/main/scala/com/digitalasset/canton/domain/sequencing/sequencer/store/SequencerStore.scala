@@ -14,31 +14,21 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.PruningError.UnsafePruningPoint
+import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.sequencer.store.SequencerStore.SequencerPruningResult
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  CommitMode,
-  PruningError,
-  SequencerPruningStatus,
-  SequencerSnapshot,
-  WriteNotification,
-}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.sequencing.protocol.{
-  MessageId,
-  SequencedEvent,
-  SequencerDeliverError,
-}
+import com.digitalasset.canton.sequencing.protocol.{MessageId, SequencedEvent}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.{Member, UnauthenticatedMemberId}
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry
+import com.digitalasset.canton.util.{ErrorUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter}
 import com.google.common.annotations.VisibleForTesting
@@ -116,6 +106,8 @@ final case class Payload(id: PayloadId, content: ByteString)
   */
 sealed trait StoreEvent[+PayloadReference] extends HasTraceContext {
 
+  val sender: SequencerMemberId
+
   /** Who gets notified of the event once it is successfully sequenced */
   val notifies: WriteNotification
 
@@ -130,6 +122,28 @@ sealed trait StoreEvent[+PayloadReference] extends HasTraceContext {
   def map[P](f: PayloadReference => P): StoreEvent[P]
 
   def payloadO: Option[PayloadReference]
+
+  /** The timestamp of the snapshot to be used for determining the signing key of this event, resolving group addresses,
+    * and for checking signatures on envelopes, if absent, sequencing time will be used instead. Absent on errors.
+    */
+  def topologyTimestampO: Option[CantonTimestamp]
+}
+
+final case class ReceiptStoreEvent(
+    override val sender: SequencerMemberId,
+    messageId: MessageId,
+    override val topologyTimestampO: Option[CantonTimestamp],
+    override val traceContext: TraceContext,
+) extends StoreEvent[Nothing] {
+  override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
+
+  override val description: String = show"receipt[message-id:$messageId]"
+
+  override val members: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
+
+  override def map[P](f: Nothing => P): StoreEvent[P] = this
+
+  override def payloadO: Option[Nothing] = None
 }
 
 /** Structure for storing a deliver events.
@@ -138,14 +152,13 @@ sealed trait StoreEvent[+PayloadReference] extends HasTraceContext {
   *                          [[scala.None]] means that the sequencing timestamp should be used.
   */
 final case class DeliverStoreEvent[P](
-    sender: SequencerMemberId,
+    override val sender: SequencerMemberId,
     messageId: MessageId,
     override val members: NonEmpty[SortedSet[SequencerMemberId]],
     payload: P,
-    topologyTimestampO: Option[CantonTimestamp],
+    override val topologyTimestampO: Option[CantonTimestamp],
     override val traceContext: TraceContext,
 ) extends StoreEvent[P] {
-  def mapPayload[Q](map: P => Q): DeliverStoreEvent[Q] = copy(payload = map(payload))
   override lazy val notifies: WriteNotification = WriteNotification.Members(members)
 
   override val description: String = show"deliver[message-id:$messageId]"
@@ -184,36 +197,38 @@ object DeliverStoreEvent {
 }
 
 final case class DeliverErrorStoreEvent(
-    sender: SequencerMemberId,
+    override val sender: SequencerMemberId,
     messageId: MessageId,
     error: Option[ByteString],
     override val traceContext: TraceContext,
 ) extends StoreEvent[Nothing] {
   override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
   override val description: String = show"deliver-error[message-id:$messageId]"
-  override def members: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
+  override val members: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
   override def map[P](f: Nothing => P): StoreEvent[P] = this
-  override def payloadO: Option[Nothing] = None
+  override val payloadO: Option[Nothing] = None
+
+  override val topologyTimestampO: Option[CantonTimestamp] = None
 }
 
 object DeliverErrorStoreEvent {
   def serializeError(
-      error: SequencerDeliverError,
+      status: Status,
       protocolVersion: ProtocolVersion,
   ): ByteString =
     VersionedStatus
-      .create(error.rpcStatusWithoutLoggingContext(), protocolVersion)
+      .create(status, protocolVersion)
       .toByteString
 
   def apply(
       sender: SequencerMemberId,
       messageId: MessageId,
-      error: SequencerDeliverError,
+      status: Status,
       protocolVersion: ProtocolVersion,
       traceContext: TraceContext,
   ): DeliverErrorStoreEvent = {
     val serializedError =
-      DeliverErrorStoreEvent.serializeError(error, protocolVersion)
+      DeliverErrorStoreEvent.serializeError(status, protocolVersion)
 
     DeliverErrorStoreEvent(
       sender,
@@ -239,11 +254,12 @@ object DeliverErrorStoreEvent {
 final case class Presequenced[+E <: StoreEvent[_]](
     event: E,
     maxSequencingTimeO: Option[CantonTimestamp],
+    blockSequencerTimestampO: Option[CantonTimestamp] = None,
 ) extends HasTraceContext {
   import cats.implicits.*
 
   def map[F <: StoreEvent[_]](fn: E => F): Presequenced[F] =
-    Presequenced(fn(event), maxSequencingTimeO)
+    this.copy(event = fn(event))
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def traverse[F[_], E2 <: StoreEvent[_]](fn: E => F[E2])(implicit
@@ -271,8 +287,9 @@ object Presequenced {
   def withMaxSequencingTime[E <: StoreEvent[_]](
       event: E,
       maxSequencingTime: CantonTimestamp,
+      blockSequencerTimestampO: Option[CantonTimestamp],
   ): Presequenced[E] =
-    Presequenced(event, Some(maxSequencingTime))
+    Presequenced(event, Some(maxSequencingTime), blockSequencerTimestampO)
   def alwaysValid[E <: StoreEvent[_]](event: E): Presequenced[E] = Presequenced(event, None)
 }
 
@@ -376,6 +393,8 @@ sealed trait SaveWatermarkError
 object SaveWatermarkError {
   case object WatermarkFlaggedOffline extends SaveWatermarkError
 
+  case object WatermarkFlaggedOnline extends SaveWatermarkError
+
   /** We expect that there is only a single writer for a given watermark that is not written concurrently.
     * If when checking the value we find it is not what we expect, it likely indicates a configuration error
     * causing multiple sequencer processes to be written as the same sequencer node index.
@@ -383,7 +402,10 @@ object SaveWatermarkError {
   final case class WatermarkUnexpectedlyChanged(message: String) extends SaveWatermarkError
 }
 
-final case class RegisteredMember(memberId: SequencerMemberId, registeredFrom: CantonTimestamp)
+final case class RegisteredMember(
+    memberId: SequencerMemberId,
+    registeredFrom: CantonTimestamp,
+)
 
 case object MemberDisabledError
 
@@ -415,11 +437,19 @@ final case class SafeWatermark(nextTimestamp: Option[CantonTimestamp]) extends R
   def payloads: Seq[Sequenced[Payload]] = Seq.empty
 }
 
+/** An interface for validating members of a sequencer, i.e. that member is registered at a certain time.
+  */
+trait SequencerMemberValidator {
+  def isMemberRegisteredAt(member: Member, time: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Boolean]
+}
+
 /** Persistence for the Sequencer.
   * Writers are expected to create a [[SequencerWriterStore]] which may delegate to this underlying store
   * through an appropriately managed storage instance.
   */
-trait SequencerStore extends NamedLogging with AutoCloseable {
+trait SequencerStore extends SequencerMemberValidator with NamedLogging with AutoCloseable {
 
   protected implicit val executionContext: ExecutionContext
 
@@ -439,19 +469,6 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
       traceContext: TraceContext
   ): Future[SequencerMemberId]
 
-  /** Unregister a disabled unauthenticated member.
-    * This should delete the member from the store.
-    */
-  def unregisterUnauthenticatedMember(member: UnauthenticatedMemberId)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
-
-  /** Evict unauthenticated member from the cache.
-    */
-  final protected def evictFromCache(member: UnauthenticatedMemberId): Unit = {
-    memberCache.evict(member)
-  }
-
   /** Lookup an existing member id for the given member.
     * Will return a cached value if available.
     * Return [[scala.None]] if no id exists.
@@ -465,6 +482,17 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
   protected def lookupMemberInternal(member: Member)(implicit
       traceContext: TraceContext
   ): Future[Option[RegisteredMember]]
+
+  override def isMemberRegisteredAt(member: Member, time: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    lookupMember(member)
+      .map { regMemberO =>
+        val registered = regMemberO.exists(_.registeredFrom <= time)
+        logger.trace(s"Checked if member $member is registered at time $time: $registered")
+        registered
+      }
+  }
 
   /** Save a series of payloads to the store.
     * Is up to the caller to determine a reasonable batch size and no batching is done within the store.
@@ -490,6 +518,13 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
       traceContext: TraceContext
   ): Future[Unit]
 
+  /** Reset the watermark to an earlier value, i.e. in case of working as a part of block sequencer.
+    * Also sets the sequencer as offline. If current watermark value is before `ts`, it will be left unchanged.
+    */
+  def resetWatermark(instanceIndex: Int, ts: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, SaveWatermarkError, Unit]
+
   /** Write the watermark that we promise not to write anything earlier than.
     * Does not indicate that there is an event written by this sequencer for this timestamp as there may be no activity
     * at the sequencer, but updating the timestamp allows the sequencer to indicate that it's still alive.
@@ -505,6 +540,10 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
   def fetchWatermark(instanceIndex: Int, maxRetries: Int = retry.Forever)(implicit
       traceContext: TraceContext
   ): Future[Option[Watermark]]
+
+  /** Return the minimum watermark across all online sequencers
+    */
+  def safeWatermark(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]]
 
   /** Flag that we're going offline (likely due to a shutdown) */
   def goOffline(instanceIndex: Int)(implicit traceContext: TraceContext): Future[Unit]
@@ -528,10 +567,11 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
   /** Delete all events that are ahead of the watermark of this sequencer.
     * These events will not have been read and should be removed before returning the sequencer online.
     * Should not be called alongside updating the watermark for this sequencer and only while the sequencer is offline.
+    * Returns the watermark that was used for the deletion.
     */
   def deleteEventsPastWatermark(instanceIndex: Int)(implicit
       traceContext: TraceContext
-  ): Future[Unit]
+  ): Future[Option[CantonTimestamp]]
 
   /** Save a checkpoint that as of a certain timestamp the member has this counter value.
     * Any future subscriptions can then use this as a starting point for serving their event stream rather than starting from 0.
@@ -596,7 +636,7 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
     */
   def isEnabled(member: SequencerMemberId)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, MemberDisabledError.type, Unit]
+  ): Future[Boolean]
 
   /** Prune as much data as safely possible from before the given timestamp.
     * @param requestedTimestamp the timestamp that we would like to prune up to (see docs on using the pruning status and disabling members for picking this value)
@@ -612,7 +652,8 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
       status: SequencerPruningStatus,
       payloadToEventMargin: NonNegativeFiniteDuration,
   )(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      closeContext: CloseContext,
   ): EitherT[Future, PruningError, SequencerPruningResult] = {
     val disabledClients = status.disabledClients
 
@@ -620,6 +661,23 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
 
     val safeTimestamp = status.safePruningTimestamp
     logger.debug(s"Safe pruning timestamp is [$safeTimestamp]")
+
+    // as counter checkpoints may lag behind acknowledgements, we make sure to save checkpoints right before the
+    // requestedTimestamp so that when we compute the adjusted timestamp, it is not so far away in the past
+    def saveRecentCheckpoints(): Future[Unit] = for {
+      checkpoints <- checkpointsAtTimestamp(requestedTimestamp.immediatePredecessor)
+      _ <- checkpoints.toList.parTraverse { case (member, checkpoint) =>
+        for {
+          memberId <- lookupMember(member).map(
+            _.fold(ErrorUtil.invalidState(s"Member $member should be registered"))(_.memberId)
+          )
+          _ <- saveCounterCheckpoint(
+            memberId,
+            checkpoint,
+          ).value
+        } yield ()
+      }
+    } yield ()
 
     // as counter checkpoints may slightly lag behind acknowledgements adjust the pruning timestamp backwards to the
     // earliest counter checkpoint before the pruning timestamp
@@ -666,13 +724,16 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
         // (if the event was dropped due to a crash or validation issue).
         payloadsRemoved <- prunePayloads(adjustedTimestamp.minus(payloadToEventMargin.duration))
         checkpointsRemoved <- pruneCheckpoints(adjustedTimestamp)
-      } yield s"Removed: at least $eventsRemoved events, at least $payloadsRemoved payloads, at least $checkpointsRemoved counter checkpoints"
+      } yield s"Removed at least $eventsRemoved events, at least $payloadsRemoved payloads, at least $checkpointsRemoved counter checkpoints"
 
     for {
       _ <- condUnitET[Future](
         requestedTimestamp <= safeTimestamp,
         UnsafePruningPoint(requestedTimestamp, safeTimestamp),
       )
+
+      _ <- EitherT.right(saveRecentCheckpoints())
+
       adjustedTimestamp <- EitherT.right(adjustTimestamp())
       additionalCheckpointInfo =
         if (adjustedTimestamp < requestedTimestamp && logger.underlying.isInfoEnabled()) {
@@ -750,11 +811,16 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
       traceContext: TraceContext
   ): Future[SequencerSnapshot]
 
-  def initializeFromSnapshot(snapshot: SequencerSnapshot)(implicit
+  def checkpointsAtTimestamp(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Map[Member, CounterCheckpoint]]
+
+  def initializeFromSnapshot(initialState: SequencerInitialState)(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
   ): EitherT[Future, String, Unit] = {
     import EitherT.right as eitherT
+    val snapshot = initialState.snapshot
     val lastTs = snapshot.lastTs
     for {
       _ <- snapshot.status.members.parTraverse { memberStatus =>
@@ -764,10 +830,14 @@ trait SequencerStore extends NamedLogging with AutoCloseable {
             if (!memberStatus.enabled) eitherT(disableMember(id))
             else EitherT.rightT[Future, String](())
           _ <- eitherT(memberStatus.lastAcknowledged.fold(Future.unit)(ack => acknowledge(id, ack)))
-          _ <- saveCounterCheckpoint(
-            id,
-            CounterCheckpoint(snapshot.heads(memberStatus.member), lastTs, Some(lastTs)),
-          ).leftMap(_.toString)
+          _ <-
+            // Some members can be registered, but not have any events yet, so there can be no CounterCheckpoint in the snapshot
+            snapshot.heads.get(memberStatus.member).fold(eitherT[String](Future.unit)) { counter =>
+              saveCounterCheckpoint(
+                id,
+                CounterCheckpoint(counter, lastTs, initialState.latestSequencerEventTimestamp),
+              ).leftMap(_.toString)
+            }
         } yield ()
       }
       _ <- saveLowerBound(lastTs).leftMap(_.toString)
@@ -783,10 +853,18 @@ object SequencerStore {
       maxInClauseSize: PositiveNumeric[Int],
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
+      sequencerMember: Member,
+      unifiedSequencer: Boolean,
       overrideCloseContext: Option[CloseContext] = None,
   )(implicit executionContext: ExecutionContext): SequencerStore =
     storage match {
-      case _: MemoryStorage => new InMemorySequencerStore(protocolVersion, loggerFactory)
+      case _: MemoryStorage =>
+        new InMemorySequencerStore(
+          protocolVersion,
+          sequencerMember,
+          unifiedSequencer = unifiedSequencer,
+          loggerFactory,
+        )
       case dbStorage: DbStorage =>
         new DbSequencerStore(
           dbStorage,
@@ -794,6 +872,8 @@ object SequencerStore {
           maxInClauseSize,
           timeouts,
           loggerFactory,
+          sequencerMember,
+          unifiedSequencer = unifiedSequencer,
           overrideCloseContext,
         )
     }

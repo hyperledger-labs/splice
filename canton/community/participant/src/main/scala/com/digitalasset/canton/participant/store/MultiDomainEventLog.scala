@@ -6,11 +6,13 @@ package com.digitalasset.canton.participant.store
 import cats.data.{EitherT, OptionT}
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import com.digitalasset.canton.LedgerSubmissionId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveLong}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.v2.ChangeId
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -50,7 +52,6 @@ import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{DiscardOps, LedgerSubmissionId, LedgerTransactionId}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
@@ -138,11 +139,6 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
   def lookupByEventIds(eventIds: Seq[EventId])(implicit
       traceContext: TraceContext
   ): Future[Map[EventId, (GlobalOffset, TimestampedEvent, CantonTimestamp)]]
-
-  /** Find the domain of a committed transaction. */
-  def lookupTransactionDomain(transactionId: LedgerTransactionId)(implicit
-      traceContext: TraceContext
-  ): OptionT[Future, DomainId]
 
   /** Yields the greatest local offsets for the underlying [[SingleDimensionEventLog]] with global offset less than
     * or equal to `upToInclusive`.
@@ -474,6 +470,8 @@ object MultiDomainEventLog {
       acceptance: Boolean,
       eventTraceContext: TraceContext,
   ) extends PrettyPrinting {
+    import com.digitalasset.canton.participant.pretty.Implicits.*
+
     override def pretty: Pretty[DeduplicationInfo] = prettyOfClass(
       param("change id", _.changeId),
       paramIfDefined("submission id", _.submissionId),
@@ -510,6 +508,7 @@ object MultiDomainEventLog {
               _reason,
               ProcessingSteps.RequestType.Transaction,
               _domainId,
+              _,
             ) =>
           val changeId = completionInfo.changeId
           DeduplicationInfo(

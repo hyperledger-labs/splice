@@ -56,4 +56,16 @@ object HttpSvSoftDomainMigrationPocAppClient {
       case http.InitializeSynchronizerResponse.OK => Right(())
     }
   }
+
+  case class SignDsoPartyToParticipant(domainIdPrefix: String)
+      extends BaseCommand[http.SignDsoPartyToParticipantResponse, Unit] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.SignDsoPartyToParticipantResponse] =
+      client.signDsoPartyToParticipant(domainIdPrefix, headers = headers)
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.SignDsoPartyToParticipantResponse.OK => Right(())
+    }
+  }
 }

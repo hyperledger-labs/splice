@@ -23,9 +23,11 @@ import com.digitalasset.canton.console.CommandErrors.{
 import com.digitalasset.canton.console.Help.{Description, Summary, Topic}
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.SerializableContract
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -33,7 +35,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
 }
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{Identifier, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.{DomainAlias, LfPartyId}
@@ -46,8 +48,16 @@ import scala.concurrent.duration.Duration as SDuration
 import scala.reflect.runtime.universe as ru
 import scala.util.control.NonFatal
 
-final case class NodeReferences[A, R <: A, L <: A](local: Seq[L], remote: Seq[R]) {
+final case class NodeReferences[A, R <: A, L <: A](
+    local: Seq[L],
+    remote: Seq[R],
+) {
   val all: Seq[A] = local ++ remote
+}
+
+object NodeReferences {
+  type ParticipantNodeReferences =
+    NodeReferences[ParticipantReference, RemoteParticipantReference, LocalParticipantReference]
 }
 
 /** The environment in which console commands are evaluated.
@@ -92,8 +102,13 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     (x: LocalInstanceReference, y: LocalInstanceReference) =>
       startupOrderPrecedence(x) compare startupOrderPrecedence(y)
 
-  /** allows for injecting a custom admin command runner during tests */
-  protected def createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner
+  /** allows for injecting a custom admin command runner during tests
+    * @param apiName API name checked against and expected on the server-side
+    */
+  protected def createAdminCommandRunner(
+      consoleEnvironment: ConsoleEnvironment,
+      apiName: String,
+  ): ConsoleGrpcAdminCommandRunner = new ConsoleGrpcAdminCommandRunner(consoleEnvironment, apiName)
 
   protected override val loggerFactory: NamedLoggerFactory = environment.loggerFactory
 
@@ -183,7 +198,14 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   }
 
   // lazy to prevent publication of this before this has been fully initialized
-  lazy val grpcAdminCommandRunner: ConsoleGrpcAdminCommandRunner = createAdminCommandRunner(this)
+  lazy val grpcAdminCommandRunner: ConsoleGrpcAdminCommandRunner =
+    createAdminCommandRunner(this, CantonGrpcUtil.ApiName.AdminApi)
+
+  lazy val grpcLedgerCommandRunner: ConsoleGrpcAdminCommandRunner =
+    createAdminCommandRunner(this, CantonGrpcUtil.ApiName.LedgerApi)
+
+  lazy val grpcDomainCommandRunner: ConsoleGrpcAdminCommandRunner =
+    createAdminCommandRunner(this, CantonGrpcUtil.ApiName.SequencerPublicApi)
 
   def runE[E, A](result: => Either[E, A]): A = {
     run(ConsoleCommandResult.fromEither(result.leftMap(_.toString)))
@@ -305,9 +327,9 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     )
 
   lazy val sequencers: NodeReferences[
-    SequencerNodeReference,
-    RemoteSequencerNodeReference,
-    LocalSequencerNodeReference,
+    SequencerReference,
+    RemoteSequencerReference,
+    LocalSequencerReference,
   ] =
     NodeReferences(
       environment.config.sequencersByString.keys.map(createSequencerReference).toSeq,
@@ -360,37 +382,37 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     */
   protected def topLevelValues: Seq[TopLevelValue[_]] = {
     val nodeTopic = Seq(topicNodeReferences)
-    val localParticipantXBinds: Seq[TopLevelValue[_]] =
+    val localParticipantBinds: Seq[TopLevelValue[_]] =
       participants.local.map(p =>
-        TopLevelValue(p.name, helpText("participant x", p.name), p, nodeTopic)
+        TopLevelValue(p.name, helpText("participant", p.name), p, nodeTopic)
       )
-    val remoteParticipantXBinds: Seq[TopLevelValue[_]] =
+    val remoteParticipantBinds: Seq[TopLevelValue[_]] =
       participants.remote.map(p =>
-        TopLevelValue(p.name, helpText("remote participant x", p.name), p, nodeTopic)
+        TopLevelValue(p.name, helpText("remote participant", p.name), p, nodeTopic)
       )
-    val localMediatorXBinds: Seq[TopLevelValue[_]] =
+    val localMediatorBinds: Seq[TopLevelValue[_]] =
       mediators.local.map(d =>
-        TopLevelValue(d.name, helpText("local mediator-x", d.name), d, nodeTopic)
+        TopLevelValue(d.name, helpText("local mediator", d.name), d, nodeTopic)
       )
-    val remoteMediatorXBinds: Seq[TopLevelValue[_]] =
+    val remoteMediatorBinds: Seq[TopLevelValue[_]] =
       mediators.remote.map(d =>
-        TopLevelValue(d.name, helpText("remote mediator-x", d.name), d, nodeTopic)
+        TopLevelValue(d.name, helpText("remote mediator", d.name), d, nodeTopic)
       )
-    val localSequencerXBinds: Seq[TopLevelValue[_]] =
+    val localSequencerBinds: Seq[TopLevelValue[_]] =
       sequencers.local.map(d =>
-        TopLevelValue(d.name, helpText("local sequencer-x", d.name), d, nodeTopic)
+        TopLevelValue(d.name, helpText("local sequencer", d.name), d, nodeTopic)
       )
-    val remoteSequencerXBinds: Seq[TopLevelValue[_]] =
+    val remoteSequencerBinds: Seq[TopLevelValue[_]] =
       sequencers.remote.map(d =>
-        TopLevelValue(d.name, helpText("remote sequencer-x", d.name), d, nodeTopic)
+        TopLevelValue(d.name, helpText("remote sequencer", d.name), d, nodeTopic)
       )
     val clockBinds: Option[TopLevelValue[_]] =
       environment.simClock.map(cl =>
         TopLevelValue("clock", "Simulated time", new SimClockCommand(cl))
       )
     val referencesTopic = Seq(topicGenericNodeReferences)
-    localParticipantXBinds ++ remoteParticipantXBinds ++
-      localSequencerXBinds ++ remoteSequencerXBinds ++ localMediatorXBinds ++ remoteMediatorXBinds ++ clockBinds.toList :+
+    localParticipantBinds ++ remoteParticipantBinds ++
+      localSequencerBinds ++ remoteSequencerBinds ++ localMediatorBinds ++ remoteMediatorBinds ++ clockBinds.toList :+
       TopLevelValue(
         "participants",
         "All participant nodes" + genericNodeReferencesDoc,
@@ -444,11 +466,11 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   private def createRemoteParticipantReference(name: String): RemoteParticipantReference =
     new RemoteParticipantReference(this, name)
 
-  private def createSequencerReference(name: String): LocalSequencerNodeReference =
-    new LocalSequencerNodeReference(this, name)
+  private def createSequencerReference(name: String): LocalSequencerReference =
+    new LocalSequencerReference(this, name)
 
-  private def createRemoteSequencerReference(name: String): RemoteSequencerNodeReference =
-    new RemoteSequencerNodeReference(this, name)
+  private def createRemoteSequencerReference(name: String): RemoteSequencerReference =
+    new RemoteSequencerReference(this, name)
 
   private def createMediatorReference(name: String): LocalMediatorReference =
     new LocalMediatorReference(this, name)
@@ -461,11 +483,18 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   protected def selfAlias(): Bind[_] = Bind(ConsoleEnvironmentBinding.BindingName, this)
 
   override def onClosed(): Unit = {
-    Lifecycle.close(grpcAdminCommandRunner, environment)(logger)
+    Lifecycle.close(
+      grpcAdminCommandRunner,
+      grpcLedgerCommandRunner,
+      grpcDomainCommandRunner,
+      environment,
+    )(logger)
   }
 
   def closeChannels(): Unit = {
     grpcAdminCommandRunner.closeChannels()
+    grpcLedgerCommandRunner.closeChannels()
+    grpcDomainCommandRunner.closeChannels()
   }
 
   def startAll(): Unit = runE(environment.startAll())
@@ -519,21 +548,20 @@ object ConsoleEnvironment {
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(connection))
 
     implicit def toGSequencerConnection(
-        ref: SequencerNodeReference
+        ref: SequencerReference
     ): SequencerConnection =
       ref.sequencerConnection
 
     implicit def toGSequencerConnections(
-        ref: SequencerNodeReference
+        ref: SequencerReference
     ): SequencerConnections =
       SequencerConnections.single(ref.sequencerConnection)
 
-    implicit def toIdentifier(id: String): Identifier = Identifier.tryCreate(id)
     implicit def toFingerprint(fp: String): Fingerprint = Fingerprint.tryCreate(fp)
 
     /** Implicitly map ParticipantReferences to the ParticipantId
       */
-    implicit def toParticipantIdX(reference: ParticipantReference): ParticipantId = reference.id
+    implicit def toParticipantId(reference: ParticipantReference): ParticipantId = reference.id
 
     /** Implicitly map an `Int` to a `NonNegativeInt`.
       * @throws java.lang.IllegalArgumentException if `n` is negative

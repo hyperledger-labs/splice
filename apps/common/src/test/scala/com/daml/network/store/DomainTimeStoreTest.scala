@@ -1,10 +1,10 @@
 package com.daml.network.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.PositiveFiniteDuration
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.time.SimClock
 import org.scalatest.wordspec.AsyncWordSpec
 

@@ -4,7 +4,7 @@
 package com.digitalasset.canton.participant.protocol.transfer
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.ViewType.TransferOutViewType
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -16,7 +16,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.TransferProcessorError
 import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.protocol.SourceDomainId
+import com.digitalasset.canton.protocol.{SourceDomainId, StaticDomainParameters}
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.version.Transfer.SourceProtocolVersion
@@ -27,6 +27,7 @@ class TransferOutProcessor(
     domainId: SourceDomainId,
     override val participantId: ParticipantId,
     damle: DAMLe,
+    staticDomainParameters: StaticDomainParameters,
     transferCoordination: TransferCoordination,
     inFlightSubmissionTracker: InFlightSubmissionTracker,
     ephemeral: SyncDomainEphemeralState,
@@ -37,6 +38,7 @@ class TransferOutProcessor(
     sourceProtocolVersion: SourceProtocolVersion,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
+    override val testingConfig: TestingConfigInternal,
 )(implicit ec: ExecutionContext)
     extends ProtocolProcessor[
       TransferOutProcessingSteps.SubmissionParam,
@@ -50,6 +52,7 @@ class TransferOutProcessor(
         damle,
         transferCoordination,
         seedGenerator,
+        staticDomainParameters,
         sourceProtocolVersion,
         loggerFactory,
       ),
@@ -58,6 +61,7 @@ class TransferOutProcessor(
       domainCrypto,
       sequencerClient,
       domainId.unwrap,
+      staticDomainParameters,
       sourceProtocolVersion.v,
       loggerFactory,
       futureSupervisor,

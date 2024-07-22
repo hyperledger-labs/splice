@@ -29,25 +29,32 @@ import com.digitalasset.canton.admin.participant.v30.ResourceManagementServiceGr
 import com.digitalasset.canton.admin.participant.v30.TransferServiceGrpc.TransferServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ResourceLimits as _, *}
 import com.digitalasset.canton.admin.pruning
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.admin.pruning.v30.{NoWaitCommitmentsSetup, WaitCommitmentsSetup}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.admin.ResourceLimits
-import com.digitalasset.canton.participant.admin.grpc.{
-  GrpcParticipantRepairService,
-  TransferSearchResult,
-}
+import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
+import com.digitalasset.canton.participant.admin.traffic.TrafficStateAdmin
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig as CDomainConnectionConfig
+import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
+  ReceivedCmtState,
+  SentCmtState,
+  SharedContractsState,
+}
 import com.digitalasset.canton.participant.sync.UpstreamOffsetConvert
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.protocol.messages.{AcsCommitment, CommitmentPeriod}
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
+import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.InstantConverter
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.time.PositiveSeconds
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.MemberTrafficStatus
-import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.util.{BinaryFileUtil, GrpcStreamingUtils}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DomainAlias, LedgerTransactionId, config}
+import com.digitalasset.canton.{DomainAlias, SequencerCounter, config}
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.timestamp.Timestamp
@@ -58,9 +65,8 @@ import io.grpc.{Context, ManagedChannel}
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, MILLISECONDS}
-import scala.concurrent.{Future, Promise, blocking}
 
 object ParticipantAdminCommands {
 
@@ -148,6 +154,42 @@ object ParticipantAdminCommands {
           case UploadDarResponse.Value.Success(UploadDarResponse.Success(hash)) => Right(hash)
           case UploadDarResponse.Value.Failure(UploadDarResponse.Failure(msg)) => Left(msg)
           case UploadDarResponse.Value.Empty => Left("unexpected empty response")
+        }
+
+      // file can be big. checking & vetting might take a while
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+
+    }
+
+    final case class ValidateDar(
+        darPath: Option[String],
+        logger: TracedLogger,
+    ) extends PackageCommand[ValidateDarRequest, ValidateDarResponse, String] {
+
+      override def createRequest(): Either[String, ValidateDarRequest] =
+        for {
+          pathValue <- darPath.toRight("DAR path not provided")
+          nonEmptyPathValue <- Either.cond(
+            pathValue.nonEmpty,
+            pathValue,
+            "Provided DAR path is empty",
+          )
+          filename = Paths.get(nonEmptyPathValue).getFileName.toString
+          darData <- BinaryFileUtil.readByteStringFromFile(nonEmptyPathValue)
+        } yield ValidateDarRequest(
+          darData,
+          filename,
+        )
+
+      override def submitRequest(
+          service: PackageServiceStub,
+          request: ValidateDarRequest,
+      ): Future[ValidateDarResponse] =
+        service.validateDar(request)
+
+      override def handleResponse(response: ValidateDarResponse): Either[String, String] =
+        response match {
+          case ValidateDarResponse(hash) => Right(hash)
         }
 
       // file can be big. checking & vetting might take a while
@@ -344,49 +386,6 @@ object ParticipantAdminCommands {
 
   object ParticipantRepairManagement {
 
-    sealed trait StreamingMachinery[Req, Resp] {
-      def stream(
-          load: StreamObserver[Resp] => StreamObserver[Req],
-          requestBuilder: Array[Byte] => Req,
-          snapshot: ByteString,
-      ): Future[Resp] = {
-        val requestComplete = Promise[Resp]()
-        val ref = new AtomicReference[Option[Resp]](None)
-
-        val responseObserver = new StreamObserver[Resp] {
-          override def onNext(value: Resp): Unit = {
-            ref.set(Some(value))
-          }
-
-          override def onError(t: Throwable): Unit = requestComplete.failure(t)
-
-          override def onCompleted(): Unit = {
-            ref.get() match {
-              case Some(response) => requestComplete.success(response)
-              case None =>
-                requestComplete.failure(
-                  io.grpc.Status.CANCELLED
-                    .withDescription("Server completed the request before providing a response")
-                    .asRuntimeException()
-                )
-            }
-
-          }
-        }
-        val requestObserver = load(responseObserver)
-
-        snapshot.toByteArray
-          .grouped(GrpcParticipantRepairService.DefaultChunkSize.value)
-          .foreach { bytes =>
-            blocking {
-              requestObserver.onNext(requestBuilder(bytes))
-            }
-          }
-        requestObserver.onCompleted()
-        requestComplete.future
-      }
-    }
-
     final case class ExportAcs(
         parties: Set[PartyId],
         partiesOffboarding: Boolean,
@@ -439,14 +438,19 @@ object ParticipantAdminCommands {
           response: CancellableContext
       ): Either[String, CancellableContext] = Right(response)
 
+      override def timeoutType: GrpcAdminCommand.TimeoutType =
+        GrpcAdminCommand.DefaultUnboundedTimeout
     }
 
     final case class ImportAcs(
         acsChunk: ByteString,
         workflowIdPrefix: String,
         allowContractIdSuffixRecomputation: Boolean,
-    ) extends GrpcAdminCommand[ImportAcsRequest, ImportAcsResponse, Map[LfContractId, LfContractId]]
-        with StreamingMachinery[ImportAcsRequest, ImportAcsResponse] {
+    ) extends GrpcAdminCommand[
+          ImportAcsRequest,
+          ImportAcsResponse,
+          Map[LfContractId, LfContractId],
+        ] {
 
       override type Svc = ParticipantRepairServiceStub
 
@@ -467,7 +471,7 @@ object ParticipantAdminCommands {
           service: ParticipantRepairServiceStub,
           request: ImportAcsRequest,
       ): Future[ImportAcsResponse] = {
-        stream(
+        GrpcStreamingUtils.streamToServer(
           service.importAcs,
           (bytes: Array[Byte]) =>
             ImportAcsRequest(
@@ -525,6 +529,7 @@ object ParticipantAdminCommands {
     final case class MigrateDomain(
         sourceDomainAlias: DomainAlias,
         targetDomainConfig: CDomainConnectionConfig,
+        force: Boolean,
     ) extends GrpcAdminCommand[MigrateDomainRequest, MigrateDomainResponse, Unit] {
       override type Svc = ParticipantRepairServiceStub
 
@@ -541,6 +546,7 @@ object ParticipantAdminCommands {
           MigrateDomainRequest(
             sourceDomainAlias.toProtoPrimitive,
             Some(targetDomainConfig.toProtoV30),
+            force = force,
           )
         )
 
@@ -548,7 +554,100 @@ object ParticipantAdminCommands {
 
       // migration command will potentially take a long time
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
 
+    final case class PurgeDeactivatedDomain(domainAlias: DomainAlias)
+        extends GrpcAdminCommand[
+          PurgeDeactivatedDomainRequest,
+          PurgeDeactivatedDomainResponse,
+          Unit,
+        ] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        ParticipantRepairServiceGrpc.stub(channel)
+
+      override def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: PurgeDeactivatedDomainRequest,
+      ): Future[PurgeDeactivatedDomainResponse] =
+        service.purgeDeactivatedDomain(request)
+
+      override def createRequest(): Either[String, PurgeDeactivatedDomainRequest] =
+        Right(PurgeDeactivatedDomainRequest(domainAlias.toProtoPrimitive))
+
+      override def handleResponse(
+          response: PurgeDeactivatedDomainResponse
+      ): Either[String, Unit] = Right(())
+    }
+
+    final case class IgnoreEvents(
+        domainId: DomainId,
+        fromInclusive: SequencerCounter,
+        toInclusive: SequencerCounter,
+        force: Boolean,
+    ) extends GrpcAdminCommand[
+          IgnoreEventsRequest,
+          IgnoreEventsResponse,
+          Unit,
+        ] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        ParticipantRepairServiceGrpc.stub(channel)
+
+      override def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: IgnoreEventsRequest,
+      ): Future[IgnoreEventsResponse] =
+        service.ignoreEvents(request)
+
+      override def createRequest(): Either[String, IgnoreEventsRequest] =
+        Right(
+          IgnoreEventsRequest(
+            domainId = domainId.toProtoPrimitive,
+            fromInclusive = fromInclusive.toProtoPrimitive,
+            toInclusive = toInclusive.toProtoPrimitive,
+            force = force,
+          )
+        )
+
+      override def handleResponse(response: IgnoreEventsResponse): Either[String, Unit] = Right(())
+    }
+
+    final case class UnignoreEvents(
+        domainId: DomainId,
+        fromInclusive: SequencerCounter,
+        toInclusive: SequencerCounter,
+        force: Boolean,
+    ) extends GrpcAdminCommand[
+          UnignoreEventsRequest,
+          UnignoreEventsResponse,
+          Unit,
+        ] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        ParticipantRepairServiceGrpc.stub(channel)
+
+      override def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: UnignoreEventsRequest,
+      ): Future[UnignoreEventsResponse] =
+        service.unignoreEvents(request)
+
+      override def createRequest(): Either[String, UnignoreEventsRequest] =
+        Right(
+          UnignoreEventsRequest(
+            domainId = domainId.toProtoPrimitive,
+            fromInclusive = fromInclusive.toProtoPrimitive,
+            toInclusive = toInclusive.toProtoPrimitive,
+            force = force,
+          )
+        )
+
+      override def handleResponse(response: UnignoreEventsResponse): Either[String, Unit] =
+        Right(())
     }
   }
 
@@ -920,29 +1019,6 @@ object ParticipantAdminCommands {
 
     }
 
-    final case class LookupTransactionDomain(transactionId: LedgerTransactionId)
-        extends Base[
-          v30.LookupTransactionDomain.Request,
-          v30.LookupTransactionDomain.Response,
-          DomainId,
-        ] {
-      override def createRequest() = Right(v30.LookupTransactionDomain.Request(transactionId))
-
-      override def submitRequest(
-          service: InspectionServiceStub,
-          request: v30.LookupTransactionDomain.Request,
-      ): Future[v30.LookupTransactionDomain.Response] =
-        service.lookupTransactionDomain(request)
-
-      override def handleResponse(
-          response: v30.LookupTransactionDomain.Response
-      ): Either[String, DomainId] =
-        DomainId.fromString(response.domainId)
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-
-    }
-
     final case class LookupOffsetByTime(ts: Timestamp)
         extends Base[v30.LookupOffsetByTime.Request, v30.LookupOffsetByTime.Response, String] {
       override def createRequest() = Right(v30.LookupOffsetByTime.Request(Some(ts)))
@@ -973,6 +1049,386 @@ object ParticipantAdminCommands {
           response: v30.LookupOffsetByIndex.Response
       ): Either[String, String] =
         Right(response.offset)
+    }
+
+    // TODO(#18451) R5: The code below should be sufficient.
+    final case class LookupReceivedAcsCommitments(
+        domainTimeRanges: Seq[DomainTimeRange],
+        counterParticipants: Seq[ParticipantId],
+        commitmentState: Seq[ReceivedCmtState],
+        verboseMode: Boolean,
+    ) extends Base[
+          v30.LookupReceivedAcsCommitments.Request,
+          v30.LookupReceivedAcsCommitments.Response,
+          Map[DomainId, Seq[ReceivedAcsCmt]],
+        ] {
+
+      override def createRequest() = Right(
+        v30.LookupReceivedAcsCommitments
+          .Request(
+            domainTimeRanges.map { case domainTimeRange =>
+              v30.DomainTimeRange(
+                domainTimeRange.domain.toProtoPrimitive,
+                domainTimeRange.timeRange.map { timeRange =>
+                  v30.TimeRange(
+                    Some(timeRange.startExclusive.toProtoTimestamp),
+                    Some(timeRange.endInclusive.toProtoTimestamp),
+                  )
+                },
+              )
+            },
+            counterParticipants.map(_.toProtoPrimitive),
+            commitmentState.map(_.toProtoV30),
+            verboseMode,
+          )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.LookupReceivedAcsCommitments.Request,
+      ): Future[v30.LookupReceivedAcsCommitments.Response] =
+        service.lookupReceivedAcsCommitments(request)
+
+      override def handleResponse(
+          response: v30.LookupReceivedAcsCommitments.Response
+      ): Either[
+        String,
+        Map[DomainId, Seq[ReceivedAcsCmt]],
+      ] = {
+        if (response.received.size != response.received.map(_.domainId).toSet.size)
+          Left(
+            s"Some domains are not unique in the response: ${response.received}"
+          )
+        else
+          response.received
+            .traverse(receivedCmtPerDomain =>
+              for {
+                domainId <- DomainId.fromString(receivedCmtPerDomain.domainId)
+                receivedCmts <- receivedCmtPerDomain.received
+                  .map(fromProtoToReceivedAcsCmt)
+                  .sequence
+              } yield domainId -> receivedCmts
+            )
+            .map(_.toMap)
+      }
+    }
+
+    final case class TimeRange(startExclusive: CantonTimestamp, endInclusive: CantonTimestamp)
+
+    final case class DomainTimeRange(domain: DomainId, timeRange: Option[TimeRange])
+
+    final case class ReceivedAcsCmt(
+        receivedCmtPeriod: CommitmentPeriod,
+        originCounterParticipant: ParticipantId,
+        receivedCommitment: Option[AcsCommitment.CommitmentType],
+        localCommitment: Option[AcsCommitment.CommitmentType],
+        state: ReceivedCmtState,
+    )
+
+    private def fromIntervalToCommitmentPeriod(
+        interval: Option[v30.Interval]
+    ): Either[String, CommitmentPeriod] = {
+      interval match {
+        case None => Left("Interval is missing")
+        case Some(v) =>
+          for {
+            from <- v.startTickExclusive
+              .traverse(CantonTimestamp.fromProtoTimestamp)
+              .leftMap(_.toString)
+            fromSecond <- CantonTimestampSecond.fromCantonTimestamp(
+              from.getOrElse(CantonTimestamp.MinValue)
+            )
+            to <- v.endTickInclusive
+              .traverse(CantonTimestamp.fromProtoTimestamp)
+              .leftMap(_.toString)
+            toSecond <- CantonTimestampSecond.fromCantonTimestamp(
+              to.getOrElse(CantonTimestamp.MinValue)
+            )
+            len <- PositiveSeconds.create(
+              java.time.Duration.ofSeconds(
+                toSecond.minusSeconds(fromSecond.getEpochSecond).getEpochSecond
+              )
+            )
+          } yield CommitmentPeriod(fromSecond, len)
+      }
+    }
+
+    private def fromProtoToReceivedAcsCmt(
+        cmt: v30.ReceivedAcsCommitment
+    ): Either[String, ReceivedAcsCmt] = {
+      for {
+        state <- ReceivedCmtState.fromProtoV30(cmt.state).leftMap(_.toString)
+        period <- fromIntervalToCommitmentPeriod(cmt.interval)
+        participantId <- ParticipantId
+          .fromProtoPrimitive(cmt.originCounterParticipantUid, "")
+          .leftMap(_.toString)
+      } yield ReceivedAcsCmt(
+        period,
+        participantId,
+        Option
+          .when(cmt.receivedCommitment.isDefined)(
+            cmt.receivedCommitment.map(AcsCommitment.commitmentTypeFromByteString)
+          )
+          .flatten,
+        Option
+          .when(cmt.ownCommitment.isDefined)(
+            cmt.ownCommitment.map(AcsCommitment.commitmentTypeFromByteString)
+          )
+          .flatten,
+        state,
+      )
+    }
+
+    // TODO(#18451) R5: The code below should be sufficient.
+    final case class LookupSentAcsCommitments(
+        domainTimeRanges: Seq[DomainTimeRange],
+        counterParticipants: Seq[ParticipantId],
+        commitmentState: Seq[SentCmtState],
+        verboseMode: Boolean,
+    ) extends Base[
+          v30.LookupSentAcsCommitments.Request,
+          v30.LookupSentAcsCommitments.Response,
+          Map[DomainId, Seq[SentAcsCmt]],
+        ] {
+
+      override def createRequest() = Right(
+        v30.LookupSentAcsCommitments
+          .Request(
+            domainTimeRanges.map { case domainTimeRange =>
+              v30.DomainTimeRange(
+                domainTimeRange.domain.toProtoPrimitive,
+                domainTimeRange.timeRange.map { timeRange =>
+                  v30.TimeRange(
+                    Some(timeRange.startExclusive.toProtoTimestamp),
+                    Some(timeRange.endInclusive.toProtoTimestamp),
+                  )
+                },
+              )
+            },
+            counterParticipants.map(_.toProtoPrimitive),
+            commitmentState.map(_.toProtoV30),
+            verboseMode,
+          )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.LookupSentAcsCommitments.Request,
+      ): Future[v30.LookupSentAcsCommitments.Response] =
+        service.lookupSentAcsCommitments(request)
+
+      override def handleResponse(
+          response: v30.LookupSentAcsCommitments.Response
+      ): Either[
+        String,
+        Map[DomainId, Seq[SentAcsCmt]],
+      ] = {
+        if (response.sent.size != response.sent.map(_.domainId).toSet.size)
+          Left(
+            s"Some domains are not unique in the response: ${response.sent}"
+          )
+        else
+          response.sent
+            .traverse(sentCmtPerDomain =>
+              for {
+                domainId <- DomainId.fromString(sentCmtPerDomain.domainId)
+                sentCmts <- sentCmtPerDomain.sent.map(fromProtoToSentAcsCmt).sequence
+              } yield domainId -> sentCmts
+            )
+            .map(_.toMap)
+      }
+    }
+
+    final case class SentAcsCmt(
+        receivedCmtPeriod: CommitmentPeriod,
+        destCounterParticipant: ParticipantId,
+        sentCommitment: Option[AcsCommitment.CommitmentType],
+        receivedCommitment: Option[AcsCommitment.CommitmentType],
+        state: SentCmtState,
+    )
+
+    private def fromProtoToSentAcsCmt(
+        cmt: v30.SentAcsCommitment
+    ): Either[String, SentAcsCmt] = {
+      for {
+        state <- SentCmtState.fromProtoV30(cmt.state).leftMap(_.toString)
+        period <- fromIntervalToCommitmentPeriod(cmt.interval)
+        participantId <- ParticipantId
+          .fromProtoPrimitive(cmt.destCounterParticipantUid, "")
+          .leftMap(_.toString)
+      } yield SentAcsCmt(
+        period,
+        participantId,
+        Option
+          .when(cmt.ownCommitment.isDefined)(
+            cmt.ownCommitment.map(AcsCommitment.commitmentTypeFromByteString)
+          )
+          .flatten,
+        Option
+          .when(cmt.receivedCommitment.isDefined)(
+            cmt.receivedCommitment.map(AcsCommitment.commitmentTypeFromByteString)
+          )
+          .flatten,
+        state,
+      )
+    }
+
+    // TODO(#10436) R7: The code below should be sufficient.
+    final case class SetConfigForSlowCounterParticipants(
+        configs: Seq[SlowCounterParticipantDomainConfig]
+    ) extends Base[
+          v30.SetConfigForSlowCounterParticipants.Request,
+          v30.SetConfigForSlowCounterParticipants.Response,
+          Unit,
+        ] {
+
+      override def createRequest() = Right(
+        v30.SetConfigForSlowCounterParticipants
+          .Request(
+            configs.map(_.toProtoV30)
+          )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.SetConfigForSlowCounterParticipants.Request,
+      ): Future[v30.SetConfigForSlowCounterParticipants.Response] =
+        service.setConfigForSlowCounterParticipants(request)
+
+      override def handleResponse(
+          response: v30.SetConfigForSlowCounterParticipants.Response
+      ): Right[
+        String,
+        Unit,
+      ] = Right(())
+    }
+
+    final case class SlowCounterParticipantDomainConfig(
+        domainIds: Seq[DomainId],
+        distinguishedParticipants: Seq[ParticipantId],
+        thresholdDistinguished: NonNegativeInt,
+        thresholdDefault: NonNegativeInt,
+        participantsMetrics: Seq[ParticipantId],
+    ) {
+      def toProtoV30: v30.SlowCounterParticipantDomainConfig = {
+        v30.SlowCounterParticipantDomainConfig(
+          domainIds.map(_.toProtoPrimitive),
+          distinguishedParticipants.map(_.toProtoPrimitive),
+          thresholdDistinguished.value.toLong,
+          thresholdDefault.value.toLong,
+          participantsMetrics.map(_.toProtoPrimitive),
+        )
+      }
+    }
+
+    object SlowCounterParticipantDomainConfig {
+      def fromProtoV30(
+          config: v30.SlowCounterParticipantDomainConfig
+      ): Either[String, SlowCounterParticipantDomainConfig] = {
+        val thresholdDistinguished = NonNegativeInt.tryCreate(config.thresholdDistinguished.toInt)
+        val thresholdDefault = NonNegativeInt.tryCreate(config.thresholdDefault.toInt)
+        val distinguishedParticipants =
+          config.distinguishedParticipantUids.map(ParticipantId.tryFromProtoPrimitive)
+        val participantsMetrics =
+          config.participantUidsMetrics.map(ParticipantId.tryFromProtoPrimitive)
+        for {
+          domainIds <- config.domainIds.map(DomainId.fromString).sequence
+        } yield SlowCounterParticipantDomainConfig(
+          domainIds,
+          distinguishedParticipants,
+          thresholdDistinguished,
+          thresholdDefault,
+          participantsMetrics,
+        )
+      }
+    }
+
+    // TODO(#10436) R7: The code below should be sufficient.
+    final case class GetConfigForSlowCounterParticipants(
+        domainIds: Seq[DomainId]
+    ) extends Base[
+          v30.GetConfigForSlowCounterParticipants.Request,
+          v30.GetConfigForSlowCounterParticipants.Response,
+          Seq[SlowCounterParticipantDomainConfig],
+        ] {
+
+      override def createRequest() = Right(
+        v30.GetConfigForSlowCounterParticipants
+          .Request(
+            domainIds.map(_.toProtoPrimitive)
+          )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.GetConfigForSlowCounterParticipants.Request,
+      ): Future[v30.GetConfigForSlowCounterParticipants.Response] =
+        service.getConfigForSlowCounterParticipants(request)
+
+      override def handleResponse(
+          response: v30.GetConfigForSlowCounterParticipants.Response
+      ): Either[String, Seq[SlowCounterParticipantDomainConfig]] =
+        response.configs.map(SlowCounterParticipantDomainConfig.fromProtoV30).sequence
+    }
+
+    final case class CounterParticipantInfo(
+        participantId: ParticipantId,
+        domainId: DomainId,
+        intervalsBehind: PositiveInt,
+        asOfSequencingTimestamp: Instant,
+    )
+
+    // TODO(#10436) R7: The code below should be sufficient.
+    final case class GetIntervalsBehindForCounterParticipants(
+        counterParticipants: Seq[ParticipantId],
+        domainIds: Seq[DomainId],
+        threshold: NonNegativeInt,
+    ) extends Base[
+          v30.GetIntervalsBehindForCounterParticipants.Request,
+          v30.GetIntervalsBehindForCounterParticipants.Response,
+          Seq[CounterParticipantInfo],
+        ] {
+
+      override def createRequest() = Right(
+        v30.GetIntervalsBehindForCounterParticipants
+          .Request(
+            counterParticipants.map(_.toProtoPrimitive),
+            domainIds.map(_.toProtoPrimitive),
+            Some(threshold.value.toLong),
+          )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.GetIntervalsBehindForCounterParticipants.Request,
+      ): Future[v30.GetIntervalsBehindForCounterParticipants.Response] =
+        service.getIntervalsBehindForCounterParticipants(request)
+
+      override def handleResponse(
+          response: v30.GetIntervalsBehindForCounterParticipants.Response
+      ): Either[String, Seq[CounterParticipantInfo]] = {
+        response.intervalsBehind.map { info =>
+          for {
+            domainId <- DomainId.fromString(info.domainId)
+            participantId <- ParticipantId
+              .fromProtoPrimitive(info.counterParticipantUid, "")
+              .leftMap(_.toString)
+            asOf <- ProtoConverter
+              .parseRequired(
+                CantonTimestamp.fromProtoTimestamp,
+                "as_of",
+                info.asOfSequencingTimestamp,
+              )
+              .leftMap(_.toString)
+            intervalsBehind <- PositiveInt.create(info.intervalsBehind.toInt).leftMap(_.toString)
+          } yield CounterParticipantInfo(
+            participantId,
+            domainId,
+            intervalsBehind,
+            asOf.toInstant,
+          )
+        }.sequence
+      }
     }
 
   }
@@ -1074,6 +1530,248 @@ object ParticipantAdminCommands {
         }
     }
 
+    // TODO(#18453) R6: The code below should be sufficient.
+    final case class SetNoWaitCommitmentsFrom(
+        counterParticipants: Seq[ParticipantId],
+        domainIds: Seq[DomainId],
+        startingAt: Either[Instant, ParticipantOffset],
+    ) extends Base[
+          pruning.v30.SetNoWaitCommitmentsFrom.Request,
+          pruning.v30.SetNoWaitCommitmentsFrom.Response,
+          Map[ParticipantId, Seq[DomainId]],
+        ] {
+      override def createRequest(): Either[String, pruning.v30.SetNoWaitCommitmentsFrom.Request] = {
+        for {
+          tsOrOffset <- startingAt match {
+            case Right(offset) =>
+              offset.value match {
+                case Value.Absolute(value) =>
+                  Right(Right(value).withLeft[CantonTimestamp]).withLeft[String]
+                case other => Left(s"Unable to convert ledger_end `$other` to absolute value")
+              }
+            case Left(ts) =>
+              CantonTimestamp.fromInstant(ts) match {
+                case Left(value) => Left(value)
+                case Right(value) => Right(Left(value).withRight[String]).withLeft[String]
+              }
+          }
+        } yield pruning.v30.SetNoWaitCommitmentsFrom.Request(
+          counterParticipants.map(_.toProtoPrimitive),
+          tsOrOffset match {
+            case Left(ts) =>
+              pruning.v30.SetNoWaitCommitmentsFrom.Request.TimestampOrOffset
+                .SequencingTimestamp(ts.toProtoTimestamp)
+            case Right(offset) =>
+              pruning.v30.SetNoWaitCommitmentsFrom.Request.TimestampOrOffset.PruningOffset(offset)
+          },
+          domainIds.map(_.toProtoPrimitive),
+        )
+      }
+
+      override def submitRequest(
+          service: Svc,
+          request: pruning.v30.SetNoWaitCommitmentsFrom.Request,
+      ): Future[pruning.v30.SetNoWaitCommitmentsFrom.Response] =
+        service.setNoWaitCommitmentsFrom(request)
+
+      override def handleResponse(
+          response: pruning.v30.SetNoWaitCommitmentsFrom.Response
+      ): Either[String, Map[ParticipantId, Seq[DomainId]]] = {
+
+        val m = response.participantDomainsMapping
+          .map { case (participant, domains) =>
+            ParticipantId.tryFromProtoPrimitive(participant) ->
+              domains.domainIds.map(DomainId.fromString).sequence
+          }
+
+        if (m.forall(_._2.isRight)) Right(m.map { case (id, either) =>
+          id -> either.getOrElse(Seq.empty)
+        })
+        else
+          Left("Error parsing response of setNoWaitCommitmentsFrom")
+      }
+    }
+
+    // TODO(#18453) R6: The code below should be sufficient.
+    final case class NoWaitCommitments(
+        counterParticipant: ParticipantId,
+        startingAt: Either[Instant, ParticipantOffset],
+        domains: Seq[DomainId],
+        state: SharedContractsState,
+    )
+
+    object NoWaitCommitments {
+      def fromSetup(setup: Seq[NoWaitCommitmentsSetup]): Either[String, Seq[NoWaitCommitments]] = {
+        val s = setup.map(setup =>
+          for {
+            ts <- setup.timestampOrOffsetActive match {
+              case NoWaitCommitmentsSetup.TimestampOrOffsetActive.SequencingTimestamp(ts) =>
+                CantonTimestamp.fromProtoTimestamp(ts).leftMap(_.toString)
+              case _ => Left("Conversion error for timestamp in ignoredParticipants")
+            }
+            offset <- setup.timestampOrOffsetActive match {
+              case NoWaitCommitmentsSetup.TimestampOrOffsetActive.PruningOffset(offset) =>
+                Right(UpstreamOffsetConvert.toParticipantOffset(offset))
+              case _ => Left("Conversion error for Offset in ignoredParticipants")
+            }
+            domains <- setup.domainIds.traverse(_.domainIds.traverse(DomainId.fromString))
+            state <- SharedContractsState
+              .fromProtoV30(setup.counterParticipantState)
+              .leftMap(_.toString)
+            participantId <- ParticipantId
+              .fromProtoPrimitive(setup.counterParticipantUid, "")
+              .leftMap(_.toString)
+          } yield NoWaitCommitments(
+            participantId,
+            setup.timestampOrOffsetActive match {
+              case NoWaitCommitmentsSetup.TimestampOrOffsetActive.SequencingTimestamp(_) =>
+                ts.toInstant.asLeft[ParticipantOffset]
+              case _ => offset.asRight[Instant]
+            },
+            domains.getOrElse(Seq.empty),
+            state,
+          )
+        )
+        if (s.forall(_.isRight)) {
+          Right(
+            s.map(
+              _.getOrElse(
+                NoWaitCommitments(
+                  ParticipantId.tryFromProtoPrimitive("PAR::participant::error"),
+                  Left(Instant.EPOCH),
+                  Seq.empty,
+                  SharedContractsState.NoSharedContracts,
+                )
+              )
+            )
+          )
+        } else
+          Left("Error parsing response of getNoWaitCommitmentsFrom")
+      }
+    }
+
+    // TODO(#18453) R6: The code below should be sufficient.
+    final case class SetWaitCommitmentsFrom(
+        counterParticipants: Seq[ParticipantId],
+        domainIds: Seq[DomainId],
+    ) extends Base[
+          pruning.v30.ResetNoWaitCommitmentsFrom.Request,
+          pruning.v30.ResetNoWaitCommitmentsFrom.Response,
+          Map[ParticipantId, Seq[DomainId]],
+        ] {
+      override def createRequest(): Right[String, pruning.v30.ResetNoWaitCommitmentsFrom.Request] =
+        Right(
+          pruning.v30.ResetNoWaitCommitmentsFrom.Request(
+            counterParticipants.map(_.toProtoPrimitive),
+            domainIds.map(_.toProtoPrimitive),
+          )
+        )
+
+      override def submitRequest(
+          service: Svc,
+          request: pruning.v30.ResetNoWaitCommitmentsFrom.Request,
+      ): Future[pruning.v30.ResetNoWaitCommitmentsFrom.Response] =
+        service.resetNoWaitCommitmentsFrom(request)
+
+      override def handleResponse(
+          response: pruning.v30.ResetNoWaitCommitmentsFrom.Response
+      ): Either[String, Map[ParticipantId, Seq[DomainId]]] = {
+
+        val m = response.participantDomainsMapping
+          .map { case (participant, domains) =>
+            ParticipantId.tryFromProtoPrimitive(participant) ->
+              domains.domainIds.map(DomainId.fromString).sequence
+          }
+
+        if (m.forall(_._2.isRight)) Right(m.map { case (id, either) =>
+          id -> either.getOrElse(Seq.empty)
+        })
+        else
+          Left("Error parsing response of resetNoWaitCommitmentsFrom")
+      }
+    }
+
+    // TODO(#18453) R6: The code below should be sufficient.
+    final case class WaitCommitments(
+        counterParticipant: ParticipantId,
+        domains: Seq[DomainId],
+        state: SharedContractsState,
+    )
+
+    object WaitCommitments {
+      def fromSetup(setup: Seq[WaitCommitmentsSetup]): Either[String, Seq[WaitCommitments]] = {
+        val s = setup.map(setup =>
+          for {
+            domains <- setup.domainIds.traverse(_.domainIds.traverse(DomainId.fromString))
+            state <- SharedContractsState
+              .fromProtoV30(setup.counterParticipantState)
+              .leftMap(_.toString)
+          } yield WaitCommitments(
+            ParticipantId.tryFromProtoPrimitive(setup.counterParticipantUid),
+            domains.getOrElse(Seq.empty),
+            state,
+          )
+        )
+        if (s.forall(_.isRight)) {
+          Right(
+            s.map(
+              _.getOrElse(
+                WaitCommitments(
+                  ParticipantId.tryFromProtoPrimitive("PAR::participant::error"),
+                  Seq.empty,
+                  SharedContractsState.NoSharedContracts,
+                )
+              )
+            )
+          )
+        } else
+          Left("Error parsing response of getNoWaitCommitmentsFrom")
+      }
+    }
+
+    // TODO(#18453) R6: The code below should be sufficient.
+    final case class GetNoWaitCommitmentsFrom(
+        domains: Seq[DomainId],
+        counterParticipants: Seq[ParticipantId],
+    ) extends Base[
+          pruning.v30.GetNoWaitCommitmentsFrom.Request,
+          pruning.v30.GetNoWaitCommitmentsFrom.Response,
+          (Seq[NoWaitCommitments], Seq[WaitCommitments]),
+        ] {
+
+      override def createRequest(): Right[String, pruning.v30.GetNoWaitCommitmentsFrom.Request] =
+        Right(
+          pruning.v30.GetNoWaitCommitmentsFrom.Request(
+            domains.map(_.toProtoPrimitive),
+            counterParticipants.map(_.toProtoPrimitive),
+          )
+        )
+
+      override def submitRequest(
+          service: Svc,
+          request: pruning.v30.GetNoWaitCommitmentsFrom.Request,
+      ): Future[pruning.v30.GetNoWaitCommitmentsFrom.Response] =
+        service.getNoWaitCommitmentsFrom(request)
+
+      override def handleResponse(
+          response: pruning.v30.GetNoWaitCommitmentsFrom.Response
+      ): Either[String, (Seq[NoWaitCommitments], Seq[WaitCommitments])] = {
+        val ignoredCounterParticipants = NoWaitCommitments.fromSetup(response.ignoredParticipants)
+        val nonIgnoredCounterParticipants =
+          WaitCommitments.fromSetup(response.notIgnoredParticipants)
+        if (ignoredCounterParticipants.isLeft || nonIgnoredCounterParticipants.isLeft) {
+          Left("Error parsing response of getNoWaitCommitmentsFrom")
+        } else {
+          Right(
+            (
+              ignoredCounterParticipants.getOrElse(Seq.empty),
+              nonIgnoredCounterParticipants.getOrElse(Seq.empty),
+            )
+          )
+        }
+      }
+    }
+
     final case class GetParticipantScheduleCommand()
         extends Base[
           pruning.v30.GetParticipantSchedule.Request,
@@ -1103,7 +1801,7 @@ object ParticipantAdminCommands {
   object Replication {
 
     final case class SetPassiveCommand()
-        extends GrpcAdminCommand[SetPassive.Request, SetPassive.Response, Unit] {
+        extends GrpcAdminCommand[SetPassive.Request, SetPassive.Response, Boolean] {
       override type Svc = EnterpriseParticipantReplicationServiceStub
 
       override def createService(
@@ -1120,9 +1818,9 @@ object ParticipantAdminCommands {
       ): Future[SetPassive.Response] =
         service.setPassive(request)
 
-      override def handleResponse(response: SetPassive.Response): Either[String, Unit] =
+      override def handleResponse(response: SetPassive.Response): Either[String, Boolean] =
         response match {
-          case SetPassive.Response() => Right(())
+          case SetPassive.Response(becamePassive) => Right(becamePassive)
         }
     }
   }
@@ -1132,7 +1830,7 @@ object ParticipantAdminCommands {
         extends GrpcAdminCommand[
           TrafficControlStateRequest,
           TrafficControlStateResponse,
-          MemberTrafficStatus,
+          TrafficState,
         ] {
       override type Svc = TrafficControlServiceGrpc.TrafficControlServiceStub
 
@@ -1153,11 +1851,11 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: TrafficControlStateResponse
-      ): Either[String, MemberTrafficStatus] = {
+      ): Either[String, TrafficState] = {
         response.trafficState
           .map { trafficStatus =>
-            MemberTrafficStatus
-              .fromProtoV30(trafficStatus)
+            TrafficStateAdmin
+              .fromProto(trafficStatus)
               .leftMap(_.message)
           }
           .getOrElse(Left("No traffic state available"))

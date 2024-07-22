@@ -6,7 +6,7 @@ package com.digitalasset.canton.platform.apiserver.ratelimiting
 import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.{MetricInfo, MetricQualification, MetricsContext}
 import com.daml.ports.Port
 import com.daml.scalautil.Statement.discard
 import com.daml.tracing.NoOpTelemetry
@@ -17,7 +17,7 @@ import com.digitalasset.canton.ledger.api.health.HealthChecks.ComponentName
 import com.digitalasset.canton.ledger.api.health.{HealthChecks, ReportsHealth}
 import com.digitalasset.canton.ledger.resources.TestResourceContext
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.ActiveStreamMetricsInterceptor
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.apiserver.ratelimiting.LimitResult.LimitResultCheck
@@ -99,7 +99,13 @@ final class RateLimitingInterceptorSpec
 
   it should "allow metadata requests even when over limit" in {
     metrics.openTelemetryMetricsFactory
-      .meter(metrics.lapi.threadpool.apiServices :+ "submitted")
+      .meter(
+        MetricInfo(
+          metrics.lapi.threadpool.apiServices :+ "submitted",
+          "",
+          MetricQualification.Debug,
+        )
+      )(MetricsContext.Empty)
       .mark(config.maxApiServicesQueueSize.toLong + 1)(MetricsContext.Empty) // Over limit
 
     val protoService = ProtoReflectionService.newInstance()
@@ -131,7 +137,13 @@ final class RateLimitingInterceptorSpec
 
   it should "allow health checks event when over limit" in {
     metrics.openTelemetryMetricsFactory
-      .meter(metrics.lapi.threadpool.apiServices :+ "submitted")
+      .meter(
+        MetricInfo(
+          metrics.lapi.threadpool.apiServices :+ "submitted",
+          "",
+          MetricQualification.Debug,
+        )
+      )(MetricsContext.Empty)
       .mark(config.maxApiServicesQueueSize.toLong + 1)(MetricsContext.Empty) // Over limit
 
     val healthService =
@@ -378,7 +390,7 @@ object RateLimitingInterceptorSpec extends MockitoSugar {
   private val logger = loggerFactory.getLogger(getClass)
   private val healthChecks = new HealthChecks(Map.empty[ComponentName, ReportsHealth])
 
-  private def metrics = Metrics.ForTesting
+  private def metrics = LedgerApiServerMetrics.ForTesting
 
   // For tests that do not involve memory
   private def underLimitMemoryPoolMXBean(): MemoryPoolMXBean = {
@@ -391,7 +403,7 @@ object RateLimitingInterceptorSpec extends MockitoSugar {
   }
 
   def withChannel(
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       service: BindableService,
       config: RateLimitingConfig,
       pool: List[MemoryPoolMXBean] = List(underLimitMemoryPoolMXBean()),

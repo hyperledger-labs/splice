@@ -4,13 +4,12 @@
 package com.digitalasset.canton.platform.indexer
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.lf.data.Time.Timestamp
 import com.daml.logging.LoggingContext
 import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ParticipantMetering
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ParticipantMetering
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.indexer.MeteringAggregator.{toOffsetDateTime, toTimestamp}
 import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
 import com.digitalasset.canton.platform.store.backend.{
@@ -20,6 +19,7 @@ import com.digitalasset.canton.platform.store.backend.{
 }
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Time.Timestamp
 
 import java.sql.Connection
 import java.time.temporal.ChronoUnit
@@ -35,7 +35,7 @@ object MeteringAggregator {
       meteringStore: MeteringStorageWriteBackend,
       parameterStore: ParameterStorageBackend,
       meteringParameterStore: MeteringParameterStorageBackend,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       period: FiniteDuration = 6.minutes,
       maxTaskDuration: FiniteDuration = 6.hours,
       override protected val loggerFactory: NamedLoggerFactory,
@@ -88,7 +88,7 @@ class MeteringAggregator(
     meteringStore: MeteringStorageWriteBackend,
     parameterStore: ParameterStorageBackend,
     meteringParameterStore: MeteringParameterStorageBackend,
-    metrics: Metrics,
+    metrics: LedgerApiServerMetrics,
     dbDispatcher: DbDispatcher,
     clock: () => Timestamp = () => Timestamp.now(),
     override protected val loggerFactory: NamedLoggerFactory,

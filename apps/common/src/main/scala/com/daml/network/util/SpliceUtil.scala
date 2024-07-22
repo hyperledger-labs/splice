@@ -4,8 +4,8 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.Unit as DamlUnit
-import com.daml.lf.data.Numeric
-import com.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Numeric
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet.Amulet
@@ -148,7 +148,7 @@ object SpliceUtil {
   private val decimalScale = Numeric.Scale.assertFromInt(10)
 
   private val roundsPerYear: Numeric =
-    com.daml.lf.data.assertRight(
+    com.digitalasset.daml.lf.data.assertRight(
       Numeric.divide(
         decimalScale,
         damlNumeric(365.0 * 24 * 60),
@@ -158,7 +158,7 @@ object SpliceUtil {
 
   lazy val defaultHoldingFee = // ~= 1.9290123456790123E-5 ~= 1.9E-5
     new splice.fees.RatePerRound(
-      com.daml.lf.data.assertRight(
+      com.digitalasset.daml.lf.data.assertRight(
         Numeric.divide(
           decimalScale,
           damlNumeric(1.0),
@@ -458,7 +458,7 @@ object SpliceUtil {
   ): java.math.BigDecimal = {
     val usdN = damlNumeric(usd)
     val amuletPriceN = damlNumeric(amuletPrice)
-    com.daml.lf.data.assertRight(Numeric.divide(decimalScale, usdN, amuletPriceN))
+    com.digitalasset.daml.lf.data.assertRight(Numeric.divide(decimalScale, usdN, amuletPriceN))
   }
 
   def ccToDollars(
@@ -467,7 +467,7 @@ object SpliceUtil {
   ): java.math.BigDecimal = {
     val ccN = damlNumeric(cc)
     val amuletPriceN = damlNumeric(amuletPrice)
-    com.daml.lf.data.assertRight(Numeric.multiply(decimalScale, amuletPriceN, ccN))
+    com.digitalasset.daml.lf.data.assertRight(Numeric.multiply(decimalScale, amuletPriceN, ccN))
   }
 
   def synchronizerFees(
@@ -486,6 +486,6 @@ object SpliceUtil {
       trafficCostCc <- Numeric.divide(decimalScale, trafficCostUsd, amuletPriceN)
     } yield (BigDecimal(trafficCostUsd), BigDecimal(trafficCostCc))
 
-    com.daml.lf.data.assertRight(tryCompute())
+    com.digitalasset.daml.lf.data.assertRight(tryCompute())
   }
 }

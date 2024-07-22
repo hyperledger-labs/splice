@@ -9,6 +9,7 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 
 final case class IngestionSummary(
     updateId: Option[String],

@@ -13,6 +13,7 @@ import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SequencerSubscription
 import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.SequencedEventError
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
@@ -36,7 +37,7 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
     val domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("da::default"))
     var handler: Option[SerializedEventOrErrorHandler[SequencedEventError]] = None
     val member = ParticipantId(DefaultTestIdentities.uid)
-    val observer = mock[ServerCallStreamObserver[v30.SubscriptionResponse]]
+    val observer = mock[ServerCallStreamObserver[v30.VersionedSubscriptionResponse]]
     var cancelCallback: Option[Runnable] = None
 
     when(observer.setOnCancelHandler(any[Runnable]))
@@ -69,19 +70,20 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
           ),
           None,
           testedProtocolVersion,
+          Option.empty[TrafficReceipt],
         ),
         SymbolicCrypto.emptySignature,
         None,
         testedProtocolVersion,
       )
       handler.fold(fail("handler not registered"))(h =>
-        Await.result(h(Right(OrdinarySequencedEvent(event, None)(traceContext))), 5.seconds)
+        Await.result(h(Right(OrdinarySequencedEvent(event)(traceContext))), 5.seconds)
       )
     }
 
     private def toSubscriptionResponseV30(event: OrdinarySerializedEvent) =
-      v30.SubscriptionResponse(
-        signedSequencedEvent = Some(event.signedEvent.toProtoV30),
+      v30.VersionedSubscriptionResponse(
+        signedSequencedEvent = event.signedEvent.toByteString,
         Some(SerializableTraceContext(event.traceContext).toProtoV30),
       )
 
@@ -101,7 +103,7 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
     "send received events" in new Env {
       createManagedSubscription()
       deliver()
-      verify(observer).onNext(any[v30.SubscriptionResponse])
+      verify(observer).onNext(any[v30.VersionedSubscriptionResponse])
     }
 
     "if observer is cancelled then subscription is closed but no response is sent" in new Env {

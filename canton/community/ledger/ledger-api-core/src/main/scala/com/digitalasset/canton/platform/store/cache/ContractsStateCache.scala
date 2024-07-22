@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.platform.store.cache
 
-import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.transaction.GlobalKey
 import com.digitalasset.canton.caching.SizedCache
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.transaction.GlobalKey
 
 import scala.concurrent.ExecutionContext
 
@@ -16,7 +16,7 @@ object ContractsStateCache {
   def apply(
       initialCacheIndex: Offset,
       cacheSize: Long,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContext

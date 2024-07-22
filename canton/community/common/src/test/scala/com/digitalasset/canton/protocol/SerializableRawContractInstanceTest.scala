@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.protocol
 
-import com.daml.lf.value.ValueCoder
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.serialization.HasCryptographicEvidenceTest
+import com.digitalasset.daml.lf.value.ValueCoder
 import com.google.protobuf.ByteString
 import org.scalatest.prop.TableFor3
 import org.scalatest.wordspec.AnyWordSpec
@@ -55,9 +55,10 @@ class SerializableRawContractInstanceTest
       val nonSerializableContractInst = ExampleTransactionFactory.veryDeepContractInstance
 
       "fail if no serialization is given" in {
-        SerializableRawContractInstance.create(nonSerializableContractInst) should matchPattern {
-          case Left(_: ValueCoder.EncodeError) =>
-        }
+        SerializableRawContractInstance
+          .create(nonSerializableContractInst)
+          .left
+          .value shouldBe a[ValueCoder.EncodeError]
       }
 
       "not attempt serialization if the serialization is provided" in {

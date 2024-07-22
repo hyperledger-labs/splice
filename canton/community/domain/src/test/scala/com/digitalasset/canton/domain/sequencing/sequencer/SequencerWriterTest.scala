@@ -22,10 +22,14 @@ import com.digitalasset.canton.sequencing.protocol.{
   SubmissionRequest,
 }
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.DefaultTestIdentities
+import com.digitalasset.canton.topology.{
+  DefaultTestIdentities,
+  Member,
+  SequencerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import org.mockito.ArgumentMatchers
 import org.scalatest.FutureOutcome
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 
@@ -60,8 +64,16 @@ class SequencerWriterTest extends FixtureAsyncWordSpec with BaseTest {
     val clock = new SimClock(loggerFactory = loggerFactory)
     val runningFlows = mutable.Buffer[MockRunningWriterFlow]()
     val storage = new MemoryStorage(loggerFactory, timeouts)
-    val store = new InMemorySequencerStore(testedProtocolVersion, loggerFactory)
-    val storeSpy = spy(store)
+    val sequencerMember: Member = SequencerId(
+      UniqueIdentifier.tryFromProtoPrimitive("sequencer::namespace")
+    )
+
+    val store = new InMemorySequencerStore(
+      protocolVersion = testedProtocolVersion,
+      sequencerMember = sequencerMember,
+      unifiedSequencer = testedUseUnifiedSequencer,
+      loggerFactory = loggerFactory,
+    )
     val instanceIndex = 0
     val storageFactory = new MockWriterStoreFactory()
 
@@ -77,15 +89,12 @@ class SequencerWriterTest extends FixtureAsyncWordSpec with BaseTest {
         // Unused because the store is overridden below
         testedProtocolVersion,
         PositiveInt.tryCreate(5),
+        sequencerMember,
+        unifiedSequencer = testedUseUnifiedSequencer,
       ) {
         override val generalStore: SequencerStore = store
       }
 
-    def setupNextGoOnlineTimestamp(ts: CantonTimestamp): Unit =
-      when(
-        storeSpy.goOnline(ArgumentMatchers.eq(instanceIndex), any[CantonTimestamp])(anyTraceContext)
-      )
-        .thenReturn(Future.successful(ts))
     def numberOfFlowsCreated: Int = runningFlows.size
 
     def latestRunningWriterFlowPromise: Promise[Unit] =
@@ -126,21 +135,14 @@ class SequencerWriterTest extends FixtureAsyncWordSpec with BaseTest {
     "wait for online timestamp to be reached" in { env =>
       import env.*
 
-      // set our time to ts2 but the returned goOnline timestamp to ts4
-      clock.advanceTo(ts(3))
-      setupNextGoOnlineTimestamp(ts(4))
-
-      val startET = writer.start()
+      val startET = writer.start(None, SequencerWriter.ResetWatermarkToClockNow)
 
       for {
         _ <- allowScheduledFuturesToComplete
         _ = writer.isRunning shouldBe false
-        _ = clock.advanceTo(ts(3)) // still not reached our online time
         _ <- allowScheduledFuturesToComplete
         _ = writer.isRunning shouldBe false
         _ = startET.value.isCompleted shouldBe false
-        // finally reach our online timestamp
-        _ = clock.advanceTo(ts(4))
         _ <- valueOrFail(startET)("Starting Sequencer Writer")
       } yield writer.isRunning shouldBe true
     }
@@ -153,19 +155,20 @@ class SequencerWriterTest extends FixtureAsyncWordSpec with BaseTest {
       val mockSubmissionRequest = SubmissionRequest.tryCreate(
         DefaultTestIdentities.participant1,
         MessageId.fromUuid(new UUID(1L, 1L)),
-        isRequest = false,
         Batch.empty(testedProtocolVersion),
         maxSequencingTime = CantonTimestamp.MaxValue,
         topologyTimestamp = None,
         aggregationRule = None,
+        submissionCost = None,
         testedProtocolVersion,
       )
 
       for {
-        _ <- valueOrFail(writer.start())("Starting writer")
+        _ <- valueOrFail(writer.start(None, SequencerWriter.ResetWatermarkToClockNow))(
+          "Starting writer"
+        )
         _ = writer.isRunning shouldBe true
-        // set the next goOffline timestamp to way in the future to delay the recovery so we can run assertions
-        _ = setupNextGoOnlineTimestamp(ts(10))
+
         // have the writer flow blow up with an exception saying we've been knocked offline
         _ = latestRunningWriterFlowPromise.failure(new SequencerOfflineException(42))
         _ <- allowScheduledFuturesToComplete
@@ -174,11 +177,10 @@ class SequencerWriterTest extends FixtureAsyncWordSpec with BaseTest {
         // load balancers
         sendError <- leftOrFail(writer.send(mockSubmissionRequest))("send when unavailable")
         _ = sendError shouldBe SendAsyncError.Unavailable("Unavailable")
-        // now progress to allow crash recovery to complete
-        _ = clock.advanceTo(ts(10))
         // there may be a number of future hops to work its way through completing the second flow which we currently
         // can't capture via flushes, so just check it eventually happens
         _ <- MonadUtil.sequentialTraverse(0 until 10)(_ => allowScheduledFuturesToComplete)
+        _ = writer.isRunning shouldBe true
       } yield {
         numberOfFlowsCreated shouldBe 2
         writer.isRunning shouldBe true

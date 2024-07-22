@@ -10,6 +10,7 @@ import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.sequencing.sequencer.DomainSequencingTestUtils.*
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.domain.sequencing.sequencer.store.*
@@ -31,17 +32,19 @@ import com.digitalasset.canton.sequencing.protocol.{
   Recipients,
   SequencerErrors,
 }
+import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
+import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, ParticipantPermission}
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   Member,
   ParticipantId,
   SequencerGroup,
   SequencerId,
-  TestingTopologyX,
+  TestingTopology,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.{BaseTest, DiscardOps, SequencerCounter, config}
+import com.digitalasset.canton.{BaseTest, SequencerCounter, config}
 import com.google.protobuf.ByteString
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
@@ -60,20 +63,26 @@ import scala.concurrent.{Future, Promise}
 
 class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
 
-  private val alice: Member = ParticipantId("alice")
-  private val bob: Member = ParticipantId("bob")
+  private val alice = ParticipantId("alice")
+  private val bob = ParticipantId("bob")
   private val ts0 = CantonTimestamp.Epoch
   private val domainId = DefaultTestIdentities.domainId
-  private val topologyClientMember = SequencerId(domainId)
-  private val crypto = TestingTopologyX(sequencerGroup =
-    SequencerGroup(
-      active = NonEmpty.mk(Seq, SequencerId(domainId)),
+  private val topologyClientMember = SequencerId(domainId.uid)
+  private val crypto = TestingTopology(
+    sequencerGroup = SequencerGroup(
+      active = NonEmpty.mk(Seq, SequencerId(domainId.uid)),
       passive = Seq.empty,
       threshold = PositiveInt.one,
-    )
-  ).build(loggerFactory).forOwner(SequencerId(domainId))
+    ),
+    participants = Seq(
+      alice,
+      bob,
+    ).map((_, ParticipantAttributes(ParticipantPermission.Confirmation))).toMap,
+  ).build(loggerFactory).forOwner(SequencerId(domainId.uid))
   private val cryptoD =
-    valueOrFail(crypto.forDomain(domainId).toRight("no crypto api"))("domain crypto")
+    valueOrFail(crypto.forDomain(domainId, defaultStaticDomainParameters).toRight("no crypto api"))(
+      "domain crypto"
+    )
   private val instanceDiscriminator = new UUID(1L, 2L)
 
   class ManualEventSignaller(implicit materializer: Materializer)
@@ -112,7 +121,12 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
       new AtomicBoolean(true) // should the latest timestamp be added to the signaller when stored
     val actorSystem: ActorSystem = ActorSystem(classOf[SequencerReaderTest].getSimpleName)
     implicit val materializer: Materializer = Materializer(actorSystem)
-    val store = new InMemorySequencerStore(testedProtocolVersion, loggerFactory)
+    val store = new InMemorySequencerStore(
+      protocolVersion = testedProtocolVersion,
+      sequencerMember = topologyClientMember,
+      unifiedSequencer = testedUseUnifiedSequencer,
+      loggerFactory = loggerFactory,
+    )
     val instanceIndex: Int = 0
     // create a spy so we can add verifications on how many times methods were called
     val storeSpy: InMemorySequencerStore = spy[InMemorySequencerStore](store)
@@ -129,6 +143,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
       cryptoD,
       eventSignaller,
       topologyClientMember,
+      trafficConsumedStoreO = None,
       testedProtocolVersion,
       timeouts,
       loggerFactory,
@@ -717,6 +732,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
                       batch,
                       Some(topologyTimestamp),
                       testedProtocolVersion,
+                      Option.empty[TrafficReceipt],
                     )
                   else
                     DeliverError.create(
@@ -729,6 +745,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
                         sequencingTimestamp,
                       ),
                       testedProtocolVersion,
+                      Option.empty[TrafficReceipt],
                     )
                 delivered.signedEvent.content shouldBe expectedSequencedEvent
             }
@@ -767,6 +784,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
                       batch,
                       Some(topologyTimestamp),
                       testedProtocolVersion,
+                      Option.empty[TrafficReceipt],
                     )
                   else
                     Deliver.create(
@@ -777,6 +795,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
                       Batch.empty(testedProtocolVersion),
                       None,
                       testedProtocolVersion,
+                      Option.empty[TrafficReceipt],
                     )
                 delivered.signedEvent.content shouldBe expectedSequencedEvent
             }

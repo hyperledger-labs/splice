@@ -6,7 +6,7 @@ package com.digitalasset.canton.integration.tests
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CommunityStorageConfig
 import com.digitalasset.canton.console.{CommandFailure, InstanceReference}
-import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.integration.CommunityTests.{
   CommunityIntegrationTest,
   SharedCommunityEnvironment,
@@ -18,7 +18,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError.PruningNotSupportedInCommunityEdition
 
-sealed trait EnterpriseFeatureInCommunityXIntegrationTest
+sealed trait EnterpriseFeatureInCommunityIntegrationTest
     extends CommunityIntegrationTest
     with SharedCommunityEnvironment {
 
@@ -36,14 +36,21 @@ sealed trait EnterpriseFeatureInCommunityXIntegrationTest
         sequencer1.start()
         mediator1.start()
 
-        sequencer1.health.status shouldBe NodeStatus.NotInitialized(true)
-        mediator1.health.status shouldBe NodeStatus.NotInitialized(true)
+        sequencer1.health.status shouldBe NodeStatus.NotInitialized(
+          active = true,
+          Some(WaitingForInitialization),
+        )
+        mediator1.health.status shouldBe NodeStatus.NotInitialized(
+          active = true,
+          Some(WaitingForInitialization),
+        )
 
         bootstrap.domain(
           domainAlias,
           Seq(sequencer1),
           Seq(mediator1),
           Seq[InstanceReference](sequencer1, mediator1),
+          staticDomainParameters = CommunityEnvironmentDefinition.defaultStaticDomainParameters,
         )
 
         sequencer1.health.wait_for_initialized()
@@ -121,8 +128,8 @@ sealed trait EnterpriseFeatureInCommunityXIntegrationTest
   }
 }
 
-final class EnterpriseFeatureInCommunityReferenceXIntegrationTest
-    extends EnterpriseFeatureInCommunityXIntegrationTest {
+final class EnterpriseFeatureInCommunityReferenceIntegrationTest
+    extends EnterpriseFeatureInCommunityIntegrationTest {
   registerPlugin(
     new UseCommunityReferenceBlockSequencer[CommunityStorageConfig.Memory](loggerFactory)
   )

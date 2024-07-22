@@ -8,10 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.classic.{Level, Logger}
-import ch.qos.logback.core.spi.AppenderAttachable
-import ch.qos.logback.core.{Appender, FileAppender}
+import ch.qos.logback.classic.Level
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand, ExerciseCommand}
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.value.Value.Sum
@@ -23,7 +20,6 @@ import com.daml.ledger.api.v2.value.{
   RecordField,
   Value,
 }
-import com.daml.lf.value.Value.ContractId
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
@@ -35,12 +31,13 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.admin.data.{
   MediatorNodeStatus,
   NodeStatus,
   SequencerNodeStatus,
 }
-import com.digitalasset.canton.logging.{LastErrorsAppender, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NodeLoggingUtil}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
@@ -55,18 +52,19 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
-  StoredTopologyTransactionsX,
+  StoredTopologyTransaction,
+  StoredTopologyTransactions,
 }
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.{
-  GenericSignedTopologyTransactionX,
-  PositiveSignedTopologyTransactionX,
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.{
+  GenericSignedTopologyTransaction,
+  PositiveSignedTopologyTransaction,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{BinaryFileUtil, EitherUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
@@ -78,7 +76,6 @@ import java.time.Instant
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 
 trait ConsoleMacros extends NamedLogging with NoTracing {
   import scala.reflect.runtime.universe.*
@@ -148,12 +145,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def synchronize_topology(
         timeoutO: Option[NonNegativeDuration] = None
     )(implicit env: ConsoleEnvironment): Unit =
-      // Disabled for CN as Canton runs in a separate process so this does nothing.
-      ()
+      ConsoleMacros.utils.retry_until_true(timeoutO.getOrElse(env.commandTimeouts.bounded)) {
+        env.nodes.all.forall(_.topology.synchronisation.is_idle())
+      }
 
     @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object GenerateDamlScriptParticipantsConf {
-      import ConsoleEnvironment.Implicits.*
 
       private val filename = "participant-config.json"
 
@@ -199,7 +196,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       def apply(
           file: Option[String] = None,
           useParticipantAlias: Boolean = true,
-          defaultParticipantX: Option[ParticipantReference] = None,
+          defaultParticipant: Option[ParticipantReference] = None,
       )(implicit env: ConsoleEnvironment): JFile = {
 
         def toLedgerApi(participantConfig: BaseParticipantConfig) =
@@ -217,7 +214,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         val uidToAlias = allParticipants.map(p => (p.id, p.name)).toMap
 
         val default_participant =
-          defaultParticipantX.map(participantReference => toLedgerApi(participantReference.config))
+          defaultParticipant.map(participantReference => toLedgerApi(participantReference.config))
 
         val participantJson = Participants(
           default_participant,
@@ -239,18 +236,18 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |It takes three arguments:
         |- file (default to "participant-config.json")
         |- useParticipantAlias (default to true): participant aliases are used instead of UIDs
-        |- defaultParticipantX (default to None): adds a default participant if provided
+        |- defaultParticipant (default to None): adds a default participant if provided
         |"""
     )
     def generate_daml_script_participants_conf(
         file: Option[String] = None,
         useParticipantAlias: Boolean = true,
-        defaultParticipantX: Option[ParticipantReference] = None,
+        defaultParticipant: Option[ParticipantReference] = None,
     )(implicit env: ConsoleEnvironment): JFile =
       GenerateDamlScriptParticipantsConf(
         file,
         useParticipantAlias,
-        defaultParticipantX,
+        defaultParticipant,
       )
 
     // TODO(i7387): add check that flag is set
@@ -283,6 +280,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           RepairService.ContractConverter.contractDataToInstance(
             contractData.templateId.toIdentifier,
             contractData.packageName,
+            contractData.packageVersion,
             contractData.createArguments,
             contractData.signatories,
             contractData.observers,
@@ -309,6 +307,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           case (
                 templateId,
                 packageName,
+                packageVersion,
                 createArguments,
                 signatories,
                 observers,
@@ -319,6 +318,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             ContractData(
               TemplateId.fromIdentifier(templateId),
               packageName,
+              packageVersion,
               createArguments,
               signatories,
               observers,
@@ -587,76 +587,25 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
     @Help.Summary("Dynamically change log level (TRACE, DEBUG, INFO, WARN, ERROR, OFF, null)")
     def set_level(loggerName: String = "com.digitalasset.canton", level: String): Unit = {
-      if (Seq("com.digitalasset.canton", "com.daml").exists(loggerName.startsWith))
-        System.setProperty("LOG_LEVEL_CANTON", level)
-
-      val logger = getLogger(loggerName)
-      if (level == "null")
-        logger.setLevel(null)
-      else
-        logger.setLevel(Level.valueOf(level))
+      NodeLoggingUtil.setLevel(loggerName, level)
     }
 
     @Help.Summary("Determine current logging level")
     def get_level(loggerName: String = "com.digitalasset.canton"): Option[Level] =
-      Option(getLogger(loggerName).getLevel)
-
-    private def getLogger(loggerName: String): Logger = {
-      import org.slf4j.LoggerFactory
-      @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-      val logger: Logger = LoggerFactory.getLogger(loggerName).asInstanceOf[Logger]
-      logger
-    }
-
-    private def getAppenders(logger: Logger): List[Appender[ILoggingEvent]] = {
-      def go(currentAppender: Appender[ILoggingEvent]): List[Appender[ILoggingEvent]] = {
-        currentAppender match {
-          case attachable: AppenderAttachable[ILoggingEvent @unchecked] =>
-            attachable.iteratorForAppenders().asScala.toList.flatMap(go)
-          case appender: Appender[ILoggingEvent] => List(appender)
-        }
-      }
-
-      logger.iteratorForAppenders().asScala.toList.flatMap(go)
-    }
-
-    private lazy val rootLogger = getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
-
-    private lazy val allAppenders = getAppenders(rootLogger)
-
-    private lazy val lastErrorsAppender: LastErrorsAppender = {
-      findAppender("LAST_ERRORS") match {
-        case Some(lastErrorsAppender: LastErrorsAppender) =>
-          lastErrorsAppender
-        case _ =>
-          logger.error(s"Log appender for last errors not found/configured")
-          throw new CommandFailure()
-      }
-    }
-
-    private def findAppender(appenderName: String): Option[Appender[ILoggingEvent]] =
-      Option(rootLogger.getAppender(appenderName))
-        .orElse(allAppenders.find(_.getName == appenderName))
-
-    private def renderError(errorEvent: ILoggingEvent): String = {
-      findAppender("FILE") match {
-        case Some(appender: FileAppender[ILoggingEvent]) =>
-          ByteString.copyFrom(appender.getEncoder.encode(errorEvent)).toStringUtf8
-        case _ => errorEvent.getFormattedMessage
-      }
-    }
+      Option(NodeLoggingUtil.getLogger(loggerName).getLevel)
 
     @Help.Summary("Returns the last errors (trace-id -> error event) that have been logged locally")
     def last_errors(): Map[String, String] =
-      lastErrorsAppender.lastErrors.fmap(renderError)
+      NodeLoggingUtil.lastErrors().getOrElse {
+        logger.error(s"Log appender for last errors not found/configured")
+        throw new CommandFailure()
+      }
 
     @Help.Summary("Returns log events for an error with the same trace-id")
     def last_error_trace(traceId: String): Seq[String] = {
-      lastErrorsAppender.lastErrorTrace(traceId) match {
-        case Some(events) => events.map(renderError)
-        case None =>
-          logger.error(s"No events found for last error trace-id $traceId")
-          throw new CommandFailure()
+      NodeLoggingUtil.lastErrorTrace(traceId).getOrElse {
+        logger.error(s"No events found for last error trace-id $traceId")
+        throw new CommandFailure()
       }
     }
   }
@@ -712,7 +661,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def decentralized_namespace(
         owners: Seq[InstanceReference],
         store: String = AuthorizedStore.filterName,
-    ): (Namespace, Seq[GenericSignedTopologyTransactionX]) = {
+    ): (Namespace, Seq[GenericSignedTopologyTransaction]) = {
       val ownersNE = NonEmpty
         .from(owners)
         .getOrElse(
@@ -720,15 +669,15 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             "There must be at least 1 owner for a decentralizedNamespace."
           )
         )
-      val expectedDNS = DecentralizedNamespaceDefinitionX.computeNamespace(
-        owners.map(_.id.member.uid.namespace).toSet
+      val expectedDNS = DecentralizedNamespaceDefinition.computeNamespace(
+        owners.map(_.namespace).toSet
       )
       val proposedOrExisting = ownersNE
         .map { owner =>
           val existingDnsO =
             owner.topology.transactions
-              .findLatestByMappingHash[DecentralizedNamespaceDefinitionX](
-                DecentralizedNamespaceDefinitionX.uniqueKey(expectedDNS),
+              .findLatestByMappingHash[DecentralizedNamespaceDefinition](
+                DecentralizedNamespaceDefinition.uniqueKey(expectedDNS),
                 filterStore = AuthorizedStore.filterName,
                 includeProposals = true,
               )
@@ -736,7 +685,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
           existingDnsO.getOrElse(
             owner.topology.decentralized_namespaces.propose(
-              owners.map(_.id.member.uid.namespace).toSet,
+              owners.map(_.namespace).toSet,
               PositiveInt.tryCreate(1.max(owners.size - 1)),
               store = store,
             )
@@ -754,15 +703,18 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       // merging the signatures here is an "optimization" so that later we only upload a single
       // decentralizedNamespace transaction, instead of a transaction per owner.
       val decentralizedNamespaceDefinition =
-        proposedOrExisting.reduceLeft[SignedTopologyTransactionX[
-          TopologyChangeOpX,
-          DecentralizedNamespaceDefinitionX,
+        proposedOrExisting.reduceLeft[SignedTopologyTransaction[
+          TopologyChangeOp,
+          DecentralizedNamespaceDefinition,
         ]]((txA, txB) => txA.addSignatures(txB.signatures.forgetNE.toSeq))
 
       val ownerNSDs = owners.flatMap(_.topology.transactions.identity_transactions())
       val foundingTransactions = ownerNSDs :+ decentralizedNamespaceDefinition
 
-      owners.foreach(_.topology.transactions.load(foundingTransactions, store = store))
+      owners.foreach(
+        _.topology.transactions
+          .load(foundingTransactions, store = store, ForceFlag.AlienMember)
+      )
 
       (decentralizedNamespaceDefinition.mapping.namespace, foundingTransactions)
     }
@@ -771,14 +723,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         owners: Seq[InstanceReference]
     ): Either[String, Option[Namespace]] = {
       val expectedNamespace =
-        DecentralizedNamespaceDefinitionX.computeNamespace(
-          owners.map(_.id.member.uid.namespace).toSet
+        DecentralizedNamespaceDefinition.computeNamespace(
+          owners.map(_.namespace).toSet
         )
       val recordedNamespaces =
         owners.map(
           _.topology.transactions
-            .findLatestByMappingHash[DecentralizedNamespaceDefinitionX](
-              DecentralizedNamespaceDefinitionX.uniqueKey(expectedNamespace),
+            .findLatestByMappingHash[DecentralizedNamespaceDefinition](
+              DecentralizedNamespaceDefinition.uniqueKey(expectedNamespace),
               filterStore = AuthorizedStore.filterName,
               includeProposals = true,
             )
@@ -793,7 +745,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
 
     private def in_domain(
-        sequencers: NonEmpty[Seq[SequencerNodeReference]],
+        sequencers: NonEmpty[Seq[SequencerReference]],
         mediators: NonEmpty[Seq[MediatorReference]],
     )(domainId: DomainId): Either[String, Option[DomainId]] = {
       def isNotInitializedOrSuccessWithDomain(
@@ -816,7 +768,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               true,
               s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId",
             )
-          case NodeStatus.NotInitialized(true) =>
+          case NodeStatus.NotInitialized(true, _) =>
             // the node is not yet initialized for this domain
             Right(false)
           case NodeStatus.Failure(msg) =>
@@ -846,7 +798,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     private def check_domain_bootstrap_status(
         name: String,
         owners: Seq[InstanceReference],
-        sequencers: Seq[SequencerNodeReference],
+        sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
     ): Either[String, Option[DomainId]] =
       for {
@@ -868,8 +820,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         domainName: String,
         staticDomainParameters: data.StaticDomainParameters,
         domainOwners: Seq[InstanceReference],
-        sequencers: Seq[SequencerNodeReference],
-        mediators: Seq[MediatorReference],
+        sequencers: Seq[SequencerReference],
+        mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
     ): DomainId = {
       val (decentralizedNamespace, foundingTxs) =
         bootstrap.decentralized_namespace(domainOwners, store = AuthorizedStore.filterName)
@@ -878,10 +830,15 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         UniqueIdentifier.tryCreate(domainName, decentralizedNamespace.toProtoPrimitive)
       )
 
+      val mediators = mediatorsToSequencers.keys.toSeq
       val seqMedIdentityTxs =
         (sequencers ++ mediators).flatMap(_.topology.transactions.identity_transactions())
       domainOwners.foreach(
-        _.topology.transactions.load(seqMedIdentityTxs, store = AuthorizedStore.filterName)
+        _.topology.transactions.load(
+          seqMedIdentityTxs,
+          store = AuthorizedStore.filterName,
+          ForceFlag.AlienMember,
+        )
       )
 
       val domainGenesisTxs = domainOwners.flatMap(
@@ -894,14 +851,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       )
 
       val initialTopologyState = (foundingTxs ++ seqMedIdentityTxs ++ domainGenesisTxs)
-        .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+        .mapFilter(_.selectOp[TopologyChangeOp.Replace])
 
       // TODO(#12390) replace this merge / active with proper tooling and checks that things are really fully authorized
       val orderingMap =
         Seq(
-          NamespaceDelegationX.code,
-          OwnerToKeyMappingX.code,
-          DecentralizedNamespaceDefinitionX.code,
+          NamespaceDelegation.code,
+          OwnerToKeyMapping.code,
+          DecentralizedNamespaceDefinition.code,
         ).zipWithIndex.toMap
           .withDefaultValue(5)
 
@@ -910,18 +867,18 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .values
         .map(
           // combine signatures of transactions with the same hash
-          _.reduceLeft[PositiveSignedTopologyTransactionX] { (a, b) =>
+          _.reduceLeft[PositiveSignedTopologyTransaction] { (a, b) =>
             a.addSignatures(b.signatures.toSeq)
           }.copy(isProposal = false)
         )
         .toSeq
         .sortBy(tx => orderingMap(tx.mapping.code))
 
-      val storedTopologySnapshot = StoredTopologyTransactionsX[TopologyChangeOpX, TopologyMappingX](
+      val storedTopologySnapshot = StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
         merged.map(stored =>
-          StoredTopologyTransactionX(
-            SequencedTime(SignedTopologyTransactionX.InitialTopologySequencingTime),
-            EffectiveTime(SignedTopologyTransactionX.InitialTopologySequencingTime),
+          StoredTopologyTransaction(
+            SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+            EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
             None,
             stored,
           )
@@ -934,14 +891,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           x.setup.assign_from_genesis_state(storedTopologySnapshot, staticDomainParameters).discard
         )
 
-      mediators
-        .filter(!_.health.initialized())
-        .foreach(
-          _.setup.assign(
+      mediatorsToSequencers
+        .filter(!_._1.health.initialized())
+        .foreach { case (mediator, mediatorSequencers) =>
+          mediator.setup.assign(
             domainId,
-            staticDomainParameters,
             SequencerConnections.tryMany(
-              sequencers
+              mediatorSequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
               PositiveInt.one,
               SubmissionRequestAmplification.NoAmplification,
@@ -951,7 +907,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             // the setup
             SequencerConnectionValidation.Disabled,
           )
-        )
+        }
 
       domainId
     }
@@ -962,17 +918,40 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
     def domain(
         domainName: String,
-        sequencers: Seq[SequencerNodeReference],
+        sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
         domainOwners: Seq[InstanceReference] = Seq.empty,
-        staticDomainParameters: data.StaticDomainParameters =
-          data.StaticDomainParameters.defaultsWithoutKMS,
+        staticDomainParameters: data.StaticDomainParameters,
+    ): DomainId =
+      domain(
+        domainName,
+        sequencers,
+        mediators.map(_ -> sequencers).toMap,
+        domainOwners,
+        staticDomainParameters,
+      )
+
+    @Help.Summary(
+      """Bootstraps a new domain with the given static domain parameters and members. Any participants as domain owners
+        |must still manually connect to the domain afterwards."""
+    )
+    def domain(
+        domainName: String,
+        sequencers: Seq[SequencerReference],
+        mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
+        domainOwners: Seq[InstanceReference],
+        staticDomainParameters: data.StaticDomainParameters,
     ): DomainId = {
+      // skip over HA sequencers
+      val uniqueSequencers =
+        sequencers.groupBy(_.id).flatMap(_._2.headOption.toList).toList
       val domainOwnersOrDefault = if (domainOwners.isEmpty) sequencers else domainOwners
+      val mediators = mediatorsToSequencers.keys.toSeq
+
       check_domain_bootstrap_status(
         domainName,
         domainOwnersOrDefault,
-        sequencers,
+        uniqueSequencers,
         mediators,
       ) match {
         case Right(Some(domainId)) =>
@@ -983,8 +962,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             domainName,
             staticDomainParameters,
             domainOwnersOrDefault,
-            sequencers,
-            mediators,
+            uniqueSequencers,
+            mediatorsToSequencers,
           )
         case Left(error) =>
           val message = s"The domain cannot be bootstrapped: $error"

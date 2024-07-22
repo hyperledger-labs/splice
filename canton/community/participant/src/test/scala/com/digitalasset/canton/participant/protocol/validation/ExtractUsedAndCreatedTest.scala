@@ -18,7 +18,8 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
   val etf: ExampleTransactionFactory = new ExampleTransactionFactory()()
 
   private val emptyUsedAndCreatedContracts = UsedAndCreatedContracts(
-    witnessedAndDivulged = Map.empty[LfContractId, SerializableContract],
+    witnessed = Map.empty[LfContractId, SerializableContract],
+    divulged = Map.empty[LfContractId, SerializableContract],
     checkActivenessTxInputs = Set.empty[LfContractId],
     consumedInputsOfHostedStakeholders = Map.empty[LfContractId, WithContractHash[Set[LfPartyId]]],
     used = Map.empty[LfContractId, SerializableContract],
@@ -46,7 +47,7 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
 
     val tree = etf.rootTransactionViewTree(singleCreate.view0)
     val transactionViewTrees = NonEmpty(Seq, (tree, Option.empty[Signature]))
-    val transactionViews = transactionViewTrees.map { case (viewTree, _signature) => viewTree.view }
+    val transactionViews = transactionViewTrees.map { case (viewTree, _) => viewTree.view }
 
     val actual = underTest.usedAndCreated(transactionViews)
 
@@ -171,6 +172,7 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
         resolvedKeys = Map.empty,
         seed = singleCreate.nodeSeed,
         isRoot = true,
+        packagePreference = Set.empty,
       )
 
       val viewData = ViewData(

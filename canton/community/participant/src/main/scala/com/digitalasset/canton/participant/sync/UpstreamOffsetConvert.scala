@@ -5,9 +5,9 @@ package com.digitalasset.canton.participant.sync
 
 import cats.syntax.either.*
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.lf.data.{Bytes as LfBytes, Ref}
 import com.digitalasset.canton.participant.{GlobalOffset, LedgerSyncOffset}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.daml.lf.data.{Bytes as LfBytes, Ref}
 import com.google.protobuf.ByteString
 
 import java.nio.{ByteBuffer, ByteOrder}
@@ -16,6 +16,7 @@ import java.nio.{ByteBuffer, ByteOrder}
   *  ParticipantState API ReadService still based on a byte string. Canton emits single-Long GlobalOffsets.
   */
 object UpstreamOffsetConvert {
+  import com.digitalasset.canton.participant.pretty.Implicits.*
 
   private val versionUpstreamOffsetsAsLong: Byte = 0
   private val longBasedByteLength: Int = 9 // One byte for the version plus 8 bytes for Long

@@ -12,16 +12,16 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion,
   ValueDecoder,
 }
-import com.daml.lf.archive.{ArchivePayload, Dar, DarReader}
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
-import com.daml.lf.typesig
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.environment.DarResource
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.daml.lf.archive.{ArchivePayload, Dar, DarReader}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
+import com.digitalasset.daml.lf.typesig
 import io.circe.Json
 
 import java.util.zip.ZipInputStream

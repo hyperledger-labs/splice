@@ -12,6 +12,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.SequencerAdminConnection
+import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -63,8 +64,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
     } yield {
       // Sorting here so we have a better chance of all SVs working on the same set traffic balance request around the same time.
       svMembersWithTrafficState.sortBy(_._1).collect {
-        case (memberId, trafficState)
-            if trafficState.extraTrafficLimit != NonNegativeLong.maxValue =>
+        case (memberId, trafficState) if trafficState.extraTrafficLimit != UnlimitedTraffic =>
           Task(memberId)
       }
     }
@@ -82,7 +82,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       _ <- sequencerAdminConnection.setSequencerTrafficControlState(
         trafficState,
         sequencerState,
-        NonNegativeLong.maxValue,
+        UnlimitedTraffic,
         context.pollingClock,
         trafficBalanceReconciliationDelay,
       )
@@ -97,7 +97,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
     trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
   } yield {
     !dsoRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
-    || trafficState.extraTrafficLimit == NonNegativeLong.maxValue
+    || trafficState.extraTrafficLimit == UnlimitedTraffic
   }
 
   private def sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
@@ -109,6 +109,9 @@ class SvOnboardingUnlimitedTrafficTrigger(
 }
 
 object SvOnboardingUnlimitedTrafficTrigger {
+
+  val UnlimitedTraffic: NonNegativeLong = NonNegativeLong.maxValue
+
   final case class Task(
       memberId: Member
   ) extends PrettyPrinting {

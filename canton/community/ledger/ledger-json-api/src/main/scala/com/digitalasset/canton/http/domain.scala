@@ -6,7 +6,7 @@ package com.digitalasset.canton.http
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes as lar
 import com.daml.ledger.api.v2 as lav2
-import com.daml.lf.typesig
+import com.digitalasset.daml.lf.typesig
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.fetchcontracts.util.IdentifierConverters.apiIdentifier
@@ -84,7 +84,7 @@ package object domain {
 package domain {
 
   import com.daml.ledger.api.v2.commands.Commands
-  import com.daml.lf.data.Ref.HexString
+  import com.digitalasset.daml.lf.data.Ref.HexString
   import com.digitalasset.canton.fetchcontracts.domain.`fc domain ErrorOps`
   import com.digitalasset.canton.topology.DomainId
 
@@ -188,14 +188,16 @@ package domain {
 
   final case class PartyDetails(identifier: Party, displayName: Option[String], isLocal: Boolean)
 
+  // Important note: when changing this ADT, adapt the custom associated JsonFormat codec in JsonProtocol
   sealed abstract class UserRight extends Product with Serializable
   final case object ParticipantAdmin extends UserRight
   final case object IdentityProviderAdmin extends UserRight
   final case class CanActAs(party: Party) extends UserRight
   final case class CanReadAs(party: Party) extends UserRight
+  final case object CanReadAsAnyParty extends UserRight
 
   object UserRights {
-    import com.daml.lf.data.Ref
+    import com.digitalasset.daml.lf.data.Ref
     import com.digitalasset.canton.ledger.api.domain.UserRight as LedgerUserRight
     import scalaz.syntax.std.either.*
     import scalaz.syntax.traverse.*
@@ -208,12 +210,14 @@ package domain {
           Ref.Party.fromString(party.unwrap).map(LedgerUserRight.CanActAs).disjunction
         case CanReadAs(party) =>
           Ref.Party.fromString(party.unwrap).map(LedgerUserRight.CanReadAs).disjunction
+        case CanReadAsAnyParty => \/.right(LedgerUserRight.CanReadAsAnyParty)
       }
 
     def fromLedgerUserRights(input: Seq[LedgerUserRight]): List[UserRight] = input
       .map[domain.UserRight] {
         case LedgerUserRight.ParticipantAdmin => ParticipantAdmin
         case LedgerUserRight.IdentityProviderAdmin => IdentityProviderAdmin
+        case LedgerUserRight.CanReadAsAnyParty => CanReadAsAnyParty
         case LedgerUserRight.CanActAs(party) =>
           CanActAs(Party(party: String))
         case LedgerUserRight.CanReadAs(party) =>
@@ -253,6 +257,7 @@ package domain {
 
   final case class AllocatePartyRequest(identifierHint: Option[Party], displayName: Option[String])
 
+  // Important note: when changing this ADT, adapt the custom associated JsonFormat codec in JsonProtocol
   sealed abstract class DeduplicationPeriod extends Product with Serializable {
     def toProto: Commands.DeduplicationPeriod =
       this match {
@@ -778,6 +783,7 @@ package domain {
 
   sealed trait RetryInfoDetailDurationTag
 
+  // Important note: when changing this ADT, adapt the custom associated JsonFormat codec in JsonProtocol
   sealed trait ErrorDetail extends Product with Serializable
   final case class ResourceInfoDetail(name: String, typ: String) extends ErrorDetail
   final case class ErrorInfoDetail(errorCodeId: String, metadata: Map[String, String])
@@ -844,7 +850,7 @@ package domain {
 
   final case class AsyncWarningsWrapper(warnings: ServiceWarning)
 
-  import com.daml.lf.data.Ref
+  import com.digitalasset.daml.lf.data.Ref
 
   import scala.collection.IterableOps
 

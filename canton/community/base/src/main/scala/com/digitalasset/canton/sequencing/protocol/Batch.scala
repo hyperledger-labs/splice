@@ -51,7 +51,7 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
   lazy val allMediatorRecipients: Set[Recipient] = {
     allRecipients.collect {
       case r @ MemberRecipient(_: MediatorId) => r
-      case r: MediatorsOfDomain => r
+      case r: MediatorGroupRecipient => r
       case AllMembersOfDomain => AllMembersOfDomain
     }
   }
@@ -86,7 +86,7 @@ object Batch extends HasProtocolVersionedCompanion2[Batch[Envelope[?]], Batch[Cl
 
   override val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v30
+      ProtocolVersion.v31
     )(v30.CompressedBatch)(
       supportedProtoVersion(_)(
         // TODO(i10428) Prevent zip bombing when decompressing the request

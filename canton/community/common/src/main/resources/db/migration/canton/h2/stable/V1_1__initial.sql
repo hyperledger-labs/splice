@@ -1,7 +1,15 @@
 -- Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-create table par_daml_packages (package_id varchar(300) not null primary key, data binary large object not null, source_description varchar not null default 'default');
+create table par_daml_packages (
+    package_id varchar(300) not null primary key,
+    data binary large object not null,
+    source_description varchar(300) not null default 'default',
+    -- UTC timestamp stored in microseconds relative to EPOCH
+    uploaded_at bigint not null,
+    -- The size of the archive payload (i.e., the serialized DAML-LF package), in bytes
+    package_size bigint not null
+);
 
 create table par_dars (
     hash_hex varchar(300) not null  primary key,
@@ -126,6 +134,9 @@ create table seq_state_manager_events (
 -- instant.
 create index idx_seq_state_manager_events_ts on seq_state_manager_events (ts desc);
 
+-- Index to speed up fetching latest counters (at a certain timestamp).
+create index idx_seq_state_manager_events_member_ts on seq_state_manager_events (member, ts);
+
 -- inclusive lower bound of when events can be read
 -- if empty it means all events from epoch can be read
 -- is updated when sequencer is pruned meaning that earlier events can no longer be read (and likely no longer exist)
@@ -227,7 +238,7 @@ create table med_response_aggregations (
 -- Stores the received sequencer messages
 create table common_sequenced_events (
     -- discriminate between different users of the sequenced events tables
-    client integer not null,
+    domain_id integer not null,
     -- Proto serialized signed message
     sequenced_event binary large object not null,
     -- Explicit fields to query the messages, which are stored as blobs
@@ -241,22 +252,22 @@ create table common_sequenced_events (
     -- flag to skip problematic events
     ignore boolean not null,
     -- The sequencer ensures that the timestamp is unique
-    primary key (client, ts)
+    primary key (domain_id, ts)
 );
 
-create unique index idx_sequenced_events_sequencer_counter on common_sequenced_events(client, sequencer_counter);
+create unique index idx_sequenced_events_sequencer_counter on common_sequenced_events(domain_id, sequencer_counter);
 
 -- Track what send requests we've made but have yet to observe being sequenced.
 -- If events are not observed by the max sequencing time we know that the send will never be processed.
 create table sequencer_client_pending_sends (
-    -- ids for distinguishing between different sequencer clients in the same node
-    client integer not null,
+    -- domain id for distinguishing between different sequencer clients in the same node
+    domain_id integer not null,
 
-    -- the message id of the send being tracked (expected to be unique for the sequencer client while the send is in flight)
+    -- the message id of the send being tracked (expected to be unique for the sequencer client while the send is in-flight)
     message_id varchar(300) not null,
 
     -- the message id should be unique for the sequencer client
-    primary key (client, message_id),
+    primary key (domain_id, message_id),
 
     -- the max sequencing time of the send request (UTC timestamp in microseconds relative to EPOCH)
     max_sequencing_time bigint not null
@@ -384,7 +395,7 @@ create index idx_par_journal_request_commit_time on par_journal_requests (domain
 
 -- the last recorded head clean counter for each domain
 create table par_head_clean_counters (
-    client integer not null primary key,
+    domain_id integer not null primary key,
     prehead_counter bigint not null, -- request counter of the prehead request
     -- UTC timestamp in microseconds relative to EPOCH
     ts bigint not null
@@ -555,12 +566,12 @@ create table par_contract_key_pruning (
 
 -- Maintains the latest timestamp (by sequencer client) for which the sequenced event store pruning has started or finished
 create table common_sequenced_event_store_pruning (
-  client integer not null,
+  domain_id integer not null,
   phase pruning_phase not null,
   -- UTC timestamp in microseconds relative to EPOCH
   ts bigint not null,
   succeeded bigint null,
-  primary key (client)
+  primary key (domain_id)
 );
 
 -- table to contain the values provided by the domain to the mediator node for initialization.
@@ -569,7 +580,6 @@ create table common_sequenced_event_store_pruning (
 create table mediator_domain_configuration (
   -- this lock column ensures that there can only ever be a single row: https://stackoverflow.com/questions/3967372/sql-server-how-to-constrain-a-table-to-contain-a-single-row
   lock char(1) not null default 'X' primary key check (lock = 'X'),
-  initial_key_context varchar(300) not null,
   domain_id varchar(300) not null,
   static_domain_parameters binary large object not null,
   sequencer_connection binary large object not null
@@ -578,7 +588,7 @@ create table mediator_domain_configuration (
 -- the last recorded head clean sequencer counter for each domain
 create table common_head_sequencer_counters (
   -- discriminate between different users of the sequencer counter tracker tables
-  client integer not null primary key,
+  domain_id integer not null primary key,
   prehead_counter bigint not null, -- sequencer counter before the first unclean sequenced event
   -- UTC timestamp in microseconds relative to EPOCH
   ts bigint not null
@@ -643,9 +653,9 @@ create table sequencer_lower_bound (
 create table sequencer_events (
     ts bigint primary key,
     node_index smallint not null,
-    -- single char to indicate the event type: D for deliver event, E for deliver error
+    -- single char to indicate the event type: D for deliver event, E for deliver error, R for deliver receipt
     event_type char(1) not null
-        constraint event_type_enum check (event_type = 'D' or event_type = 'E'),
+        constraint event_type_enum check (event_type IN ('D', 'E', 'R')),
     message_id varchar null,
     sender integer null,
     -- null if event goes to everyone, otherwise specify member ids of recipients
@@ -718,10 +728,10 @@ create index idx_par_in_flight_submission_message_id on par_in_flight_submission
 
 create table par_settings(
   client integer primary key, -- dummy field to enforce at most one row
-  max_dirty_requests integer,
-  max_rate integer,
+  max_infight_validation_requests integer,
+  max_submission_rate integer,
   max_deduplication_duration binary large object, -- non-negative finite duration
-  max_burst_factor double precision not null default 0.5
+  max_submission_burst_factor double precision not null default 0.5
 );
 
 create table par_command_deduplication (
@@ -838,7 +848,7 @@ CREATE TABLE common_topology_transactions (
     -- the timestamp at which the transaction is sequenced by the sequencer
     -- UTC timestamp in microseconds relative to EPOCH
     sequenced bigint not null,
-    -- type of transaction (refer to TopologyMappingX.Code)
+    -- type of transaction (refer to TopologyMapping.Code)
     transaction_type int not null,
     -- the namespace this transaction is operating on
     namespace varchar(300) not null,
@@ -853,8 +863,8 @@ CREATE TABLE common_topology_transactions (
     -- (redundant also embedded in instance)
     serial_counter int not null,
     -- validity window, UTC timestamp in microseconds relative to EPOCH
-    -- so `TopologyChangeOpX.Replace` transactions have an effect for valid_from < t <= valid_until
-    -- a `TopologyChangeOpX.Remove` will have valid_from = valid_until
+    -- so `TopologyChangeOp.Replace` transactions have an effect for valid_from < t <= valid_until
+    -- a `TopologyChangeOp.Remove` will have valid_from = valid_until
     valid_from bigint not null,
     valid_until bigint null,
     -- operation
@@ -883,41 +893,6 @@ CREATE TABLE common_topology_transactions (
 
 CREATE INDEX idx_common_topology_transactions ON common_topology_transactions (store_id, transaction_type, namespace, identifier, valid_until, valid_from);
 
--- update the seq_state_manager_events to store traffic information per event
--- this will be needed to re-hydrate the sequencer from a specific point in time deterministically
--- adds extra traffic remainder at the time of the event
-alter table seq_state_manager_events
-    add column extra_traffic_remainder bigint;
--- adds total extra traffic consumed at the time of the event
-alter table seq_state_manager_events
-    add column extra_traffic_consumed bigint;
--- adds base traffic remainder at the time of the event
-alter table seq_state_manager_events
-    add column base_traffic_remainder bigint;
-
--- adds extra traffic remainder per event in sequenced event store
--- this way the participant can replay event and reconstruct the correct traffic state
--- adds extra traffic remainder at the time of the event
-alter table common_sequenced_events
-    add column extra_traffic_remainder bigint;
--- adds total extra traffic consumed at the time of the event
-alter table common_sequenced_events
-    add column extra_traffic_consumed bigint;
-
--- adds initial traffic info per member for when a sequencer gets onboarded
--- initial extra traffic remainder
-alter table seq_initial_state
-    add column extra_traffic_remainder bigint;
--- initial total extra traffic consumed
-alter table seq_initial_state
-    add column extra_traffic_consumed bigint;
--- initial base traffic remainder
-alter table seq_initial_state
-    add column base_traffic_remainder bigint;
--- timestamp of the initial traffic state
-alter table seq_initial_state
-    add column sequenced_timestamp bigint;
-
 -- Stores the traffic balance updates
 create table seq_traffic_control_balance_updates (
     -- member the traffic balance update is for
@@ -937,6 +912,22 @@ create table seq_traffic_control_initial_timestamp (
         -- Timestamp used to initialize the sequencer during onboarding, and the balance manager as well
         initial_timestamp bigint not null,
         primary key (initial_timestamp)
+);
+
+-- Stores the traffic consumed as a journal
+create table seq_traffic_control_consumed_journal (
+    -- member the traffic consumed entry is for
+       member varchar(300) not null,
+    -- timestamp at which the event that caused traffic to be consumed was sequenced
+       sequencing_timestamp bigint not null,
+    -- total traffic consumed at sequencing_timestamp
+       extra_traffic_consumed bigint not null,
+    -- base traffic remainder at sequencing_timestamp
+       base_traffic_remainder bigint not null,
+    -- the last cost consumed at sequencing_timestamp
+       last_consumed_cost bigint not null,
+    -- traffic entries have a unique sequencing_timestamp per member
+       primary key (member, sequencing_timestamp)
 );
 
 --   BFT Ordering Tables
@@ -983,4 +974,12 @@ create table ord_pbft_messages(
     -- in the case of pre-prepare, we only expect one message for the whole block, but for simplicity
     -- we won't differentiate that at the database level.
     primary key (block_number, from_sequencer_id, discriminator)
+);
+
+-- Stores metadata for blocks that have been assigned timestamps in the output module
+create table ord_metadata_output_blocks (
+    block_number bigint not null,
+    bft_ts bigint not null,
+    last_topology_ts bigint not null,
+    primary key (block_number)
 );

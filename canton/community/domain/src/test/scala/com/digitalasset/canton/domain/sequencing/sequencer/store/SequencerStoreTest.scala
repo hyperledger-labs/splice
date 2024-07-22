@@ -4,30 +4,20 @@
 package com.digitalasset.canton.domain.sequencing.sequencer.store
 
 import cats.data.EitherT
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.{CantonTimestamp, Counter}
 import com.digitalasset.canton.domain.sequencing.sequencer.DomainSequencingTestUtils.mockDeliverStoreEvent
+import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.sequencer.store.SaveLowerBoundError.BoundLowerThanExisting
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  CommitMode,
-  DomainSequencingTestUtils,
-  SequencerMemberStatus,
-  SequencerPruningStatus,
-  SequencerSnapshot,
-}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.sequencing.protocol.{MessageId, SequencerErrors}
 import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.{
-  Member,
-  ParticipantId,
-  UnauthenticatedMemberId,
-  UniqueIdentifier,
-}
+import com.digitalasset.canton.topology.{DefaultTestIdentities, Member, ParticipantId}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAsyncWordSpec, SequencerCounter}
 import com.google.protobuf.ByteString
@@ -46,6 +36,9 @@ trait SequencerStoreTest
     with HasCloseContext
     with FlagCloseable
     with ProtocolVersionChecksAsyncWordSpec {
+
+  lazy val sequencerMember: Member = DefaultTestIdentities.sequencerId
+
   def sequencerStore(mk: () => SequencerStore): Unit = {
 
     val instanceIndex: Int = 0
@@ -59,6 +52,7 @@ trait SequencerStoreTest
     val ts1 = ts(1)
     val ts2 = ts(2)
     val ts3 = ts(3)
+    val ts4 = ts(4)
 
     val payloadBytes1 = ByteString.copyFromUtf8("1")
     val payloadBytes2 = ByteString.copyFromUtf8("1")
@@ -68,6 +62,7 @@ trait SequencerStoreTest
     val messageId1 = MessageId.tryCreate("1")
     val messageId2 = MessageId.tryCreate("2")
     val messageId3 = MessageId.tryCreate("3")
+    val messageId4 = MessageId.tryCreate("4")
 
     val instanceDiscriminator1 = UUID.randomUUID()
     val instanceDiscriminator2 = UUID.randomUUID()
@@ -108,6 +103,42 @@ trait SequencerStoreTest
             NonEmpty(SortedSet, senderId, recipientIds.toSeq*),
             payloadId,
             None,
+            traceContext,
+          ),
+        )
+
+      def deliverReceipt(
+          ts: CantonTimestamp,
+          sender: Member,
+          messageId: MessageId,
+          topologyTimestamp: CantonTimestamp,
+      ): Future[Sequenced[PayloadId]] =
+        for {
+          senderId <- store.registerMember(sender, ts)
+        } yield Sequenced(
+          ts,
+          ReceiptStoreEvent(
+            senderId,
+            messageId,
+            topologyTimestampO = Some(topologyTimestamp),
+            traceContext,
+          ),
+        )
+
+      def deliverReceipt(
+          ts: CantonTimestamp,
+          sender: Member,
+          messageId: MessageId,
+          topologyTimestamp: CantonTimestamp,
+      ): Future[Sequenced[PayloadId]] =
+        for {
+          senderId <- store.registerMember(sender, ts)
+        } yield Sequenced(
+          ts,
+          ReceiptStoreEvent(
+            senderId,
+            messageId,
+            topologyTimestampO = Some(topologyTimestamp),
             traceContext,
           ),
         )
@@ -162,12 +193,73 @@ trait SequencerStoreTest
         }
       }
 
+      def assertReceiptEvent(
+          event: Sequenced[Payload],
+          expectedTimestamp: CantonTimestamp,
+          expectedSender: Member,
+          expectedMessageId: MessageId,
+          expectedTopologyTimestamp: Option[CantonTimestamp],
+      ): Future[Assertion] = {
+        for {
+          senderId <- lookupRegisteredMember(expectedSender)
+        } yield {
+          event.timestamp shouldBe expectedTimestamp
+          event.event match {
+            case ReceiptStoreEvent(
+                  sender,
+                  messageId,
+                  topologyTimestampO,
+                  _traceContext,
+                ) =>
+              sender shouldBe senderId
+              messageId shouldBe expectedMessageId
+              event.event.members shouldBe Set(senderId)
+              event.event.payloadO shouldBe None
+              topologyTimestampO shouldBe expectedTopologyTimestamp
+            case other =>
+              fail(s"Expected deliver receipt but got $other")
+          }
+        }
+      }
+
+      def assertReceiptEvent(
+          event: Sequenced[Payload],
+          expectedTimestamp: CantonTimestamp,
+          expectedSender: Member,
+          expectedMessageId: MessageId,
+          expectedTopologyTimestamp: Option[CantonTimestamp],
+      ): Future[Assertion] = {
+        for {
+          senderId <- lookupRegisteredMember(expectedSender)
+        } yield {
+          event.timestamp shouldBe expectedTimestamp
+          event.event match {
+            case ReceiptStoreEvent(
+                  sender,
+                  messageId,
+                  topologyTimestampO,
+                  _traceContext,
+                ) =>
+              sender shouldBe senderId
+              messageId shouldBe expectedMessageId
+              event.event.members shouldBe Set(senderId)
+              event.event.payloadO shouldBe None
+              topologyTimestampO shouldBe expectedTopologyTimestamp
+            case other =>
+              fail(s"Expected deliver receipt but got $other")
+          }
+        }
+      }
+
       /** Save payloads using the default `instanceDiscriminator1` and expecting it to succeed */
       def savePayloads(payloads: NonEmpty[Seq[Payload]]): Future[Unit] =
         valueOrFail(store.savePayloads(payloads, instanceDiscriminator1))("savePayloads")
 
       def saveWatermark(ts: CantonTimestamp): EitherT[Future, SaveWatermarkError, Unit] =
         store.saveWatermark(instanceIndex, ts)
+
+      def resetWatermark(ts: CantonTimestamp): EitherT[Future, SaveWatermarkError, Unit] =
+        store.resetWatermark(instanceIndex, ts)
     }
 
     def checkpoint(
@@ -181,7 +273,7 @@ trait SequencerStoreTest
       "be able to serialize to and deserialize the error from protobuf" in {
         val error = SequencerErrors.TopoologyTimestampTooEarly("too early!")
         val errorStatus = error.rpcStatusWithoutLoggingContext()
-        val serialized = DeliverErrorStoreEvent.serializeError(error, testedProtocolVersion)
+        val serialized = DeliverErrorStoreEvent.serializeError(errorStatus, testedProtocolVersion)
         val deserialized =
           DeliverErrorStoreEvent.fromByteString(Some(serialized), testedProtocolVersion)
         deserialized shouldBe Right(errorStatus)
@@ -283,15 +375,16 @@ trait SequencerStoreTest
             payload2.id,
             recipients = Set(alice, bob),
           )
+          receiptAlice <- env.deliverReceipt(ts4, alice, messageId4, ts3)
           deliverEventBob <- env.deliverEvent(ts3, bob, messageId3, payload3.id)
           _ <- env.store.saveEvents(
             instanceIndex,
-            NonEmpty(Seq, deliverEventAlice, deliverEventAll, deliverEventBob),
+            NonEmpty(Seq, deliverEventAlice, deliverEventAll, deliverEventBob, receiptAlice),
           )
-          _ <- env.saveWatermark(deliverEventBob.timestamp).valueOrFail("saveWatermark")
+          _ <- env.saveWatermark(receiptAlice.timestamp).valueOrFail("saveWatermark")
           aliceEvents <- env.readEvents(alice)
           bobEvents <- env.readEvents(bob)
-          _ = aliceEvents should have size (2)
+          _ = aliceEvents should have size (3)
           _ = bobEvents should have size (2)
           _ <- env.assertDeliverEvent(aliceEvents(0), ts1, alice, messageId1, Set(alice), payload1)
           _ <- env.assertDeliverEvent(
@@ -301,6 +394,13 @@ trait SequencerStoreTest
             messageId2,
             Set(alice, bob),
             payload2,
+          )
+          _ <- env.assertReceiptEvent(
+            aliceEvents(2),
+            ts4,
+            alice,
+            messageId4,
+            ts3.some,
           )
           _ <- env.assertDeliverEvent(
             bobEvents(0),
@@ -412,7 +512,7 @@ trait SequencerStoreTest
     }
 
     "save payloads" should {
-      "return an error if there is a conflicting id" in {
+      "return an error if there is a conflicting id for database sequencer" onlyRunWhen (!testedUseUnifiedSequencer) in {
         val env = Env()
         val Seq(p1, p2, p3) =
           0.until(3).map(n => Payload(PayloadId(ts(n)), ByteString.copyFromUtf8(n.toString)))
@@ -427,6 +527,23 @@ trait SequencerStoreTest
             env.store.savePayloads(NonEmpty(Seq, p2, p3), instanceDiscriminator2)
           )("savePayloads2")
         } yield error shouldBe SavePayloadsError.ConflictingPayloadId(p2.id, instanceDiscriminator1)
+      }
+
+      "succeed on a conflicting payload id for unified sequencer" onlyRunWhen (testedUseUnifiedSequencer) in {
+        val env = Env()
+        val Seq(p1, p2, p3) =
+          0.until(3).map(n => Payload(PayloadId(ts(n)), ByteString.copyFromUtf8(n.toString)))
+
+        // we'll first write p1 and p2 that should work
+        // then write p2 and p3 with a separate instance discriminator which should fail due to a conflicting id
+        for {
+          _ <- valueOrFail(env.store.savePayloads(NonEmpty(Seq, p1, p2), instanceDiscriminator1))(
+            "savePayloads1"
+          )
+          _ <- valueOrFail(
+            env.store.savePayloads(NonEmpty(Seq, p2, p3), instanceDiscriminator2)
+          )("savePayloads2")
+        } yield succeed
       }
     }
 
@@ -934,31 +1051,14 @@ trait SequencerStoreTest
         disabledClientsAfter <- store.status(ts(0)).map(_.disabledClients)
         _ = disabledClientsAfter.members should contain.only(alice, bob)
         // alice instances should be entirely disabled
-        aliceEnabled <- leftOrFail(store.isEnabled(aliceId))("alice1Enabled")
-        _ = aliceEnabled shouldBe MemberDisabledError
+        aliceEnabled <- clue("alice1Enabled") {
+          store.isEnabled(aliceId)
+        }
+        _ = aliceEnabled shouldBe false
         // should also be idempotent
         _ <- store.disableMember(aliceId)
         _ <- store.disableMember(bobId)
         _ <- store.disableMember(caroleId)
-      } yield succeed
-    }
-
-    "unregister unauthenticated members" in {
-      val env = Env()
-      import env.*
-
-      val unauthenticatedAlice: UnauthenticatedMemberId =
-        UnauthenticatedMemberId(UniqueIdentifier.tryCreate("alice_unauthenticated", "fingerprint"))
-
-      for {
-        id <- store.registerMember(unauthenticatedAlice, ts1)
-        aliceLookup1 <- store.lookupMember(unauthenticatedAlice)
-        _ = aliceLookup1 shouldBe Some(RegisteredMember(id, ts1))
-        _ <- store.unregisterUnauthenticatedMember(unauthenticatedAlice)
-        aliceLookup2 <- store.lookupMember(unauthenticatedAlice)
-        _ = aliceLookup2 shouldBe empty
-        // should also be idempotent
-        _ <- store.unregisterUnauthenticatedMember(unauthenticatedAlice)
       } yield succeed
     }
 
@@ -979,6 +1079,8 @@ trait SequencerStoreTest
           import env.*
           for {
             aliceId <- store.registerMember(alice, ts1)
+            sequencerId <- store.registerMember(sequencerMember, ts1)
+
             _ <- store.saveEvents(
               instanceIndex,
               NonEmpty(
@@ -997,7 +1099,7 @@ trait SequencerStoreTest
                   DeliverStoreEvent(
                     aliceId,
                     messageId1,
-                    NonEmpty(SortedSet, aliceId, bobId),
+                    NonEmpty(SortedSet, aliceId, bobId, sequencerId),
                     payload1.id,
                     None,
                     traceContext,
@@ -1006,28 +1108,36 @@ trait SequencerStoreTest
               ),
             )
             _ <- saveWatermark(ts(4)).valueOrFail("saveWatermark")
-            state <- store.readStateAtTimestamp(ts(4))
+            snapshot <- store.readStateAtTimestamp(ts(4))
+            state <- store.checkpointsAtTimestamp(ts(4))
 
+            value1 = NonEmpty(
+              Seq,
+              deliverEventWithDefaults(ts(5))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
+              deliverEventWithDefaults(ts(6))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
+            )
             _ <- store.saveEvents(
               instanceIndex,
-              NonEmpty(
-                Seq,
-                deliverEventWithDefaults(ts(5))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
-                deliverEventWithDefaults(ts(6))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
-              ),
+              value1,
             )
             _ <- saveWatermark(ts(6)).valueOrFail("saveWatermark")
 
-            stateAfterNewEvents <- store.readStateAtTimestamp(ts(6))
+            stateAfterNewEvents <- store.checkpointsAtTimestamp(ts(6))
 
-          } yield (state, stateAfterNewEvents)
+          } yield (snapshot, state, stateAfterNewEvents)
         }
 
         def createFromSnapshot(snapshot: SequencerSnapshot) = {
           val env = Env()
           import env.*
+          val initialState = SequencerInitialState(
+            domainId = DefaultTestIdentities.domainId, // not used
+            snapshot = snapshot,
+            latestSequencerEventTimestamp = None,
+            initialTopologyEffectiveTimestamp = None,
+          )
           for {
-            _ <- store.initializeFromSnapshot(snapshot).value.map {
+            _ <- store.initializeFromSnapshot(initialState).value.map {
               case Left(error) =>
                 fail(s"Failed to initialize from snapshot $error")
               case _ => ()
@@ -1036,6 +1146,7 @@ trait SequencerStoreTest
             stateFromNewStore <- store.readStateAtTimestamp(ts(4))
 
             newAliceId <- store.lookupMember(alice).map(_.getOrElse(fail()).memberId)
+            newSequencerId <- store.lookupMember(sequencerMember).map(_.getOrElse(fail()).memberId)
             newBobId <- store.lookupMember(bob).map(_.getOrElse(fail()).memberId)
 
             _ <- store.saveEvents(
@@ -1043,7 +1154,7 @@ trait SequencerStoreTest
               NonEmpty(
                 Seq,
                 deliverEventWithDefaults(ts(5))(recipients =
-                  NonEmpty(SortedSet, newAliceId, newBobId)
+                  NonEmpty(SortedSet, newAliceId, newSequencerId)
                 ),
                 deliverEventWithDefaults(ts(6))(recipients =
                   NonEmpty(SortedSet, newAliceId, newBobId)
@@ -1052,13 +1163,13 @@ trait SequencerStoreTest
             )
             _ <- saveWatermark(ts(6)).valueOrFail("saveWatermark")
 
-            stateFromNewStoreAfterNewEvents <- store.readStateAtTimestamp(ts(6))
+            stateFromNewStoreAfterNewEvents <- store.checkpointsAtTimestamp(ts(6))
           } yield (stateFromNewStore, stateFromNewStoreAfterNewEvents)
         }
 
         for {
           snapshots <- createSnapshots()
-          (state, stateAfterNewEvents) = snapshots
+          (snapshot, state, stateAfterNewEvents) = snapshots
 
           // resetting the db tables
           _ = this match {
@@ -1066,24 +1177,63 @@ trait SequencerStoreTest
             case _ => ()
           }
 
-          newSnapshots <- createFromSnapshot(state)
+          newSnapshots <- createFromSnapshot(snapshot)
+          (snapshotFromNewStore, stateFromNewStoreAfterNewEvents) = newSnapshots
         } yield {
-          val (stateFromNewStore, stateFromNewStoreAfterNewEvents) = newSnapshots
 
           val memberCheckpoints = Map(
-            (alice, Counter(1L)),
-            (bob, Counter(0L)),
+            (alice, CounterCheckpoint(Counter(1L), ts(4), Some(ts(4)))),
+            (bob, CounterCheckpoint(Counter(0L), ts(4), Some(ts(4)))),
+            (sequencerMember, CounterCheckpoint(Counter(0L), ts(4), Some(ts(4)))),
           )
-          state.heads shouldBe memberCheckpoints
-          stateFromNewStore.heads shouldBe memberCheckpoints
+          state shouldBe memberCheckpoints
+          snapshotFromNewStore.heads shouldBe memberCheckpoints.fmap(_.counter)
 
-          val memberHeadsAfterNewEvents = Map(
-            (alice, Counter(3L)),
-            (bob, Counter(2L)),
+          stateAfterNewEvents shouldBe Map(
+            (alice, CounterCheckpoint(Counter(3L), ts(6), Some(ts(4)))),
+            (bob, CounterCheckpoint(Counter(2L), ts(6), Some(ts(4)))),
+            (sequencerMember, CounterCheckpoint(Counter(0L), ts(4), Some(ts(4)))),
           )
 
-          stateAfterNewEvents.heads shouldBe memberHeadsAfterNewEvents
-          stateFromNewStoreAfterNewEvents.heads shouldBe memberHeadsAfterNewEvents
+          stateFromNewStoreAfterNewEvents shouldBe Map(
+            (alice, CounterCheckpoint(Counter(3L), ts(6), Some(ts(5)))),
+            (bob, CounterCheckpoint(Counter(1L), ts(6), None)),
+            (sequencerMember, CounterCheckpoint(Counter(1L), ts(5), Some(ts(5)))),
+          )
+        }
+      }
+    }
+
+    "resetting watermark" should {
+      "reset watermark if the ts if before the current watermark" in {
+        val env = Env()
+        import env.*
+        for {
+          _ <- saveWatermark(ts(5)).valueOrFail("saveWatermark=5 failed")
+          _ <- resetWatermark(ts(7)).valueOrFail("resetWatermark=7 failed")
+          watermark1 <- store.fetchWatermark(0)
+          _ <- resetWatermark(ts(4)).valueOrFail("resetWatermark=4 failed")
+          watermark2 <- store.fetchWatermark(0)
+        } yield {
+          watermark1 shouldBe Some(
+            Watermark(ts(5), online = true)
+          ) // ts(5) was not touched and still online
+          watermark2 shouldBe Some(Watermark(ts(4), online = false)) // ts(5) was reset and offline
+        }
+      }
+    }
+
+    "deleteEventsPastWatermark" should {
+      "return the watermark used for the deletion" in {
+        val testWatermark = CantonTimestamp.assertFromLong(1719841168208718L)
+        val env = Env()
+        import env.*
+
+        for {
+          _ <- saveWatermark(testWatermark).valueOrFail("saveWatermark")
+          watermark <- store.deleteEventsPastWatermark(0)
+        } yield {
+          watermark shouldBe Some(testWatermark)
         }
       }
     }

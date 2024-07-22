@@ -3,7 +3,7 @@
 
 package com.daml.network.environment
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.util.ResourceUtil
 import com.google.protobuf.ByteString
 import io.grpc.stub.StreamObserver

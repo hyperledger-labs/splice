@@ -6,16 +6,13 @@ package com.digitalasset.canton.platform.apiserver.services.admin
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc.MeteringReportService
 import com.daml.ledger.api.v2.admin.metering_report_service.*
-import com.daml.lf.data.Ref
-import com.daml.lf.data.Ref.ApplicationId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors
 import com.digitalasset.canton.ledger.error.groups.AdminServiceErrors
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore
-import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore
+import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -28,6 +25,9 @@ import com.digitalasset.canton.platform.apiserver.meteringreport.{
   MeteringReportKey,
 }
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiMeteringReportService.*
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.ApplicationId
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
 import io.grpc.{ServerServiceDefinition, StatusRuntimeException}
 

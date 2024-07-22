@@ -4,7 +4,6 @@
 package com.digitalasset.canton.participant.admin.inspection
 
 import cats.data.OptionT
-import com.daml.lf.data.Ref
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.admin.inspection.AcsInspectionTest.{
@@ -39,6 +38,7 @@ import com.digitalasset.canton.{
   RequestCounterDiscriminator,
   TransferCounter,
 }
+import com.digitalasset.daml.lf.data.Ref
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
@@ -173,7 +173,7 @@ object AcsInspectionTest extends MockitoSugar with ArgumentMatchersSugar {
       .thenAnswer(Future.successful(SortedMap.from(snapshot)))
 
     val cs = mock[ContractStore]
-    when(cs.lookupManyUncached(any[Seq[LfContractId]]))
+    when(cs.lookupManyExistingUncached(any[Seq[LfContractId]]))
       .thenAnswer { (contractIds: Seq[LfContractId]) =>
         OptionT
           .fromOption[Future](NonEmpty.from(contractIds.filter(missingContracts)))

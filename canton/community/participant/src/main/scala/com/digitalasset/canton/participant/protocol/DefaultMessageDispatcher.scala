@@ -10,12 +10,16 @@ import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
-import com.digitalasset.canton.participant.protocol.MessageDispatcher.RequestProcessors
+import com.digitalasset.canton.participant.protocol.MessageDispatcher.{
+  ParticipantTopologyProcessor,
+  RequestProcessors,
+}
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
 import com.digitalasset.canton.sequencing.{
   AsyncResult,
   HandlerResult,
@@ -29,7 +33,6 @@ import com.digitalasset.canton.store.SequencedEventStore.{
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
-import com.digitalasset.canton.traffic.TrafficControlProcessor
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -45,11 +48,7 @@ class DefaultMessageDispatcher(
     override protected val participantId: ParticipantId,
     override protected val requestTracker: RequestTracker,
     override protected val requestProcessors: RequestProcessors,
-    override protected val topologyProcessor: (
-        SequencerCounter,
-        SequencedTime,
-        Traced[List[DefaultOpenEnvelope]],
-    ) => HandlerResult,
+    override protected val topologyProcessor: ParticipantTopologyProcessor,
     override protected val trafficProcessor: TrafficControlProcessor,
     override protected val acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
     override protected val requestCounterAllocator: RequestCounterAllocator,
@@ -119,10 +118,10 @@ class DefaultMessageDispatcher(
 
     withSpan(s"MessageDispatcher.handle") { implicit traceContext => _ =>
       val future = eventE.event match {
-        case OrdinarySequencedEvent(signedEvent, _) =>
+        case OrdinarySequencedEvent(signedEvent) =>
           val signedEventE = eventE.map(_ => signedEvent)
           processOrdinary(signedEventE)
-        case IgnoredSequencedEvent(ts, sc, _, _) =>
+        case IgnoredSequencedEvent(ts, sc, _) =>
           tickTrackers(sc, ts, triggerAcsChangePublication = false)
       }
 
@@ -134,11 +133,11 @@ class DefaultMessageDispatcher(
       signedEventE: WithOpeningErrors[SignedContent[SequencedEvent[DefaultOpenEnvelope]]]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     signedEventE.event.content match {
-      case deliver @ Deliver(sc, ts, _, _, _, _) if TimeProof.isTimeProofDeliver(deliver) =>
+      case deliver @ Deliver(sc, ts, _, _, _, _, _) if TimeProof.isTimeProofDeliver(deliver) =>
         logTimeProof(sc, ts)
         tickTrackers(sc, ts, triggerAcsChangePublication = true)
 
-      case Deliver(sc, ts, _, msgIdO, _, _) =>
+      case Deliver(sc, ts, _, msgIdO, _, _, _) =>
         if (signedEventE.hasNoErrors) {
           logEvent(sc, ts, msgIdO, signedEventE.event)
         } else {
@@ -157,7 +156,7 @@ class DefaultMessageDispatcher(
               logger.error("event processing failed.", ex)
           }
 
-      case error @ DeliverError(sc, ts, _, msgId, status) =>
+      case error @ DeliverError(sc, ts, _, msgId, status, _) =>
         logDeliveryError(sc, ts, msgId, status)
         logger.debug(s"Received a deliver error at ${sc} / ${ts}")
         for {
@@ -175,7 +174,7 @@ class DefaultMessageDispatcher(
     for {
       // Signal to the topology processor that all messages up to timestamp `ts` have arrived
       // Publish the empty ACS change only afterwards as this may trigger an ACS commitment computation which accesses the topology state.
-      _unit <- runAsyncResult(topologyProcessor(sc, SequencedTime(ts), Traced(List.empty)))
+      _unit <- runAsyncResult(topologyProcessor(sc, SequencedTime(ts), None, Traced(List.empty)))
     } yield {
       // Make sure that the tick is not lost
       requestTracker.tick(sc, ts)

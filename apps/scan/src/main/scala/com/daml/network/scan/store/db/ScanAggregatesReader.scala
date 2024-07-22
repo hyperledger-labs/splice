@@ -63,7 +63,7 @@ object ScanAggregatesReader {
     case object Failed extends ConState
     private val conState = new AtomicReference[ConState](Uninitialized)
 
-    import com.digitalasset.canton.DiscardOps
+    import com.digitalasset.canton.discard.Implicits.DiscardOps
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
       conState.get() match {
         case Uninitialized => Nil

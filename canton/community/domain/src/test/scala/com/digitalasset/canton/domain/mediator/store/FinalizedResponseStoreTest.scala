@@ -12,17 +12,15 @@ import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.domain.mediator.{FinalizedResponse, MediatorVerdict}
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.protocol.messages.InformeeMessage
-import com.digitalasset.canton.protocol.{ConfirmationPolicy, RequestId, RootHash}
+import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
+import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.{DefaultTestIdentities, TestingIdentityFactoryX}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{ApplicationId, BaseTest, CommandId, LfPartyId}
 import org.scalatest.BeforeAndAfterAll
@@ -38,17 +36,14 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
   def ts(n: Int): CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(n.toLong)
   def requestIdTs(n: Int): RequestId = RequestId(ts(n))
 
-  val requestId = RequestId(CantonTimestamp.Epoch)
-  val fullInformeeTree = {
+  val requestId: RequestId = RequestId(CantonTimestamp.Epoch)
+  val fullInformeeTree: FullInformeeTree = {
     val domainId = DefaultTestIdentities.domainId
     val participantId = DefaultTestIdentities.participant1
 
     val alice = LfPartyId.assertFromString("alice")
-    val aliceInformee = PlainInformee(alice)
-    val bobConfirmingParty = ConfirmingParty(
-      LfPartyId.assertFromString("bob"),
-      PositiveInt.tryCreate(2),
-    )
+    val bob = LfPartyId.assertFromString("bob")
+    val bobCp = Map(bob -> PositiveInt.tryCreate(2))
     val hashOps = new SymbolicPureCrypto
 
     def h(i: Int): Hash = TestHash.digest(i)
@@ -56,9 +51,11 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
     def s(i: Int): Salt = TestSalt.generateSalt(i)
 
     val viewCommonData =
-      ViewCommonData.create(hashOps)(
-        Set(aliceInformee, bobConfirmingParty),
-        NonNegativeInt.tryCreate(2),
+      ViewCommonData.tryCreate(hashOps)(
+        ViewConfirmationParameters.tryCreate(
+          Set(alice, bob),
+          Seq(Quorum(bobCp, NonNegativeInt.tryCreate(2))),
+        ),
         s(999),
         testedProtocolVersion,
       )
@@ -82,9 +79,8 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
     )
     val commonMetadata = CommonMetadata
       .create(hashOps, testedProtocolVersion)(
-        ConfirmationPolicy.Signatory,
         domainId,
-        MediatorsOfDomain(MediatorGroupIndex.zero),
+        MediatorGroupRecipient(MediatorGroupIndex.zero),
         s(5417),
         new UUID(0L, 0L),
       )
@@ -98,9 +94,9 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
       testedProtocolVersion,
     )
   }
-  val informeeMessage =
+  val informeeMessage: InformeeMessage =
     InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion)
-  val currentVersion = FinalizedResponse(
+  val currentVersion: FinalizedResponse = FinalizedResponse(
     requestId,
     informeeMessage,
     requestId.unwrap,
@@ -122,14 +118,14 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
         sut.fetch(requestId).value.map { result =>
           result shouldBe None
         }
-      }
+      }.failOnShutdown("Unexpected shutdown.")
       "should be able to fetch previously stored response" in {
         val sut = mk()
         for {
           _ <- sut.store(currentVersion)
           result <- sut.fetch(requestId).value
         } yield result shouldBe Some(currentVersion)
-      }
+      }.failOnShutdown("Unexpected shutdown.")
       "should allow the same response to be stored more than once" in {
         // can happen after a crash and event replay
         val sut = mk()
@@ -137,7 +133,7 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
           _ <- sut.store(currentVersion)
           _ <- sut.store(currentVersion)
         } yield succeed
-      }
+      }.failOnShutdown("Unexpected shutdown.")
     }
 
     "pruning" should {
@@ -150,11 +146,11 @@ trait FinalizedResponseStoreTest extends BeforeAndAfterAll {
         for {
           _ <- requests.toList.parTraverse(sut.store)
           _ <- sut.prune(ts(2))
-          _ <- noneOrFail(sut.fetch(requestIdTs(1)))("fetch(ts1)")
-          _ <- noneOrFail(sut.fetch(requestIdTs(2)))("fetch(ts2)")
-          _ <- valueOrFail(sut.fetch(requestIdTs(3)))("fetch(ts3)")
+          _ <- noneOrFailUS(sut.fetch(requestIdTs(1)))("fetch(ts1)")
+          _ <- noneOrFailUS(sut.fetch(requestIdTs(2)))("fetch(ts2)")
+          _ <- valueOrFailUS(sut.fetch(requestIdTs(3)))("fetch(ts3)")
         } yield succeed
-      }
+      }.failOnShutdown("Unexpected shutdown.")
     }
   }
 }
@@ -174,8 +170,6 @@ trait DbFinalizedResponseStoreTest
     with FinalizedResponseStoreTest {
   this: DbTest =>
 
-  val pureCryptoApi: CryptoPureApi = TestingIdentityFactoryX.pureCrypto()
-
   def cleanDb(storage: DbStorage): Future[Int] = {
     import storage.api.*
     storage.update(sqlu"truncate table med_response_aggregations", functionFullName)
@@ -184,7 +178,7 @@ trait DbFinalizedResponseStoreTest
     behave like finalizedResponseStore(() =>
       new DbFinalizedResponseStore(
         storage,
-        pureCryptoApi,
+        new SymbolicPureCrypto,
         testedProtocolVersion,
         timeouts,
         loggerFactory,

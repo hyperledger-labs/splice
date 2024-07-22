@@ -13,17 +13,17 @@ import com.daml.ledger.api.v2.commands.Command.Command.{
   ExerciseByKey as ProtoExerciseByKey,
 }
 import com.daml.ledger.api.v2.commands.{Command, Commands}
-import com.daml.lf.command.*
-import com.daml.lf.data.*
-import com.daml.lf.value.Value as Lf
+import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
+import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.util.{DurationConversion, TimestampConversion}
 import com.digitalasset.canton.ledger.api.validation.CommandsValidator.{
   Submitters,
   effectiveSubmitters,
 }
-import com.digitalasset.canton.ledger.api.{DeduplicationPeriod, domain}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.daml.lf.command.*
+import com.digitalasset.daml.lf.data.*
+import com.digitalasset.daml.lf.value.Value as Lf
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag.*
 
@@ -32,8 +32,7 @@ import scala.Ordering.Implicits.infixOrderingOps
 import scala.collection.immutable
 
 final class CommandsValidator(
-    validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions =
-      ValidateUpgradingPackageResolutions.UpgradingDisabled,
+    validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions,
     validateDisclosedContracts: ValidateDisclosedContracts = new ValidateDisclosedContracts,
 ) {
 
@@ -223,8 +222,6 @@ final class CommandsValidator(
     } yield Submitters(actAs, readAs)
   }
 
-  // TODO(i12279): Address usage of deprecated class DeduplicationTime
-
   /** We validate only using current time because we set the currentTime as submitTime so no need to check both
     */
   def validateDeduplicationPeriod(
@@ -263,8 +260,6 @@ final class CommandsValidator(
 }
 
 object CommandsValidator {
-  def apply(validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions) =
-    new CommandsValidator(validateUpgradingPackageResolutions)
 
   /** Effective submitters of a command
     * @param actAs Guaranteed to be non-empty. Will contain exactly one element in most cases.
@@ -273,10 +268,6 @@ object CommandsValidator {
   final case class Submitters[T](actAs: Set[T], readAs: Set[T])
 
   def effectiveSubmitters(commands: Option[Commands]): Submitters[String] = {
-    commands.fold(noSubmitters)(effectiveSubmitters)
-  }
-
-  def effectiveSubmittersV2(commands: Option[Commands]): Submitters[String] = {
     commands.fold(noSubmitters)(effectiveSubmitters)
   }
 

@@ -16,8 +16,10 @@ final case class PostgresStorageBackendFactory(loggerFactory: NamedLoggerFactory
   override val createIngestionStorageBackend: IngestionStorageBackend[_] =
     new IngestionStorageBackendTemplate(PostgresQueryStrategy, PGSchema.schema)
 
-  override def createPackageStorageBackend(ledgerEndCache: LedgerEndCache): PackageStorageBackend =
-    new PackageStorageBackendTemplate(PostgresQueryStrategy, ledgerEndCache)
+  override def createParameterStorageBackend(
+      stringInterning: StringInterning
+  ): ParameterStorageBackend =
+    new ParameterStorageBackendImpl(PostgresQueryStrategy, stringInterning)
 
   override def createPartyStorageBackend(ledgerEndCache: LedgerEndCache): PartyStorageBackend =
     new PartyStorageBackendTemplate(PostgresQueryStrategy, ledgerEndCache)
@@ -42,6 +44,7 @@ final case class PostgresStorageBackendFactory(loggerFactory: NamedLoggerFactory
     new PostgresEventStorageBackend(
       ledgerEndCache = ledgerEndCache,
       stringInterning = stringInterning,
+      parameterStorageBackend = createParameterStorageBackend(stringInterning),
       loggerFactory = loggerFactory,
     )
 

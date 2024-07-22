@@ -3,33 +3,33 @@
 
 package com.digitalasset.canton.environment
 
+import better.files.File
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
-  ConsoleGrpcAdminCommandRunner,
   ConsoleOutput,
   GrpcAdminCommandRunner,
   HealthDumpGenerator,
   StandardConsoleOutput,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.mediator.{MediatorNodeBootstrapX, MediatorNodeParameters}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.domain.mediator.{MediatorNodeBootstrap, MediatorNodeParameters}
 import com.digitalasset.canton.domain.metrics.MediatorMetrics
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrapX
+import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.environment.Environment.*
-import com.digitalasset.canton.environment.ParticipantNodes.ParticipantNodesX
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
-import com.digitalasset.canton.metrics.MetricsRegistry
+import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, MetricsRegistry}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.resource.DbMigrationsFactory
 import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry, OpenTelemetryFactory}
@@ -53,7 +53,7 @@ import scala.util.control.NonFatal
   */
 trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
-  type Config <: CantonConfig
+  type Config <: CantonConfig & ConfigDefaults[DefaultPorts, Config]
   type Console <: ConsoleEnvironment
 
   val config: Config
@@ -61,47 +61,61 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   val loggerFactory: NamedLoggerFactory
 
-  lazy val configuredOpenTelemetry: ConfiguredOpenTelemetry = {
-    OpenTelemetryFactory.initializeOpenTelemetry(
-      testingConfig.initializeGlobalOpenTelemetry,
-      config.monitoring.metrics.reporters.nonEmpty,
-      MetricsRegistry
-        .registerReporters(config.monitoring.metrics, loggerFactory),
-      config.monitoring.tracing.tracer,
-      config.monitoring.metrics.histograms,
-      config.monitoring.metrics.cardinality.unwrap,
-      loggerFactory,
-    )
-  }
-
-  config.monitoring.metrics.jvmMetrics
-    .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
-
   implicit val scheduler: ScheduledExecutorService =
     Threading.singleThreadScheduledExecutor(
       loggerFactory.threadName + "-env-sched",
       noTracingLogger,
     )
 
-  // public for buildDocs task to be able to construct a fake participant and domain to document available metrics via reflection
-
-  lazy val metricsRegistry: MetricsRegistry = new MetricsRegistry(
-    configuredOpenTelemetry.openTelemetry.meterBuilder("canton").build(),
-    testingConfig.metricsFactoryType,
+  val histogramInventory = new HistogramInventory()
+  private val histograms = new CantonHistograms()(histogramInventory)
+  val dbStorageHistograms = new DbStorageHistograms(
+    MetricName("cn")
+  )(histogramInventory)
+  private val baseFilter = new MetricsInfoFilter(
+    config.monitoring.metrics.globalFilters,
+    config.monitoring.metrics.qualifiers.toSet,
   )
+  lazy val configuredOpenTelemetry: ConfiguredOpenTelemetry = {
+    OpenTelemetryFactory.initializeOpenTelemetry(
+      initializeGlobalOpenTelemetry = testingConfig.initializeGlobalOpenTelemetry,
+      testingSupportAdhocMetrics = testingConfig.supportAdhocMetrics,
+      metricsEnabled = config.monitoring.metrics.reporters.nonEmpty,
+      attachReporters = MetricsRegistry
+        .registerReporters(config.monitoring.metrics, loggerFactory),
+      config = config.monitoring.tracing.tracer,
+      histogramInventory = histogramInventory,
+      histogramFilter = baseFilter,
+      histogramConfigs = config.monitoring.metrics.histograms,
+      config.monitoring.metrics.cardinality.unwrap,
+      loggerFactory,
+    )
+  }
+  lazy val metricsRegistry: MetricsRegistry = {
+    config.monitoring.metrics.jvmMetrics
+      .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
 
-  protected def participantNodeFactoryX
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrapX]
+    new MetricsRegistry(
+      configuredOpenTelemetry.openTelemetry.meterBuilder("canton").build(),
+      testingConfig.metricsFactoryType,
+      // TODO(#13042) - remove this once we have exponential histograms
+      testingSupportAdhocMetrics = true,
+      histograms = histograms,
+      baseFilter = baseFilter,
+      loggerFactory = loggerFactory,
+    )
+  }
+
+  protected def participantNodeFactory
+      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap]
   protected def migrationsFactory: DbMigrationsFactory
 
   def isEnterprise: Boolean
 
   def createConsole(
-      consoleOutput: ConsoleOutput = StandardConsoleOutput,
-      createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner =
-        new ConsoleGrpcAdminCommandRunner(_),
+      consoleOutput: ConsoleOutput = StandardConsoleOutput
   ): Console = {
-    val console = _createConsole(consoleOutput, createAdminCommandRunner)
+    val console = _createConsole(consoleOutput)
     healthDumpGenerator
       .putIfAbsent(createHealthDumpGenerator(console.grpcAdminCommandRunner))
       .discard
@@ -109,9 +123,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   }
 
   protected def _createConsole(
-      consoleOutput: ConsoleOutput = StandardConsoleOutput,
-      createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner =
-        new ConsoleGrpcAdminCommandRunner(_),
+      consoleOutput: ConsoleOutput = StandardConsoleOutput
   ): Console
 
   protected def createHealthDumpGenerator(
@@ -127,7 +139,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   private val healthDumpGenerator = new SingleUseCell[HealthDumpGenerator[_]]
 
   // Function passed down to the node boostrap used to generate a health dump file
-  val writeHealthDumpToFile: HealthDumpFunction = () =>
+  val writeHealthDumpToFile: HealthDumpFunction = (file: File) =>
     Future {
       healthDumpGenerator
         .getOrElse {
@@ -135,7 +147,12 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
             TracerProvider.Factory(configuredOpenTelemetry, "admin_command_runner")
           implicit val tracer: Tracer = tracerProvider.tracer
 
-          val commandRunner = new GrpcAdminCommandRunner(this, config.parameters.timeouts.console)
+          val commandRunner =
+            new GrpcAdminCommandRunner(
+              this,
+              config.parameters.timeouts.console,
+              CantonGrpcUtil.ApiName.AdminApi,
+            )
           val newGenerator = createHealthDumpGenerator(commandRunner)
           val previous = healthDumpGenerator.putIfAbsent(newGenerator)
           previous match {
@@ -148,11 +165,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
               newGenerator
           }
         }
-        .generateHealthDump(
-          better.files.File.newTemporaryFile(
-            prefix = "canton-remote-health-dump"
-          )
-        )
+        .generateHealthDump(file)
     }
 
   installJavaUtilLoggingBridge()
@@ -165,7 +178,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       noTracingLogger,
       Some(
         new ExecutorServiceMetrics(
-          metricsRegistry.create(MetricsContext.Empty)
+          metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
         )
       ),
       numThreads,
@@ -253,8 +266,8 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   private val testingTimeService = new TestingTimeService(clock, () => simClocks)
 
   lazy val participants =
-    new ParticipantNodesX[Config#ParticipantConfigType](
-      createParticipantX,
+    new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode, Config#ParticipantConfigType](
+      createParticipant,
       migrationsFactory,
       timeouts,
       config.participantsByString,
@@ -262,22 +275,22 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       loggerFactory,
     )
 
-  val sequencers = new SequencerNodesX(
-    createSequencerX,
+  val sequencers = new SequencerNodes(
+    createSequencer,
     migrationsFactory,
     timeouts,
     config.sequencersByString,
-    config.sequencerNodeParametersByStringX,
+    config.sequencerNodeParametersByString,
     loggerFactory,
   )
 
   val mediators =
-    new MediatorNodesX(
-      createMediatorX,
+    new MediatorNodes(
+      createMediator,
       migrationsFactory,
       timeouts,
       config.mediatorsByString,
-      config.mediatorNodeParametersByStringX,
+      config.mediatorNodeParametersByString,
       loggerFactory,
     )
 
@@ -350,7 +363,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       traceContext: TraceContext
   ): Either[StartupError, Unit] = {
     def reconnect(
-        instance: CantonNodeBootstrap[ParticipantNodeCommon] & ParticipantNodeBootstrapCommon
+        instance: ParticipantNodeBootstrap
     ): EitherT[Future, StartupError, Unit] = {
       instance.getNode match {
         case None =>
@@ -449,21 +462,21 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     )
   }
 
-  protected def createSequencerX(
+  protected def createSequencer(
       name: String,
-      sequencerConfig: Config#SequencerNodeXConfigType,
-  ): SequencerNodeBootstrapX
+      sequencerConfig: Config#SequencerNodeConfigType,
+  ): SequencerNodeBootstrap
 
-  protected def createMediatorX(
+  protected def createMediator(
       name: String,
-      mediatorConfig: Config#MediatorNodeXConfigType,
-  ): MediatorNodeBootstrapX
+      mediatorConfig: Config#MediatorNodeConfigType,
+  ): MediatorNodeBootstrap
 
-  protected def createParticipantX(
+  protected def createParticipant(
       name: String,
       participantConfig: Config#ParticipantConfigType,
-  ): ParticipantNodeBootstrapX = {
-    participantNodeFactoryX
+  ): ParticipantNodeBootstrap = {
+    participantNodeFactory
       .create(
         NodeFactoryArguments(
           name,
@@ -485,20 +498,20 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   protected def mediatorNodeFactoryArguments(
       name: String,
-      mediatorConfig: Config#MediatorNodeXConfigType,
+      mediatorConfig: Config#MediatorNodeConfigType,
   ): NodeFactoryArguments[
-    Config#MediatorNodeXConfigType,
+    Config#MediatorNodeConfigType,
     MediatorNodeParameters,
     MediatorMetrics,
   ] = NodeFactoryArguments(
     name,
     mediatorConfig,
-    config.mediatorNodeParametersByStringX(name),
-    createClock(Some(MediatorNodeBootstrapX.LoggerFactoryKeyName -> name)),
+    config.mediatorNodeParametersByString(name),
+    createClock(Some(MediatorNodeBootstrap.LoggerFactoryKeyName -> name)),
     metricsRegistry.forMediator(name),
     testingConfig,
     futureSupervisor,
-    loggerFactory.append(MediatorNodeBootstrapX.LoggerFactoryKeyName, name),
+    loggerFactory.append(MediatorNodeBootstrap.LoggerFactoryKeyName, name),
     writeHealthDumpToFile,
     configuredOpenTelemetry,
   )

@@ -1,0 +1,211 @@
+workflow:
+  deploy_hard_migration:
+    when:
+      equal: [ deploy-hard-migration, << pipeline.parameters.run-job >> ]
+    jobs:
+      - artifacts_push:
+          context:
+            - artifactory
+      - deploy_cluster:
+          name: "deploy_cluster_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - artifacts_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          wait_for_sv: false
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false
+          requires:
+            - prepare_cluster_for_migration
+            - prepare_sv_runbook_for_migration
+      - hard_migration:
+          name: "prepare_cluster_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "prepare"
+          scope: "core"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
+      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+          name: "prepare_sv_runbook_for_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          action: "prepare"
+          scope: "sv"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
+      - hard_migration:
+          name: "migrate_cluster"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "core"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - prepare_cluster_for_migration
+            - trigger_global_domain_migration
+      - preflight_check:
+          name: "preflight_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+          name: "migrate_sv_runbook"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "sv"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - prepare_sv_runbook_for_migration
+            - migrate_cluster
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      - hard_migration:
+          name: "migrate_validator_runbook"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          action: "migrate"
+          scope: "validator"
+          base_version: << pipeline.parameters.base-version >>
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          send_notifications: false
+          requires:
+            - migrate_cluster
+      - preflight_validator_check:
+          name: "preflight_validator_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          migration_id: 1
+          cluster: << pipeline.parameters.cluster >>
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          cluster: << pipeline.parameters.cluster >>
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
+      - deploy_sv_runbook:
+          name: "deploy_fresh_sv_runbook_after_migration"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          deploy_version: << pipeline.parameters.upgrade-version >>
+          global_domain_active_migration_id: 1
+          reset_cluster: true # it's the default, but to make it explicit
+          requires:
+            - restore_node
+      - preflight_sv_check:
+          name: "preflight_sv_check_redeployed"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            # We wait for the runbook to redeploy to make sure we're not testing the original deployment
+            - deploy_fresh_sv_runbook_after_migration
+      - reset_cluster:
+          cluster: << pipeline.parameters.cluster >>
+          is_shared_cluster: true
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_sv_check_redeployed

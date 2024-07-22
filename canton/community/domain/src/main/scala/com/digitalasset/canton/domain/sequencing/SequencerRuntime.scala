@@ -4,10 +4,15 @@
 package com.digitalasset.canton.domain.sequencing
 
 import cats.data.EitherT
+import cats.syntax.foldable.*
 import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.connection.GrpcApiInfoService
+import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.api.v30
 import com.digitalasset.canton.domain.config.PublicServerConfig
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
@@ -20,38 +25,78 @@ import com.digitalasset.canton.domain.sequencing.authentication.{
   MemberAuthenticationServiceFactory,
   MemberAuthenticationStore,
 }
+import com.digitalasset.canton.domain.sequencing.config.SequencerNodeParameters
 import com.digitalasset.canton.domain.sequencing.sequencer.*
-import com.digitalasset.canton.domain.sequencing.sequencer.errors.RegisterMemberError.AlreadyRegisteredError
-import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
-  OperationError,
-  RegisterMemberError,
-  SequencerWriteError,
-}
 import com.digitalasset.canton.domain.sequencing.service.*
 import com.digitalasset.canton.health.HealthListener
-import com.digitalasset.canton.health.admin.data.{SequencerHealthStatus, TopologyQueueStatus}
-import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext, Lifecycle}
+import com.digitalasset.canton.health.admin.data.{
+  SequencerAdminStatus,
+  SequencerHealthStatus,
+  TopologyQueueStatus,
+}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  Lifecycle,
+  PromiseUnlessShutdown,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.DomainParametersLookup.SequencerDomainParameters
+import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.protocol.{
   DomainParametersLookup,
   DynamicDomainParametersLookup,
   StaticDomainParameters,
 }
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencer.admin.v30.SequencerVersionServiceGrpc
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.sequencer.admin.v30.{
+  SequencerAdministrationServiceGrpc,
+  SequencerVersionServiceGrpc,
+}
+import com.digitalasset.canton.sequencing.client.SequencerClient
+import com.digitalasset.canton.sequencing.handlers.{
+  DiscardIgnoredEvents,
+  EnvelopeOpener,
+  StripSignature,
+}
+import com.digitalasset.canton.sequencing.protocol.SequencedEvent
+import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
+import com.digitalasset.canton.sequencing.{
+  BoxedEnvelope,
+  HandlerResult,
+  SubscriptionStart,
+  UnsignedEnvelopeBox,
+  UnsignedProtocolEventHandler,
+}
+import com.digitalasset.canton.store.{IndexedDomain, SequencerCounterTrackerStore}
+import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
-import com.digitalasset.canton.topology.store.TopologyStateForInitializationService
+import com.digitalasset.canton.topology.processing.{
+  EffectiveTime,
+  SequencedTime,
+  TopologyTransactionProcessingSubscriber,
+  TopologyTransactionProcessor,
+}
+import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
+import com.digitalasset.canton.topology.store.{TopologyStateForInitializationService, TopologyStore}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.{
+  DomainTrustCertificate,
+  MediatorDomainState,
+  SequencerDomainState,
+}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.FutureUtil
-import com.digitalasset.canton.{DiscardOps, config}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
+import com.digitalasset.canton.{SequencerCounter, config, lifecycle}
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.{ServerInterceptors, ServerServiceDefinition}
 import org.apache.pekko.actor.ActorSystem
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 
 final case class SequencerAuthenticationConfig(
     nonceExpirationInterval: config.NonNegativeFiniteDuration,
@@ -69,17 +114,25 @@ object SequencerAuthenticationConfig {
   *
   * @param authenticationConfig   Authentication setup if supported, otherwise none.
   * @param staticDomainParameters The set of members to register on startup statically.
+  *
+  * Creates a sequencer client and connect it to a topology client
+  * to power sequencer authentication.
   */
 class SequencerRuntime(
     sequencerId: SequencerId,
     val sequencer: Sequencer,
+    client: SequencerClient,
     staticDomainParameters: StaticDomainParameters,
-    localNodeParameters: CantonNodeWithSequencerParameters,
+    localNodeParameters: SequencerNodeParameters,
     publicServerConfig: PublicServerConfig,
+    timeTracker: DomainTimeTracker,
     val metrics: SequencerMetrics,
-    val domainId: DomainId,
-    protected val syncCrypto: DomainSyncCryptoClient,
+    indexedDomain: IndexedDomain,
+    syncCrypto: DomainSyncCryptoClient,
+    domainTopologyManager: DomainTopologyManager,
+    topologyStore: TopologyStore[DomainStore],
     topologyClient: DomainTopologyClientWithInit,
+    topologyProcessor: TopologyTransactionProcessor,
     topologyManagerStatusO: Option[TopologyManagerStatus],
     storage: Storage,
     clock: Clock,
@@ -88,24 +141,23 @@ class SequencerRuntime(
     staticMembersToRegister: Seq[Member],
     futureSupervisor: FutureSupervisor,
     memberAuthenticationServiceFactory: MemberAuthenticationServiceFactory,
-    topologyStateForInitializationService: Option[TopologyStateForInitializationService],
+    topologyStateForInitializationService: TopologyStateForInitializationService,
+    maybeDomainOutboxFactory: Option[DomainOutboxFactorySingleCreate],
     protected val loggerFactory: NamedLoggerFactory,
+    runtimeReadyPromise: PromiseUnlessShutdown[Unit],
 )(implicit
     executionContext: ExecutionContext,
     actorSystem: ActorSystem,
+    traceContext: TraceContext,
 ) extends FlagCloseable
     with HasCloseContext
     with NamedLogging {
 
   override protected def timeouts: ProcessingTimeout = localNodeParameters.processingTimeouts
 
-  protected val isTopologyInitializedPromise = Promise[Unit]()
+  def domainId: DomainId = indexedDomain.domainId
 
-  protected def domainOutboxO: Option[DomainOutboxHandle] = None
-
-  def initialize(
-      topologyInitIsCompleted: Boolean = true
-  )(implicit traceContext: TraceContext): EitherT[Future, String, Unit] = {
+  def initialize()(implicit traceContext: TraceContext): EitherT[Future, String, Unit] = {
     def keyCheckET =
       EitherT {
         val snapshot = syncCrypto
@@ -118,33 +170,29 @@ class SequencerRuntime(
           }
       }
 
-    def registerInitialMembers = {
-      logger.debug("Registering initial sequencer members")
-      // only register the sequencer itself if we have remote sequencers that will necessitate topology transactions
-      // being sent to them
+    def registerInitialMembers: EitherT[Future, String, Unit] = {
+      logger.debug(s"Registering initial sequencer members: $staticMembersToRegister")
       staticMembersToRegister
-        .parTraverse(
-          sequencer
-            .ensureRegistered(_)
-            .leftFlatMap[Unit, SequencerWriteError[RegisterMemberError]] {
-              // if other sibling sequencers are initializing at the same time and try to run this step,
-              // or if a sequencer automatically registers the idm (eg the Ethereum sequencer)
-              // we might get AlreadyRegisteredError which we can safely ignore
-              case OperationError(_: AlreadyRegisteredError) => EitherT.pure(())
-              case otherError => EitherT.leftT(otherError)
+        .parTraverse_ { member =>
+          for {
+            firstKnownAtO <- EitherT.right(topologyClient.headSnapshot.memberFirstKnownAt(member))
+            _ <- {
+              firstKnownAtO match {
+                case Some((_, firstKnownAtEffectiveTime)) =>
+                  sequencer
+                    .registerMemberInternal(member, firstKnownAtEffectiveTime.value)
+                    .leftMap(_.toString)
+                case None => EitherT.leftT[Future, Unit](s"Member $member not known in topology")
+              }
             }
-        )
+          } yield ()
+        }
     }
 
     for {
       _ <- keyCheckET
-      _ <- registerInitialMembers.leftMap(_.toString)
-    } yield {
-      // if we run embedded, we complete the future here
-      if (topologyInitIsCompleted) {
-        isTopologyInitializedPromise.success(())
-      }
-    }
+      _ <- registerInitialMembers
+    } yield ()
   }
 
   protected val sequencerDomainParamsLookup
@@ -157,11 +205,6 @@ class SequencerRuntime(
       loggerFactory,
     )
 
-  /** Only SequencerXs expect MediatorXs to expose "topology_request_address" and
-    * allow corresponding unauthenticated messages upon initial bootstrap.
-    */
-  protected def mediatorsProcessParticipantTopologyRequests: Boolean = false
-
   private val sequencerService = GrpcSequencerService(
     sequencer,
     metrics,
@@ -170,8 +213,8 @@ class SequencerRuntime(
     sequencerDomainParamsLookup,
     localNodeParameters,
     staticDomainParameters.protocolVersion,
+    domainTopologyManager,
     topologyStateForInitializationService,
-    mediatorsProcessParticipantTopologyRequests,
     loggerFactory,
   )
 
@@ -212,7 +255,9 @@ class SequencerRuntime(
       // it's important to disconnect the member AFTER we expired the token, as otherwise, the member
       // can still re-subscribe with the token just before we removed it
       Traced.lift(sequencerService.disconnectMember(_)(_)),
-      isTopologyInitializedPromise.future,
+      runtimeReadyPromise.future.map(_ =>
+        ()
+      ), // on shutdown, MemberAuthenticationStore will be closed via closeContext
     )
 
     val sequencerAuthenticationService =
@@ -241,6 +286,9 @@ class SequencerRuntime(
     clients = topologyClient.numPendingChanges,
   )
 
+  def adminStatus: SequencerAdminStatus =
+    sequencer.adminStatus
+
   def fetchActiveMembers(): Future[Seq[Member]] =
     Future.successful(sequencerService.membersWithActiveSubscriptions)
 
@@ -257,6 +305,21 @@ class SequencerRuntime(
     // hook for registering enterprise administration service if in an appropriate environment
     additionalAdminServiceFactory(sequencer).foreach(register)
     sequencer.adminServices.foreach(register)
+    register(
+      SequencerAdministrationServiceGrpc.bindService(
+        sequencerAdministrationService,
+        executionContext,
+      )
+    )
+    // register the api info services
+    register(
+      ApiInfoServiceGrpc.bindService(
+        new GrpcApiInfoService(
+          CantonGrpcUtil.ApiName.AdminApi
+        ),
+        executionContext,
+      )
+    )
   }
 
   def domainServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = Seq(
@@ -267,6 +330,7 @@ class SequencerRuntime(
             domainId,
             sequencerId,
             staticDomainParameters,
+            domainTopologyManager,
             syncCrypto,
             loggerFactory,
           )(
@@ -294,16 +358,160 @@ class SequencerRuntime(
         v30.SequencerServiceGrpc.bindService(sequencerService, ec),
         interceptors,
       )
+    }, {
+      ApiInfoServiceGrpc.bindService(
+        new GrpcApiInfoService(
+          CantonGrpcUtil.ApiName.SequencerPublicApi
+        ),
+        executionContext,
+      )
     },
   )
 
-  override def onClosed(): Unit =
+  @VisibleForTesting
+  protected[canton] val topologyManagerSequencerCounterTrackerStore =
+    SequencerCounterTrackerStore(
+      storage,
+      indexedDomain,
+      timeouts,
+      loggerFactory,
+    )
+
+  logger.info("Subscribing to topology transactions for auto-registering members")
+  topologyProcessor.subscribe(new TopologyTransactionProcessingSubscriber {
+    override val executionOrder: Int = 5
+
+    override def observed(
+        sequencedTimestamp: SequencedTime,
+        effectiveTimestamp: EffectiveTime,
+        sequencerCounter: SequencerCounter,
+        transactions: Seq[GenericSignedTopologyTransaction],
+    )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+
+      val possibleNewMembers = transactions.map(_.mapping).flatMap {
+        case dtc: DomainTrustCertificate => Seq(dtc.participantId)
+        case mds: MediatorDomainState => mds.active ++ mds.observers
+        case sds: SequencerDomainState => sds.active ++ sds.observers
+        case _ => Seq.empty
+      }
+
+      // TODO(#18394): Batch the member registrations?
+      // TODO(#18401): Change F to FUS in registerMemberInternal
+      val f = possibleNewMembers
+        .parTraverse_ { member =>
+          logger.info(s"Topology change has triggered sequencer registration of member $member")
+          sequencer.registerMemberInternal(member, effectiveTimestamp.value)
+        }
+        .valueOr(e =>
+          ErrorUtil.internalError(new RuntimeException(s"Failed to register member: $e"))
+        )
+      lifecycle.FutureUnlessShutdown.outcomeF(f)
+    }
+  })
+
+  private lazy val domainOutboxO: Option[DomainOutboxHandle] =
+    maybeDomainOutboxFactory
+      .map(
+        _.createOnlyOnce(
+          staticDomainParameters.protocolVersion,
+          topologyClient,
+          client,
+          clock,
+          loggerFactory,
+        )
+      )
+
+  private val topologyHandler = topologyProcessor.createHandler(domainId)
+  private val trafficProcessor =
+    new TrafficControlProcessor(
+      syncCrypto,
+      domainId,
+      sequencer.rateLimitManager.flatMap(_.balanceKnownUntil),
+      loggerFactory,
+    )
+
+  sequencer.rateLimitManager.foreach(rlm => trafficProcessor.subscribe(rlm.balanceUpdateSubscriber))
+
+  // TODO(i17434): Use topologyHandler.combineWith(trafficProcessorHandler)
+  private def handler(domainId: DomainId): UnsignedProtocolEventHandler =
+    new UnsignedProtocolEventHandler {
+      override def name: String = s"sequencer-runtime-$domainId"
+
+      override def subscriptionStartsAt(
+          start: SubscriptionStart,
+          domainTimeTracker: DomainTimeTracker,
+      )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+        Seq(
+          topologyProcessor.subscriptionStartsAt(start, domainTimeTracker),
+          trafficProcessor.subscriptionStartsAt(start, domainTimeTracker),
+        ).sequence_
+
+      override def apply(
+          tracedEvents: BoxedEnvelope[UnsignedEnvelopeBox, DefaultOpenEnvelope]
+      ): HandlerResult =
+        tracedEvents.withTraceContext { implicit traceContext => events =>
+          NonEmpty.from(events).fold(HandlerResult.done)(handle)
+        }
+
+      private def handle(tracedEvents: NonEmpty[Seq[Traced[SequencedEvent[DefaultOpenEnvelope]]]])(
+          implicit traceContext: TraceContext
+      ): HandlerResult = {
+        for {
+          topology <- topologyHandler(Traced(tracedEvents))
+          _ <- trafficProcessor.handle(tracedEvents)
+        } yield topology
+      }
+    }
+
+  private val eventHandler = StripSignature(handler(domainId))
+
+  private val sequencerAdministrationService =
+    new GrpcSequencerAdministrationService(
+      sequencer,
+      client,
+      topologyStore,
+      topologyClient,
+      timeTracker,
+      staticDomainParameters,
+      loggerFactory,
+    )
+
+  def initializeAll()(implicit traceContext: TraceContext): EitherT[Future, String, Unit] = {
+    for {
+      _ <- initialize()
+      _ = logger.debug("Subscribing topology client within sequencer runtime")
+      _ <- EitherT.right(
+        client.subscribeTracking(
+          topologyManagerSequencerCounterTrackerStore,
+          DiscardIgnoredEvents(loggerFactory) {
+            EnvelopeOpener(staticDomainParameters.protocolVersion, syncCrypto.pureCrypto)(
+              eventHandler
+            )
+          },
+          timeTracker,
+        )
+      )
+      _ <- domainOutboxO
+        .map(_.startup().onShutdown(Right(())))
+        .getOrElse(EitherT.rightT[Future, String](()))
+    } yield {
+      logger.info("Sequencer runtime initialized")
+      runtimeReadyPromise.outcome(())
+    }
+  }
+
+  override def onClosed(): Unit = {
     Lifecycle.close(
+      Lifecycle.toCloseableOption(sequencer.rateLimitManager),
+      timeTracker,
       syncCrypto,
       topologyClient,
+      client,
+      topologyProcessor,
+      topologyManagerSequencerCounterTrackerStore,
       sequencerService,
       authenticationServices.memberAuthenticationService,
       sequencer,
     )(logger)
-
+  }
 }

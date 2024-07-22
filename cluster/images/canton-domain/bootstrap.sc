@@ -2,16 +2,15 @@ import cats.syntax.either._
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+import com.digitalasset.canton.version.ProtocolVersion
 
 def main() {
   val domainParametersConfig = DomainParametersConfig(
-    protocolVersion = DomainProtocolVersion(ProtocolVersion.v30),
-    devVersionSupport = true,
+    alphaVersionSupport = true
   )
   def staticParameters(sequencer: LocalInstanceReference) =
     domainParametersConfig
-      .toStaticDomainParameters(sequencer.config.crypto)
+      .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v31)
       .map(StaticDomainParameters(_))
       .getOrElse(sys.error("whatever"))
   utils.retry_until_true {
@@ -19,7 +18,7 @@ def main() {
       case NodeStatus.Failure(msg) =>
         logger.info(s"Failed to query sequencer status: $msg")
         false
-      case NodeStatus.NotInitialized(_) =>
+      case NodeStatus.NotInitialized(_, _) =>
         logger.info("Initializing domain")
         com.digitalasset.canton.console.EnterpriseConsoleMacros.bootstrap.domain(
           "domain",

@@ -15,11 +15,13 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.environment.{CantonNodeParameters, HasGeneralCantonNodeParameters}
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
 import com.digitalasset.canton.participant.config.{
+  CantonEngineConfig,
   LedgerApiServerParametersConfig,
   ParticipantProtocolConfig,
   ParticipantStoreConfig,
   PartyNotificationConfig,
 }
+import com.digitalasset.canton.participant.sync.CommandProgressTrackerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
@@ -35,16 +37,16 @@ final case class ParticipantNodeParameters(
     protocolConfig: ParticipantProtocolConfig,
     ledgerApiServerParameters: LedgerApiServerParametersConfig,
     excludeInfrastructureTransactions: Boolean,
-    enableEngineStackTrace: Boolean,
-    iterationsBetweenInterruptions: Long,
+    engine: CantonEngineConfig,
     journalGarbageCollectionDelay: NonNegativeFiniteDuration,
     disableUpgradeValidation: Boolean,
+    allowForUnauthenticatedContractIds: Boolean,
+    commandProgressTracking: CommandProgressTrackerConfig,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
-  override def devVersionSupport: Boolean = protocolConfig.devVersionSupport
-  override def initialProtocolVersion: ProtocolVersion = protocolConfig.initialProtocolVersion
-
+  override def alphaVersionSupport: Boolean = protocolConfig.alphaVersionSupport
+  override def betaVersionSupport: Boolean = protocolConfig.betaVersionSupport
 }
 
 object ParticipantNodeParameters {
@@ -57,7 +59,8 @@ object ParticipantNodeParameters {
       logQueryCost = None,
       processingTimeouts = DefaultProcessingTimeouts.testing,
       enablePreviewFeatures = false,
-      nonStandardConfig = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      nonStandardConfig = true,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(
         maxPruningBatchSize = PositiveNumeric.tryCreate(10),
@@ -65,9 +68,9 @@ object ParticipantNodeParameters {
       ),
       sequencerClient = SequencerClientConfig(),
       dbMigrateAndStart = false,
-      useNewTrafficControl = false,
       exitOnFatalFailures = true,
       useUnifiedSequencer = false,
+      watchdog = None,
     ),
     partyChangeNotification = PartyNotificationConfig.Eager,
     adminWorkflow = AdminWorkflowConfig(
@@ -78,16 +81,17 @@ object ParticipantNodeParameters {
     transferTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
     protocolConfig = ParticipantProtocolConfig(
       Some(testedProtocolVersion),
-      devVersionSupport = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      alphaVersionSupport = true,
+      betaVersionSupport = true,
       dontWarnOnDeprecatedPV = false,
-      initialProtocolVersion = testedProtocolVersion,
     ),
     ledgerApiServerParameters = LedgerApiServerParametersConfig(),
     excludeInfrastructureTransactions = true,
-    enableEngineStackTrace = false,
-    iterationsBetweenInterruptions =
-      10000, // 10000 is the default value in the engine configuration
+    engine = CantonEngineConfig(),
     journalGarbageCollectionDelay = NonNegativeFiniteDuration.Zero,
-    disableUpgradeValidation = true,
+    disableUpgradeValidation = false,
+    allowForUnauthenticatedContractIds = false,
+    commandProgressTracking = CommandProgressTrackerConfig(),
   )
 }

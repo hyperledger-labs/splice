@@ -5,6 +5,7 @@ package com.digitalasset.canton.platform.store.interning
 
 import com.digitalasset.canton.platform.{Identifier, PackageName, Party}
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
 /** The facade for all supported string-interning domains
   *
@@ -14,6 +15,7 @@ import com.digitalasset.canton.topology.DomainId
 trait StringInterning {
   def templateId: StringInterningDomain[Identifier]
   def packageName: StringInterningDomain[PackageName]
+  def packageVersion: StringInterningDomain[PackageVersion]
   def party: StringInterningDomain[Party]
   def domainId: StringInterningDomain[DomainId]
 }

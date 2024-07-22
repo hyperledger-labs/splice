@@ -12,10 +12,9 @@ import com.daml.error.{
   Explanation,
   Resolution,
 }
-import com.daml.lf.transaction.GlobalKey
-import com.daml.lf.value.Value
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.ConsistencyErrorGroup
-import com.digitalasset.canton.ledger.participant.state.v2.ChangeId
+import com.digitalasset.daml.lf.transaction.GlobalKey
+import com.digitalasset.daml.lf.value.Value
 
 import java.time.Instant
 
@@ -40,7 +39,6 @@ object ConsistencyErrors extends ConsistencyErrorGroup {
     final case class Reject(
         override val definiteAnswer: Boolean = false,
         existingCommandSubmissionId: Option[String],
-        changeId: Option[ChangeId] = None,
     )(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
@@ -50,9 +48,7 @@ object ConsistencyErrors extends ConsistencyErrorGroup {
       override def context: Map[String, String] =
         super.context ++ existingCommandSubmissionId
           .map("existing_submission_id" -> _)
-          .toList ++ changeId
-          .map(changeId => Seq("changeId" -> changeId.toString))
-          .getOrElse(Seq.empty)
+          .toList
     }
   }
 
@@ -146,6 +142,7 @@ object ConsistencyErrors extends ConsistencyErrorGroup {
             //                   If the key is big, it can force chunking other resources.
             (ErrorResource.TemplateId, key.templateId.toString),
             (ErrorResource.ContractKey, encodedKey),
+            (ErrorResource.PackageName, key.packageName),
           )
         }
     }
@@ -203,6 +200,7 @@ object ConsistencyErrors extends ConsistencyErrorGroup {
             //                   If the key is big, it can force chunking other resources.
             (ErrorResource.TemplateId, key.templateId.toString),
             (ErrorResource.ContractKey, encodedKey),
+            (ErrorResource.PackageName, key.packageName),
           )
         }
     }

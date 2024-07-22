@@ -4,16 +4,15 @@
 package com.daml.network
 
 import com.daml.metrics.HealthMetrics
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
-import com.daml.network.environment.SpliceMetrics
-import com.digitalasset.canton.metrics.DbStorageMetrics
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
 
 /** A shared trait to capture the commonalities across our amulet node metrics. */
 trait SpliceMetrics {
 
-  def metricsFactory: CantonLabeledMetricsFactory
+  def metricsFactory: LabeledMetricsFactory
 
   def grpcClientMetrics: GrpcClientMetrics
 
@@ -22,8 +21,11 @@ trait SpliceMetrics {
   def dbStorage: DbStorageMetrics
 }
 
-abstract class BaseSpliceMetrics(nodeType: String, val metricsFactory: CantonLabeledMetricsFactory)
-    extends SpliceMetrics {
+abstract class BaseSpliceMetrics(
+    nodeType: String,
+    val metricsFactory: LabeledMetricsFactory,
+    storageHistograms: DbStorageHistograms,
+) extends SpliceMetrics {
 
   private implicit val mc: MetricsContext = MetricsContext.Empty
 
@@ -33,5 +35,5 @@ abstract class BaseSpliceMetrics(nodeType: String, val metricsFactory: CantonLab
   override def healthMetrics: HealthMetrics = new HealthMetrics(metricsFactory)
 
   override def dbStorage: DbStorageMetrics =
-    new DbStorageMetrics(SpliceMetrics.MetricsPrefix, metricsFactory)
+    new DbStorageMetrics(storageHistograms, metricsFactory)
 }

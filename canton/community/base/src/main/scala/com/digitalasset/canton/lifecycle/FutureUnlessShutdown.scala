@@ -8,15 +8,17 @@ import cats.data.EitherT
 import cats.{Applicative, FlatMap, Functor, Id, Monad, MonadThrow, Monoid, Parallel, ~>}
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricHandle.Timer
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.AbortedDueToShutdownException
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{LoggerUtil, Thereafter}
+import com.digitalasset.canton.util.{LoggerUtil, Thereafter, ThereafterAsync}
 import com.digitalasset.canton.{
   DoNotDiscardLikeFuture,
   DoNotReturnFromSynchronizedLikeFuture,
   DoNotTraverseLikeFuture,
 }
 
+import java.util.concurrent.CompletionException
 import scala.concurrent.{Awaitable, ExecutionContext, Future}
 import scala.util.chaining.*
 import scala.util.{Failure, Success, Try}
@@ -45,6 +47,10 @@ object FutureUnlessShutdown {
     Future.successful(x)
   )
 
+  /** Analog to Future.apply without the overhead that handles an exception of `x` as a failed future. */
+  def wrap[A](x: => A): FutureUnlessShutdown[A] =
+    FutureUnlessShutdown.fromTry(Try(x))
+
   /** Wraps the result of a [[scala.concurrent.Future]] into an [[UnlessShutdown.Outcome]] */
   def outcomeF[A](f: Future[A])(implicit ec: ExecutionContext): FutureUnlessShutdown[A] =
     FutureUnlessShutdown(f.map(UnlessShutdown.Outcome(_)))
@@ -72,6 +78,22 @@ object FutureUnlessShutdown {
   }
 
   def never: FutureUnlessShutdown[Nothing] = FutureUnlessShutdown(Future.never)
+
+  /** Can transform a future from [[FutureUnlessShutdownImpl.Ops.failOnShutdownToAbortException]] back
+    * to [[FutureUnlessShutdown]].
+    */
+  def transformAbortedF[V](f: Future[V])(implicit ec: ExecutionContext): FutureUnlessShutdown[V] =
+    apply(f.transform({
+      case Success(value) => Success(UnlessShutdown.Outcome(value))
+      case Failure(AbortedDueToShutdownException(_)) => Success(UnlessShutdown.AbortedDueToShutdown)
+      case Failure(ce: CompletionException) =>
+        ce.getCause match {
+          case AbortedDueToShutdownException(_) => Success(UnlessShutdown.AbortedDueToShutdown)
+          case _ => Failure(ce)
+        }
+      case Failure(other) => Failure(other)
+    }))
+
 }
 
 /** Monad combination of `Future` and [[UnlessShutdown]]
@@ -153,17 +175,27 @@ object FutureUnlessShutdownImpl {
       FutureUnlessShutdown(unwrap.transformWith(Instance.unsubst[K](f)))
     }
 
+    def andThen[B](pf: PartialFunction[Try[UnlessShutdown[A]], B])(implicit
+        executor: ExecutionContext
+    ): FutureUnlessShutdown[A] =
+      FutureUnlessShutdown(unwrap.andThen(pf))
+
     /** Analog to [[scala.concurrent.Future]].onComplete */
     def onComplete[B](f: Try[UnlessShutdown[A]] => Unit)(implicit ec: ExecutionContext): Unit =
       unwrap.onComplete(f)
 
     /** Analog to [[scala.concurrent.Future]].`failed` */
-    def failed: Future[Throwable] = self.unwrap.failed
+    def failed(implicit ec: ExecutionContext): FutureUnlessShutdown[Throwable] =
+      FutureUnlessShutdown.outcomeF(self.unwrap.failed)
 
     /** Evaluates `f` and returns its result if this future completes with [[UnlessShutdown.AbortedDueToShutdown]]. */
     def onShutdown[B >: A](f: => B)(implicit ec: ExecutionContext): Future[B] =
       unwrap.map(_.onShutdown(f))
 
+    def failOnShutdownToAbortException(action: String)(implicit ec: ExecutionContext): Future[A] =
+      failOnShutdownTo(AbortedDueToShutdownException(action))
+
+    /** consider using [[failOnShutdownToAbortException]] unless you need a specific exception. */
     def failOnShutdownTo(t: => Throwable)(implicit ec: ExecutionContext): Future[A] = {
       unwrap.flatMap {
         case UnlessShutdown.Outcome(result) => Future.successful(result)
@@ -309,32 +341,45 @@ object FutureUnlessShutdownImpl {
   ): Parallel[FutureUnlessShutdown] =
     Instance.subst[Parallel](parallelInstanceFutureUnlessShutdownOpened)
 
-  class FutureUnlessShutdownThereafter extends Thereafter[FutureUnlessShutdown] {
+  class FutureUnlessShutdownThereafter(implicit ec: ExecutionContext)
+      extends ThereafterAsync[FutureUnlessShutdown] {
     override type Content[A] = FutureUnlessShutdownThereafterContent[A]
-    override def thereafter[A](f: FutureUnlessShutdown[A])(body: Try[UnlessShutdown[A]] => Unit)(
-        implicit ec: ExecutionContext
+    override def thereafter[A](f: FutureUnlessShutdown[A])(
+        body: Try[UnlessShutdown[A]] => Unit
     ): FutureUnlessShutdown[A] =
       FutureUnlessShutdown(f.unwrap.thereafter(body))
 
     override def thereafterF[A](f: FutureUnlessShutdown[A])(
         body: Try[UnlessShutdown[A]] => Future[Unit]
-    )(implicit ec: ExecutionContext): FutureUnlessShutdown[A] = {
-      FutureUnlessShutdown(Thereafter[Future].thereafterF(f.unwrap)(body))
+    ): FutureUnlessShutdown[A] = {
+      FutureUnlessShutdown(ThereafterAsync[Future].thereafterF(f.unwrap)(body))
     }
+
+    override def maybeContent[A](content: FutureUnlessShutdownThereafterContent[A]): Option[A] =
+      content match {
+        case Success(UnlessShutdown.Outcome(x)) => Some(x)
+        case _ => None
+      }
   }
 
   /** Use a type synonym instead of a type lambda so that the Scala compiler does not get confused during implicit resolution,
     * at least for simple cases.
     */
   type FutureUnlessShutdownThereafterContent[A] = Try[UnlessShutdown[A]]
-  implicit val thereafterFutureUnlessShutdown
-      : Thereafter.Aux[FutureUnlessShutdown, FutureUnlessShutdownThereafterContent] =
+  implicit def thereafterFutureUnlessShutdown(implicit
+      ec: ExecutionContext
+  ): ThereafterAsync.Aux[FutureUnlessShutdown, FutureUnlessShutdownThereafterContent] =
     new FutureUnlessShutdownThereafter
 
   /** Enable `onShutdown` syntax on [[cats.data.EitherT]]`[`[[FutureUnlessShutdown]]`...]`. */
   implicit class EitherTOnShutdownSyntax[A, B](
       private val eitherT: EitherT[FutureUnlessShutdown, A, B]
   ) extends AnyVal {
+    def failOnShutdownTo[C >: A, D >: B](t: => Throwable)(implicit
+        ec: ExecutionContext
+    ): EitherT[Future, C, D] =
+      EitherT(eitherT.value.failOnShutdownTo(t))
+
     def onShutdown[C >: A, D >: B](f: => Either[C, D])(implicit
         ec: ExecutionContext
     ): EitherT[Future, C, D] =
@@ -356,4 +401,8 @@ object FutureUnlessShutdownImpl {
     def future[T](timer: Timer, future: => FutureUnlessShutdown[T]): FutureUnlessShutdown[T] =
       FutureUnlessShutdown(timed.future(timer, future.unwrap))
   }
+
+  final case class AbortedDueToShutdownException(action: String)
+      extends RuntimeException(s"'$action' was aborted due to shutdown.")
+
 }

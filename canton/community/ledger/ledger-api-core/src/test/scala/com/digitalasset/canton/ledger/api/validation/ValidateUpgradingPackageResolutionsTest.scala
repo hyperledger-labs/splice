@@ -4,12 +4,15 @@
 package com.digitalasset.canton.ledger.api.validation
 
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
-import com.daml.lf.data.Ref
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ledger.api.validation.ValidateUpgradingPackageResolutions.ValidatedCommandPackageResolutionsSnapshot
-import com.digitalasset.canton.platform.store.packagemeta.{
-  PackageMetadataSnapshot,
-  PackageMetadataStore,
+import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata.{
+  LocalPackagePreference,
+  PackageResolution,
 }
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status.Code.INVALID_ARGUMENT
 import io.grpc.StatusRuntimeException
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
@@ -48,7 +51,7 @@ class ValidateUpgradingPackageResolutionsTest
         request = validator(Seq(p11, p12)),
         code = INVALID_ARGUMENT,
         description =
-          "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: duplicate preference for package-name pkgName1: pkgId11 vs pkgId12",
+          "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: duplicate preference for package-name pkgName1: pkgId11 vs pkgId12",
       )
     }
 
@@ -57,7 +60,7 @@ class ValidateUpgradingPackageResolutionsTest
         request = validator(Seq("not%valid^pkgId")),
         code = INVALID_ARGUMENT,
         description =
-          """INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: package_id_selection_preference parsing failed with `non expected character 0x25 in Daml-LF Package ID "not%valid^pkgId"`. The package_id_selection_preference field must contain non-empty and valid package ids""",
+          """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: package_id_selection_preference parsing failed with `non expected character 0x25 in Daml-LF Package ID "not%valid^pkgId"`. The package_id_selection_preference field must contain non-empty and valid package ids""",
       )
     }
 
@@ -66,7 +69,7 @@ class ValidateUpgradingPackageResolutionsTest
         request = validator(Seq("nonExistingPackageId")),
         code = INVALID_ARGUMENT,
         description =
-          "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: user-specified pkg id (nonExistingPackageId) could not be found",
+          "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: user-specified pkg id (nonExistingPackageId) could not be found",
       )
     }
   }
@@ -96,15 +99,22 @@ class ValidateUpgradingPackageResolutionsTest
 
     protected implicit val contextualizedErrorLogger: ContextualizedErrorLogger = NoLogging
 
-    private val packageMetadataSnapshot = mock[PackageMetadataSnapshot]
-    when(packageMetadataSnapshot.getUpgradablePackagePreferenceMap).thenReturn(
-      preferenceMapSnapshot
+    private val getPackageMetadataSnapshot = (_: ContextualizedErrorLogger) =>
+      PackageMetadata().copy(
+        packageIdVersionMap = packageMapSnapshot,
+        packageNameMap = preferenceMapSnapshot.view.mapValues { preferredPackage =>
+          PackageResolution(
+            preference = LocalPackagePreference(
+              version = PackageVersion.assertFromString("0.0.0"), // unused
+              packageId = preferredPackage,
+            ),
+            allPackageIdsForName = NonEmpty.mk(Set, preferredPackage),
+          )
+        }.toMap,
+      )
+    protected val validator = new ValidateUpgradingPackageResolutionsImpl(
+      getPackageMetadataSnapshot
     )
-    when(packageMetadataSnapshot.getUpgradablePackageMap)
-      .thenReturn(packageMapSnapshot)
-    private val packageMetadataStore = mock[PackageMetadataStore]
-    when(packageMetadataStore.getSnapshot).thenReturn(packageMetadataSnapshot)
-    protected val validator = new ValidateUpgradingPackageResolutionsImpl(packageMetadataStore)
 
     def testResolutions(
         userPreference: Seq[String],

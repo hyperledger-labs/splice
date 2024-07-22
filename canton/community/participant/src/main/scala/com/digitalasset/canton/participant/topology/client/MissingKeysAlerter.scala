@@ -8,10 +8,11 @@ import com.digitalasset.canton.crypto.store.CryptoPrivateStore
 import com.digitalasset.canton.crypto.{Fingerprint, KeyPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.client.DomainTopologyClient
 import com.digitalasset.canton.topology.processing.*
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -39,29 +40,29 @@ class MissingKeysAlerter(
     }
   }
 
-  def attachToTopologyProcessorX(): TopologyTransactionProcessingSubscriberX =
-    new TopologyTransactionProcessingSubscriberX {
+  def attachToTopologyProcessor(): TopologyTransactionProcessingSubscriber =
+    new TopologyTransactionProcessingSubscriber {
       override def observed(
           sequencedTimestamp: SequencedTime,
           effectiveTimestamp: EffectiveTime,
           sequencerCounter: SequencerCounter,
-          transactions: Seq[GenericSignedTopologyTransactionX],
+          transactions: Seq[GenericSignedTopologyTransaction],
       )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
         FutureUnlessShutdown.pure(
-          processTransactionsX(effectiveTimestamp.value, transactions)
+          processTransactions(effectiveTimestamp.value, transactions)
         )
     }
 
-  private def processTransactionsX(
+  private def processTransactions(
       timestamp: CantonTimestamp,
-      transactions: Seq[GenericSignedTopologyTransactionX],
+      transactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): Unit = {
     // scan state and alarm if the domain suggest that I use a key which I don't have
     transactions.view
-      .filter(tx => tx.operation == TopologyChangeOpX.Replace && !tx.isProposal)
+      .filter(tx => tx.operation == TopologyChangeOp.Replace && !tx.isProposal)
       .map(_.mapping)
       .foreach {
-        case ParticipantDomainPermissionX(
+        case ParticipantDomainPermission(
               `domainId`,
               `participantId`,
               permission,
@@ -71,7 +72,7 @@ class MissingKeysAlerter(
           logger.info(
             s"Domain $domainId update my participant permission as of $timestamp to $permission"
           )
-        case OwnerToKeyMappingX(`participantId`, _, keys) =>
+        case OwnerToKeyMapping(`participantId`, _, keys) =>
           keys.foreach(k => alertOnMissingKey(k.fingerprint, k.purpose))
         case _ => ()
       }
@@ -83,11 +84,12 @@ class MissingKeysAlerter(
     lazy val errorMsg =
       s"Error checking if key $fingerprint associated with this participant node on domain $domainId is present in the public crypto store"
     cryptoPrivateStore.existsPrivateKey(fingerprint, purpose).value.onComplete {
-      case Success(Right(false)) =>
+      case Success(Outcome(Right(false))) =>
         logger.error(
           s"On domain $domainId, the key $fingerprint for $purpose is associated with this participant node, but this key is not present in the private crypto store."
         )
-      case Success(Left(storeError)) => logger.error(errorMsg, storeError)
+      case Success(Outcome(Left(storeError))) => logger.error(errorMsg, storeError)
+      case Success(AbortedDueToShutdown) => ()
       case Failure(exception) => logger.error(errorMsg, exception)
       case _ => ()
     }

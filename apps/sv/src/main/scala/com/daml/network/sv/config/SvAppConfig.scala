@@ -25,7 +25,6 @@ import com.digitalasset.canton.config.RequireTypes.{
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.nio.file.Path
@@ -258,7 +257,5 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
-    parameters: DomainParametersConfig = DomainParametersConfig(
-      protocolVersion = DomainProtocolVersion(ProtocolVersion.v30)
-    ),
+    parameters: DomainParametersConfig = DomainParametersConfig(),
 )

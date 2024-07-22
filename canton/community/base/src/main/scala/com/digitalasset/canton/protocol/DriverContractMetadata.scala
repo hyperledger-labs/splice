@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.protocol
 
-import com.daml.lf.data.Bytes as LfBytes
 import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -14,6 +13,7 @@ import com.digitalasset.canton.version.{
   ProtoVersion,
   ProtocolVersion,
 }
+import com.digitalasset.daml.lf.data.Bytes as LfBytes
 
 import scala.util.chaining.*
 
@@ -38,7 +38,7 @@ object DriverContractMetadata extends HasVersionedMessageCompanion[DriverContrac
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v30,
+      ProtocolVersion.v31,
       supportedProtoVersion(v30.DriverContractMetadata)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

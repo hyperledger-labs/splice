@@ -5,14 +5,14 @@ package com.digitalasset.canton.platform.store.dao
 
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.api.v2.update_service.GetUpdateTreesResponse
-import com.daml.lf.data.Ref
-import com.daml.lf.ledger.EventId
-import com.daml.lf.transaction.{Node, NodeId}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.util.TimestampConversion
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.platform.store.entries.LedgerEntry
 import com.digitalasset.canton.platform.store.utils.EventOps.TreeEventOps
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.ledger.EventId
+import com.digitalasset.daml.lf.transaction.{Node, NodeId}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.scalatest.*
@@ -218,15 +218,47 @@ private[dao] trait JdbcLedgerDaoTransactionTreesSpec
           .getTransactionTrees(
             startExclusive = from,
             endInclusive = to,
-            requestingParties = Set(alice, bob, charlie),
+            requestingParties = Some(Set(alice, bob, charlie)),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
-              wildcardWitnesses = Set(alice, bob, charlie),
+              templateWildcardWitnesses = Some(Set(alice, bob, charlie)),
             ),
           )
       )
     } yield {
       comparable(result) should contain theSameElementsInOrderAs comparable(lookups)
+    }
+  }
+
+  it should "work correctly for party-wildcard" in {
+    for {
+      (from, to, _) <- storeTestFixture()
+      result <- transactionsOf(
+        ledgerDao.transactionsReader
+          .getTransactionTrees(
+            startExclusive = from,
+            endInclusive = to,
+            requestingParties = Some(Set(alice, bob, charlie)),
+            eventProjectionProperties = EventProjectionProperties(
+              verbose = true,
+              templateWildcardWitnesses = Some(Set(alice, bob, charlie)),
+            ),
+          )
+      )
+      resultPartyWildcard <- transactionsOf(
+        ledgerDao.transactionsReader
+          .getTransactionTrees(
+            startExclusive = from,
+            endInclusive = to,
+            requestingParties = None,
+            eventProjectionProperties = EventProjectionProperties(
+              verbose = true,
+              templateWildcardWitnesses = None,
+            ),
+          )
+      )
+    } yield {
+      comparable(result) should contain theSameElementsInOrderAs comparable(resultPartyWildcard)
     }
   }
 
@@ -251,10 +283,10 @@ private[dao] trait JdbcLedgerDaoTransactionTreesSpec
           .getTransactionTrees(
             startExclusive = from.lastOffset,
             endInclusive = to.lastOffset,
-            requestingParties = Set(alice),
+            requestingParties = Some(Set(alice)),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
-              wildcardWitnesses = Set(alice),
+              templateWildcardWitnesses = Some(Set(alice)),
             ),
           )
       )
@@ -263,10 +295,10 @@ private[dao] trait JdbcLedgerDaoTransactionTreesSpec
           .getTransactionTrees(
             startExclusive = from.lastOffset,
             endInclusive = to.lastOffset,
-            requestingParties = Set(bob),
+            requestingParties = Some(Set(bob)),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
-              wildcardWitnesses = Set(bob),
+              templateWildcardWitnesses = Some(Set(bob)),
             ),
           )
       )
@@ -275,10 +307,10 @@ private[dao] trait JdbcLedgerDaoTransactionTreesSpec
           .getTransactionTrees(
             startExclusive = from.lastOffset,
             endInclusive = to.lastOffset,
-            requestingParties = Set(charlie),
+            requestingParties = Some(Set(charlie)),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
-              wildcardWitnesses = Set(charlie),
+              templateWildcardWitnesses = Some(Set(charlie)),
             ),
           )
       )

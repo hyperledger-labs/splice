@@ -4,7 +4,7 @@
 package com.daml.network.sv.automation
 
 import com.daml.metrics.api.MetricHandle.Gauge
-import com.daml.metrics.api.{MetricName, MetricsContext}
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskNoop,
@@ -23,14 +23,15 @@ import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricQualification.Debug
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -153,7 +154,7 @@ object ReportSvStatusMetricsExportTrigger {
   private case class SvId(svParty: String, svName: String)
 
   private case class SvCometBftMetrics(
-      metricsFactory: CantonLabeledMetricsFactory
+      metricsFactory: LabeledMetricsFactory
   ) extends AutoCloseable {
 
     private implicit val mc: MetricsContext =
@@ -161,11 +162,25 @@ object ReportSvStatusMetricsExportTrigger {
 
     private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sv_cometbft"
 
-    private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
-      metricsFactory.gauge(prefix :+ name, initial = initial)
-
-    val cometBftEarliestBlockHeight: Gauge[Long] = gauge("earliest_block_height", initial = 0L)
-    val cometBftLatestBlockHeight: Gauge[Long] = gauge("latest_block_height", initial = 0L)
+    val cometBftEarliestBlockHeight: Gauge[Long] =
+      metricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "earliest_block_height",
+          "The earliest available block",
+          Debug,
+          "Earliest available block on the CometBFT node, that was not pruned yet.",
+        ),
+        initial = 0L,
+      )
+    val cometBftLatestBlockHeight: Gauge[Long] = metricsFactory.gauge(
+      MetricInfo(
+        prefix :+ "latest_block_height",
+        "The latest available block",
+        Debug,
+        "Latest available block on the CometBFT node, and that can be read by the sequencer.",
+      ),
+      initial = 0L,
+    )
 
     override def close(): Unit = {
       cometBftEarliestBlockHeight.close()
@@ -175,7 +190,7 @@ object ReportSvStatusMetricsExportTrigger {
 
   private case class SvStatusMetrics(
       svId: SvId,
-      metricsFactory: CantonLabeledMetricsFactory,
+      metricsFactory: LabeledMetricsFactory,
   ) extends AutoCloseable {
 
     private implicit val mc: MetricsContext =
@@ -183,23 +198,37 @@ object ReportSvStatusMetricsExportTrigger {
         Map("report_publisher" -> svId.svName, "report_publisher_party" -> svId.svParty)
       )
     private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "sv_status_report"
-    private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
-      metricsFactory.gauge(prefix :+ name, initial = initial)
+    private def gauge(name: String, summary: String, initial: Long)(implicit
+        mc: MetricsContext
+    ): Gauge[Long] =
+      metricsFactory.gauge(MetricInfo(prefix :+ name, summary, Debug), initial = initial)
 
     private val minTimestampValue = CantonTimestamp.MinValue.toMicros
 
-    val reportNumber: Gauge[Long] = gauge("number", initial = 0L)
-    val creationTime: Gauge[Long] = gauge("creation_time_us", initial = minTimestampValue)
-    val cometBftHeight: Gauge[Long] = gauge("cometbft_height", initial = -1L)
+    val reportNumber: Gauge[Long] =
+      gauge("number", "The report number, as reported in the contract", initial = 0L)
+    val creationTime: Gauge[Long] =
+      gauge("creation_time_us", "When was the last report created", initial = minTimestampValue)
+    val cometBftHeight: Gauge[Long] =
+      gauge("cometbft_height", "CometBFT height as reported during the last report", initial = -1L)
     val mediatorSynchronizerTime: Gauge[Long] =
-      gauge("domain_time_us", initial = minTimestampValue)(
+      gauge(
+        "domain_time_us",
+        "The domain time as observed during the last report",
+        initial = minTimestampValue,
+      )(
         mc.withExtraLabels("target_node" -> "mediator")
       )
     val participantSynchronizerTime: Gauge[Long] =
-      gauge("domain_time_us", initial = minTimestampValue)(
+      gauge(
+        "domain_time_us",
+        "The domain time as observed during the last report",
+        initial = minTimestampValue,
+      )(
         mc.withExtraLabels("target_node" -> "participant")
       )
-    val latestOpenRound: Gauge[Long] = gauge("latest_open_round", initial = -1L)
+    val latestOpenRound: Gauge[Long] =
+      gauge("latest_open_round", "Latest open round", initial = -1L)
 
     override def close(): Unit = {
       reportNumber.close()

@@ -50,15 +50,15 @@ private[onboarding] object SetupUtil {
       RetryFor.WaitingOnInitDependency,
     )
 
-  def grantSvUserRightReadAsDso(
+  def grantSvUserRightActAsDso(
       connection: SpliceLedgerConnection,
       user: String,
       dso: PartyId,
   ): Future[Unit] = {
     connection.grantUserRights(
       user,
-      Seq.empty,
       Seq(dso),
+      Seq.empty,
     )
   }
 }

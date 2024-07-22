@@ -16,6 +16,8 @@ import com.digitalasset.canton.crypto.{
   PrivateKey,
   SigningPrivateKey,
 }
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +25,7 @@ import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Extends a CryptoPrivateStore with the necessary store write/read operations and is intended to be used by canton
   * internal private crypto stores (e.g. [[com.digitalasset.canton.crypto.store.memory.InMemoryCryptoPrivateStore]],
@@ -47,7 +49,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
       key: StoredPrivateKey
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit]
 
   /** Replaces a set of keys transactionally to avoid an inconsistent state of the store.
     * Key ids will remain the same while replacing these keys.
@@ -56,24 +58,24 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
     */
   private[crypto] def replaceStoredPrivateKeys(newKeys: Seq[StoredPrivateKey])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit]
 
   private[crypto] def readPrivateKey(keyId: Fingerprint, purpose: KeyPurpose)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[StoredPrivateKey]]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]]
 
   @VisibleForTesting
   private[canton] def listPrivateKeys(purpose: KeyPurpose, encrypted: Boolean)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Set[StoredPrivateKey]]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]]
 
   private[crypto] def deletePrivateKey(keyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit]
 
   def storePrivateKey(key: PrivateKey, name: Option[KeyName])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] = {
     (key: @unchecked) match {
       case signingPrivateKey: SigningPrivateKey => storeSigningKey(signingPrivateKey, name)
       case encryptionPrivateKey: EncryptionPrivateKey =>
@@ -83,7 +85,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   def exportPrivateKey(keyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[PrivateKey]] = {
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[PrivateKey]] = {
     logger.info(s"Exporting private key: $keyId")
     for {
       sigKey <- signingKey(keyId).widen[Option[PrivateKey]]
@@ -96,7 +98,9 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
   def existsPrivateKey(
       keyId: Fingerprint,
       keyPurpose: KeyPurpose,
-  )(implicit traceContext: TraceContext): EitherT[Future, CryptoPrivateStoreError, Boolean] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean] =
     keyPurpose match {
       case KeyPurpose.Signing => existsSigningKey(keyId)
       case KeyPurpose.Encryption => existsDecryptionKey(keyId)
@@ -104,16 +108,19 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   def removePrivateKey(
       keyId: Fingerprint
-  )(implicit traceContext: TraceContext): EitherT[Future, CryptoPrivateStoreError, Unit] = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] = {
     val deletedSigKey = signingKeyMap.remove(keyId)
     val deletedDecKey = decryptionKeyMap.remove(keyId)
 
-    deletePrivateKey(keyId).leftMap { err =>
-      // In case the deletion in the persistence layer failed, we have to restore the cache.
-      deletedSigKey.foreach(signingKeyMap.put(keyId, _))
-      deletedDecKey.foreach(decryptionKeyMap.put(keyId, _))
-      err
-    }
+    deletePrivateKey(keyId)
+      .leftMap { err =>
+        // In case the deletion in the persistence layer failed, we have to restore the cache.
+        deletedSigKey.foreach(signingKeyMap.put(keyId, _))
+        deletedDecKey.foreach(decryptionKeyMap.put(keyId, _))
+        err
+      }
   }
 
   private def readAndParsePrivateKey[A <: PrivateKey, B <: PrivateKeyWithName](
@@ -122,13 +129,13 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
       buildKeyWithNameFunc: (A, Option[KeyName]) => B,
   )(keyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[B]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[B]] =
     readPrivateKey(keyId, keyPurpose)
       .flatMap {
         case Some(storedPrivateKey) =>
           parsingFunc(storedPrivateKey) match {
             case Left(parseErr) =>
-              EitherT.leftT[Future, Option[B]](
+              EitherT.leftT[FutureUnlessShutdown, Option[B]](
                 CryptoPrivateStoreError
                   .FailedToReadKey(
                     keyId,
@@ -136,22 +143,22 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
                   )
               )
             case Right(privateKey) =>
-              EitherT.rightT[Future, CryptoPrivateStoreError](
+              EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
                 Some(buildKeyWithNameFunc(privateKey, storedPrivateKey.name))
               )
           }
-        case None => EitherT.rightT[Future, CryptoPrivateStoreError](None)
+        case None => EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](None)
       }
 
   private[crypto] def signingKey(signingKeyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[SigningPrivateKey]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[SigningPrivateKey]] =
     retrieveAndUpdateCache(
       signingKeyMap,
       keyFingerprint =>
         readAndParsePrivateKey[SigningPrivateKey, SigningPrivateKeyWithName](
           Signing,
-          key => SigningPrivateKey.fromByteString(key.data),
+          key => SigningPrivateKey.fromTrustedByteString(key.data),
           (privateKey, name) => SigningPrivateKeyWithName(privateKey, name),
         )(keyFingerprint),
     )(signingKeyId)
@@ -161,7 +168,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
       name: Option[KeyName],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] =
     for {
       _ <- writePrivateKey(
         new StoredPrivateKey(
@@ -179,18 +186,18 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   def existsSigningKey(signingKeyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Boolean] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean] =
     signingKey(signingKeyId).map(_.nonEmpty)
 
   private[crypto] def decryptionKey(encryptionKeyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[EncryptionPrivateKey]] = {
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[EncryptionPrivateKey]] = {
     retrieveAndUpdateCache(
       decryptionKeyMap,
       keyFingerprint =>
         readAndParsePrivateKey[EncryptionPrivateKey, EncryptionPrivateKeyWithName](
           Encryption,
-          key => EncryptionPrivateKey.fromByteString(key.data),
+          key => EncryptionPrivateKey.fromTrustedByteString(key.data),
           (privateKey, name) => EncryptionPrivateKeyWithName(privateKey, name),
         )(keyFingerprint),
     )(encryptionKeyId)
@@ -201,7 +208,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
       name: Option[KeyName],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] =
     for {
       _ <- writePrivateKey(
         new StoredPrivateKey(
@@ -219,13 +226,13 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   def existsDecryptionKey(decryptionKeyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Boolean] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean] =
     decryptionKey(decryptionKeyId).map(_.nonEmpty)
 
   private def retrieveAndUpdateCache[KN <: PrivateKeyWithName](
       cache: TrieMap[Fingerprint, KN],
-      readKey: Fingerprint => EitherT[Future, CryptoPrivateStoreError, Option[KN]],
-  )(keyId: Fingerprint): EitherT[Future, CryptoPrivateStoreError, Option[KN#K]] =
+      readKey: Fingerprint => EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[KN]],
+  )(keyId: Fingerprint): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[KN#K]] =
     cache.get(keyId) match {
       case Some(value) => EitherT.rightT(Some(value.privateKey))
       case None =>
@@ -243,5 +250,5 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
     */
   private[crypto] def encrypted(keyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CryptoPrivateStoreError, Option[String300]]
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[String300]]
 }

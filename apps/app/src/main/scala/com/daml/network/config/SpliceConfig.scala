@@ -44,13 +44,13 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
   CommunityParticipantConfig,
   RemoteParticipantConfig,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
@@ -65,12 +65,8 @@ import scala.util.Try
 import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
-import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.domain.mediator.{CommunityMediatorNodeXConfig, RemoteMediatorConfig}
-import com.digitalasset.canton.domain.sequencing.config.{
-  CommunitySequencerNodeXConfig,
-  RemoteSequencerConfig,
-}
+import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 
 case class SpliceConfig(
@@ -124,9 +120,7 @@ case class SpliceConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         validatorConfig.sequencerClient,
-        devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         batchingConfig = validatorConfig.parameters.batching,
       )
@@ -166,9 +160,7 @@ case class SpliceConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         svConfig.sequencerClient,
-        devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         batchingConfig = new BatchingConfig(),
       )
@@ -207,9 +199,7 @@ case class SpliceConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         scanConfig.sequencerClient,
-        devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         batchingConfig = new BatchingConfig(),
       )
@@ -248,9 +238,7 @@ case class SpliceConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         splitwellConfig.sequencerClient,
-        devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         batchingConfig = new BatchingConfig(),
       )
@@ -292,15 +280,11 @@ case class SpliceConfig(
 
   // TODO(#736): we want to remove these mediator configs
 
-  override type MediatorNodeXConfigType = CommunityMediatorNodeXConfig
-
-  override def mediators: Map[InstanceName, MediatorNodeXConfigType] = Map.empty
+  override def mediators: Map[InstanceName, MediatorNodeConfigType] = Map.empty
 
   override def remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty
 
-  override type SequencerNodeXConfigType = CommunitySequencerNodeXConfig
-
-  override def sequencers: Map[InstanceName, SequencerNodeXConfigType] = Map.empty
+  override def sequencers: Map[InstanceName, SequencerNodeConfigType] = Map.empty
 
   override def remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty
 }

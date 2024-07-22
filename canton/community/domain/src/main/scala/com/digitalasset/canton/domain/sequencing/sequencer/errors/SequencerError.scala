@@ -21,6 +21,7 @@ import com.digitalasset.canton.util.LoggerUtil
 
 import scala.concurrent.duration.Duration
 
+sealed trait SequencerError extends BaseCantonError
 object SequencerError extends SequencerErrorGroup {
 
   @Explanation("""
@@ -102,12 +103,12 @@ object SequencerError extends SequencerErrorGroup {
     final case class Error(
         signedSubmissionRequest: SignedContent[SubmissionRequest],
         error: SignatureCheckError,
-        sequencingTimestamp: CantonTimestamp,
-        timestampOfSigningKey: CantonTimestamp,
+        topologyTimestamp: CantonTimestamp,
+        timestampOfSigningKey: Option[CantonTimestamp],
     ) extends Alarm({
           val submissionRequest = signedSubmissionRequest.content
-          s"Sender [${submissionRequest.sender}] of send request [${submissionRequest.messageId}] provided signature from $timestampOfSigningKey that failed to be verified. " +
-            s"Could not sequence at $sequencingTimestamp: $error"
+          s"Sender [${submissionRequest.sender}] of send request [${submissionRequest.messageId}] provided signature from $timestampOfSigningKey that failed to be verified at $topologyTimestamp. " +
+            s"Discarding request. $error"
         })
   }
 
@@ -141,23 +142,6 @@ object SequencerError extends SequencerErrorGroup {
     ) extends Alarm({
           s"Sender [${submissionRequest.sender}] of send request [${submissionRequest.messageId}] has submitted a request " +
             s"to send envelopes to multiple mediators or mediator groups ${submissionRequest.batch.allMediatorRecipients}. " +
-            s"Could not sequence at $sequencingTimestamp"
-        })
-  }
-
-  @Explanation("""
-      |This error indicates that the sequencer has detected that the signed submission request being processed is missing a signature timestamp.
-      |It indicates that the sequencer node that placed the request is not following the protocol as there should always be a defined timestamp.
-      |This request will not get processed.
-      |""")
-  object MissingSubmissionRequestSignatureTimestamp
-      extends AlarmErrorCode("MISSING_SUBMISSION_REQUEST_SIGNATURE_TIMESTAMP") {
-    final case class Error(
-        signedSubmissionRequest: SignedContent[SubmissionRequest],
-        sequencingTimestamp: CantonTimestamp,
-    ) extends Alarm({
-          val submissionRequest = signedSubmissionRequest.content
-          s"Send request [${submissionRequest.messageId}] by sender [${submissionRequest.sender}] is missing a signature timestamp. " +
             s"Could not sequence at $sequencingTimestamp"
         })
   }
@@ -235,5 +219,44 @@ object SequencerError extends SequencerErrorGroup {
             s"The payload to event time bound [$bound] has been been exceeded by payload time [$payloadTs] and sequenced event time [$sequencedTs]: $messageId"
         )
   }
+  @Explanation(
+    """This error indicates that no sequencer snapshot can be found for the given timestamp."""
+  )
+  @Resolution(
+    """Verify that the timestamp is correct and that the sequencer is healthy."""
+  )
+  object SnapshotNotFound
+      extends ErrorCode(
+        "SNAPSHOT_NOT_FOUND",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(requestTimestamp: CantonTimestamp, safeWatermark: CantonTimestamp)
+        extends BaseCantonError.Impl(
+          cause =
+            s"Requested snapshot at $requestTimestamp is after the safe watermark $safeWatermark"
+        )
+        with SequencerError
 
+    final case class MissingSafeWatermark(id: Member)
+        extends BaseCantonError.Impl(
+          cause = s"No safe watermark found for the sequencer $id"
+        )
+        with SequencerError
+  }
+
+  @Explanation("""This error indicates that no block can be found for the given timestamp.""")
+  @Resolution(
+    """Verify that the timestamp is correct and that the sequencer is healthy."""
+  )
+  object BlockNotFound
+      extends ErrorCode(
+        "BLOCK_NOT_FOUND",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class InvalidTimestamp(timestamp: CantonTimestamp)
+        extends BaseCantonError.Impl(
+          cause = s"Invalid timestamp $timestamp"
+        )
+        with SequencerError
+  }
 }

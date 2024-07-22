@@ -8,6 +8,8 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion as TemplateCompanion,
 }
 import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
+import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.{
   ans,
@@ -16,32 +18,31 @@ import com.daml.network.codegen.java.splice.{
   validatoronboarding as vo,
   wallet as spw,
 }
-import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.ConfigTransforms.{
-  ConfigurableApp,
   updateAllAutomationConfigs,
   updateAllValidatorConfigs,
   updateAutomationConfig,
+  ConfigurableApp,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.sv.automation.confirmation.ElectionRequestTrigger
 import com.daml.network.sv.automation.singlesv.{
+  AmuletConfigReassignmentTrigger,
   ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
-  DsoRulesTransferTrigger,
 }
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
-  AssignedContract,
   AmuletConfigSchedule,
+  AssignedContract,
   ConfigScheduleUtil,
   Contract,
   ContractWithState,
   WalletTestUtil,
 }
 import com.daml.network.validator.config.AppManagerConfig
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
@@ -75,7 +76,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
             )
           ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[AssignTrigger]
-              .withPausedTrigger[DsoRulesTransferTrigger]
+              .withPausedTrigger[AmuletConfigReassignmentTrigger]
               .withResumedTrigger[TransferFollowTrigger]
               // DsoRules gets replaced during create phase with this on
               .withPausedTrigger[ElectionRequestTrigger]
@@ -109,7 +110,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
 
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
 
-  private[this] val mostDistantPossibleExpiry = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
+  private[this] val mostDistantPossibleExpiry =
+    com.digitalasset.daml.lf.data.Time.Timestamp.MaxValue.toInstant
 
   "scheduled global domain upgrade happens" in { implicit env =>
     initDsoWithSv1Only() withClue "spin up Dso"
@@ -418,7 +420,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       val dso = dsoParty.toProtoPrimitive
       val validator = sv1ValidatorBackend.getValidatorPartyId()
       val provider = sv1WalletUser
-      val maxTimestamp = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
+      val maxTimestamp = com.digitalasset.daml.lf.data.Time.Timestamp.MaxValue.toInstant
 
       protectAppRewardCoupons.pause().futureValue
 
@@ -590,7 +592,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       )
     }
 
-    sv1Backend.dsoAutomation.trigger[DsoRulesTransferTrigger].resume()
+    sv1Backend.dsoAutomation.trigger[AmuletConfigReassignmentTrigger].resume()
     // note that getDsoInfo can 404 transiently from this point on as
     // DsoRules is being reassigned
 

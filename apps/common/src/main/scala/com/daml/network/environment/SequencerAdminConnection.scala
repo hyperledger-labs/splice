@@ -11,22 +11,26 @@ import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
   StatusAdminCommands,
+  TopologyAdminCommands,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateResponse
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.topology.transaction.SequencerDomainStateX
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
+import com.digitalasset.canton.topology.transaction.SequencerDomainState
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
+import com.digitalasset.canton.topology.admin.v30.GenesisStateResponse
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -49,39 +53,46 @@ class SequencerAdminConnection(
       loggerFactory,
       grpcClientMetrics,
       retryProvider,
-    ) {
+    )
+    with StatusAdminConnection {
 
   override val serviceName = "Canton Sequencer Admin API"
 
-  private val sequencerStatusCommand =
-    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV30)
+  override protected type Status = SequencerNodeStatus
 
-  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[SequencerNodeStatus]] =
-    runCmd(
-      sequencerStatusCommand
-    )
+  override protected def getStatusRequest: StatusAdminCommands.GetStatus[SequencerNodeStatus] =
+    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV30)
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
 
   def getGenesisState(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[ByteString] =
+  ): Future[ByteString] = {
+    val responseObserver = new ByteStringStreamObserver[GenesisStateResponse](_.chunk)
     runCmd(
-      EnterpriseSequencerAdminCommands.GenesisState(timestamp = Some(timestamp))
-    )
-
+      TopologyAdminCommands.Read
+        .GenesisState(
+          timestamp = Some(timestamp),
+          filterDomainStore = None,
+          observer = responseObserver,
+        )
+    ).flatMap(_ => responseObserver.resultBytes)
+  }
   def getOnboardingState(sequencerId: SequencerId)(implicit
       traceContext: TraceContext
-  ): Future[ByteString] =
+  ): Future[ByteString] = {
+    val responseObserver =
+      new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
     runCmd(
-      EnterpriseSequencerAdminCommands.OnboardingState(Left(sequencerId))
-    )
+      EnterpriseSequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
+    ).flatMap(_ => responseObserver.resultBytes)
+  }
 
   /** This is used for initializing the sequencer when the domain is first bootstrapped.
     */
   def initializeFromBeginning(
-      topologySnapshot: GenericStoredTopologyTransactionsX,
+      topologySnapshot: GenericStoredTopologyTransactions,
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
@@ -119,7 +130,16 @@ class SequencerAdminConnection(
   ): Future[Seq[TrafficState]] =
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
-    ).map(_.members.map(TrafficState))
+    ).map(
+      _.trafficStates
+        .map { case (member, trafficState) =>
+          TrafficState(
+            member,
+            trafficState,
+          )
+        }
+        .toSeq
+    )
 
   def getSequencerTrafficControlState(
       member: Member
@@ -154,13 +174,13 @@ class SequencerAdminConnection(
       serial: PositiveInt,
   )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
     runCmd(
-      SequencerAdminCommands.SetTrafficBalance(member, serial, newTotalExtraTrafficLimit)
+      SequencerAdminCommands.SetTrafficPurchased(member, serial, newTotalExtraTrafficLimit)
     )
   }
 
   def getSequencerDomainState()(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] = {
+  ): Future[TopologyResult[SequencerDomainState]] = {
     for {
       domainId <- getStatus.map(_.trySuccess.domainId)
       sequencerState <- getSequencerDomainState(domainId)
@@ -177,7 +197,7 @@ class SequencerAdminConnection(
     */
   def setSequencerTrafficControlState(
       currentTrafficState: TrafficState,
-      currentSequencerState: TopologyResult[SequencerDomainStateX],
+      currentSequencerState: TopologyResult[SequencerDomainState],
       newTotalExtraTrafficLimit: NonNegativeLong,
       clock: Clock,
       timeout: NonNegativeFiniteDuration,
@@ -268,7 +288,7 @@ class SequencerAdminConnection(
   override def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] = {
     getStatus.map {
       case NodeStatus.Failure(_) => false
-      case NodeStatus.NotInitialized(_) => false
+      case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
     }
   }
@@ -276,19 +296,15 @@ class SequencerAdminConnection(
 
 object SequencerAdminConnection {
 
-  case class TrafficState(status: MemberTrafficStatus) extends PrettyPrinting {
-    def member: Member = status.member
-    def extraTrafficConsumed: NonNegativeLong = status.trafficState.extraTrafficConsumed
+  case class TrafficState(member: Member, state: protocol.TrafficState) extends PrettyPrinting {
+    def extraTrafficConsumed: NonNegativeLong = state.extraTrafficConsumed
     def extraTrafficLimit: NonNegativeLong =
-      status.trafficState.extraTrafficLimit.fold(NonNegativeLong.zero)(_.toNonNegative)
-    def nextSerial: PositiveInt = status.balanceSerial.fold(PositiveInt.one)(_.increment)
+      state.extraTrafficPurchased
+    def nextSerial: PositiveInt = state.serial.fold(PositiveInt.one)(_.increment)
 
     override def pretty: Pretty[TrafficState] = prettyOfClass(
       param("member", _.member),
-      param("extraTrafficConsumed", _.extraTrafficConsumed),
-      param("extraTrafficLimit", _.extraTrafficLimit),
-      param("nextSerial", _.nextSerial),
-      param("status", _.status),
+      param("state", _.state),
     )
   }
 }

@@ -18,7 +18,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
 import com.google.rpc.status.Status
 
-/** Possible verdicts on a transaction view from the participant's perspective.
+/** Possible verdicts on a transaction request from the participant's perspective.
   * The verdict can be `LocalApprove` or `LocalReject`.
   * The verdict `LocalReject` includes a `reason` pointing out which checks in Phase 3 have failed, and
   * a flag `isMalformed` indicating whether the rejection occurs due to malicious behavior.
@@ -46,7 +46,7 @@ object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
 
   override def supportedProtoVersions: messages.LocalVerdict.SupportedProtoVersions =
     SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.LocalVerdict)(
+      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.LocalVerdict)(
         supportedProtoVersion(_)(fromProtoV30),
         _.toProtoV30.toByteString,
       )

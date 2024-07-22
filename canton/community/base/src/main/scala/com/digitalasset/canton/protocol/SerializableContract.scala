@@ -5,7 +5,6 @@ package com.digitalasset.canton.protocol
 
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import com.daml.lf.value.ValueCoder
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
@@ -16,6 +15,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfTimestamp, admin, crypto, protocol}
+import com.digitalasset.daml.lf.value.ValueCoder
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp.Timestamp
 import io.scalaland.chimney.dsl.*
@@ -89,6 +89,7 @@ case class SerializableContract(
   def toLf: LfNodeCreate = LfNodeCreate(
     coid = contractId,
     packageName = rawContractInstance.contractInstance.unversioned.packageName,
+    packageVersion = rawContractInstance.contractInstance.unversioned.packageVersion,
     templateId = rawContractInstance.contractInstance.unversioned.template,
     arg = rawContractInstance.contractInstance.unversioned.arg,
     signatories = metadata.signatories,
@@ -104,7 +105,7 @@ object SerializableContract
     with HasVersionedMessageCompanionDbHelpers[SerializableContract] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v30,
+      ProtocolVersion.v31,
       supportedProtoVersion(protocol.v30.SerializableContract)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -156,7 +157,7 @@ object SerializableContract
           )
         else
           DriverContractMetadata
-            .fromByteArray(driverContractMetadataBytes)
+            .fromTrustedByteArray(driverContractMetadataBytes)
             .leftMap(err => s"Failed parsing disclosed contract driver contract metadata: $err")
             .map(m => Some(m.salt))
       }
@@ -164,7 +165,7 @@ object SerializableContract
       cantonContractMetadata <- ContractMetadata.create(
         signatories = create.signatories,
         stakeholders = create.stakeholders,
-        maybeKeyWithMaintainers = create.versionedKeyOpt,
+        maybeKeyWithMaintainersVersioned = create.versionedKeyOpt,
       )
       contract <- SerializableContract(
         contractId = disclosedContract.contractId,

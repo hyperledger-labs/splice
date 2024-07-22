@@ -23,7 +23,10 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.platform.apiserver.LedgerFeatures
-import com.digitalasset.canton.platform.config.UserManagementServiceConfig
+import com.digitalasset.canton.platform.config.{
+  PartyManagementServiceConfig,
+  UserManagementServiceConfig,
+}
 import io.grpc.ServerServiceDefinition
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -34,6 +37,7 @@ import scala.util.control.NonFatal
 private[apiserver] final class ApiVersionService(
     ledgerFeatures: LedgerFeatures,
     userManagementServiceConfig: UserManagementServiceConfig,
+    partyManagementServiceConfig: PartyManagementServiceConfig,
     telemetry: Telemetry,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -62,9 +66,15 @@ private[apiserver] final class ApiVersionService(
           )
         }
       ),
+      partyManagement = Some(
+        PartyManagementFeature(
+          maxPartiesPageSize = partyManagementServiceConfig.maxPartiesPageSize.value
+        )
+      ),
       experimental = Some(
         ExperimentalFeatures.of(
-          staticTime = Some(ExperimentalStaticTime(supported = ledgerFeatures.staticTime))
+          staticTime = Some(ExperimentalStaticTime(supported = ledgerFeatures.staticTime)),
+          commandInspectionService = Some(ledgerFeatures.commandInspectionService),
         )
       ),
     )

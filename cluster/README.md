@@ -1834,7 +1834,6 @@ To create a new cluster, you need to follow these steps:
    Commit them and push them to the repository.
 
 If the cluster is a new scratchnet, in `.circleci/config/workflows/deploy_scratchnet_workflow.yml` you should also update:
-* `deploy_scratchnet`
 * `deploy_scratchnet_basic`
 * `deploy_scratchnet_DR`
 to include the `hold_scratchnet` and `release_hold_set_scratchnet` jobs for the new cluster.

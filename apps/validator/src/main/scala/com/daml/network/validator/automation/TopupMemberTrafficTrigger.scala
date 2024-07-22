@@ -33,11 +33,10 @@ import com.daml.network.wallet.util.{ExtraTrafficTopupParameters, TopupUtil, Val
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.sequencing.protocol.SequencerErrors
+import com.digitalasset.canton.sequencing.protocol.{SequencerErrors, TrafficState}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.MemberTrafficStatus
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -168,7 +167,7 @@ class TopupMemberTrafficTrigger(
 
   private def shouldTopup(
       hasSufficientFunds: Boolean,
-      currentTrafficState: MemberTrafficStatus,
+      currentTrafficState: TrafficState,
       topupState: Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState],
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Boolean = {
@@ -182,7 +181,7 @@ class TopupMemberTrafficTrigger(
       false
     } else {
       val currentExtraTrafficRemainder =
-        currentTrafficState.trafficState.extraTrafficRemainder.value
+        currentTrafficState.extraTrafficRemainder
       val currentTime = clock.now
       val tooSoon =
         topupState.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis > currentTime.toEpochMilli
@@ -255,7 +254,7 @@ object TopupMemberTrafficTrigger {
   final case class Task(
       topupParameters: ExtraTrafficTopupParameters,
       topupState: Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState],
-      trafficState: MemberTrafficStatus,
+      trafficState: TrafficState,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Task] =
       prettyOfClass[Task](

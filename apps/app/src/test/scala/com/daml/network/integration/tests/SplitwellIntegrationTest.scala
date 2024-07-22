@@ -93,7 +93,7 @@ class SplitwellIntegrationTest
       aliceWalletClient.tap(50)
 
       val rules = aliceSplitwellClient.listSplitwellRules()
-      rules.keySet.map(_.uid.id) shouldBe Set("splitwell")
+      rules.keySet.map(_.uid.identifier) shouldBe Set("splitwell")
 
       val (_, paymentRequest) =
         actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(

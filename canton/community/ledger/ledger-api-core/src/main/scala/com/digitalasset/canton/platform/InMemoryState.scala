@@ -5,7 +5,8 @@ package com.digitalasset.canton.platform
 
 import com.daml.ledger.resources.ResourceOwner
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.cache.{
@@ -17,13 +18,11 @@ import com.digitalasset.canton.platform.store.interning.{
   StringInterningView,
   UpdatingStringInterningView,
 }
-import com.digitalasset.canton.platform.store.packagemeta.PackageMetadataView
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.chaining.*
 
 /** Wrapper and life-cycle manager for the in-memory Ledger API state. */
 private[platform] class InMemoryState(
@@ -32,8 +31,8 @@ private[platform] class InMemoryState(
     val inMemoryFanoutBuffer: InMemoryFanoutBuffer,
     val stringInterningView: StringInterningView,
     val dispatcherState: DispatcherState,
-    val packageMetadataView: PackageMetadataView,
     val submissionTracker: SubmissionTracker,
+    val commandProgressTracker: CommandProgressTracker,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -45,8 +44,7 @@ private[platform] class InMemoryState(
     * NOTE: This method is not thread-safe. Calling it concurrently leads to undefined behavior.
     */
   final def initializeTo(ledgerEnd: LedgerEnd)(
-      updateStringInterningView: (UpdatingStringInterningView, LedgerEnd) => Future[Unit],
-      updatePackageMetadataView: PackageMetadataView => Future[Unit],
+      updateStringInterningView: (UpdatingStringInterningView, LedgerEnd) => Future[Unit]
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Initializing participant in-memory state to ledger end: $ledgerEnd")
 
@@ -58,8 +56,6 @@ private[platform] class InMemoryState(
       _ <- dispatcherState.stopDispatcher()
       // Reset the string interning view to the latest ledger end
       _ <- updateStringInterningView(stringInterningView, ledgerEnd)
-      // Reset the package metadata view
-      _ <- updatePackageMetadataView(packageMetadataView)
       // Reset the Ledger API caches to the latest ledger end
       _ <- Future {
         contractStateCaches.reset(ledgerEnd.lastOffset)
@@ -75,16 +71,20 @@ private[platform] class InMemoryState(
 
 object InMemoryState {
   def owner(
+      commandProgressTracker: CommandProgressTracker,
       apiStreamShutdownTimeout: Duration,
       bufferedStreamsPageSize: Int,
       maxContractStateCacheSize: Long,
       maxContractKeyStateCacheSize: Long,
       maxTransactionsInMemoryFanOutBufferSize: Int,
       maxCommandsInFlight: Int,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       executionContext: ExecutionContext,
       tracer: Tracer,
       loggerFactory: NamedLoggerFactory,
+  )(
+      mutableLedgerEndCache: MutableLedgerEndCache,
+      stringInterningView: StringInterningView,
   )(implicit traceContext: TraceContext): ResourceOwner[InMemoryState] = {
     val initialLedgerEnd = LedgerEnd.beforeBegin
 
@@ -97,10 +97,7 @@ object InMemoryState {
         loggerFactory,
       )
     } yield new InMemoryState(
-      ledgerEndCache = MutableLedgerEndCache()
-        .tap(
-          _.set((initialLedgerEnd.lastOffset, initialLedgerEnd.lastEventSeqId))
-        ),
+      ledgerEndCache = mutableLedgerEndCache,
       dispatcherState = dispatcherState,
       contractStateCaches = ContractStateCaches.build(
         initialLedgerEnd.lastOffset,
@@ -115,9 +112,9 @@ object InMemoryState {
         maxBufferedChunkSize = bufferedStreamsPageSize,
         loggerFactory = loggerFactory,
       ),
-      stringInterningView = new StringInterningView(loggerFactory),
-      packageMetadataView = PackageMetadataView.create,
+      stringInterningView = stringInterningView,
       submissionTracker = submissionTracker,
+      commandProgressTracker = commandProgressTracker,
       loggerFactory = loggerFactory,
     )(executionContext)
   }

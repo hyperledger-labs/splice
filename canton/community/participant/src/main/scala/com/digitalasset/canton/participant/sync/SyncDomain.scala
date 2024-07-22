@@ -7,20 +7,20 @@ import cats.data.EitherT
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.{Eval, Monad}
-import com.daml.lf.engine.Engine
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, TransferSubmitterMetadata}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{
   AtomicHealthComponent,
   CloseableHealthComponent,
   ComponentHealthState,
 }
-import com.digitalasset.canton.ledger.participant.state.v2.{SubmitterInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.{SubmitterInfo, TransactionMeta}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -33,7 +33,7 @@ import com.digitalasset.canton.participant.event.{
   ContractStakeholdersAndTransferCounter,
   RecordTime,
 }
-import com.digitalasset.canton.participant.metrics.{PruningMetrics, SyncDomainMetrics}
+import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
   TransactionSubmissionError,
@@ -58,21 +58,22 @@ import com.digitalasset.canton.participant.pruning.{
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
-import com.digitalasset.canton.participant.topology.ParticipantTopologyDispatcherCommon
+import com.digitalasset.canton.participant.topology.ParticipantTopologyDispatcher
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
-import com.digitalasset.canton.participant.traffic.{
-  ParticipantTrafficControlSubscriber,
-  TrafficStateController,
-}
+import com.digitalasset.canton.participant.traffic.ParticipantTrafficControlSubscriber
 import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
-import com.digitalasset.canton.platform.apiserver.execution.AuthorityResolver
+import com.digitalasset.canton.platform.apiserver.execution.{
+  AuthorityResolver,
+  CommandProgressTracker,
+}
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.{PeriodicAcknowledgements, RichSequencerClient}
 import com.digitalasset.canton.sequencing.handlers.CleanSequencerCounterTracker
-import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, Envelope}
+import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, Envelope, TrafficState}
+import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
 import com.digitalasset.canton.store.SequencedEventStore
 import com.digitalasset.canton.store.SequencedEventStore.PossiblyIgnoredSequencedEvent
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
@@ -81,15 +82,15 @@ import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.Autho
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
   EffectiveTime,
-  TopologyTransactionProcessorCommon,
+  TopologyTransactionProcessor,
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.traffic.{MemberTrafficStatus, TrafficControlProcessor}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
+import com.digitalasset.daml.lf.engine.Engine
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -115,20 +116,20 @@ class SyncDomain(
     participantNodePersistentState: Eval[ParticipantNodePersistentState],
     private[sync] val persistent: SyncDomainPersistentState,
     val ephemeral: SyncDomainEphemeralState,
-    val packageService: PackageService,
+    val packageService: Eval[PackageService],
     domainCrypto: DomainSyncCryptoClient,
-    identityPusher: ParticipantTopologyDispatcherCommon,
-    topologyProcessorFactory: TopologyTransactionProcessorCommon.Factory,
+    identityPusher: ParticipantTopologyDispatcher,
+    topologyProcessorFactory: TopologyTransactionProcessor.Factory,
     missingKeysAlerter: MissingKeysAlerter,
     transferCoordination: TransferCoordination,
     inFlightSubmissionTracker: InFlightSubmissionTracker,
+    commandProgressTracker: CommandProgressTracker,
     messageDispatcherFactory: MessageDispatcher.Factory[MessageDispatcher],
     clock: Clock,
-    pruningMetrics: PruningMetrics,
     metrics: SyncDomainMetrics,
-    trafficStateController: TrafficStateController,
     futureSupervisor: FutureSupervisor,
     override protected val loggerFactory: NamedLoggerFactory,
+    testingConfig: TestingConfigInternal,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with StartAndCloseable[Either[SyncDomainInitializationError, Unit]]
@@ -166,14 +167,15 @@ class SyncDomain(
     )
 
   private val packageResolver: PackageResolver = pkgId =>
-    traceContext => packageService.getPackage(pkgId)(traceContext)
+    traceContext => packageService.value.getPackage(pkgId)(traceContext)
 
   private val damle =
     new DAMLe(
-      pkgId => traceContext => packageService.getPackage(pkgId)(traceContext),
+      pkgId => traceContext => packageService.value.getPackage(pkgId)(traceContext),
       authorityResolver,
       Some(domainId),
       engine,
+      parameters.engine.validationPhaseLogging,
       loggerFactory,
     )
 
@@ -183,21 +185,25 @@ class SyncDomain(
     domainId,
     damle,
     staticDomainParameters,
+    parameters,
     domainCrypto,
     sequencerClient,
     inFlightSubmissionTracker,
     ephemeral,
+    commandProgressTracker,
     metrics.transactionProcessing,
     timeouts,
     loggerFactory,
     futureSupervisor,
     packageResolver = packageResolver,
+    testingConfig = testingConfig,
   )
 
   private val transferOutProcessor: TransferOutProcessor = new TransferOutProcessor(
     SourceDomainId(domainId),
     participantId,
     damle,
+    staticDomainParameters,
     transferCoordination,
     inFlightSubmissionTracker,
     ephemeral,
@@ -208,12 +214,14 @@ class SyncDomain(
     SourceProtocolVersion(staticDomainParameters.protocolVersion),
     loggerFactory,
     futureSupervisor,
+    testingConfig = testingConfig,
   )
 
   private val transferInProcessor: TransferInProcessor = new TransferInProcessor(
     TargetDomainId(domainId),
     participantId,
     damle,
+    staticDomainParameters,
     transferCoordination,
     inFlightSubmissionTracker,
     ephemeral,
@@ -224,6 +232,7 @@ class SyncDomain(
     TargetProtocolVersion(staticDomainParameters.protocolVersion),
     loggerFactory,
     futureSupervisor,
+    testingConfig = testingConfig,
   )
 
   private val sortedReconciliationIntervalsProvider = new SortedReconciliationIntervalsProvider(
@@ -255,7 +264,7 @@ class SyncDomain(
       sortedReconciliationIntervalsProvider,
       persistent.acsCommitmentStore,
       journalGarbageCollector.observer,
-      pruningMetrics,
+      metrics.commitments,
       staticDomainParameters.protocolVersion,
       timeouts,
       futureSupervisor,
@@ -263,6 +272,8 @@ class SyncDomain(
       persistent.contractStore,
       persistent.enableAdditionalConsistencyChecks,
       loggerFactory,
+      testingConfig,
+      clock,
     )
     ephemeral.recordOrderPublisher.setAcsChangeListener(listener)
     listener
@@ -279,9 +290,13 @@ class SyncDomain(
       loggerFactory,
     )
 
-  if (parameters.useNewTrafficControl) {
+  sequencerClient.trafficStateController.foreach { tsc =>
     trafficProcessor.subscribe(
-      new ParticipantTrafficControlSubscriber(trafficStateController, participantId, loggerFactory)
+      new ParticipantTrafficControlSubscriber(
+        tsc,
+        participantId,
+        loggerFactory,
+      )
     )
   }
 
@@ -292,6 +307,7 @@ class SyncDomain(
       sequencerClient,
       domainId,
       participantId,
+      staticDomainParameters,
       staticDomainParameters.protocolVersion,
       timeouts,
       loggerFactory,
@@ -320,7 +336,6 @@ class SyncDomain(
       transactionProcessor,
       transferOutProcessor,
       transferInProcessor,
-      registerIdentityTransactionHandle.processor,
       topologyProcessor,
       trafficProcessor,
       acsCommitmentProcessor.processBatch,
@@ -341,8 +356,16 @@ class SyncDomain(
       traceContext: TraceContext
   ): Unit = journalGarbageCollector.removeOneLock()
 
-  def getTrafficControlState: Future[Option[MemberTrafficStatus]] =
-    trafficStateController.getState()
+  def getTrafficControlState(implicit traceContext: TraceContext): Future[TrafficState] =
+    sequencerClient.trafficStateController
+      .map { tsc =>
+        Future.successful(tsc.getState)
+      }
+      .getOrElse {
+        ErrorUtil.invalidState(
+          "Participant's sequencer client should have a traffic state controller"
+        )
+      }
 
   def authorityOfInSnapshotApproximation(requestingAuthority: Set[LfPartyId])(implicit
       traceContext: TraceContext
@@ -352,11 +375,11 @@ class SyncDomain(
   private def initialize(implicit
       traceContext: TraceContext
   ): EitherT[Future, SyncDomainInitializationError, Unit] = {
-    def liftF[A](f: Future[A]): EitherT[Future, SyncDomainInitializationError, A] = EitherT.liftF(f)
+    def liftF[A](f: Future[A]): EitherT[Future, SyncDomainInitializationError, A] = EitherT.right(f)
 
     def withMetadataSeq(cids: Seq[LfContractId]): Future[Seq[StoredContract]] =
       persistent.contractStore
-        .lookupManyUncached(cids)
+        .lookupManyExistingUncached(cids)
         .valueOr { missingContractId =>
           ErrorUtil.internalError(
             new IllegalStateException(
@@ -579,15 +602,14 @@ class SyncDomain(
 
   protected def startAsync()(implicit
       initializationTraceContext: TraceContext
-  ): Future[Either[SyncDomainInitializationError, Unit]] = {
+  ): FutureUnlessShutdown[Either[SyncDomainInitializationError, Unit]] = {
 
-    val delayLogger =
-      new DelayLogger(
-        clock,
-        logger,
-        parameters.delayLoggingThreshold,
-        metrics.sequencerClient.handler.delay,
-      )
+    val delayLogger = new DelayLogger(
+      clock,
+      logger,
+      parameters.delayLoggingThreshold,
+      metrics.sequencerClient.handler.delay,
+    )
 
     def firstUnpersistedEventScF: Future[SequencerCounter] =
       persistent.sequencedEventStore
@@ -621,8 +643,10 @@ class SyncDomain(
 
     // Initialize, replay and process stored events, then subscribe to new events
     (for {
-      _ <- initialize(initializationTraceContext)
-      firstUnpersistedEventSc <- EitherT.liftF(firstUnpersistedEventScF)
+      _ <- initialize(initializationTraceContext).mapK(FutureUnlessShutdown.outcomeK)
+      firstUnpersistedEventSc <- EitherT
+        .liftF(firstUnpersistedEventScF)
+        .mapK(FutureUnlessShutdown.outcomeK)
       monitor = new SyncDomain.EventProcessingMonitor(
         ephemeral.startingPoints,
         firstUnpersistedEventSc,
@@ -652,7 +676,6 @@ class SyncDomain(
           ): HandlerResult = {
             tracedEvents.withTraceContext { traceContext => closedEvents =>
               val openEvents = closedEvents.map { event =>
-                trafficStateController.updateState(event)
                 val openedEvent = PossiblyIgnoredSequencedEvent.openEnvelopes(event)(
                   staticDomainParameters.protocolVersion,
                   domainCrypto.crypto.pureCrypto,
@@ -682,32 +705,33 @@ class SyncDomain(
         loggerFactory,
       )
       trackingHandler = cleanSequencerCounterTracker(eventHandler)
-      _ <- EitherT.right[SyncDomainInitializationError](
-        sequencerClient.subscribeAfter(
-          subscriptionPriorTs,
-          sequencerCounterPreheadTsO,
-          trackingHandler,
-          ephemeral.timeTracker,
-          PeriodicAcknowledgements.fetchCleanCounterFromStore(
-            persistent.sequencerCounterTrackerStore
-          ),
-        )(initializationTraceContext)
-      )
+      _ <- EitherT
+        .right[SyncDomainInitializationError](
+          sequencerClient.subscribeAfter(
+            subscriptionPriorTs,
+            sequencerCounterPreheadTsO,
+            trackingHandler,
+            ephemeral.timeTracker,
+            PeriodicAcknowledgements.fetchCleanCounterFromStore(
+              persistent.sequencerCounterTrackerStore
+            ),
+          )(initializationTraceContext)
+        )
+        .mapK(FutureUnlessShutdown.outcomeK)
 
       // wait for initial topology transactions to be sequenced and received before we start computing pending
       // topology transactions to push for IDM approval
-      _ <- waitForParticipantToBeInTopology(initializationTraceContext).onShutdown(Right(()))
+      _ <- waitForParticipantToBeInTopology(initializationTraceContext)
       _ <-
         registerIdentityTransactionHandle
           .domainConnected()(initializationTraceContext)
-          .onShutdown(Right(()))
           .leftMap[SyncDomainInitializationError](ParticipantTopologyHandshakeError)
     } yield {
       logger.debug(s"Started sync domain for $domainId")(initializationTraceContext)
       ephemeral.markAsRecovered()
       logger.debug("Sync domain is ready.")(initializationTraceContext)
-      FutureUtil.doNotAwait(
-        completeTransferIn.unwrap,
+      FutureUtil.doNotAwaitUnlessShutdown(
+        completeTransferIn,
         "Failed to complete outstanding transfer-ins on startup. " +
           "You may have to complete the transfer-ins manually.",
       )
@@ -740,6 +764,7 @@ class SyncDomain(
                 AutomaticTransferIn.perform(
                   data.transferId,
                   TargetDomainId(domainId),
+                  staticDomainParameters,
                   transferCoordination,
                   data.contract.metadata.stakeholders,
                   data.transferOutRequest.submitterMetadata,
@@ -976,19 +1001,19 @@ object SyncDomain {
         participantNodePersistentState: Eval[ParticipantNodePersistentState],
         persistentState: SyncDomainPersistentState,
         ephemeralState: SyncDomainEphemeralState,
-        packageService: PackageService,
+        packageService: Eval[PackageService],
         domainCrypto: DomainSyncCryptoClient,
-        identityPusher: ParticipantTopologyDispatcherCommon,
-        topologyProcessorFactory: TopologyTransactionProcessorCommon.Factory,
+        identityPusher: ParticipantTopologyDispatcher,
+        topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
         transferCoordination: TransferCoordination,
         inFlightSubmissionTracker: InFlightSubmissionTracker,
+        commandProgressTracker: CommandProgressTracker,
         clock: Clock,
-        pruningMetrics: PruningMetrics,
         syncDomainMetrics: SyncDomainMetrics,
-        trafficStateController: TrafficStateController,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
+        testingConfig: TestingConfigInternal,
     )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): T
   }
 
@@ -1003,19 +1028,19 @@ object SyncDomain {
         participantNodePersistentState: Eval[ParticipantNodePersistentState],
         persistentState: SyncDomainPersistentState,
         ephemeralState: SyncDomainEphemeralState,
-        packageService: PackageService,
+        packageService: Eval[PackageService],
         domainCrypto: DomainSyncCryptoClient,
-        identityPusher: ParticipantTopologyDispatcherCommon,
-        topologyProcessorFactory: TopologyTransactionProcessorCommon.Factory,
+        identityPusher: ParticipantTopologyDispatcher,
+        topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
         transferCoordination: TransferCoordination,
         inFlightSubmissionTracker: InFlightSubmissionTracker,
+        commandProgressTracker: CommandProgressTracker,
         clock: Clock,
-        pruningMetrics: PruningMetrics,
         syncDomainMetrics: SyncDomainMetrics,
-        trafficStateController: TrafficStateController,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
+        testingConfig: TestingConfigInternal,
     )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): SyncDomain =
       new SyncDomain(
         domainId,
@@ -1034,18 +1059,20 @@ object SyncDomain {
         missingKeysAlerter,
         transferCoordination,
         inFlightSubmissionTracker,
+        commandProgressTracker,
         MessageDispatcher.DefaultFactory,
         clock,
-        pruningMetrics,
         syncDomainMetrics,
-        trafficStateController,
         futureSupervisor,
         loggerFactory,
+        testingConfig,
       )
   }
 }
 
 sealed trait SyncDomainInitializationError
+
+final case class AbortedDueToShutdownError(msg: String) extends SyncDomainInitializationError
 
 final case class SequencedEventStoreError(err: store.SequencedEventStoreError)
     extends SyncDomainInitializationError

@@ -8,12 +8,14 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
+  FutureUnlessShutdown,
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.TracedLogger
@@ -28,6 +30,7 @@ import com.digitalasset.canton.sequencing.OrdinarySerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, ParticipantPermission}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.RepresentativeProtocolVersion
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter, config}
@@ -44,10 +47,10 @@ import scala.concurrent.duration.*
 class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecutionContext {
 
   private val domainId = DefaultTestIdentities.domainId
-  private val alice: Member = ParticipantId("alice")
-  private val bob: Member = ParticipantId("bob")
-  private val carole: Member = ParticipantId("carole")
-  private val topologyClientMember = SequencerId(domainId)
+  private val alice = ParticipantId("alice")
+  private val bob = ParticipantId("bob")
+  private val carole = ParticipantId("carole")
+  private val topologyClientMember = SequencerId(domainId.uid)
 
   // Config to turn on Pekko logging
   private lazy val pekkoConfig = {
@@ -71,19 +74,29 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
       Some(parallelExecutionContext),
     )
     private val materializer = implicitly[Materializer]
-    val store = new InMemorySequencerStore(testedProtocolVersion, loggerFactory)
+    val store = new InMemorySequencerStore(
+      protocolVersion = testedProtocolVersion,
+      sequencerMember = topologyClientMember,
+      unifiedSequencer = testedUseUnifiedSequencer,
+      loggerFactory = loggerFactory,
+    )
     val clock = new WallClock(timeouts, loggerFactory = loggerFactory)
     val crypto: DomainSyncCryptoClient = valueOrFail(
-      TestingTopologyX(sequencerGroup =
-        SequencerGroup(
-          active = NonEmpty.mk(Seq, SequencerId(domainId)),
+      TestingTopology(
+        sequencerGroup = SequencerGroup(
+          active = NonEmpty.mk(Seq, SequencerId(domainId.uid)),
           passive = Seq.empty,
           threshold = PositiveInt.one,
-        )
+        ),
+        participants = Seq(
+          alice,
+          bob,
+          carole,
+        ).map((_, ParticipantAttributes(ParticipantPermission.Confirmation))).toMap,
       )
         .build(loggerFactory)
-        .forOwner(SequencerId(domainId))
-        .forDomain(domainId)
+        .forOwner(SequencerId(domainId.uid))
+        .forDomain(domainId, defaultStaticDomainParameters)
         .toRight("crypto error")
     )("building crypto")
     val metrics: SequencerMetrics = SequencerMetrics.noop("sequencer-test")
@@ -102,6 +115,7 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
         metrics,
         loggerFactory,
         unifiedSequencer = testedUseUnifiedSequencer,
+        runtimeReady = FutureUnlessShutdown.unit,
       )(parallelExecutionContext, tracer, materializer)
 
     def readAsSeq(
@@ -178,7 +192,6 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
       val submission = SubmissionRequest.tryCreate(
         alice,
         messageId,
-        isRequest = true,
         Batch.closeEnvelopes(
           Batch.of(
             testedProtocolVersion,
@@ -189,16 +202,20 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
         clock.now.plusSeconds(10),
         None,
         None,
+        None,
         testedProtocolVersion,
       )
 
       for {
         _ <- valueOrFail(
-          List(alice, bob, carole, topologyClientMember).parTraverse(sequencer.registerMember)
+          List(alice, bob, carole, topologyClientMember).parTraverse(
+            TestDatabaseSequencerWrapper(sequencer)
+              .registerMemberInternal(_, CantonTimestamp.Epoch)
+          )
         )(
           "member registration"
         )
-        _ <- valueOrFail(sequencer.sendAsync(submission))("send")
+        _ <- sequencer.sendAsync(submission).valueOrFailShutdown("send")
         aliceDeliverEvent <- readAsSeq(alice, 1)
           .map(_.loneElement.signedEvent.content)
           .map(asDeliverEvent)

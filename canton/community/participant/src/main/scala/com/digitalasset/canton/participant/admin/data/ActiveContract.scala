@@ -48,7 +48,7 @@ object ActiveContract extends HasProtocolVersionedCompanion[ActiveContract] {
   override def name: String = "ActiveContract"
 
   override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.ActiveContract)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ActiveContract)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -116,7 +116,7 @@ object ActiveContract extends HasProtocolVersionedCompanion[ActiveContract] {
     var errorMessageO: Option[String] = None
 
     while (hasDataInStream && errorMessageO.isEmpty) {
-      ActiveContract.parseDelimitedFromUnsafe(source) match {
+      ActiveContract.parseDelimitedFromTrusted(source) match {
         case None =>
           // parseDelimitedFrom returns None to indicate that there is no more data to read from the input stream
           hasDataInStream = false

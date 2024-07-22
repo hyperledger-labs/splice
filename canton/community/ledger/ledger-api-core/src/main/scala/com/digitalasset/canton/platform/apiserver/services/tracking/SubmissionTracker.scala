@@ -8,16 +8,17 @@ import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRespons
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.concurrent.DirectExecutionContext
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.{
   SubmissionKey,
   Submitters,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.{DiscardOps, config}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
@@ -46,7 +47,7 @@ object SubmissionTracker {
 
   def owner(
       maxCommandsInFlight: Int,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       tracer: Tracer,
       loggerFactory: NamedLoggerFactory,
   ): ResourceOwner[SubmissionTracker] =
@@ -68,7 +69,7 @@ object SubmissionTracker {
   private[tracking] class SubmissionTrackerImpl(
       cancellableTimeoutSupport: CancellableTimeoutSupport,
       maxCommandsInFlight: Int,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       val loggerFactory: NamedLoggerFactory,
   )(implicit val tracer: Tracer)
       extends SubmissionTracker

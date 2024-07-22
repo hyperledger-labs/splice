@@ -10,10 +10,14 @@ import com.daml.network.automation.{
   TransferFollowTrigger,
 }
 import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import com.daml.network.store.MultiDomainAcsStore.ConstrainedTemplate
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
@@ -144,40 +148,61 @@ class SvDsoAutomationService(
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    registerTrigger(new DsoRulesTransferTrigger(triggerContext, dsoStore, connection))
+    if (config.supportsSoftDomainMigrationPoc) {
+      registerTrigger(
+        new AmuletConfigReassignmentTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          Seq[ConstrainedTemplate](
+            AmuletRules.COMPANION,
+            OpenMiningRound.COMPANION,
+            IssuingMiningRound.COMPANION,
+          ),
+        )
+      )
+    } else {
+      registerTrigger(
+        new AmuletConfigReassignmentTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          Seq(DsoRules.COMPANION),
+        )
+      )
+      registerTrigger(
+        new TransferFollowTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          store.key.dsoParty,
+          implicit tc =>
+            dsoStore.listDsoRulesTransferFollowers().flatMap { dsoRulesFollowers =>
+              // don't try to schedule AmuletRules' followers if AmuletRules might move
+              // (i.e. be one of dsoRulesFollowers)
+              if (dsoRulesFollowers.nonEmpty) Future successful dsoRulesFollowers
+              else dsoStore.listAmuletRulesTransferFollowers()
+            },
+        )
+      )
+
+      registerTrigger(
+        new TransferFollowTrigger(
+          triggerContext,
+          svStore,
+          connection,
+          store.key.svParty,
+          implicit tc =>
+            dsoStore
+              .lookupDsoRules()
+              .flatMap(
+                _.map(svStore.listDsoRulesTransferFollowers(_))
+                  .getOrElse(Future successful Seq.empty)
+              ),
+        )
+      )
+    }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
-
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        dsoStore,
-        connection,
-        store.key.dsoParty,
-        implicit tc =>
-          dsoStore.listDsoRulesTransferFollowers().flatMap { dsoRulesFollowers =>
-            // don't try to schedule AmuletRules' followers if AmuletRules might move
-            // (i.e. be one of dsoRulesFollowers)
-            if (dsoRulesFollowers.nonEmpty) Future successful dsoRulesFollowers
-            else dsoStore.listAmuletRulesTransferFollowers()
-          },
-      )
-    )
-
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        svStore,
-        connection,
-        store.key.svParty,
-        implicit tc =>
-          dsoStore
-            .lookupDsoRules()
-            .flatMap(
-              _.map(svStore.listDsoRulesTransferFollowers(_))
-                .getOrElse(Future successful Seq.empty)
-            ),
-      )
-    )
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(triggerContext, dsoStore, connection)
     )
@@ -434,7 +459,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
-      aTrigger[DsoRulesTransferTrigger],
+      aTrigger[AmuletConfigReassignmentTrigger],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],

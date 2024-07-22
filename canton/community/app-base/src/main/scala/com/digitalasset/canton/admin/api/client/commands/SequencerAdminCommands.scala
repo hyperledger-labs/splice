@@ -3,13 +3,19 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
-import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.TimestampSelector.TimestampSelector
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
+  SequencerTrafficStatus,
+  TimestampSelector,
+}
 import com.digitalasset.canton.sequencer.admin
+import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.Member
 import io.grpc.ManagedChannel
 
@@ -48,14 +54,17 @@ object SequencerAdminCommands {
       SequencerPruningStatus.fromProtoV30(response.getPruningStatus).leftMap(_.toString)
   }
 
-  final case class GetTrafficControlState(members: Seq[Member])
-      extends BaseSequencerAdministrationCommands[
+  final case class GetTrafficControlState(
+      members: Seq[Member],
+      timestampSelector: TimestampSelector = TimestampSelector.LatestSafe,
+  ) extends BaseSequencerAdministrationCommands[
         admin.v30.TrafficControlStateRequest,
         admin.v30.TrafficControlStateResponse,
         SequencerTrafficStatus,
       ] {
     override def createRequest(): Either[String, admin.v30.TrafficControlStateRequest] = Right(
-      admin.v30.TrafficControlStateRequest(members.map(_.toProtoPrimitive))
+      admin.v30
+        .TrafficControlStateRequest(members.map(_.toProtoPrimitive), timestampSelector.toProtoV30)
     )
     override def submitRequest(
         service: admin.v30.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
@@ -65,28 +74,36 @@ object SequencerAdminCommands {
     override def handleResponse(
         response: admin.v30.TrafficControlStateResponse
     ): Either[String, SequencerTrafficStatus] =
-      response.trafficStates
-        .traverse(com.digitalasset.canton.traffic.MemberTrafficStatus.fromProtoV30)
-        .leftMap(_.toString)
+      response.trafficStates.toList
+        .traverse { case (member, state) =>
+          (
+            Member.fromProtoPrimitive(member, "member").leftMap(_.toString),
+            TrafficState.fromProtoV30(state).leftMap(_.toString).map(Right(_)),
+          ).tupled
+        }
+        .map(_.toMap)
         .map(SequencerTrafficStatus)
   }
 
-  final case class SetTrafficBalance(member: Member, serial: PositiveInt, balance: NonNegativeLong)
-      extends BaseSequencerAdministrationCommands[
-        admin.v30.SetTrafficBalanceRequest,
-        admin.v30.SetTrafficBalanceResponse,
+  final case class SetTrafficPurchased(
+      member: Member,
+      serial: PositiveInt,
+      balance: NonNegativeLong,
+  ) extends BaseSequencerAdministrationCommands[
+        admin.v30.SetTrafficPurchasedRequest,
+        admin.v30.SetTrafficPurchasedResponse,
         Option[CantonTimestamp],
       ] {
-    override def createRequest(): Either[String, admin.v30.SetTrafficBalanceRequest] = Right(
-      admin.v30.SetTrafficBalanceRequest(member.toProtoPrimitive, serial.value, balance.value)
+    override def createRequest(): Either[String, admin.v30.SetTrafficPurchasedRequest] = Right(
+      admin.v30.SetTrafficPurchasedRequest(member.toProtoPrimitive, serial.value, balance.value)
     )
     override def submitRequest(
         service: admin.v30.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
-        request: admin.v30.SetTrafficBalanceRequest,
-    ): Future[admin.v30.SetTrafficBalanceResponse] =
-      service.setTrafficBalance(request)
+        request: admin.v30.SetTrafficPurchasedRequest,
+    ): Future[admin.v30.SetTrafficPurchasedResponse] =
+      service.setTrafficPurchased(request)
     override def handleResponse(
-        response: admin.v30.SetTrafficBalanceResponse
+        response: admin.v30.SetTrafficPurchasedResponse
     ): Either[String, Option[CantonTimestamp]] = {
       response.maxSequencingTimestamp
         .traverse(CantonTimestamp.fromProtoTimestamp)

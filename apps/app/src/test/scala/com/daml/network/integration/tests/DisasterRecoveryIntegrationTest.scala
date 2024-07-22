@@ -2,8 +2,9 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import better.files.File.apply
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.config.{ConfigTransforms, ParticipantClientConfig, NetworkAppClientConfig}
-import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.console.{
   AppBackendReference,
   ScanAppBackendReference,
@@ -26,7 +27,7 @@ import com.daml.network.sv.migration.{
   DomainMigrationDump,
   SynchronizerNodeIdentities,
 }
-import com.daml.network.validator.migration.{DomainMigrationDump as ValidatorDomainMigrationDump}
+import com.daml.network.validator.migration.DomainMigrationDump as ValidatorDomainMigrationDump
 import com.daml.network.util.{
   DomainMigrationUtil,
   ProcessTestUtil,
@@ -51,7 +52,6 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import io.circe.syntax.EncoderOps
 import org.scalatest.time.{Minute, Span}
 

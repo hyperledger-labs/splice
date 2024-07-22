@@ -15,9 +15,9 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.protocol.OnboardingRestriction
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.processing.EffectiveTime
-import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
-import com.digitalasset.canton.topology.transaction.TopologyTransactionX.{
-  GenericTopologyTransactionX,
+import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction.GenericValidatedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
+  GenericTopologyTransaction,
   TxHash,
 }
 import com.digitalasset.canton.topology.transaction.*
@@ -64,8 +64,8 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         )
         with TopologyManagerError
 
-    final case class IncompatibleOpMapping(op: TopologyChangeOpX, mapping: TopologyMappingX)(
-        implicit val loggingContext: ErrorLoggingContext
+    final case class IncompatibleOpMapping(op: TopologyChangeOp, mapping: TopologyMapping)(implicit
+        val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "The operation is incompatible with the mapping"
         )
@@ -78,7 +78,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         )
         with TopologyManagerError
 
-    final case class ReplaceExistingFailed(invalid: GenericValidatedTopologyTransactionX)(implicit
+    final case class ReplaceExistingFailed(invalid: GenericValidatedTopologyTransaction)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "Replacing existing transaction failed upon removal"
@@ -184,6 +184,21 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           cause = s"Wrong domain $wrong"
         )
         with TopologyManagerError
+
+    final case class InvalidFilterStore(filterStore: String)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"No domain store found for the filter store provided: $filterStore"
+        )
+        with TopologyManagerError
+
+    final case class MultipleDomainStores(filterStore: String)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Multiple domain stores found for the filter store provided: $filterStore. Specify the entire domainID to avoid ambiguity."
+        )
+        with TopologyManagerError
   }
 
   @Explanation(
@@ -199,7 +214,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
       ) {
     final case class Failure(
-        transaction: GenericTopologyTransactionX,
+        transaction: GenericTopologyTransaction,
         authKey: Fingerprint,
     )(implicit
         val loggingContext: ErrorLoggingContext
@@ -224,7 +239,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         id = "TOPOLOGY_MAPPING_ALREADY_EXISTS",
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
       ) {
-    final case class FailureX(existing: TopologyMappingX, keys: NonEmpty[Set[Fingerprint]])(implicit
+    final case class Failure(existing: TopologyMapping, keys: NonEmpty[Set[Fingerprint]])(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
@@ -277,7 +292,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         id = "NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
-    final case class Mapping(mapping: TopologyMappingX)(implicit
+    final case class Mapping(mapping: TopologyMapping)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
@@ -301,6 +316,33 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "Topology transaction would remove the last key of the given entity"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates that a dangerous owner to key mapping authorization was rejected.
+      |This is the case if a command is run that could break a node.
+      |If the command was run to assign a key for the given node, then the command
+      |was rejected because the key is not in the node's private store.
+      |If the command is run on a node to issue transactions for another node,
+      |then such commands must be run with force, as they are very dangerous and could easily break
+      |the node.
+      |As an example, if we assign an encryption key to a participant that the participant does not
+      |have, then the participant will be unable to process an incoming transaction. Therefore we must
+      |be very careful to not create such situations.
+      | """
+  )
+  @Resolution("Set the ForceFlag.AlienMember if you really know what you are doing.")
+  object DangerousKeyUseCommandRequiresForce
+      extends ErrorCode(
+        id = "DANGEROUS_KEY_USE_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class AlienMember(member: Member)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = "Issuing owner to key mappings for alien members requires ForceFlag.AlienMember"
         )
         with TopologyManagerError
   }
@@ -335,9 +377,9 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
       |
       |Use ``myDomain.service.set_ledger_time_record_time_tolerance`` for securely increasing ledgerTimeRecordTimeTolerance.
       |
-      |Alternatively, add the ``force = true`` flag to your command, if security is not a concern for you.
+      |Alternatively, add the flag ``ForceFlag.LedgerTimeRecordTimeToleranceIncrease`` to your command, if security is not a concern for you.
       |The security checks will be effective again after twice the new value of ``ledgerTimeRecordTimeTolerance``.
-      |Using ``force = true`` is safe upon domain bootstrapping.
+      |Using ``ForceFlag.LedgerTimeRecordTimeToleranceIncrease`` is safe upon domain bootstrapping.
       |"""
   )
   object IncreaseOfLedgerTimeRecordTimeTolerance
@@ -394,23 +436,6 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   }
 
   @Explanation(
-    "This error indicates that a threshold in the submitted transaction was higher than the number of members that would have to satisfy that threshold."
-  )
-  @Resolution(
-    """Submit the topology transaction with a lower threshold.
-      |The metadata details of this error contain the expected maximum in the field ``expectedMaximum``."""
-  )
-  object InvalidThreshold
-      extends ErrorCode(id = "INVALID_THRESHOLD", ErrorCategory.InvalidIndependentOfSystemState) {
-    final case class ThresholdTooHigh(actual: Int, expectedMaximum: Int)(implicit
-        override val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = s"Threshold must not be higher than $expectedMaximum, but was $actual."
-        )
-        with TopologyManagerError
-  }
-
-  @Explanation(
     "This error indicates that members referenced in a topology transaction have not declared at least one signing key or at least 1 encryption key or both."
   )
   @Resolution(
@@ -431,6 +456,20 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         with TopologyManagerError
   }
 
+  object PartyExceedsHostingLimit
+      extends ErrorCode(
+        id = "PARTY_EXCEEDS_HOSTING_LIMIT",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+    final case class Reject(party: PartyId, limit: Int, numParticipants: Int)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Party $party exceeds hosting limit of $limit with desired number of $numParticipants hosting participant."
+        )
+        with TopologyManagerError
+  }
+
   @Explanation(
     "This error indicates that the topology transaction references members that are currently unknown."
   )
@@ -447,6 +486,26 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         override val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"Members ${members.sorted.mkString(", ")} are unknown."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    "This error indicates that the topology transaction references parties that are currently unknown."
+  )
+  @Resolution(
+    """Wait for the onboarding of the parties to be become active or remove the unknown parties from the topology transaction.
+      |The metadata details of this error contain the unknown parties in the field ``parties``."""
+  )
+  object UnknownParties
+      extends ErrorCode(
+        id = "UNKNOWN_PARTIES",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+    final case class Failure(parties: Seq[PartyId])(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Parties ${parties.sorted.mkString(", ")} are unknown."
         )
         with TopologyManagerError
   }
@@ -496,6 +555,79 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     ) extends CantonError.Impl(
           cause =
             s"The $participantId can not join the domain because onboarding restrictions are in place"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates that the submitted topology mapping was invalid."""
+  )
+  @Resolution(
+    """The participant should work with the owners of the parties mentioned in the ``parties`` field in the
+      |error details metadata to get itself removed from the list of hosting participants of those parties."""
+  )
+  object InvalidTopologyMapping
+      extends ErrorCode(
+        id = "INVALID_TOPOLOGY_MAPPING",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+    final case class Reject(
+        description: String
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The topology transaction was rejected due to an invalid mapping: $description"
+        )
+        with TopologyManagerError
+  }
+
+  object MissingTopologyMapping
+      extends ErrorCode(
+        id = "MISSING_TOPOLOGY_MAPPING",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+    final case class Reject(
+        missingMappings: Map[Member, Seq[TopologyMapping.Code]]
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = {
+            val mappingString = missingMappings.toSeq
+              .sortBy(_._1)
+              .map { case (member, mappings) =>
+                s"$member: ${mappings.mkString(", ")}"
+              }
+              .mkString("; ")
+            s"The following members are missing certain topology mappings: $mappingString"
+          }
+        )
+        with TopologyManagerError
+
+    final case class MissingDomainParameters(effectiveTime: EffectiveTime)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Missing domain parameters at $effectiveTime"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates that the namespace is already used by another entity."""
+  )
+  @Resolution(
+    """Change the namespace used in the submitted topology transaction."""
+  )
+  object NamespaceAlreadyInUse
+      extends ErrorCode(
+        id = "NAMESPACE_ALREADY_IN_USE",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+      ) {
+    final case class Reject(
+        namespace: Namespace
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The namespace $namespace is already in use by another entity."
         )
         with TopologyManagerError
   }

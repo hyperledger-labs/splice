@@ -3,44 +3,59 @@
 
 package com.digitalasset.canton.participant.metrics
 
-import com.daml.metrics.api.MetricDoc.MetricQualification.Debug
-import com.daml.metrics.api.MetricHandle.{Histogram, Timer}
-import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.daml.metrics.api.HistogramInventory.Item
+import com.daml.metrics.api.MetricHandle.{Histogram, LabeledMetricsFactory, Timer}
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricQualification, MetricsContext}
 
-class TransactionProcessingMetrics(
-    val prefix: MetricName,
-    factory: CantonLabeledMetricsFactory,
-)(implicit context: MetricsContext) {
+class TransactionProcessingHistograms(val prefix: MetricName)(implicit
+    inventory: HistogramInventory
+) {
 
-  object protocolMessages {
-    private val prefix = TransactionProcessingMetrics.this.prefix :+ "protocol-messages"
+  private val protocolPrefix = prefix :+ "protocol-messages"
 
-    @MetricDoc.Tag(
+  private[metrics] val confirmationRequestCreation: Item =
+    Item(
+      protocolPrefix :+ "confirmation-request-creation",
       summary = "Time to create a transaction confirmation request",
       description =
         """The time that the transaction protocol processor needs to create a transaction confirmation request.""",
-      qualification = Debug,
+      qualification = MetricQualification.Latency,
     )
-    val confirmationRequestCreation: Timer =
-      factory.timer(prefix :+ "confirmation-request-creation")
 
-    @MetricDoc.Tag(
-      summary = "Time to parse a transaction message",
+  private[metrics] val transactionMessageReceipt: Item =
+    Item(
+      protocolPrefix :+ "transaction-message-receipt",
+      summary = "Time to parse and decrypt a transaction message",
       description =
         """The time that the transaction protocol processor needs to parse and decrypt an incoming confirmation request.""",
-      qualification = Debug,
+      qualification = MetricQualification.Debug,
     )
-    val transactionMessageReceipt: Timer = factory.timer(prefix :+ "transaction-message-receipt")
 
-    @MetricDoc.Tag(
+  private[metrics] val confirmationRequestSize: Item =
+    Item(
+      protocolPrefix :+ "confirmation-request-size",
       summary = "Confirmation request size",
       description =
         """Records the histogram of the sizes of (transaction) confirmation requests.""",
-      qualification = Debug,
+      qualification = MetricQualification.Debug,
     )
+
+}
+
+class TransactionProcessingMetrics(
+    histograms: TransactionProcessingHistograms,
+    factory: LabeledMetricsFactory,
+)(implicit metricsContext: MetricsContext) {
+
+  object protocolMessages {
+
+    val confirmationRequestCreation: Timer =
+      factory.timer(histograms.confirmationRequestCreation.info)
+
+    val transactionMessageReceipt: Timer = factory.timer(histograms.transactionMessageReceipt.info)
+
     val confirmationRequestSize: Histogram =
-      factory.histogram(prefix :+ "confirmation-request-size")
+      factory.histogram(histograms.confirmationRequestSize.info)
   }
 
 }

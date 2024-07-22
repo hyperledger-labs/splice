@@ -50,6 +50,7 @@ import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -266,6 +267,7 @@ object SequencedEventValidator extends HasLoggerName {
       latestTopologyClientTimestamp: Option[CantonTimestamp],
       protocolVersion: ProtocolVersion,
       warnIfApproximate: Boolean,
+      getTolerance: DynamicDomainParametersWithValidity => NonNegativeFiniteDuration,
   )(implicit
       loggingContext: NamedLoggingContext,
       executionContext: ExecutionContext,
@@ -278,6 +280,7 @@ object SequencedEventValidator extends HasLoggerName {
       latestTopologyClientTimestamp,
       protocolVersion,
       warnIfApproximate,
+      getTolerance,
     )(
       SyncCryptoClient.getSnapshotForTimestamp _,
       (topology, traceContext) => topology.findDynamicDomainParameters()(traceContext),
@@ -291,6 +294,7 @@ object SequencedEventValidator extends HasLoggerName {
       latestTopologyClientTimestamp: Option[CantonTimestamp],
       protocolVersion: ProtocolVersion,
       warnIfApproximate: Boolean,
+      getTolerance: DynamicDomainParametersWithValidity => NonNegativeFiniteDuration,
   )(implicit
       loggingContext: NamedLoggingContext,
       executionContext: ExecutionContext,
@@ -303,6 +307,7 @@ object SequencedEventValidator extends HasLoggerName {
       latestTopologyClientTimestamp,
       protocolVersion,
       warnIfApproximate,
+      getTolerance,
     )(
       SyncCryptoClient.getSnapshotForTimestampUS _,
       (topology, traceContext) =>
@@ -322,6 +327,7 @@ object SequencedEventValidator extends HasLoggerName {
       latestTopologyClientTimestamp: Option[CantonTimestamp],
       protocolVersion: ProtocolVersion,
       warnIfApproximate: Boolean,
+      getTolerance: DynamicDomainParametersWithValidity => NonNegativeFiniteDuration,
   )(
       getSnapshotF: (
           SyncCryptoClient[SyncCryptoApi],
@@ -341,6 +347,9 @@ object SequencedEventValidator extends HasLoggerName {
 
     def snapshotF: F[SyncCryptoApi] = getSnapshotF(
       syncCryptoApi,
+      // As we use topologyTimestamp here (as opposed to sequencingTimestamp),
+      // a valid topologyTimestamp can be used until topologyTimestamp + tolerance.
+      // So a change of tolerance does not negatively impact pending requests.
       topologyTimestamp,
       latestTopologyClientTimestamp,
       protocolVersion,
@@ -354,7 +363,7 @@ object SequencedEventValidator extends HasLoggerName {
         .map { dynamicDomainParametersE =>
           for {
             dynamicDomainParameters <- dynamicDomainParametersE.leftMap(NoDynamicDomainParameters)
-            tolerance = dynamicDomainParameters.sequencerTopologyTimestampTolerance
+            tolerance = getTolerance(dynamicDomainParameters)
             withinSigningTolerance = {
               import scala.Ordered.orderingToOrdered
               tolerance.unwrap >= sequencingTimestamp - topologyTimestamp
@@ -403,15 +412,10 @@ object SequencedEventValidator extends HasLoggerName {
 trait SequencedEventValidatorFactory {
 
   /** Creates a new [[SequencedEventValidator]] to be used for a subscription with the given parameters.
-    *
-    * @param initialLastEventProcessedO
-    *    The last event that the sequencer client had validated (and persisted) in case of a resubscription.
-    *    The [[com.digitalasset.canton.sequencing.client.SequencerSubscription]] requests this event again.
-    * @param unauthenticated Whether the subscription is unauthenticated
     */
-  def create(
-      unauthenticated: Boolean
-  )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator
+  def create(loggerFactory: NamedLoggerFactory)(implicit
+      traceContext: TraceContext
+  ): SequencedEventValidator
 }
 
 object SequencedEventValidatorFactory {
@@ -426,19 +430,17 @@ object SequencedEventValidatorFactory {
       domainId: DomainId,
       warn: Boolean = true,
   ): SequencedEventValidatorFactory = new SequencedEventValidatorFactory {
-    override def create(
-        unauthenticated: Boolean
-    )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
-      SequencedEventValidator.noValidation(domainId, warn)
+    override def create(loggerFactory: NamedLoggerFactory)(implicit
+        traceContext: TraceContext
+    ): SequencedEventValidator =
+      SequencedEventValidator.noValidation(domainId, warn)(
+        NamedLoggingContext(loggerFactory, traceContext)
+      )
   }
 }
 
-/** Validate whether a received event is valid for processing.
-  *
-  * @param unauthenticated if true, then the connection is unauthenticated. in such cases, we have to skip some validations.
-  */
+/** Validate whether a received event is valid for processing. */
 class SequencedEventValidatorImpl(
-    unauthenticated: Boolean,
     domainId: DomainId,
     protocolVersion: ProtocolVersion,
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
@@ -576,21 +578,15 @@ class SequencedEventValidatorImpl(
     Either.cond(receivedDomainId == domainId, (), BadDomainId(domainId, receivedDomainId))
   }
 
-  private def verifySignature(
+  @VisibleForTesting
+  protected def verifySignature(
       priorEventO: Option[PossiblyIgnoredSerializedEvent],
       event: OrdinarySerializedEvent,
       sequencerId: SequencerId,
       protocolVersion: ProtocolVersion,
   ): EitherT[FutureUnlessShutdown, SequencedEventValidationError[Nothing], Unit] = {
     implicit val traceContext: TraceContext = event.traceContext
-    if (unauthenticated) {
-      // TODO(i4933) once we have topology data on the sequencer api, we might fetch the domain keys
-      //  and use the domain keys to validate anything here if we are unauthenticated
-      logger.debug(
-        s"Skipping sequenced event validation for counter ${event.counter} and timestamp ${event.timestamp} in unauthenticated subscription from $sequencerId"
-      )
-      EitherT.fromEither[FutureUnlessShutdown](checkNoTimestampOfSigningKey(event))
-    } else if (event.counter == SequencerCounter.Genesis) {
+    if (event.counter == SequencerCounter.Genesis) {
       // TODO(#4933) This is a fresh subscription. Either fetch the domain keys via a future sequencer API and validate the signature
       //  or wait until the topology processor has processed the topology information in the first message and then validate the signature.
       logger.info(
@@ -612,6 +608,7 @@ class SequencedEventValidatorImpl(
             lastTopologyClientTimestamp(priorEventO),
             protocolVersion,
             warnIfApproximate = priorEventO.nonEmpty,
+            _.sequencerTopologyTimestampTolerance,
           )
           .leftMap(InvalidTopologyTimestamp(event.timestamp, signingTs, _))
         _ = logger.debug(s"Successfully validated the event topology timestamp ${event.timestamp}")

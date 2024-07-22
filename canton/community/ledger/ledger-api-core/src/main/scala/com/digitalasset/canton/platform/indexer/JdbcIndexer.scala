@@ -4,10 +4,9 @@
 package com.digitalasset.canton.platform.indexer
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.lf.data.Ref
-import com.digitalasset.canton.ledger.participant.state.v2 as state
+import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.index.InMemoryStateUpdater
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
@@ -27,11 +26,11 @@ import com.digitalasset.canton.platform.store.backend.{
   StorageBackendFactory,
   StringInterningStorageBackend,
 }
-import com.digitalasset.canton.platform.store.cache.ImmutableLedgerEndCache
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.platform.store.dao.events.{CompressionStrategy, LfValueTranslation}
 import com.digitalasset.canton.platform.store.interning.UpdatingStringInterningView
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.*
 
@@ -42,8 +41,9 @@ object JdbcIndexer {
       participantId: Ref.ParticipantId,
       participantDataSourceConfig: ParticipantDataSourceConfig,
       config: IndexerConfig,
+      excludedPackageIds: Set[Ref.PackageId],
       readService: state.ReadService,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       inMemoryState: InMemoryState,
       apiUpdaterFlow: InMemoryStateUpdater.UpdaterFlow,
       executionContext: ExecutionContext,
@@ -64,7 +64,8 @@ object JdbcIndexer {
       val dataSourceStorageBackend = factory.createDataSourceStorageBackend
       val ingestionStorageBackend = factory.createIngestionStorageBackend
       val meteringStoreBackend = factory.createMeteringStorageWriteBackend
-      val parameterStorageBackend = factory.createParameterStorageBackend
+      val parameterStorageBackend =
+        factory.createParameterStorageBackend(inMemoryState.stringInterningView)
       val meteringParameterStorageBackend = factory.createMeteringParameterStorageBackend
       val DBLockStorageBackend = factory.createDBLockStorageBackend
       val stringInterningStorageBackend = factory.createStringInterningStorageBackend
@@ -111,6 +112,7 @@ object JdbcIndexer {
           submissionBatchSize = config.submissionBatchSize,
           maxTailerBatchSize = config.maxTailerBatchSize,
           maxOutputBatchedBufferSize = config.maxOutputBatchedBufferSize,
+          excludedPackageIds = excludedPackageIds,
           metrics = metrics,
           inMemoryStateUpdaterFlow = apiUpdaterFlow,
           stringInterningView = inMemoryState.stringInterningView,
@@ -136,18 +138,7 @@ object JdbcIndexer {
                   dbDispatcher,
                   updatingStringInterningView,
                   ledgerEnd,
-                ),
-              updatePackageMetadataView = UpdatePackageMetadataView(
-                factory.createPackageStorageBackend(
-                  ImmutableLedgerEndCache(ledgerEnd.lastOffset -> ledgerEnd.lastEventSeqId)
-                ),
-                metrics,
-                dbDispatcher,
-                _,
-                executionContext,
-                config.packageMetadataView,
-                loggerFactory,
-              ),
+                )
             ),
         loggerFactory = loggerFactory,
         indexerDbDispatcherOverride = indexerDbDispatcherOverride,
@@ -159,7 +150,7 @@ object JdbcIndexer {
 
   private def updateStringInterningView(
       stringInterningStorageBackend: StringInterningStorageBackend,
-      metrics: Metrics,
+      metrics: LedgerApiServerMetrics,
       dbDispatcher: DbDispatcher,
       updatingStringInterningView: UpdatingStringInterningView,
       ledgerEnd: ParameterStorageBackend.LedgerEnd,

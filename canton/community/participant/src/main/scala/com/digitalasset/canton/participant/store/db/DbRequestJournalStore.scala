@@ -19,11 +19,7 @@ import com.digitalasset.canton.participant.store.db.DbRequestJournalStore.Replac
 import com.digitalasset.canton.resource.DbStorage.DbAction.ReadOnly
 import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
-import com.digitalasset.canton.store.db.{
-  DbBulkUpdateProcessor,
-  DbCursorPreheadStore,
-  SequencerClientDiscriminator,
-}
+import com.digitalasset.canton.store.db.{DbBulkUpdateProcessor, DbCursorPreheadStore}
 import com.digitalasset.canton.store.{CursorPreheadStore, IndexedDomain}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -54,7 +50,7 @@ class DbRequestJournalStore(
 
   private[store] override val cleanPreheadStore: CursorPreheadStore[RequestCounterDiscriminator] =
     new DbCursorPreheadStore[RequestCounterDiscriminator](
-      SequencerClientDiscriminator.fromIndexedDomainId(domainId),
+      domainId,
       storage,
       cursorTable = "par_head_clean_counters",
       timeouts,
@@ -238,19 +234,18 @@ class DbRequestJournalStore(
       newState: RequestState,
       commitTime: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): EitherT[Future, RequestJournalStoreError, Unit] =
-    if (commitTime.exists(_ < requestTimestamp))
-      EitherT.leftT[Future, Unit](
-        CommitTimeBeforeRequestTime(
-          rc,
-          requestTimestamp,
-          commitTime.getOrElse(
-            throw new RuntimeException("An Option guarded by an exists must contain a value")
-          ),
+    commitTime match {
+      case Some(commitTime) if commitTime < requestTimestamp =>
+        EitherT.leftT[Future, Unit](
+          CommitTimeBeforeRequestTime(
+            rc,
+            requestTimestamp,
+            commitTime,
+          )
         )
-      )
-    else {
-      val request = ReplaceRequest(rc, requestTimestamp, newState, commitTime)
-      EitherT(batchAggregatorReplace.run(request).flatMap(Future.fromTry))
+      case _ =>
+        val request = ReplaceRequest(rc, requestTimestamp, newState, commitTime)
+        EitherT(batchAggregatorReplace.run(request).flatMap(Future.fromTry))
     }
 
   private val batchAggregatorReplace = {
@@ -385,7 +380,17 @@ class DbRequestJournalStore(
     storage.query(statement, functionFullName)
   }
 
+  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[Int] = {
+    val statement =
+      sql"""
+        select count(*)
+        from par_journal_requests where domain_id = $domainId and commit_time is null
+        """.as[Int].head
+    storage.query(statement, functionFullName)
+  }
+
   override def onClosed(): Unit = Lifecycle.close(cleanPreheadStore)(logger)
+
 }
 
 object DbRequestJournalStore {

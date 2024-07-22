@@ -178,7 +178,7 @@ class HttpExternalWalletHandler(
           .transform(
             _.mapping.participantIds,
             // We translate NOT_FOUND raised by getPartyToParticipant to INVALID_ARGUMENT
-            // if no PartyToParticipantX state is found
+            // if no PartyToParticipant state is found
             {
               case ex: io.grpc.StatusRuntimeException
                   if ex.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>

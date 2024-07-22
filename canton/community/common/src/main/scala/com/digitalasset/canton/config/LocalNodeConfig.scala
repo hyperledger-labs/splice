@@ -31,9 +31,9 @@ trait LocalNodeParametersConfig {
 
   /** Various cache sizes */
   def caching: CachingConfigs
-  def useNewTrafficControl: Boolean
   def useUnifiedSequencer: Boolean
-  def devVersionSupport: Boolean
+  def alphaVersionSupport: Boolean
+  def watchdog: Option[WatchdogConfig]
 }
 
 trait CommunityLocalNodeConfig extends LocalNodeConfig {

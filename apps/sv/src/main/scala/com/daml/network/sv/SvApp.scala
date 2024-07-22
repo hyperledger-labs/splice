@@ -75,6 +75,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.version.ProtocolVersion
 import io.circe.Json
 import io.circe.syntax.*
 import io.grpc.Status
@@ -86,7 +87,7 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -193,7 +194,8 @@ class SvApp(
           ),
           config.parameters
             .toStaticDomainParameters(
-              CommunityCryptoConfig(provider = CommunityCryptoProvider.Tink)
+              CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
+              ProtocolVersion.v31,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")

@@ -16,10 +16,9 @@ import com.digitalasset.canton.domain.mediator.store.{
 }
 import com.digitalasset.canton.domain.metrics.MediatorTestMetrics
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.InformeeMessage
-import com.digitalasset.canton.sequencing.protocol.MediatorsOfDomain
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
@@ -44,20 +43,19 @@ class MediatorStateTest
     val fullInformeeTree = {
       val domainId = DefaultTestIdentities.domainId
       val participantId = DefaultTestIdentities.participant1
-      val aliceParty = LfPartyId.assertFromString("alice")
-      val alice = PlainInformee(aliceParty)
-      val bob = ConfirmingParty(
-        LfPartyId.assertFromString("bob"),
-        PositiveInt.tryCreate(2),
-      )
+      val alice = LfPartyId.assertFromString("alice")
+      val bob = LfPartyId.assertFromString("bob")
+      val bobCp = Map(bob -> PositiveInt.tryCreate(2))
       val hashOps: HashOps = new SymbolicPureCrypto
       val h: Int => Hash = TestHash.digest
       val s: Int => Salt = TestSalt.generateSalt
       def rh(index: Int): RootHash = RootHash(h(index))
       val viewCommonData =
-        ViewCommonData.create(hashOps)(
-          Set(alice, bob),
-          NonNegativeInt.tryCreate(2),
+        ViewCommonData.tryCreate(hashOps)(
+          ViewConfirmationParameters.tryCreate(
+            Set(alice, bob),
+            Seq(Quorum(bobCp, NonNegativeInt.tryCreate(2))),
+          ),
           s(999),
           testedProtocolVersion,
         )
@@ -68,7 +66,7 @@ class MediatorStateTest
         testedProtocolVersion,
       )
       val submitterMetadata = SubmitterMetadata(
-        NonEmpty(Set, aliceParty),
+        NonEmpty(Set, alice),
         ApplicationId.assertFromString("kaese"),
         CommandId.assertFromString("wurst"),
         participantId,
@@ -81,9 +79,8 @@ class MediatorStateTest
       )
       val commonMetadata = CommonMetadata
         .create(hashOps, testedProtocolVersion)(
-          ConfirmationPolicy.Signatory,
           domainId,
-          MediatorsOfDomain(MediatorGroupIndex.zero),
+          MediatorGroupRecipient(MediatorGroupIndex.zero),
           s(5417),
           new UUID(0, 0),
         )
@@ -109,6 +106,7 @@ class MediatorStateTest
         .fromRequest(
           requestId,
           informeeMessage,
+          requestId.unwrap.plusSeconds(300),
           mockTopologySnapshot,
         )(traceContext, executorService)
         .futureValue // without explicit ec it deadlocks on AnyTestSuite.serialExecutionContext
@@ -143,7 +141,7 @@ class MediatorStateTest
         } yield {
           sut.pendingRequestIdsBefore(CantonTimestamp.MaxValue) shouldBe empty
         }
-      }
+      }.failOnShutdown("Unexpected shutdown.")
     }
 
     "fetching items" should {
@@ -156,7 +154,7 @@ class MediatorStateTest
           progress shouldBe Some(currentVersion)
           noItem shouldBe None
         }
-      }
+      }.failOnShutdown("Unexpected shutdown.")
     }
 
     "updating items" should {
@@ -175,13 +173,13 @@ class MediatorStateTest
             ),
           )
         } yield result shouldBe None
-      }
+      }.failOnShutdown("Unexpected shutdown.")
 
       "allow updating to a newer version" in {
         for {
           result <- sut.replace(currentVersion, newVersion).value
         } yield result shouldBe Some(())
-      }
+      }.failOnShutdown("Unexpected shutdown.")
     }
   }
 }

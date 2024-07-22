@@ -12,12 +12,13 @@ import com.digitalasset.canton.domain.sequencing.sequencer.DatabaseSequencerConf
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerHealthConfig
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitManager
-import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficBalanceStore
+import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficPurchasedStore
 import com.digitalasset.canton.environment.CantonNodeParameters
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, DomainTopologyManagerId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, SequencerId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.trace.Tracer
@@ -62,7 +63,7 @@ class DriverBlockSequencerFactory[C](
       cryptoApi: DomainSyncCryptoClient,
       stateManager: BlockSequencerStateManager,
       store: SequencerBlockStore,
-      balanceStore: TrafficBalanceStore,
+      balanceStore: TrafficPurchasedStore,
       storage: Storage,
       futureSupervisor: FutureSupervisor,
       health: Option[SequencerHealthConfig],
@@ -73,22 +74,23 @@ class DriverBlockSequencerFactory[C](
       orderingTimeFixMode: OrderingTimeFixMode,
       initialBlockHeight: Option[Long],
       domainLoggerFactory: NamedLoggerFactory,
+      runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
       materializer: Materializer,
       tracer: Tracer,
   ): BlockSequencer =
     new BlockSequencer(
-      new DriverBlockSequencerOps(
+      new DriverBlockOrderer(
         sequencerDriverFactory.create(
           config,
           nodeParameters.nonStandardConfig,
           driverClock,
           initialBlockHeight,
-          DomainTopologyManagerId(domainId).toProtoPrimitive,
+          domainId.toString,
           domainLoggerFactory,
         ),
-        protocolVersion,
+        orderingTimeFixMode,
       ),
       name,
       domainId,
@@ -110,6 +112,7 @@ class DriverBlockSequencerFactory[C](
       metrics,
       domainLoggerFactory,
       unifiedSequencer = nodeParameters.useUnifiedSequencer,
+      runtimeReady = runtimeReady,
     )
 }
 

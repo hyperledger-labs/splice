@@ -18,29 +18,28 @@ import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerTrafficConfig,
 }
 import com.digitalasset.canton.domain.sequencing.sequencer.{
+  DatabaseSequencerFactory,
   Sequencer,
-  SequencerFactory,
   SequencerHealthConfig,
   SequencerInitialState,
 }
-import com.digitalasset.canton.domain.sequencing.traffic.EnterpriseSequencerRateLimitManager.BalanceUpdateClient
-import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficBalanceStore
+import com.digitalasset.canton.domain.sequencing.traffic.store.{
+  TrafficConsumedStore,
+  TrafficPurchasedStore,
+}
 import com.digitalasset.canton.domain.sequencing.traffic.{
-  BalanceUpdateClientImpl,
-  BalanceUpdateClientTopologyImpl,
   EnterpriseSequencerRateLimitManager,
-  TrafficBalanceManager,
+  TrafficPurchasedManager,
 }
 import com.digitalasset.canton.environment.CantonNodeParameters
-import com.digitalasset.canton.lifecycle.{CloseContext, Lifecycle}
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.traffic.EventCostCalculator
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.traffic.EventCostCalculator
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace
@@ -59,22 +58,33 @@ abstract class BlockSequencerFactory(
     testingInterceptor: Option[TestingInterceptor],
     metrics: SequencerMetrics,
 )(implicit ec: ExecutionContext)
-    extends SequencerFactory
+    extends DatabaseSequencerFactory(storage, nodeParameters.processingTimeouts, protocolVersion)
     with NamedLogging {
 
   private val store = SequencerBlockStore(
     storage,
     protocolVersion,
     nodeParameters.processingTimeouts,
-    if (nodeParameters.enableAdditionalConsistencyChecks) Some(sequencerId) else None,
+    nodeParameters.enableAdditionalConsistencyChecks,
+    // Block sequencer invariant checks will fail in unified sequencer mode
+    checkedInvariant = Option.when(
+      nodeParameters.enableAdditionalConsistencyChecks && !nodeParameters.useUnifiedSequencer
+    )(sequencerId),
     loggerFactory,
+    unifiedSequencer = nodeParameters.useUnifiedSequencer,
   )
 
-  private val balanceStore = TrafficBalanceStore(
+  private val trafficPurchasedStore = TrafficPurchasedStore(
     storage,
     nodeParameters.processingTimeouts,
     loggerFactory,
     nodeParameters.batchingConfig.aggregator,
+  )
+
+  private val trafficConsumedStore = TrafficConsumedStore(
+    storage,
+    nodeParameters.processingTimeouts,
+    loggerFactory,
   )
 
   protected val name: String
@@ -87,7 +97,7 @@ abstract class BlockSequencerFactory(
       cryptoApi: DomainSyncCryptoClient,
       stateManager: BlockSequencerStateManager,
       store: SequencerBlockStore,
-      balanceStore: TrafficBalanceStore,
+      balanceStore: TrafficPurchasedStore,
       storage: Storage,
       futureSupervisor: FutureSupervisor,
       health: Option[SequencerHealthConfig],
@@ -98,6 +108,7 @@ abstract class BlockSequencerFactory(
       orderingTimeFixMode: OrderingTimeFixMode,
       initialBlockHeight: Option[Long],
       domainLoggerFactory: NamedLoggerFactory,
+      runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       executionContext: ExecutionContext,
       materializer: Materializer,
@@ -110,30 +121,45 @@ abstract class BlockSequencerFactory(
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit] = {
     val initialBlockState = BlockEphemeralState.fromSequencerInitialState(snapshot)
     logger.debug(s"Storing sequencers initial state: $initialBlockState")
-    val result = for {
-      _ <- store.setInitialState(initialBlockState, snapshot.initialTopologyEffectiveTimestamp)
-      _ <- snapshot.snapshot.trafficBalances.parTraverse_(balanceStore.store)
-      _ = logger.debug(
-        s"from snapshot: ticking traffic balance manager with ${snapshot.latestSequencerEventTimestamp}"
+    for {
+      _ <- super[DatabaseSequencerFactory].initialize(
+        snapshot,
+        sequencerId,
+      ) // Members are stored in the DBS
+      _ <- EitherT.right(
+        store.setInitialState(initialBlockState, snapshot.initialTopologyEffectiveTimestamp)
       )
-      _ <- snapshot.latestSequencerEventTimestamp
-        .traverse(ts => balanceStore.setInitialTimestamp(ts))
+      _ <- EitherT.right(
+        snapshot.snapshot.trafficPurchased.parTraverse_(trafficPurchasedStore.store)
+      )
+      _ <- EitherT.right(snapshot.snapshot.trafficConsumed.parTraverse_(trafficConsumedStore.store))
+      _ = logger.debug(
+        s"from snapshot: ticking traffic purchased entry manager with ${snapshot.latestSequencerEventTimestamp}"
+      )
+      _ <- EitherT.right(
+        snapshot.latestSequencerEventTimestamp
+          .traverse(ts => trafficPurchasedStore.setInitialTimestamp(ts))
+      )
     } yield ()
-
-    EitherT.right(result)
   }
 
   @VisibleForTesting
   protected def makeRateLimitManager(
-      balanceUpdateClient: BalanceUpdateClient,
+      trafficPurchasedManager: TrafficPurchasedManager,
       futureSupervisor: FutureSupervisor,
+      domainSyncCryptoApi: DomainSyncCryptoClient,
+      protocolVersion: ProtocolVersion,
+      trafficConfig: SequencerTrafficConfig,
   ): SequencerRateLimitManager = {
     new EnterpriseSequencerRateLimitManager(
-      balanceUpdateClient,
+      trafficPurchasedManager,
+      trafficConsumedStore,
       loggerFactory,
-      futureSupervisor,
       nodeParameters.processingTimeouts,
       metrics,
+      domainSyncCryptoApi,
+      protocolVersion,
+      trafficConfig,
       eventCostCalculator = new EventCostCalculator(loggerFactory),
     )
   }
@@ -146,6 +172,7 @@ abstract class BlockSequencerFactory(
       domainSyncCryptoApi: DomainSyncCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -169,40 +196,23 @@ abstract class BlockSequencerFactory(
       s"Creating $name sequencer at block height $initialBlockHeight"
     )
 
-    val balanceManager = new TrafficBalanceManager(
-      balanceStore,
+    val balanceManager = new TrafficPurchasedManager(
+      trafficPurchasedStore,
       clock,
       trafficConfig,
       futureSupervisor,
       metrics,
+      protocolVersion,
       nodeParameters.processingTimeouts,
       loggerFactory,
     )
 
-    //  Start auto pruning of traffic balances
-    FutureUtil.doNotAwaitUnlessShutdown(
-      balanceManager.startAutoPruning,
-      "Auto pruning of traffic balances",
-    )
-    def newTrafficBalanceClient = new BalanceUpdateClientImpl(balanceManager, loggerFactory)
-
-    // Old balance client from topology
-    def topologyTrafficBalanceClient = {
-      implicit val closeContext = CloseContext(domainSyncCryptoApi)
-      new BalanceUpdateClientTopologyImpl(
-        domainSyncCryptoApi,
-        protocolVersion,
-        loggerFactory,
-      )
-    }
-
-    val balanceUpdateClient =
-      if (nodeParameters.useNewTrafficControl) newTrafficBalanceClient
-      else topologyTrafficBalanceClient
-
     val rateLimitManager = makeRateLimitManager(
-      balanceUpdateClient,
+      balanceManager,
       futureSupervisor,
+      domainSyncCryptoApi,
+      protocolVersion,
+      trafficConfig,
     )
 
     val domainLoggerFactory = loggerFactory.append("domainId", domainId.toString)
@@ -215,7 +225,7 @@ abstract class BlockSequencerFactory(
       nodeParameters.enableAdditionalConsistencyChecks,
       nodeParameters.processingTimeouts,
       domainLoggerFactory,
-      rateLimitManager,
+      nodeParameters.useUnifiedSequencer,
     )
 
     for {
@@ -228,7 +238,7 @@ abstract class BlockSequencerFactory(
         domainSyncCryptoApi,
         stateManager,
         store,
-        balanceStore,
+        trafficPurchasedStore,
         storage,
         futureSupervisor,
         health,
@@ -239,6 +249,7 @@ abstract class BlockSequencerFactory(
         orderingTimeFixMode,
         initialBlockHeight,
         domainLoggerFactory,
+        runtimeReady,
       )
       testingInterceptor
         .map(_(clock)(sequencer)(ec))
@@ -246,8 +257,9 @@ abstract class BlockSequencerFactory(
     }
   }
 
-  override final def close(): Unit =
+  override def onClosed(): Unit = {
     Lifecycle.close(store)(logger)
+  }
 }
 
 object BlockSequencerFactory {
@@ -259,8 +271,12 @@ object BlockSequencerFactory {
 
   object OrderingTimeFixMode {
 
+    /** Ordering timestamps are not necessarily unique or increasing.
+      * Clients should adjust timestamps to enforce that.
+      */
     final case object MakeStrictlyIncreasing extends OrderingTimeFixMode
 
+    /** Ordering timestamps are strictly monotonically increasing. */
     final case object ValidateOnly extends OrderingTimeFixMode
   }
 }

@@ -4,13 +4,12 @@
 package com.digitalasset.canton.participant.store
 
 import cats.syntax.option.*
-import com.daml.lf.data.{ImmArray, Time}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.v2.TransactionMeta
+import com.digitalasset.canton.ledger.participant.state.TransactionMeta
 import com.digitalasset.canton.participant.store.db.DbEventLogTestResources
-import com.digitalasset.canton.participant.sync.LedgerSyncEvent.PublicPackageUploadRejected
+import com.digitalasset.canton.participant.sync.LedgerSyncEvent.PartyAllocationRejected
 import com.digitalasset.canton.participant.sync.TimestampedEvent.TimelyRejectionEventId
 import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, TimestampedEvent}
 import com.digitalasset.canton.participant.{
@@ -30,6 +29,7 @@ import com.digitalasset.canton.{
   RequestCounter,
   SequencerCounter,
 }
+import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
@@ -296,7 +296,8 @@ trait SingleDimensionEventLogTest extends BeforeAndAfterAll with BaseTest {
         val event2 =
           generateEvent(
             LedgerSyncRecordTime.MaxValue,
-            Long.MaxValue,
+            // Long.MaxValue would throw out-of-bound exception for the Canton timestamp
+            CantonTimestamp.MaxValue.getEpochSecond,
             Some(SequencerCounter.MaxValue),
           )
 
@@ -487,10 +488,11 @@ private[participant] object SingleDimensionEventLogTest {
       requestSequencerCounter: Option[SequencerCounter] = Some(SequencerCounter(42)),
   )(implicit traceContext: TraceContext): TimestampedEvent =
     TimestampedEvent(
-      PublicPackageUploadRejected(
-        LedgerSubmissionId.assertFromString("submission"),
-        recordTime,
-        "event",
+      PartyAllocationRejected(
+        submissionId = LedgerSubmissionId.assertFromString("submission"),
+        participantId = Ref.ParticipantId.assertFromString("participant"),
+        recordTime = recordTime,
+        rejectionReason = "event",
       ),
       localOffset,
       requestSequencerCounter,

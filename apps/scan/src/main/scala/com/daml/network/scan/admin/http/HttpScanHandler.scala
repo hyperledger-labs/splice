@@ -6,7 +6,7 @@ package com.daml.network.scan.admin.http
 import com.digitalasset.canton.data.CantonTimestamp
 import cats.data.OptionT
 import cats.syntax.either.*
-import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
@@ -40,7 +40,7 @@ import scala.jdk.OptionConverters.*
 import scala.util.Using
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   DevnetTap,
   Mint,
@@ -632,7 +632,7 @@ class HttpScanHandler(
       val afterO = request.after.map { after =>
         (
           after.afterMigrationId,
-          CantonTimestamp(Timestamp.assertFromString(after.afterRecordTime)),
+          CantonTimestamp(Timestamp.assertFromInstant(Instant.parse(after.afterRecordTime))),
         )
       }
       updateHistory

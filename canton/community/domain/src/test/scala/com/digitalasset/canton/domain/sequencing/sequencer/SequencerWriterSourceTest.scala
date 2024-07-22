@@ -20,7 +20,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
-import com.digitalasset.canton.topology.{Member, ParticipantId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.{BaseTest, HasExecutorService, config}
@@ -81,10 +81,19 @@ class SequencerWriterSourceTest extends AsyncWordSpec with BaseTest with HasExec
     val instanceIndex: Int = 0
     val testWriterConfig: SequencerWriterConfig.LowLatency =
       SequencerWriterConfig.LowLatency()
-
+    lazy val sequencerMember: Member = SequencerId(
+      UniqueIdentifier.tryFromProtoPrimitive("sequencer::namespace")
+    )
     class InMemoryStoreWithTimeAdvancement(lFactory: NamedLoggerFactory)(implicit
         ec: ExecutionContext
-    ) extends InMemorySequencerStore(testedProtocolVersion, lFactory)(ec) {
+    ) extends InMemorySequencerStore(
+          testedProtocolVersion,
+          sequencerMember,
+          testedUseUnifiedSequencer,
+          lFactory,
+        )(
+          ec
+        ) {
       private val timeAdvancement = new AtomicReference[java.time.Duration](java.time.Duration.ZERO)
 
       def setClockAdvanceBeforeSavePayloads(duration: java.time.Duration): Unit =
@@ -229,8 +238,8 @@ class SequencerWriterSourceTest extends AsyncWordSpec with BaseTest with HasExec
           None,
         )
         _ <- {
-          offerDeliverOrFail(Presequenced.withMaxSequencingTime(deliver1, beforeNow))
-          offerDeliverOrFail(Presequenced.withMaxSequencingTime(deliver2, longAfterNow))
+          offerDeliverOrFail(Presequenced.withMaxSequencingTime(deliver1, beforeNow, None))
+          offerDeliverOrFail(Presequenced.withMaxSequencingTime(deliver2, longAfterNow, None))
           completeFlow()
         }
 
@@ -327,7 +336,6 @@ class SequencerWriterSourceTest extends AsyncWordSpec with BaseTest with HasExec
             SubmissionRequest.tryCreate(
               alice,
               MessageId.tryCreate("test-unknown-recipients"),
-              isRequest = true,
               batch = Batch.fromClosed(
                 testedProtocolVersion,
                 ClosedEnvelope.create(
@@ -340,6 +348,7 @@ class SequencerWriterSourceTest extends AsyncWordSpec with BaseTest with HasExec
               maxSequencingTime = CantonTimestamp.MaxValue,
               topologyTimestamp = None,
               aggregationRule = None,
+              submissionCost = None,
               protocolVersion = testedProtocolVersion,
             )
           )

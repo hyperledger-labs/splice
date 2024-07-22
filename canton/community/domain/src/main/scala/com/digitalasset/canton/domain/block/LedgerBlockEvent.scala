@@ -6,6 +6,11 @@ package com.digitalasset.canton.domain.block
 import cats.syntax.either.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.RawLedgerBlock.RawBlockEvent
+import com.digitalasset.canton.domain.sequencing.sequencer.OrderingRequest
+import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.{
+  SignedOrderingRequest,
+  SignedOrderingRequestOps,
+}
 import com.digitalasset.canton.logging.HasLoggerName
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
@@ -14,7 +19,6 @@ import com.digitalasset.canton.sequencing.protocol.{
   SubmissionRequest,
 }
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfTimestamp, ProtoDeserializationError}
@@ -30,9 +34,12 @@ object LedgerBlockEvent extends HasLoggerName {
 
   final case class Send(
       timestamp: CantonTimestamp,
-      signedSubmissionRequest: SignedContent[SubmissionRequest],
-  ) extends LedgerBlockEvent
-  final case class AddMember(member: Member) extends LedgerBlockEvent
+      signedOrderingRequest: SignedOrderingRequest,
+      originalPayloadSize: Int =
+        0, // default is 0 for testing as this value is only used for metrics
+  ) extends LedgerBlockEvent {
+    lazy val signedSubmissionRequest = signedOrderingRequest.signedSubmissionRequest
+  }
   final case class Acknowledgment(request: SignedContent[AcknowledgeRequest])
       extends LedgerBlockEvent
 
@@ -42,39 +49,55 @@ object LedgerBlockEvent extends HasLoggerName {
     blockEvent match {
       case RawBlockEvent.Send(request, microsecondsSinceEpoch) =>
         for {
-          deserializedRequest <- deserializeSignedSubmissionRequest(protocolVersion)(request)
+          deserializedRequest <- deserializeSignedOrderingRequest(protocolVersion)(request)
           timestamp <- LfTimestamp
             .fromLong(microsecondsSinceEpoch)
             .leftMap(e => ProtoDeserializationError.TimestampConversionError(e))
-        } yield LedgerBlockEvent.Send(CantonTimestamp(timestamp), deserializedRequest)
-      case RawBlockEvent.AddMember(memberString) =>
-        Member
-          .fromProtoPrimitive_(memberString)
-          .bimap(ProtoDeserializationError.StringConversionError, LedgerBlockEvent.AddMember)
+        } yield LedgerBlockEvent.Send(CantonTimestamp(timestamp), deserializedRequest, request.size)
       case RawBlockEvent.Acknowledgment(acknowledgement) =>
         deserializeSignedAcknowledgeRequest(protocolVersion)(acknowledgement).map(
           LedgerBlockEvent.Acknowledgment
         )
     }
 
-  def deserializeSignedSubmissionRequest(
+  def deserializeSignedOrderingRequest(
       protocolVersion: ProtocolVersion
-  )(submissionRequestBytes: ByteString): ParsingResult[SignedContent[SubmissionRequest]] = {
+  )(submissionRequestBytes: ByteString): ParsingResult[SignedOrderingRequest] = {
 
     // TODO(i10428) Prevent zip bombing when decompressing the request
-    SignedContent
-      .fromByteString(protocolVersion)(
-        submissionRequestBytes
-      )
-      .flatMap(
-        _.deserializeContent(
-          SubmissionRequest.fromByteString(protocolVersion)(MaxRequestSizeToDeserialize.NoLimit)
+    for {
+      // This is the SignedContent signed by the submitting sequencer (so SignedContent[OrderingRequest[SignedContent[SubmissionRequest]]])
+      // See explanation diagram in the [[Sequencer]] companion object
+      sequencerSignedContent <- SignedContent
+        .fromByteString(protocolVersion)(submissionRequestBytes)
+      signedOrderingRequest <- sequencerSignedContent
+        .deserializeContent(
+          // Now we deserialize the first inner content as an OrderingRequest[_]
+          (OrderingRequest.fromByteString(protocolVersion) _)
+            .andThen(
+              // Then deserialize the ordering request's content as a SignedContent[_] (signed by the sending participant this time)
+              _.flatMap(
+                _.deserializeContent(
+                  (SignedContent.fromByteString(protocolVersion) _)
+                    // And then deserialize the final inner content as SubmissionRequest
+                    .andThen(
+                      _.flatMap(
+                        _.deserializeContent(
+                          // ... and we're done!
+                          SubmissionRequest.fromByteString(protocolVersion)(
+                            MaxRequestSizeToDeserialize.NoLimit
+                          )
+                        )
+                      )
+                    )
+                )
+              )
+            )
         )
-      )
-
+    } yield signedOrderingRequest
   }
 
-  def deserializeSignedAcknowledgeRequest(protocolVersion: ProtocolVersion)(
+  private def deserializeSignedAcknowledgeRequest(protocolVersion: ProtocolVersion)(
       ackRequestBytes: ByteString
   ): ParsingResult[SignedContent[AcknowledgeRequest]] =
     SignedContent

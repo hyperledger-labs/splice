@@ -16,7 +16,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
-import com.digitalasset.canton.topology.SafeSimpleString
+import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.version.{
   HasVersionedMessageCompanion,
   HasVersionedWrapper,
@@ -33,12 +33,16 @@ trait CryptoKey extends Product with Serializable {
 }
 
 /** a human readable fingerprint of a key that serves as a unique identifier */
-final case class Fingerprint(protected val str: String68)
+final case class Fingerprint private (protected val str: String68)
     extends LengthLimitedStringWrapper
     with PrettyPrinting {
   def toLengthLimitedString: String68 = str
 
   override def pretty: Pretty[Fingerprint] = prettyOfParam(_.unwrap.readableHash)
+}
+
+trait HasFingerprint {
+  @inline def fingerprint: Fingerprint
 }
 
 object Fingerprint {
@@ -64,8 +68,8 @@ object Fingerprint {
 
   /** create fingerprint from a human readable string */
   def fromProtoPrimitive(str: String): ParsingResult[Fingerprint] =
-    SafeSimpleString
-      .fromProtoPrimitive(str)
+    UniqueIdentifier
+      .verifyValidString(str) // verify that we can represent the string as part of the UID.
       .leftMap(ProtoDeserializationError.StringConversionError)
       .flatMap(String68.fromProtoPrimitive(_, "Fingerprint"))
       .map(Fingerprint(_))
@@ -77,10 +81,17 @@ object Fingerprint {
     new Fingerprint(hash.toLengthLimitedHexString)
   }
 
+  def create(str: String): Either[String, Fingerprint] =
+    fromProtoPrimitive(str).leftMap(_.message)
+
   def tryCreate(str: String): Fingerprint =
-    fromProtoPrimitive(str).valueOr(err =>
+    create(str).valueOr(err =>
       throw new IllegalArgumentException(s"Invalid fingerprint $str: $err")
     )
+
+  def tryCreate(str68: String68): Fingerprint =
+    tryCreate(str68.unwrap)
+
 }
 
 trait CryptoKeyPairKey extends CryptoKey {
@@ -118,7 +129,7 @@ object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKe
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v30,
+      ProtocolVersion.v31,
       supportedProtoVersion(v30.CryptoKeyPair)(fromProtoCryptoKeyPairV30),
       _.toProtoCryptoKeyPairV30.toByteString,
     )
@@ -151,6 +162,11 @@ trait PublicKey extends CryptoKeyPairKey {
   def toByteString(version: ProtocolVersion): ByteString
 
   def fingerprint: Fingerprint = id
+
+  override lazy val id: Fingerprint = {
+    // TODO(i15649): Consider the key format and fingerprint scheme before computing
+    Fingerprint.create(key)
+  }
 
   def purpose: KeyPurpose
 
@@ -218,7 +234,7 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v30,
+      ProtocolVersion.v31,
       supportedProtoVersion(v30.PublicKeyWithName)(fromProto30),
       _.toProtoV30.toByteString,
     )
@@ -278,11 +294,6 @@ object CryptoKeyFormat {
   implicit val cryptoKeyFormatOrder: Order[CryptoKeyFormat] =
     Order.by[CryptoKeyFormat, String](_.name)
 
-  case object Tink extends CryptoKeyFormat {
-    override val name: String = "Tink"
-    override def toProtoEnum: v30.CryptoKeyFormat = v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_TINK
-  }
-
   case object Der extends CryptoKeyFormat {
     override val name: String = "DER"
     override def toProtoEnum: v30.CryptoKeyFormat = v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER
@@ -307,7 +318,6 @@ object CryptoKeyFormat {
         Left(ProtoDeserializationError.FieldNotSet(field))
       case v30.CryptoKeyFormat.Unrecognized(value) =>
         Left(ProtoDeserializationError.UnrecognizedEnum(field, value))
-      case v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_TINK => Right(CryptoKeyFormat.Tink)
       case v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER => Right(CryptoKeyFormat.Der)
       case v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW => Right(CryptoKeyFormat.Raw)
       case v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_SYMBOLIC => Right(CryptoKeyFormat.Symbolic)

@@ -4,12 +4,14 @@
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
+import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.{Crypto, SyncCryptoApi, SyncCryptoClient}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLoggingContext}
 import com.digitalasset.canton.metrics.SequencerClientMetrics
 import com.digitalasset.canton.networking.Endpoint
@@ -25,7 +27,8 @@ import com.digitalasset.canton.sequencing.client.transports.replay.{
   ReplayingSendsSequencerClientTransportImpl,
   ReplayingSendsSequencerClientTransportPekko,
 }
-import com.digitalasset.canton.sequencing.handshake.SequencerHandshake
+import com.digitalasset.canton.sequencing.protocol.{GetTrafficStateForMemberRequest, TrafficState}
+import com.digitalasset.canton.sequencing.traffic.{EventCostCalculator, TrafficStateController}
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
@@ -77,7 +80,7 @@ object SequencerClientFactory {
       loggerFactory: NamedLoggerFactory,
       supportedProtocolVersions: Seq[ProtocolVersion],
       minimumProtocolVersion: Option[ProtocolVersion],
-  ): SequencerClientFactory with SequencerClientTransportFactory =
+  ): SequencerClientFactory & SequencerClientTransportFactory =
     new SequencerClientFactory with SequencerClientTransportFactory {
 
       override def create(
@@ -110,13 +113,13 @@ object SequencerClientFactory {
           loggerFactory,
         )
 
-        for {
-          sequencerTransportsMap <- makeTransport(
-            sequencerConnections,
-            member,
-            requestSigner,
-          )
+        val sequencerTransportsMap = makeTransport(
+          sequencerConnections,
+          member,
+          requestSigner,
+        )
 
+        for {
           sequencerTransports <- EitherT.fromEither[Future](
             SequencerTransports.from(
               sequencerTransportsMap,
@@ -126,26 +129,74 @@ object SequencerClientFactory {
             )
           )
 
+          // Find the timestamp of the last known sequenced event, we'll use that timestamp to initialize
+          // the traffic state
+          latestSequencedTimestampO <- EitherT.right(
+            sequencedEventStore
+              .find(SequencedEventStore.LatestUpto(CantonTimestamp.MaxValue))
+              .toOption
+              .value
+              .map(_.map(_.timestamp))
+          )
+          getTrafficStateFromDomainFn = { (ts: CantonTimestamp) =>
+            BftSender
+              .makeRequest[SequencerAlias, String, SequencerClientTransport, Option[
+                TrafficState
+              ], Option[TrafficState]](
+                s"Retrieving traffic state from domain for $member at $ts",
+                futureSupervisor,
+                loggerFactory.getTracedLogger(this.getClass),
+                sequencerTransportsMap.forgetNE,
+                sequencerConnections.sequencerTrustThreshold,
+                _.getTrafficStateForMember(
+                  GetTrafficStateForMemberRequest(member, ts, domainParameters.protocolVersion)
+                ).map(_.trafficState),
+                identity,
+              )
+              .leftMap { err =>
+                s"Failed to retrieve traffic state from domain for $member: $err"
+              }
+          }
+          // Make a BFT call to all the transports to retrieve the current traffic state from the domain
+          // and initialize the trafficStateController with it
+          trafficStateO <- latestSequencedTimestampO
+            .traverse(getTrafficStateFromDomainFn(_).onShutdown(Left("Aborted due to shutdown")))
+            .map(_.flatten)
+
           // fetch the initial set of pending sends to initialize the client with.
           // as it owns the client that should be writing to this store it should not be racy.
           initialPendingSends <- EitherT.right(sendTrackerStore.fetchPendingSends)
+          trafficStateController = new TrafficStateController(
+            member,
+            loggerFactory,
+            syncCryptoApi,
+            trafficStateO.getOrElse(TrafficState.empty(CantonTimestamp.Epoch)),
+            domainParameters.protocolVersion,
+            new EventCostCalculator(loggerFactory),
+            futureSupervisor,
+            processingTimeout,
+            metrics.trafficConsumption,
+          )
           sendTracker = new SendTracker(
             initialPendingSends,
             sendTrackerStore,
             metrics,
             loggerFactory,
             processingTimeout,
+            Some(trafficStateController),
+            member,
           )
           // pluggable send approach to support transitioning to the new async sends
           validatorFactory = new SequencedEventValidatorFactory {
-            override def create(
-                unauthenticated: Boolean
-            )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
+            override def create(loggerFactory: NamedLoggerFactory)(implicit
+                traceContext: TraceContext
+            ): SequencedEventValidator =
               if (config.skipSequencedEventValidation) {
-                SequencedEventValidator.noValidation(domainId)
+                SequencedEventValidator.noValidation(domainId)(
+                  NamedLoggingContext(loggerFactory, traceContext)
+                )
               } else {
                 new SequencedEventValidatorImpl(
-                  unauthenticated,
                   domainId,
                   domainParameters.protocolVersion,
                   syncCryptoApi,
@@ -171,8 +222,9 @@ object SequencerClientFactory {
           metrics,
           recorderO,
           replayConfigForMember(member).isDefined,
-          syncCryptoApi.pureCrypto,
+          syncCryptoApi,
           loggingConfig,
+          Some(trafficStateController),
           loggerFactory,
           futureSupervisor,
           SequencerCounter.Genesis,
@@ -189,76 +241,65 @@ object SequencerClientFactory {
           executionSequencerFactory: ExecutionSequencerFactory,
           materializer: Materializer,
           traceContext: TraceContext,
-      ): EitherT[Future, String, SequencerClientTransport & SequencerClientTransportPekko] = {
+      ): SequencerClientTransport & SequencerClientTransportPekko = {
+        val loggerFactoryWithSequencerAlias =
+          SequencerClient.loggerFactoryWithSequencerConnection(
+            loggerFactory,
+            connection.sequencerAlias,
+          )
+
         // TODO(#13789) Use only `SequencerClientTransportPekko` as the return type
         def mkRealTransport(): SequencerClientTransport & SequencerClientTransportPekko =
           connection match {
             case grpc: GrpcSequencerConnection => grpcTransport(grpc, member)
           }
 
-        val transport: SequencerClientTransport & SequencerClientTransportPekko =
-          replayConfigForMember(member).filter(_ => allowReplay) match {
-            case None => mkRealTransport()
-            case Some(ReplayConfig(recording, SequencerEvents)) =>
-              new ReplayingEventsSequencerClientTransport(
+        replayConfigForMember(member).filter(_ => allowReplay) match {
+          case None => mkRealTransport()
+          case Some(ReplayConfig(recording, SequencerEvents)) =>
+            new ReplayingEventsSequencerClientTransport(
+              domainParameters.protocolVersion,
+              recording.fullFilePath,
+              processingTimeout,
+              loggerFactoryWithSequencerAlias,
+            )
+          case Some(ReplayConfig(recording, replaySendsConfig: SequencerSends)) =>
+            if (replaySendsConfig.usePekko) {
+              val underlyingTransport = mkRealTransport()
+              new ReplayingSendsSequencerClientTransportPekko(
                 domainParameters.protocolVersion,
                 recording.fullFilePath,
+                replaySendsConfig,
+                member,
+                underlyingTransport,
+                requestSigner,
+                metrics,
                 processingTimeout,
-                loggerFactory,
+                loggerFactoryWithSequencerAlias,
               )
-            case Some(ReplayConfig(recording, replaySendsConfig: SequencerSends)) =>
-              if (replaySendsConfig.usePekko) {
-                val underlyingTransport = mkRealTransport()
-                new ReplayingSendsSequencerClientTransportPekko(
-                  domainParameters.protocolVersion,
-                  recording.fullFilePath,
-                  replaySendsConfig,
-                  member,
-                  underlyingTransport,
-                  requestSigner,
-                  metrics,
-                  processingTimeout,
-                  loggerFactory,
-                )
-              } else {
-                val underlyingTransport = mkRealTransport()
-                new ReplayingSendsSequencerClientTransportImpl(
-                  domainParameters.protocolVersion,
-                  recording.fullFilePath,
-                  replaySendsConfig,
-                  member,
-                  underlyingTransport,
-                  requestSigner,
-                  metrics,
-                  processingTimeout,
-                  loggerFactory,
-                )
-              }
-          }
-
-        for {
-          // handshake to check that sequencer client supports the protocol version required by the sequencer
-          _ <- SequencerHandshake
-            .handshake(
-              supportedProtocolVersions,
-              minimumProtocolVersion,
-              transport,
-              config,
-              processingTimeout,
-              loggerFactory,
-            )
-            .leftMap { error =>
-              // make sure to close transport in case of handshake failure
-              transport.close()
-              error
+            } else {
+              val underlyingTransport = mkRealTransport()
+              new ReplayingSendsSequencerClientTransportImpl(
+                domainParameters.protocolVersion,
+                recording.fullFilePath,
+                replaySendsConfig,
+                member,
+                underlyingTransport,
+                requestSigner,
+                metrics,
+                processingTimeout,
+                loggerFactoryWithSequencerAlias,
+              )
             }
-        } yield transport
+        }
       }
 
       private def createChannel(conn: GrpcSequencerConnection)(implicit
           executionContext: ExecutionContextExecutor
       ): ManagedChannel = {
-        val channelBuilder = ClientChannelBuilder(loggerFactory)
+        val channelBuilder = ClientChannelBuilder(
+          SequencerClient.loggerFactoryWithSequencerConnection(loggerFactory, conn.sequencerAlias)
+        )
         GrpcSequencerChannelBuilder(
           channelBuilder,
           conn,
@@ -280,7 +321,10 @@ object SequencerClientFactory {
       private def grpcSequencerClientAuth(
           connection: GrpcSequencerConnection,
           member: Member,
-      )(implicit executionContext: ExecutionContextExecutor): GrpcSequencerClientAuth = {
+      )(implicit
+          executionContext: ExecutionContextExecutor,
+          traceContext: TraceContext,
+      ): GrpcSequencerClientAuth = {
         val channelPerEndpoint = connection.endpoints.map { endpoint =>
           val subConnection = connection.copy(endpoints = NonEmpty.mk(Seq, endpoint))
           endpoint -> createChannel(subConnection)
@@ -294,7 +338,10 @@ object SequencerClientFactory {
           config.authToken,
           clock,
           processingTimeout,
-          loggerFactory,
+          SequencerClient.loggerFactoryWithSequencerConnection(
+            loggerFactory,
+            connection.sequencerAlias,
+          ),
         )
       }
 
@@ -302,6 +349,7 @@ object SequencerClientFactory {
           executionContext: ExecutionContextExecutor,
           executionSequencerFactory: ExecutionSequencerFactory,
           materializer: Materializer,
+          traceContext: TraceContext,
       ): SequencerClientTransport & SequencerClientTransportPekko = {
         val channel = createChannel(connection)
         val auth = grpcSequencerClientAuth(connection, member)
@@ -312,7 +360,8 @@ object SequencerClientFactory {
           auth,
           metrics,
           processingTimeout,
-          loggerFactory.append("sequencerConnection", connection.sequencerAlias.unwrap),
+          SequencerClient
+            .loggerFactoryWithSequencerConnection(loggerFactory, connection.sequencerAlias),
           domainParameters.protocolVersion,
         )
       }

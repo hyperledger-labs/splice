@@ -9,7 +9,7 @@ import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, Retry
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.transaction.{PartyToParticipantX, TopologyChangeOpX}
+import com.digitalasset.canton.topology.transaction.{PartyToParticipant, TopologyChangeOp}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -46,11 +46,11 @@ class DsoPartyHosting(
       domain: DomainId,
       participantId: Option[ParticipantId],
       timeQuery: TimeQuery = TimeQuery.HeadState,
-  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] =
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] =
     participantAdminConnection
       .listPartyToParticipant(
         filterStore = domain.toProtoPrimitive,
-        operation = Some(TopologyChangeOpX.Replace),
+        operation = Some(TopologyChangeOp.Replace),
         filterParticipant = participantId.fold("")(_.toProtoPrimitive),
         filterParty = party.toProtoPrimitive,
         timeQuery = timeQuery,
@@ -86,7 +86,7 @@ class DsoPartyHosting(
   private def getDsoPartyToParticipantTransaction(
       domain: DomainId,
       participantId: ParticipantId,
-  )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipantX]] =
+  )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(for {
       // We only fetch transactions for the DSO party so one per SV on/offboarding which
       // we expect to be rare so we can fetch the entire history.
@@ -99,7 +99,7 @@ class DsoPartyHosting(
     } yield {
       // topology read service _should_ sort this but given that we assume everything
       // fits in memory we may as well go for the extra safeguard.
-      xs.sortBy(_.base.serial).foldLeft[Option[TopologyResult[PartyToParticipantX]]](None) {
+      xs.sortBy(_.base.serial).foldLeft[Option[TopologyResult[PartyToParticipant]]](None) {
         // Participant is no longer hosting the party
         case (_, newMapping) if !newMapping.mapping.participantIds.contains(participantId) => None
         // Participant starts hosting party

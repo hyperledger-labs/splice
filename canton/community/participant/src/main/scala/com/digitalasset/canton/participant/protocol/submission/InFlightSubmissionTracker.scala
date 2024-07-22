@@ -15,8 +15,7 @@ import com.daml.error.utils.DecodedCantonError
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.api.DeduplicationPeriod
+import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.LocalOffset
@@ -43,7 +42,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Tracker for in-flight submissions backed by the [[com.digitalasset.canton.participant.store.InFlightSubmissionStore]].
   *
-  * A submission is in flight if it is in the [[com.digitalasset.canton.participant.store.InFlightSubmissionStore]].
+  * A submission is in-flight if it is in the [[com.digitalasset.canton.participant.store.InFlightSubmissionStore]].
   * The tracker registers a submission
   * before the [[com.digitalasset.canton.sequencing.protocol.SubmissionRequest]]
   * is sent to the [[com.digitalasset.canton.sequencing.client.SequencerClient]] of a domain.
@@ -73,7 +72,7 @@ class InFlightSubmissionTracker(
     with NamedLogging {
   import InFlightSubmissionTracker.*
 
-  /** Registers the given submission as being in flight and unsequenced
+  /** Registers the given submission as being in-flight and unsequenced
     * unless there already is an in-flight submission for the same change ID
     * or the timeout has already elapsed.
     *
