@@ -175,11 +175,10 @@ class AppUpgradeIntegrationTest
           }
 
           // Founder does not upload DAR before the vote goes through
-          // TODO(#13413) Enable this
-          // val founderPackages = sv1Backend.participantClientWithAdminToken.packages.list()
-          // forAll(founderPackages) { pkg =>
-          //   pkg.packageId should not be DarResources.amulet.bootstrap.packageId
-          // }
+          val founderPackages = sv1Backend.participantClientWithAdminToken.packages.list()
+          forAll(founderPackages) { pkg =>
+            pkg.packageId should not be DarResources.amulet.bootstrap.packageId
+          }
 
           val amuletRules = sv2ScanBackend.getAmuletRules()
           val amuletConfig = amuletRules.payload.configSchedule.initialValue
