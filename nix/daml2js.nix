@@ -8,8 +8,8 @@ stdenv.mkDerivation rec {
     url = "https://digitalasset.jfrog.io/artifactory/assembly/daml/${sources.tooling_sdk_version}/daml-sdk-${sources.tooling_sdk_version}-${if stdenv.isDarwin then "macos" else "linux-intel"}.tar.gz";
     sha256 =
       if stdenv.isDarwin
-        then "sha256:0ha1lzkhsq7s45qy44j5gb0yiw9xq15024xkhnnvp686br011sn8"
-        else "sha256:0x9vynp6zc4ys880l3apny6702d188iqxhgy5dxsizwsx9d0nsbv";
+        then "sha256:16gn0kybfwj00dhgzmmvi6c87lzp8l91my1y8ia1sgi1isfqhrcj"
+        else "sha256:1lwv3vbrlv00nd5ilhxdzx2vnlxymkcky403ny2bzahlz0qi3338";
   };
   dontUnpack = true;
   installPhase = ''
