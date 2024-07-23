@@ -1628,7 +1628,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "splitwell",
+        "nodeIdentifier": "PAR-splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2542,7 +2542,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "Digital-Asset-2",
+        "nodeIdentifier": "PAR-Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -3620,7 +3620,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-2",
+        "nodeIdentifier": "PAR-Digital-Asset-Eng-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -4664,7 +4664,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-3",
+        "nodeIdentifier": "PAR-Digital-Asset-Eng-3",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -5708,7 +5708,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-4",
+        "nodeIdentifier": "PAR-Digital-Asset-Eng-4",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -6713,7 +6713,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "validator1",
+        "nodeIdentifier": "PAR-validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",

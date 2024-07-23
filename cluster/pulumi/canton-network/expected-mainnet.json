@@ -826,7 +826,7 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "Digital-Asset-2",
+        "nodeIdentifier": "PAR-Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",

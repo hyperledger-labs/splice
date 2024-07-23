@@ -14,6 +14,7 @@ import {
   Auth0Config,
   LogLevel,
   DomainMigrationIndex,
+  prefixParticipantNodeIdentifier,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
@@ -101,7 +102,7 @@ export function installParticipant(
           active: isActiveDomain,
         },
       },
-      nodeIdentifier,
+      nodeIdentifier: prefixParticipantNodeIdentifier(nodeIdentifier),
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       auth: {

@@ -666,7 +666,7 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
+        "nodeIdentifier": "PAR-DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_2",
           "host": "participant-pg.sv.svc.cluster.local",
