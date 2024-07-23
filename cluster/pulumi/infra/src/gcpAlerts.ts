@@ -68,6 +68,8 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash")
 -(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:.*" AND jsonPayload.message=~".*Authorization Failed.*")
 -(jsonPayload.level="error" AND jsonPayload.msg=~".*/readyz")
+-- The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
+-jsonPayload.message="The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response."
 -- istio-proxy is spammy with warnings
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 ${conditionalString(
