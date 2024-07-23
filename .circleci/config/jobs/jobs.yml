@@ -866,25 +866,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - run:
-          name: clone splice-staging
-          command: |
-            cd ..
-            for i in $(seq 1 5)
-            do
-              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
-            done
-            (exit $s)
-      - setup_sbt_test_job
-      - run_bash_command_in_nix:
-          cmd_name: dump latest into splice-staging
-          cmd: |
-            scripts/copy-to-splice.sh ../splice
-      - run:
-          name: copy circleci-specific files to the splice directory
-          command: |
-            mkdir -p ../splice/.circleci
-            cp -r .circleci/canton-scripts ../splice/.circleci
+      - clone_and_update_splice
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
@@ -895,3 +877,34 @@ jobs:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
+
+  create_splice_pr:
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: "small"
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - clone_and_update_splice
+      - run:
+          name: Create branch & commit
+          command: |
+            commit=$(git rev-parse --short HEAD)
+            cd ../splice
+            branch="splice-cci-update-$(date +%s)"
+            git config user.email "circleci@circleci.com"
+            git config user.name "CircleCI"
+            git checkout -b "$branch"
+            git add .
+            git commit -m "Update Splice from CCI" --allow-empty
+      - run_bash_command_in_nix:
+          cmd_name: Push branch & create PR
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            commit=$(git rev-parse --short HEAD)
+            date=$(date +%Y-%m-%d)
+            cd ../splice
+            git push origin HEAD
+            gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes as of commit DACH-NY/canton-network-node@$commit" --base main --reviewer isegall-da,cocreature,nicu-da,martinflorian-da,ray-roestenburg-da
+          cmd_retry_count: 5

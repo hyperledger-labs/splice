@@ -1253,3 +1253,26 @@ commands:
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
+
+  clone_and_update_splice:
+      steps:
+      - run:
+          name: clone splice-staging
+          command: |
+            cd ..
+            for i in $(seq 1 5)
+            do
+              # Cloning via https and not ssh to allow also pushing from within nix, where we don't have the ssh key
+              git clone "https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+            done
+            (exit $s)
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: dump latest into splice-staging
+          cmd: |
+            scripts/copy-to-splice.sh ../splice
+      - run:
+          name: copy circleci-specific files to the splice directory
+          command: |
+            mkdir -p ../splice/.circleci
+            cp -r .circleci/canton-scripts ../splice/.circleci
