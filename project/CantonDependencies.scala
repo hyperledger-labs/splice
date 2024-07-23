@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.1.0-snapshot.20240708.13168.0.v7ed18470"
+  val version: String = "3.1.0-snapshot.20240717.13187.0.va47ab77f"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -85,8 +85,6 @@ object CantonDependencies {
     "com.daml" %% "test-evidence-scalatest" % daml_libraries_version
   lazy val daml_test_evidence_generator_scalatest =
     "com.daml" %% "test-evidence-generator" % daml_libraries_version
-  lazy val daml_lf_dev_archive_java_proto =
-    "com.daml" % "daml-lf-dev-archive-java-proto" % daml_libraries_version
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version

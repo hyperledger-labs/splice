@@ -37,7 +37,7 @@ import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
   TransactionSubmissionError,
-  TransactionSubmitted,
+  TransactionSubmissionResult,
 }
 import com.digitalasset.canton.participant.protocol.*
 import com.digitalasset.canton.participant.protocol.submission.{
@@ -666,7 +666,7 @@ class SyncDomain(
           )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
             Seq(
               topologyProcessor.subscriptionStartsAt(start, domainTimeTracker)(traceContext),
-              trafficProcessor.subscriptionStartsAt(start, domainTimeTracker)(traceContext),
+              trafficProcessor.subscriptionStartsAt(start)(traceContext),
             ).parSequence_
 
           override def apply(
@@ -839,14 +839,12 @@ class SyncDomain(
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionSubmissionError, FutureUnlessShutdown[
-    TransactionSubmitted
+    TransactionSubmissionResult
   ]] =
-    performUnlessClosingEitherT[TransactionSubmissionError, FutureUnlessShutdown[
-      TransactionSubmitted
-    ]](
-      functionFullName,
-      SubmissionDuringShutdown.Rejection(),
-    ) {
+    performUnlessClosingEitherT[
+      TransactionSubmissionError,
+      FutureUnlessShutdown[TransactionSubmissionResult],
+    ](functionFullName, SubmissionDuringShutdown.Rejection()) {
       ErrorUtil.requireState(ready, "Cannot submit transaction before recovery")
       transactionProcessor
         .submit(submitterInfo, transactionMeta, keyResolver, transaction, disclosedContracts)

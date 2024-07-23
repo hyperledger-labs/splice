@@ -851,7 +851,6 @@ object BuildCommon {
           scalatestScalacheck % Test,
           scalacheck % Test,
           daml_lf_archive_reader,
-          daml_lf_dev_archive_java_proto,
           daml_lf_engine,
           logback_classic % Runtime,
           logback_core % Runtime,

@@ -21,7 +21,11 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdown}
+import com.digitalasset.canton.lifecycle.{
+  FutureUnlessShutdown,
+  PromiseUnlessShutdown,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
 import com.digitalasset.canton.metrics.*
 import com.digitalasset.canton.participant.RequestOffset
@@ -37,6 +41,8 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.Submiss
   ContractAuthenticationFailed,
   DomainWithoutMediatorError,
   SequencerRequest,
+  SubmissionDuringShutdown,
+  SubmissionInternalError,
 }
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -76,7 +82,6 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
-import com.digitalasset.canton.sequencing.client.SendAsyncClientError
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.store.SessionKeyStore
@@ -129,7 +134,7 @@ class TransactionProcessingSteps(
 )(implicit val ec: ExecutionContext)
     extends ProcessingSteps[
       SubmissionParam,
-      TransactionSubmitted,
+      TransactionSubmissionResult,
       TransactionViewType,
       TransactionSubmissionError,
     ]
@@ -276,8 +281,18 @@ class TransactionProcessingSteps(
             error
           ) -> emptyDeduplicationPeriod
       }
-      TransactionSubmissionTrackingData(
+      mkTransactionSubmissionTrackingData(
+        error,
         submitterInfo.toCompletionInfo.copy(optDeduplicationPeriod = dedupInfo.some),
+      )
+    }
+
+    private def mkTransactionSubmissionTrackingData(
+        error: TransactionError,
+        completionInfo: CompletionInfo,
+    ): TransactionSubmissionTrackingData = {
+      TransactionSubmissionTrackingData(
+        completionInfo,
         TransactionSubmissionTrackingData.CauseWithTemplate(error),
         domainId,
         protocolVersion,
@@ -499,7 +514,24 @@ class TransactionProcessingSteps(
     override def shutdownDuringInFlightRegistration: TransactionSubmissionError =
       TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown.Rejection()
 
-    override def onFailure: TransactionSubmitted = TransactionSubmitted
+    override def onDefinitiveFailure: TransactionSubmissionResult = TransactionSubmissionFailure
+
+    override def definiteFailureTrackingData(
+        failure: UnlessShutdown[Throwable]
+    ): SubmissionTrackingData = {
+      val error = (failure match {
+        case UnlessShutdown.AbortedDueToShutdown =>
+          SubmissionDuringShutdown.Rejection()
+        case UnlessShutdown.Outcome(exception) =>
+          SubmissionInternalError.Failure(exception)
+      }): TransactionError
+      mkTransactionSubmissionTrackingData(error, submitterInfo.toCompletionInfo)
+    }
+
+    override def onPotentialFailure(
+        maxSequencingTime: CantonTimestamp
+    ): TransactionSubmissionResult =
+      TransactionSubmissionUnknown(maxSequencingTime)
   }
 
   private class PreparedTransactionBatch(
@@ -517,12 +549,8 @@ class TransactionProcessingSteps(
     override def submissionErrorTrackingData(
         error: SubmissionSendError
     )(implicit traceContext: TraceContext): TransactionSubmissionTrackingData = {
-      val errorCode: TransactionError = error.sendError match {
-        case SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded(_)) =>
-          TransactionProcessor.SubmissionErrors.DomainBackpressure.Rejection(error.toString)
-        case otherSendError =>
-          TransactionProcessor.SubmissionErrors.SequencerRequest.Error(otherSendError)
-      }
+      val errorCode: TransactionError =
+        TransactionProcessor.SubmissionErrors.SequencerRequest.Error(error.sendError)
       val rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(errorCode)
       TransactionSubmissionTrackingData(
         completionInfo,

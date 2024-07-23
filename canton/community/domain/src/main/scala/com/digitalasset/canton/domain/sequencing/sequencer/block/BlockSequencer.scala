@@ -44,7 +44,7 @@ import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
-import com.digitalasset.canton.sequencing.client.SequencerClient
+import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.sequencing.traffic.{
@@ -52,7 +52,7 @@ import com.digitalasset.canton.sequencing.traffic.{
   TrafficPurchasedSubmissionHandler,
 }
 import com.digitalasset.canton.serialization.HasCryptographicEvidence
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
@@ -532,41 +532,38 @@ class BlockSequencer(
           requestedTimestamp <= status.safePruningTimestamp,
           UnsafePruningPoint(requestedTimestamp, status.safePruningTimestamp): PruningError,
         )
-        msgs <- EitherT.right(
+        msg <- EitherT(
           pruningQueue
             .execute(
               for {
                 eventsMsg <- store.prune(requestedTimestamp)
                 trafficMsg <- blockRateLimitManager.prune(requestedTimestamp)
-              } yield ((eventsMsg, trafficMsg)),
+                msgEither <-
+                  if (unifiedSequencer) {
+                    super[DatabaseSequencer]
+                      .prune(requestedTimestamp)
+                      .map(dbsMsg =>
+                        s"${eventsMsg.replace("0 events and ", "")}\n$dbsMsg\n$trafficMsg"
+                      )
+                      .value
+                  } else {
+                    Future.successful(Right(s"$eventsMsg\n$trafficMsg"))
+                  }
+              } yield msgEither,
               s"pruning sequencer at $requestedTimestamp",
             )
             .unwrap
             .map(
               _.onShutdown(
-                (s"pruning at $requestedTimestamp canceled because we're shutting down", "")
+                Right(s"pruning at $requestedTimestamp canceled because we're shutting down")
               )
             )
         )
-        (eventsMsg, trafficMsg) = msgs
         _ <- EitherT.right(
           placeLocalEvent(BlockSequencer.UpdateInitialMemberCounters(requestedTimestamp))
         )
         _ <- EitherT.right(supervisedPruningF)
-        dbsMsg <-
-          if (unifiedSequencer) {
-            // TODO(#19526): Move in together within the pruningQueue.execute above
-            super[DatabaseSequencer].prune(requestedTimestamp)
-          } else {
-            EitherT.pure[Future, PruningError]("")
-          }
-      } yield {
-        if (unifiedSequencer) {
-          s"${eventsMsg.replace("0 events and ", "")}\n$dbsMsg\n$trafficMsg"
-        } else {
-          s"$eventsMsg\n$trafficMsg"
-        }
-      }
+      } yield msg
     else
       EitherT.right(
         supervisedPruningF.map(_ =>
@@ -681,7 +678,8 @@ class BlockSequencer(
       member: Member,
       serial: PositiveInt,
       totalTrafficPurchased: NonNegativeLong,
-      sequencerClient: SequencerClient,
+      sequencerClient: SequencerClientSend,
+      domainTimeTracker: DomainTimeTracker,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TrafficControlError, CantonTimestamp] = {
@@ -701,6 +699,7 @@ class BlockSequencer(
         serial,
         totalTrafficPurchased,
         sequencerClient,
+        domainTimeTracker,
         cryptoApi,
       )
     } yield timestamp

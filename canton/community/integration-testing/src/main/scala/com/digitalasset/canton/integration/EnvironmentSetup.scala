@@ -176,6 +176,7 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
 
   protected def destroyEnvironment(testName: Option[String], environment: TCE): Unit = {
     val metrics = testInfrastructureEnvironmentMetrics(testName)
+    environment.verifyParticipantLapiIntegrity(plugins)
     ConcurrentEnvironmentLimiter.destroy(getClass.getName, numPermits) {
       Timed.value(metrics.environmentDestroy, manualDestroyEnvironment(environment))
     }

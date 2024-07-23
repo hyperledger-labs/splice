@@ -9,13 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.v2.admin.*
 import com.daml.ledger.api.v2.*
-import com.daml.ledger.javaapi.data.{
-  Command,
-  CreateUserResponse,
-  ListUserRightsResponse,
-  ParticipantOffset,
-  User,
-}
+import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
@@ -203,7 +197,7 @@ private[environment] class LedgerClient(
         stub <- withCredentials(updateServiceStub)
       } yield ClientAdapter
         .serverStreaming(request.toProto, stub.getUpdateTrees)
-        .map(GetTreeUpdatesResponse.fromProto)
+        .mapConcat(GetTreeUpdatesResponse.fromProto)
     )
   }
 
@@ -490,7 +484,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: Option[lapi.participant_offset.ParticipantOffset],
+      begin: lapi.participant_offset.ParticipantOffset.Value.Absolute,
   ): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -499,7 +493,9 @@ private[environment] class LedgerClient(
         lapi.command_completion_service.CompletionStreamRequest(
           applicationId = applicationId,
           parties = parties.map(_.toProtoPrimitive),
-          beginExclusive = begin,
+          // empty string does work but it now starts from ledger begin instead of ledger end
+          // which we never want.
+          beginExclusive = begin.value,
         ),
         stub.completionStream,
       ) map CompletionStreamResponse.fromProto
@@ -657,12 +653,12 @@ object LedgerClient {
 
     private[network] def fromProto(
         proto: lapi.update_service.GetUpdateTreesResponse
-    ): GetTreeUpdatesResponse = {
+    ): Option[GetTreeUpdatesResponse] = {
       proto.update match {
         case TU.TransactionTree(tree) =>
           val javaTree = lapiTreeToJavaTree(tree)
           val update = TransactionTreeUpdate(javaTree)
-          GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId))
+          Some(GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId)))
 
         case TU.Reassignment(x) =>
           val domainIdP = x.event match {
@@ -671,10 +667,14 @@ object LedgerClient {
             case lapi.reassignment.Reassignment.Event.UnassignedEvent(unassign) => unassign.source
             case lapi.reassignment.Reassignment.Event.AssignedEvent(assign) => assign.target
           }
-          GetTreeUpdatesResponse(
-            ReassignmentUpdate(Reassignment.fromProto(x)),
-            DomainId.tryFromString(domainIdP),
+          Some(
+            GetTreeUpdatesResponse(
+              ReassignmentUpdate(Reassignment.fromProto(x)),
+              DomainId.tryFromString(domainIdP),
+            )
           )
+
+        case TU.OffsetCheckpoint(_) => None
 
         case TU.Empty => sys.error("uninitialized update service result (update)")
       }
@@ -748,20 +748,18 @@ object LedgerClient {
     }
   }
 
-  final case class CompletionStreamResponse(laterOffset: ParticipantOffset, completion: Completion)
+  final case class CompletionStreamResponse(laterOffset: String, completion: Completion)
 
   object CompletionStreamResponse {
     def fromProto(
         spb: lapi.command_completion_service.CompletionStreamResponse
     ): CompletionStreamResponse = {
-      val offset = (for {
-        checkpoint <- spb.checkpoint
-        offset <- checkpoint.offset
-      } yield offset)
+      val offset = spb.checkpoint
+        .map(_.offset)
         .getOrElse(throw new IllegalArgumentException("missing offset in CompletionStreamResponse"))
       // ignoring checkpoint.record_time
       CompletionStreamResponse(
-        ParticipantOffset.fromProto(scalapbToJava(offset)(_.companion)),
+        offset,
         Completion.fromProto(spb.getCompletion),
       )
     }

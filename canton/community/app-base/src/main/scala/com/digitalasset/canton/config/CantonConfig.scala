@@ -785,9 +785,8 @@ object CantonConfig {
     lazy implicit val authServiceConfigJwtRs256CrtReader
         : ConfigReader[AuthServiceConfig.JwtRs256Crt] =
       deriveReader[AuthServiceConfig.JwtRs256Crt]
-    lazy implicit val authServiceConfigJwtRs256JwksReader
-        : ConfigReader[AuthServiceConfig.JwtRs256Jwks] =
-      deriveReader[AuthServiceConfig.JwtRs256Jwks]
+    lazy implicit val authServiceConfigJwtJwksReader: ConfigReader[AuthServiceConfig.JwtJwks] =
+      deriveReader[AuthServiceConfig.JwtJwks]
     lazy implicit val authServiceConfigWildcardReader
         : ConfigReader[AuthServiceConfig.Wildcard.type] =
       deriveReader[AuthServiceConfig.Wildcard.type]
@@ -1204,9 +1203,8 @@ object CantonConfig {
     lazy implicit val authServiceConfigJwtRs256CrtWriter
         : ConfigWriter[AuthServiceConfig.JwtRs256Crt] =
       deriveWriter[AuthServiceConfig.JwtRs256Crt]
-    lazy implicit val authServiceConfigJwtRs256JwksWriter
-        : ConfigWriter[AuthServiceConfig.JwtRs256Jwks] =
-      deriveWriter[AuthServiceConfig.JwtRs256Jwks]
+    lazy implicit val authServiceConfigJwtJwksWriter: ConfigWriter[AuthServiceConfig.JwtJwks] =
+      deriveWriter[AuthServiceConfig.JwtJwks]
     lazy implicit val authServiceConfigUnsafeJwtHmac256Writer
         : ConfigWriter[AuthServiceConfig.UnsafeJwtHmac256] =
       confidentialWriter[AuthServiceConfig.UnsafeJwtHmac256](

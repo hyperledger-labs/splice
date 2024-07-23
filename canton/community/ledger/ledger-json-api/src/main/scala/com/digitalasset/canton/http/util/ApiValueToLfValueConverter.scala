@@ -6,7 +6,7 @@ package com.digitalasset.canton.http.util
 import com.daml.error.NoLogging
 import com.digitalasset.daml.lf
 import com.digitalasset.canton.ledger.api.validation.StricterValueValidator
-import com.daml.ledger.api.{v2 => lav2}
+import com.daml.ledger.api.{v2 as lav2}
 import io.grpc.StatusRuntimeException
 import scalaz.{Show, \/}
 

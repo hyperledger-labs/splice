@@ -27,4 +27,6 @@ trait TestEnvironment[+E <: Environment]
   implicit def actorSystem: ActorSystem = environment.actorSystem
   implicit val executionSequencerFactory: ExecutionSequencerFactory =
     environment.executionSequencerFactory
+
+  def verifyParticipantLapiIntegrity(plugins: Seq[EnvironmentSetupPlugin[_, _]]): Unit = ()
 }

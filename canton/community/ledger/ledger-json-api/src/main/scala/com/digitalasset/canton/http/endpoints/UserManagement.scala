@@ -22,15 +22,17 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
- final class UserManagement(
+final class UserManagement(
     decodeJwt: EndpointsCompanion.ValidateJwt,
     userManagementClient: UserManagementClient,
 )(implicit
     ec: ExecutionContext
 ) {
-  import UserManagement._
+  import UserManagement.*
 
-  def getUser(jwt: Jwt, req: domain.GetUserRequest)(implicit traceContext: TraceContext): ET[domain.SyncResponse[domain.UserDetails]] =
+  def getUser(jwt: Jwt, req: domain.GetUserRequest)(implicit
+      traceContext: TraceContext
+  ): ET[domain.SyncResponse[domain.UserDetails]] =
     for {
       userId <- parseUserId(req.userId)
       user <- EitherT.rightT(userManagementClient.getUser(userId = userId, token = Some(jwt.value)))
@@ -42,9 +44,9 @@ import scala.concurrent.{ExecutionContext, Future}
       jwt: Jwt,
       createUserRequest: domain.CreateUserRequest,
   )(implicit traceContext: TraceContext): ET[domain.SyncResponse[spray.json.JsObject]] = {
-    import scalaz.std.option._
-    import scalaz.syntax.traverse._
-    import scalaz.syntax.std.either._
+    import scalaz.std.option.*
+    import scalaz.syntax.traverse.*
+    import scalaz.syntax.std.either.*
     import com.digitalasset.daml.lf.data.Ref
     val input =
       for {
@@ -138,13 +140,17 @@ import scala.concurrent.{ExecutionContext, Future}
     ): domain.SyncResponse[List[domain.UserRight]]
   }
 
-  def getAuthenticatedUser(jwt: Jwt)(implicit traceContext: TraceContext): ET[domain.SyncResponse[domain.UserDetails]] =
+  def getAuthenticatedUser(
+      jwt: Jwt
+  )(implicit traceContext: TraceContext): ET[domain.SyncResponse[domain.UserDetails]] =
     for {
       userId <- getUserIdFromToken(jwt)
       user <- EitherT.rightT(userManagementClient.getUser(userId = userId, token = Some(jwt.value)))
     } yield domain.OkResponse(domain.UserDetails(user.id, user.primaryParty))
 
-  def listAuthenticatedUserRights(jwt: Jwt)(implicit traceContext: TraceContext): ET[domain.SyncResponse[List[domain.UserRight]]] = {
+  def listAuthenticatedUserRights(
+      jwt: Jwt
+  )(implicit traceContext: TraceContext): ET[domain.SyncResponse[List[domain.UserRight]]] = {
     for {
       userId <- getUserIdFromToken(jwt)
       rights <- EitherT.rightT(
@@ -158,7 +164,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
   def listUsers(
       jwt: Jwt
-  )(implicit traceContext: TraceContext): ET[domain.SyncResponse[Source[Error \/ domain.UserDetails, NotUsed]]] = {
+  )(implicit
+      traceContext: TraceContext
+  ): ET[domain.SyncResponse[Source[Error \/ domain.UserDetails, NotUsed]]] = {
     val users = aggregateListUserPages(Some(jwt.value))
     val userDetails = users.map(_ map domain.UserDetails.fromUser)
     EitherT.rightT(Future.successful(domain.OkResponse(userDetails)))
@@ -168,7 +176,7 @@ import scala.concurrent.{ExecutionContext, Future}
       token: Option[String],
       pageSize: Int = 1000, // TODO could be made configurable in the future
   )(implicit traceContext: TraceContext): Source[Error \/ User, NotUsed] = {
-    import scalaz.std.option._
+    import scalaz.std.option.*
     Source.unfoldAsync(some("")) {
       _ traverse { pageToken =>
         userManagementClient

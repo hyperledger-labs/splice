@@ -3,14 +3,14 @@
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.daml.daml_lf_dev.DamlLf
-import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.domain.ParticipantId
 import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.TransactionMetering
 import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
 import com.digitalasset.canton.platform.store.dao.JdbcLedgerDao
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
+import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
@@ -32,7 +32,7 @@ private[store] object StorageBackendTestValues {
   /** Produces offsets that are ordered the same as the input value */
   def offset(x: Long): Offset = Offset.fromLong(x)
   def ledgerEnd(o: Long, e: Long): ParameterStorageBackend.LedgerEnd =
-    ParameterStorageBackend.LedgerEnd(offset(o), e, 0)
+    ParameterStorageBackend.LedgerEnd(offset(o), e, 0, CantonTimestamp.now())
   def transactionIdFromOffset(x: Offset): Ref.LedgerString =
     Ref.LedgerString.assertFromString(x.toHexString)
 
@@ -294,10 +294,14 @@ private[store] object StorageBackendTestValues {
       recordTime: Timestamp = someTime,
       messageUuid: Option[String] = None,
       transactionId: Option[String] = Some(""),
+      publicationTime: Timestamp = someTime,
+      isTransaction: Boolean = true,
+      requestSequencerCounter: Option[Long] = None,
   ): DbDto.CommandCompletion =
     DbDto.CommandCompletion(
       completion_offset = offset.toHexString,
       record_time = recordTime.micros,
+      publication_time = publicationTime.micros,
       application_id = applicationId,
       submitters = Set(submitter),
       command_id = commandId,
@@ -312,8 +316,8 @@ private[store] object StorageBackendTestValues {
       deduplication_start = deduplicationStart.map(_.micros),
       domain_id = domainId,
       message_uuid = messageUuid,
-      request_sequencer_counter = None,
-      is_transaction = true,
+      request_sequencer_counter = requestSequencerCounter,
+      is_transaction = isTransaction,
       trace_context = traceContext,
     )
 
@@ -323,11 +327,14 @@ private[store] object StorageBackendTestValues {
       event_sequential_id_last: Long,
       recordTime: Timestamp = someTime,
       transactionId: Option[String] = None,
+      domainId: String = someDomainId.toProtoPrimitive,
+      publicationTime: Timestamp = someTime,
   ): DbDto.TransactionMeta = DbDto.TransactionMeta(
     transaction_id = transactionId.getOrElse(transactionIdFromOffset(offset)),
     event_offset = offset.toHexString,
+    publication_time = publicationTime.micros,
     record_time = recordTime.micros,
-    domain_id = someDomainId.toProtoPrimitive,
+    domain_id = domainId,
     event_sequential_id_first = event_sequential_id_first,
     event_sequential_id_last = event_sequential_id_last,
   )
@@ -403,6 +410,7 @@ private[store] object StorageBackendTestValues {
   def metaFromSingle(dbDto: DbDto): DbDto.TransactionMeta = DbDto.TransactionMeta(
     transaction_id = dtoTransactionId(dbDto),
     event_offset = dtoOffset(dbDto),
+    publication_time = someTime.micros,
     record_time = someTime.micros,
     domain_id = someDomainId.toProtoPrimitive,
     event_sequential_id_first = dtoEventSeqId(dbDto),

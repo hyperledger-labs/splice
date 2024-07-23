@@ -16,7 +16,6 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  ParticipantOffset,
   Transaction,
   TransactionTree,
   User,
@@ -896,48 +895,46 @@ class SpliceLedgerConnection(
     val commandId = UUID.randomUUID().toString()
     logger.debug(s"reassignment $commandId is for $command")
 
-    val (ks, completion) = cancelIfFailed(
-      client
-        .completions(applicationId, Seq(submitter), begin = None)
-        .wireTap(csr => logger.trace(s"completions while awaiting reassignment $commandId: $csr"))
-    )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
-      // We call the callbacks for handling stale contract errors here, but wait for the offset
-      // ingestion at which the completion is reported.
-      callCallbacksOnCompletionNoWaitForOffset(
+    ledgerEnd().flatMap { ledgerEnd =>
+      val (ks, completion) = cancelIfFailed(
         client
-          .submitReassignment(
-            applicationId,
-            commandId,
-            submissionId = commandId,
-            submitter,
-            command,
-          )
-          .andThen { _ =>
-            logger.info(
-              s"Submitted reassignment to ledger, waiting for completion: commandId: $commandId"
+          .completions(applicationId, Seq(submitter), begin = ledgerEnd)
+          .wireTap(csr => logger.trace(s"completions while awaiting reassignment $commandId: $csr"))
+      )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
+        // We call the callbacks for handling stale contract errors here, but wait for the offset
+        // ingestion at which the completion is reported.
+        callCallbacksOnCompletionNoWaitForOffset(
+          client
+            .submitReassignment(
+              applicationId,
+              commandId,
+              submissionId = commandId,
+              submitter,
+              command,
             )
-          }
-      )
-    )
-
-    retryProvider
-      .waitUnlessShutdown(completion)
-      .flatMap { case ((offset, _), ()) =>
-        FutureUnlessShutdown.outcomeF(offset match {
-          case absolute: ParticipantOffset.Absolute =>
-            completionOffsetCallback(absolute.getOffset).map(_ => ())
-          case other =>
-            logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
-            Future.unit
-        })
-      }
-      .onShutdown {
-        logger.debug(
-          s"shutting down while awaiting completion of reassignment $commandId; pretending a completion arrived"
+            .andThen { _ =>
+              logger.info(
+                s"Submitted reassignment to ledger, waiting for completion: commandId: $commandId"
+              )
+            }
         )
-        ks.shutdown()
-        ()
-      }
+      )
+
+      retryProvider
+        .waitUnlessShutdown(completion)
+        .flatMap { case ((offset, _), ()) =>
+          FutureUnlessShutdown.outcomeF(
+            completionOffsetCallback(offset).map(_ => ())
+          )
+        }
+        .onShutdown {
+          logger.debug(
+            s"shutting down while awaiting completion of reassignment $commandId; pretending a completion arrived"
+          )
+          ks.shutdown()
+          ()
+        }
+    }
   }
 
   // simulate the completion check of command service; future only yields
@@ -948,7 +945,7 @@ class SpliceLedgerConnection(
   )(implicit
       traceContext: TraceContext
   ): Sink[LedgerClient.CompletionStreamResponse, Future[
-    (ParticipantOffset, LedgerClient.Completion)
+    (String, LedgerClient.Completion)
   ]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
     val howLongToWait = timeouts.network.asFiniteApproximation
@@ -969,7 +966,7 @@ class SpliceLedgerConnection(
       .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
       .toMat(
         Sink
-          .headOption[(ParticipantOffset, LedgerClient.Completion)]
+          .headOption[(String, LedgerClient.Completion)]
           .mapMaterializedValue(_ map (_ map { case result @ (_, completion) =>
             if (completion.status.isOk) result
             else throw completion.status.asRuntimeException()
