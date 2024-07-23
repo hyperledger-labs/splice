@@ -1421,8 +1421,7 @@ commands:
             cd ..
             for i in $(seq 1 5)
             do
-              # Cloning via https and not ssh to allow also pushing from within nix, where we don't have the ssh key
-              git clone "https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
       - setup_sbt_test_job
@@ -3217,27 +3216,11 @@ jobs:
     steps:
       - checkout_with_retry
       - clone_and_update_splice
-      - run:
-          name: Create branch & commit
-          command: |
-            commit=$(git rev-parse --short HEAD)
-            cd ../splice
-            branch="splice-cci-update-$(date +%s)"
-            git config user.email "circleci@circleci.com"
-            git config user.name "CircleCI"
-            git checkout -b "$branch"
-            git add .
-            git commit -m "Update Splice from CCI" --allow-empty
       - run_bash_command_in_nix:
-          cmd_name: Push branch & create PR
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd_name: Push changes to Splice
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
-            commit=$(git rev-parse --short HEAD)
-            date=$(date +%Y-%m-%d)
-            cd ../splice
-            git push origin HEAD
-            gh pr create --title "Update Splice from CCI ($date)" --body "This PR updates Splice from the latest changes as of commit DACH-NY/canton-network-node@$commit" --base main --reviewer isegall-da,cocreature,nicu-da,martinflorian-da,ray-roestenburg-da
-          cmd_retry_count: 5
+            .circleci/create-splice-pr.sh /home/circleci/splice
 
   deploy_operator:
     circleci_ip_ranges: true
@@ -3989,7 +3972,6 @@ workflows:
             - artifactory
             - slack-context
       - create_splice_pr:
-          <<: *main-branch-only
           <<: *notify-fail
           context:
             - artifactory
