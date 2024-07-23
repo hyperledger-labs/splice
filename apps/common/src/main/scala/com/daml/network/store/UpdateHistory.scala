@@ -75,11 +75,12 @@ final class UpdateHistory(
   private[this] def domainMigrationId = domainMigrationInfo.currentMigrationId
 
   private val state = new AtomicReference[State](State.empty())
-  private def historyId: Long =
+  def historyId: Long =
     state
       .get()
       .historyId
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
+  def isReady: Boolean = state.get().historyId.isDefined
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
     new MultiDomainAcsStore.IngestionSink {
@@ -769,13 +770,6 @@ final class UpdateHistory(
           exercises.getOrElse(row.rowId, Seq.empty),
         ) -> row.migrationId
       }
-    }
-  }
-
-  // TODO (#13511): implement or remove placeholder
-  def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
-    queryCreateEvents((1L to 100L).toSeq).map { result =>
-      result.values.flatten.map(_.toCreatedEvent).toSeq
     }
   }
 
