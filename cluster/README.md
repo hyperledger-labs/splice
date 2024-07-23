@@ -114,18 +114,18 @@ The global Canton Network clusters are currently hosted in Google
 Cloud. There are multiple clusters, each with a different purpose, all
 of which are accessible only through VPN:
 
-| Cluster         | URL                                          | Deployment Policy           | Purpose                                |
-|-----------------|----------------------------------------------|-----------------------------|----------------------------------------|
-| TestNet         | http://test.network.canton.global            | Weekly, Midnight UTC Sunday | Longer Running Tests                   |
-| DevNet          | http://dev.network.canton.global             | Weekly, 3AM UTC Monday      | Current, Tested `main`                 |
-| CIDaily         | http://cidaily.network.canton.global         | Nightly, 6AM UTC            | Current, Tested `main`                 |
-| CIMain          | http://cimain.network.canton.global          | After every push to `main`  | Latest `main`                          |
-| CILR            | http://cilr.network.canton.global            | Monthly, on the first       | Test behavior of long running clusters |
-| ScratchNetA     | http://scratcha.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetB     | http://scratchb.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetC     | http://scratchc.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetD     | http://scratchd.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetE     | http://scratche.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+| Cluster         | URL                                                | Deployment Policy           | Purpose                                |
+|-----------------|----------------------------------------------------|-----------------------------|----------------------------------------|
+| TestNet         | http://test.global.canton.network.digitalasset.com | Weekly, Midnight UTC Sunday | Longer Running Tests                   |
+| DevNet          | http://dev.global.canton.network.digitalasset.com  | Weekly, 3AM UTC Monday      | Current, Tested `main`                 |
+| CIDaily         | http://cidaily.network.canton.global               | Nightly, 6AM UTC            | Current, Tested `main`                 |
+| CIMain          | http://cimain.network.canton.global                | After every push to `main`  | Latest `main`                          |
+| CILR            | http://cilr.network.canton.global                  | Monthly, on the first       | Test behavior of long running clusters |
+| ScratchNetA     | http://scratcha.network.canton.global              | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetB     | http://scratchb.network.canton.global              | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetC     | http://scratchc.network.canton.global              | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetD     | http://scratchd.network.canton.global              | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetE     | http://scratche.network.canton.global              | Ad hoc, manual              | Cluster Configuration Development      |
 
 
 The automatic deployments are configured as
@@ -1670,7 +1670,7 @@ You can also access sequencer and mediator:
 Just use `curl`! For example, here is how to get the current SVs (as per the `DsoRules`) from SV1 on DevNet:
 
 ```
-curl https://sv.sv-2.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs'
+curl https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/dso | jq '.dso_rules.payload.svs'
 ```
 
 ### App APIs with authentication
@@ -1693,7 +1693,7 @@ prepare a validator onboarding via SV1's SV API:
 
 ```
 export TOKEN="What you got from Auth0"
-curl -sSL --fail-with-body "https://sv.sv-2.dev.network.canton.global/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+curl -sSL --fail-with-body "https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
 ```
 
 For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,
