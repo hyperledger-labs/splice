@@ -1457,7 +1457,7 @@ The following steps assume that:
 - The cluster is already deployed and is at migration ID 0.
 - We already know that a migration will take place.
 
-See also: [Operating on Production Clusters](./OPERATIONS.md)
+See also: [Operating on Production Clusters](../OPERATIONS.md)
 
 #### Via the Pulumi operator
 
