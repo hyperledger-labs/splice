@@ -1262,8 +1262,7 @@ commands:
             cd ..
             for i in $(seq 1 5)
             do
-              # Cloning via https and not ssh to allow also pushing from within nix, where we don't have the ssh key
-              git clone "https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
       - setup_sbt_test_job

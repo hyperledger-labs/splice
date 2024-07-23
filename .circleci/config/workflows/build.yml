@@ -22,7 +22,6 @@ workflow:
             - artifactory
             - slack-context
       - create_splice_pr:
-          <<: *main-branch-only
           <<: *notify-fail
           context:
             - artifactory
