@@ -124,7 +124,7 @@ const AnsReady: React.FC<AnsProps> = ({ fullEntryName }) => {
         <DoneRounded color="success" style={statusIconStyle} />
         <Typography variant="h5">Thank you for confirming your subscription.</Typography>
         <Typography variant="h5">
-          {fullEntryName} is now registered in the Canton Network.
+          {fullEntryName} is now registered in {config.spliceInstanceNames.networkName}.
         </Typography>
         <YourAnsEntriesButton />
       </Stack>
@@ -134,18 +134,18 @@ const AnsReady: React.FC<AnsProps> = ({ fullEntryName }) => {
 };
 
 const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
-  const isUnverified = fullEntryName.endsWith('.unverified.cns');
+  const nsn = config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase();
+  const isUnverified = fullEntryName.endsWith(`.unverified.${nsn}`);
   if (isUnverified) {
     return (
       <Stack>
         <Typography variant="body1" color="colors.neutral.80">
-          Why <i>unverified</i>.ans?
+          Why <i>unverified</i>.{nsn}?
         </Typography>
         <Typography variant="body1" color="colors.neutral.80">
           There is no verification of a user’s identity for
-          {config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} entry names at this
-          point so entries are required to include ".unverified" in the name to allow for the later
-          addition of verified entries.
+          {nsn.toUpperCase()} entry names at this point so entries are required to include
+          ".unverified" in the name to allow for the later addition of verified entries.
         </Typography>
       </Stack>
     );
@@ -158,7 +158,7 @@ const YourAnsEntriesButton: React.FC = () => {
   return (
     <Link to="/">
       <Button variant="pill" id="ans-entries-button">
-        Go to your CNS Entries
+        Go to your {config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} Entries
       </Button>
     </Link>
   );
