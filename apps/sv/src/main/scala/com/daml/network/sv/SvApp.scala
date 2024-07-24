@@ -398,13 +398,11 @@ class SvApp(
       }
 
       (_, _, isDevNet, _, _, _) <- (
-        // TODO(#5141) Remove the comment about DAR uploads.
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
         // 1. The ValidatorLicense has both the DSO and the SV as a stakeholder.
         //    That can cause problems during the DSO party migration because the contract is imported there
         //    but could also be imported through the stream of the SV party. By only creating the validator user here
         //    we ensure that the party migration has been completed before the contract is created.
-        // 2. Concurrent DAR uploads currently break Canton's topology state management.
         appInitStep("Initialize validator") {
           SvApp.initializeValidator(dsoAutomation, config, retryProvider, logger, clock)
         },

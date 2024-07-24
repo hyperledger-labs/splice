@@ -3,6 +3,7 @@
 
 package com.daml.network.environment
 
+import cats.implicits.catsSyntaxParallelTraverse_
 import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.daml.network.environment.ParticipantAdminConnection.{
   HasParticipantId,
@@ -29,6 +30,7 @@ import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsR
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -380,9 +382,8 @@ class ParticipantAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    pkgs.foldLeft(Future.unit)((previous, dar) =>
-      previous.flatMap(_ => uploadDarFile(dar, retryFor))
+    pkgs.parTraverse_(
+      uploadDarFile(_, retryFor)
     )
 
   def uploadDarFileLocally(

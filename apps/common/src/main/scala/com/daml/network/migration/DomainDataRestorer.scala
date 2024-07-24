@@ -3,15 +3,16 @@
 
 package com.daml.network.migration
 
+import cats.implicits.catsSyntaxParallelTraverse_
 import com.daml.network.environment.{BaseLedgerConnection, ParticipantAdminConnection, RetryFor}
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -89,18 +90,15 @@ class DomainDataRestorer(
   }
 
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {
-    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    MonadUtil
-      .sequentialTraverse(dars.map { dar =>
+    dars
+      .map { dar =>
         UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
-      }) { dar =>
+      }
+      .parTraverse_ { dar =>
         participantAdminConnection.uploadDarFileLocally(
           dar,
           RetryFor.WaitingOnInitDependency,
         )
-      }
-      .map { _ =>
-        ()
       }
   }
 
