@@ -72,8 +72,7 @@ class PackageVetting(
         _ <- DarResources
           .lookupAllPackageVersions(pkg.packageName)
           .filter(_.metadata.version < version)
-          .map(uploadDar(_))
-          .sequence
+          .traverse(uploadDar(_))
       } yield ()
     }
   }

@@ -33,6 +33,8 @@ import ParticipantAdminConnection.{HasParticipantId, IMPORT_ACS_WORKFLOW_ID_PREF
 import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
   */
@@ -416,6 +418,7 @@ class ParticipantAdminConnection(
     runCmd(
       ParticipantAdminCommands.Package.ListDars(limit)
     )
+
   private def uploadDarLocally(
       path: String,
       darFile: => ByteString,
@@ -424,28 +427,27 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
-    for {
-      _ <- retryProvider
-        .ensureThatO(
-          retryFor,
-          "upload_dar_locally",
-          s"DAR file $path with hash $darHash has been uploaded.",
-          lookupDar(darHash).map(_.map(_ => ())),
-          runCmd(
-            ParticipantAdminCommands.Package
-              .UploadDar(
-                Some(path),
-                vetAllPackages = true,
-                synchronizeVetting = false,
-                logger,
-                Some(darFile),
-              )
-          ).map(_ => ()),
-          logger,
-        )
-    } yield ()
+    retryProvider
+      .ensureThatO(
+        retryFor,
+        "upload_dar_locally",
+        s"DAR file $path with hash $darHash has been uploaded.",
+        lookupDar(darHash).map(_.map(_ => ())),
+        runCmd(
+          ParticipantAdminCommands.Package
+            .UploadDar(
+              Some(path),
+              vetAllPackages = true,
+              synchronizeVetting = false,
+              logger,
+              Some(darFile),
+            )
+        ).map(_ => ()),
+        logger,
+      )
   }
 
+  private val inProgressUpload = new AtomicBoolean(false)
   private def uploadDarFileInternal(
       path: String,
       darFile: => ByteString,
@@ -454,8 +456,14 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
-    for {
-      _ <- retryProvider
+    if (!inProgressUpload.compareAndSet(false, true)) {
+      Future.failed(
+        Status.INVALID_ARGUMENT
+          .withDescription("Cannot upload multiple DARs concurrently")
+          .asRuntimeException()
+      )
+    } else {
+      retryProvider
         .ensureThatO(
           retryFor,
           "upload_dar",
@@ -474,7 +482,8 @@ class ParticipantAdminConnection(
           ).map(_ => ()),
           logger,
         )
-    } yield ()
+        .andThen(_ => inProgressUpload.set(false))
+    }
   }
 
   def ensureInitialPartyToParticipant(
