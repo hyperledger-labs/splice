@@ -211,6 +211,9 @@ lazy val docs = project
           log,
           None,
           Some(baseDir),
+          extraEnv = Seq(
+            ("VERSION", version)
+          ),
         )
         org.apache.commons.io.FileUtils.deleteDirectory(outDir / "doctrees")
         Set(outDir)
