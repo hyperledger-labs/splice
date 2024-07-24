@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 60,
+  "id": 1212,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -33,6 +33,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -107,7 +108,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(cn_sequencer_pruning_latency_duration_seconds_sum{namespace=~\"$namespace\"}[$__rate_interval]) / rate(cn_sequencer_pruning_latency_duration_seconds_count{namespace=~\"$namespace\"}[$__rate_interval])",
+          "expr": "histogram_avg(rate(cn_sequencer_pruning_latency_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -128,6 +129,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -178,8 +180,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 8
+        "x": 12,
+        "y": 0
       },
       "id": 1,
       "options": {
@@ -217,8 +219,7 @@
     }
   ],
   "refresh": "",
-  "schemaVersion": 38,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
@@ -263,6 +264,6 @@
   "timezone": "",
   "title": "Sequencer Pruning",
   "uid": "bc8fea13-0bf5-488b-ac31-76e4ec7f4c1f",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1133,
+  "id": 1213,
   "links": [],
   "panels": [
     {
@@ -658,7 +658,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_block_events_total,namespace)",
+        "definition": "label_values(daml_sequencer_block_events_total,namespace)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -666,7 +666,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_block_events_total,namespace)",
+          "query": "label_values(daml_sequencer_block_events_total,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -685,7 +685,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_block_events_total{namespace=\"$namespace\"},job)",
+        "definition": "label_values(daml_sequencer_block_events_total{namespace=\"$namespace\"},job)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -693,7 +693,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_block_events_total{namespace=\"$namespace\"},job)",
+          "query": "label_values(daml_sequencer_block_events_total{namespace=\"$namespace\"},job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -712,6 +712,6 @@
   "timezone": "",
   "title": "Sequencer Traffic",
   "uid": "fdjrxql2alblsd",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

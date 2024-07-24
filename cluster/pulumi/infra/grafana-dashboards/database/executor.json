@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 401,
+  "id": 1181,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -99,7 +99,7 @@
       },
       "gridPos": {
         "h": 15,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 1
       },
@@ -129,7 +129,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -145,7 +145,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -161,7 +161,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_sum{namespace=~\"$namespace\"}[$__rate_interval])) / sum by(le, namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds_count{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum by(namespace, node_name, node_type, component, name, node) (histogram_avg(rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
           "legendFormat": "avg {{namespace}} {{node_name}}{{node}}",
@@ -233,7 +233,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 16
       },
@@ -330,7 +330,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 26
       },
@@ -375,12 +375,12 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
-            "sv-2"
+            "All"
           ],
           "value": [
-            "sv-2"
+            "$__all"
           ]
         },
         "datasource": {
@@ -408,12 +408,10 @@
         "current": {
           "selected": true,
           "text": [
-            "cn",
-            "daml"
+            "cn"
           ],
           "value": [
-            "cn",
-            "daml"
+            "cn"
           ]
         },
         "hide": 0,
@@ -427,7 +425,7 @@
             "value": "cn"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "daml",
             "value": "daml"
           }
@@ -441,12 +439,10 @@
         "current": {
           "selected": true,
           "text": [
-            "general",
-            "write"
+            "general"
           ],
           "value": [
-            "general",
-            "write"
+            "general"
           ]
         },
         "hide": 0,
@@ -460,7 +456,7 @@
             "value": "general"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "write",
             "value": "write"
           },
@@ -485,6 +481,6 @@
   "timezone": "",
   "title": "Executor",
   "uid": "d7498b3f-c5e4-41ba-9fe2-2874aa683f51",
-  "version": 11,
+  "version": 3,
   "weekStart": ""
 }

@@ -18,11 +18,11 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 127,
+  "id": 1208,
   "links": [],
   "panels": [
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -30,115 +30,115 @@
         "y": 0
       },
       "id": 8,
-      "panels": [
+      "panels": [],
+      "title": "Commands",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Submissions currently running",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "submissions"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS}"
           },
-          "description": "Submissions currently running",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "submissions"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 10,
-            "w": 12,
-            "x": 0,
-            "y": 1
-          },
-          "id": 11,
-          "options": {
-            "legend": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true,
-              "sortBy": "Last *",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS}"
-              },
-              "disableTextWrap": false,
-              "editorMode": "code",
-              "expr": "daml_commands_submissions_running{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "interval": "1m",
-              "legendFormat": "{{namespace}} {{job}} {{node}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            }
-          ],
-          "title": "In Flight Commands",
-          "type": "timeseries"
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "daml_participant_api_commands_submissions_running{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "interval": "1m",
+          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Commands",
-      "type": "row"
+      "title": "In Flight Commands",
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -146,7 +146,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 11
       },
       "id": 6,
       "panels": [],
@@ -249,7 +249,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 12
       },
       "id": 3,
       "options": {
@@ -367,7 +367,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 22
       },
       "id": 10,
       "options": {
@@ -473,7 +473,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 22
       },
       "id": 7,
       "options": {
@@ -520,158 +520,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 32
       },
       "id": 5,
       "panels": [],
       "title": "Status",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "daml_max_dirty_requests"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
-              },
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": true,
-                  "tooltip": true,
-                  "viz": false
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 23
-      },
-      "id": 1,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "daml_dirty_requests{namespace=~\"$namespace\", job=~\"$job\", node=~\"$participant\"}",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": true,
-          "legendFormat": "dirty {{namespace}} {{job}} {{node}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "daml_max_dirty_requests{namespace=~\"$namespace\", job=~\"$job\", node=~\"$participant\"}",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "key": "Q-b7751364-9a71-4565-b9a1-f54c8ef371be-1",
-          "legendFormat": "{{namespace}} {{job}} {{node}}",
-          "range": true,
-          "refId": "B",
-          "useBackend": false
-        }
-      ],
-      "title": "Dirty requests",
-      "type": "timeseries"
     },
     {
       "datasource": {
@@ -768,35 +622,19 @@
       {
         "allValue": "",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "multi-validator",
-            "splitwell",
-            "sv",
-            "sv-1",
-            "sv-2",
-            "sv-3",
-            "sv-4",
-            "validator",
-            "validator1"
+            "sv-1"
           ],
           "value": [
-            "multi-validator",
-            "splitwell",
-            "sv",
-            "sv-1",
-            "sv-2",
-            "sv-3",
-            "sv-4",
-            "validator",
-            "validator1"
+            "sv-1"
           ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_dirty_requests,namespace)",
+        "definition": "label_values(daml_health_status{component=\"participant\"},namespace)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
@@ -804,7 +642,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_dirty_requests,namespace)",
+          "query": "label_values(daml_health_status{component=\"participant\"},namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -816,19 +654,19 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "multi-participant-2"
+            "participant-0"
           ],
           "value": [
-            "multi-participant-2"
+            "participant-0"
           ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_dirty_requests{namespace=~\"$namespace\"},job)",
+        "definition": "label_values(daml_health_status{namespace=~\"$namespace\", component=\"participant\"},job)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
@@ -836,7 +674,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_dirty_requests{namespace=~\"$namespace\"},job)",
+          "query": "label_values(daml_health_status{namespace=~\"$namespace\", component=\"participant\"},job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -848,19 +686,19 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "participant_00"
+            "All"
           ],
           "value": [
-            "participant_00"
+            "$__all"
           ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_dirty_requests{namespace=~\"$namespace\", job=~\"$job\"},node)",
+        "definition": "label_values(daml_health_status{namespace=~\"$namespace\", job=~\"$job\"},node)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
@@ -868,7 +706,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_dirty_requests{namespace=~\"$namespace\", job=~\"$job\"},node)",
+          "query": "label_values(daml_health_status{namespace=~\"$namespace\", job=~\"$job\"},node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -887,6 +725,6 @@
   "timezone": "browser",
   "title": "Participant",
   "uid": "edkzo5ukgeqyoc",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }

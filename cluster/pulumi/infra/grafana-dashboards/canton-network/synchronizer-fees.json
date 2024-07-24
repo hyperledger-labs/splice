@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1137,
+  "id": 1215,
   "links": [],
   "panels": [
     {
@@ -509,7 +509,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_traffic_control_event_delivered_cost_total,namespace)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,namespace)",
         "hide": 0,
         "includeAll": false,
         "label": "Namespace",
@@ -518,7 +518,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_traffic_control_event_delivered_cost_total,namespace)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -537,7 +537,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_traffic_control_event_delivered_cost_total,job)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,job)",
         "hide": 0,
         "includeAll": false,
         "label": "Job",
@@ -546,7 +546,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_traffic_control_event_delivered_cost_total,job)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -570,7 +570,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_traffic_control_event_delivered_cost_total,member)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
         "hide": 0,
         "includeAll": true,
         "label": "Member",
@@ -579,7 +579,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_traffic_control_event_delivered_cost_total,member)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -598,6 +598,6 @@
   "timezone": "",
   "title": "Synchronizer Fees",
   "uid": "fdnphvrryfq4gf",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
