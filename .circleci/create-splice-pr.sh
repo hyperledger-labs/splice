@@ -59,7 +59,7 @@ until [ "$n" -ge 5 ]; do
   gh pr create --title "Update Splice from CCI ($date)" \
     --body "This PR updates Splice from the latest changes as of commit DACH-NY/canton-network-node@$commit" \
     --base "$base_branch" \
-    --reviewer isegall-da,cocreature,nicu-da,martinflorian-da,ray-roestenburg-da && break
+    --reviewer isegall-da,moritzkiefer-da,nicu-da,martinflorian-da,ray-roestenburg-da && break
    n=$((n+1))
    sleep 5
 done
@@ -67,4 +67,3 @@ if [ "$n" -ge 5 ]; then
   echo "Failed to create PR"
   exit 1
 fi
-
