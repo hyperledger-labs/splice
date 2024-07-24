@@ -151,10 +151,12 @@ trait SynchronizerFeesTestUtil extends TestCommon {
           Seq(validatorParty),
           Seq(validatorParty),
           executeBatchCmd,
-          disclosedContracts = DisclosedContracts(
-            transferContext.amuletRules,
-            transferContext.latestOpenMiningRound,
-          ).toLedgerApiDisclosedContracts,
+          disclosedContracts = DisclosedContracts
+            .forTesting(
+              transferContext.amuletRules,
+              transferContext.latestOpenMiningRound,
+            )
+            .toLedgerApiDisclosedContracts,
         )
         .exerciseResult
         .outcomes
@@ -202,10 +204,12 @@ trait SynchronizerFeesTestUtil extends TestCommon {
         Seq(buyer),
         cmd,
         None,
-        disclosedContracts = DisclosedContracts(
-          sv1ScanBackend.getAmuletRules(),
-          sv1ScanBackend.getLatestOpenMiningRound(now),
-        ).toLedgerApiDisclosedContracts,
+        disclosedContracts = DisclosedContracts
+          .forTesting(
+            sv1ScanBackend.getAmuletRules(),
+            sv1ScanBackend.getLatestOpenMiningRound(now),
+          )
+          .toLedgerApiDisclosedContracts,
       )
     result.exerciseResult.buyTrafficRequest
   }

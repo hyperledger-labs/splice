@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   SpliceLedgerClient,
+  SpliceLedgerConnection,
   HttpAppConnection,
   PackageIdResolver,
   RetryFor,
@@ -136,7 +137,8 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
     } yield openRound
   }
 
-  def getAppTransferContext(providerPartyId: PartyId)(implicit
+  def getAppTransferContext(ledgerConnection: SpliceLedgerConnection, providerPartyId: PartyId)(
+      implicit
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -153,12 +155,16 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
           openMiningRound.contractId,
           featured.map(_.contractId).toJava,
         ),
-        DisclosedContracts(amuletRules, openMiningRound),
+        ledgerConnection.disclosedContracts(amuletRules, openMiningRound),
       )
     }
   }
 
-  def getAppTransferContextForRound(providerPartyId: PartyId, round: Round)(implicit
+  def getAppTransferContextForRound(
+      ledgerConnection: SpliceLedgerConnection,
+      providerPartyId: PartyId,
+      round: Round,
+  )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -179,7 +185,7 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
                 openMiningRound.contractId,
                 featured.map(_.contractId).toJava,
               ),
-              DisclosedContracts(amuletRules, openMiningRound),
+              ledgerConnection.disclosedContracts(amuletRules, openMiningRound),
             )
           )
         case None => Left("round is not an open mining round")

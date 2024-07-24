@@ -275,7 +275,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val tc =
       sv1ScanBackend.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = signatories,
@@ -300,7 +300,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -328,7 +328,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val tc =
       sv1ScanBackend.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands
       .submitWithResult(
         userId = userId,
@@ -354,7 +354,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -380,7 +380,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now, Some(payment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, senderParty),
@@ -404,7 +404,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts.forTesting(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -770,7 +770,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       entryDescription,
       userParty.toProtoPrimitive,
     )
-    val disclosure = DisclosedContracts(ansRules)
+    val disclosure = DisclosedContracts.forTesting(ansRules)
 
     clue("request a ans entry from ansRules contract") {
       val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
@@ -1024,7 +1024,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(refs.userParty),
         readAs = Seq.empty,
         update = cmd,
-        disclosedContracts = DisclosedContracts(ansRules).toLedgerApiDisclosedContracts,
+        disclosedContracts = DisclosedContracts.forTesting(ansRules).toLedgerApiDisclosedContracts,
       )
       .exerciseResult
       .requestCid
@@ -1176,7 +1176,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           .asScala
           .toSeq,
         disclosedContracts =
-          DisclosedContracts(amuletRules, openRound).toLedgerApiDisclosedContracts,
+          DisclosedContracts.forTesting(amuletRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
 }

@@ -6,6 +6,7 @@ package com.daml.network.util
 import cats.syntax.traverse.*
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.topology.DomainId
 import com.daml.network.http.v0.definitions
@@ -54,5 +55,22 @@ object ContractWithState {
       )
       state <- maybeCached.domainId.traverse(d => DomainId fromString d map Assigned)
     } yield ContractWithState(contract, state getOrElse InFlight)
+  }
+
+  def fromHttp[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
+  )(http: definitions.ContractWithState)(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[ProtoDeserializationError, ContractWithState[TCid, T]] = {
+    for {
+      contract <- Contract.fromHttp(companion)(http.contract)
+      state <- http.domainId
+        .traverse(d => DomainId.fromString(d).map(ContractState.Assigned))
+        .left
+        .map(err => ProtoDeserializationError.ValueConversionError("domainId", err))
+    } yield ContractWithState(
+      contract,
+      state.getOrElse(ContractState.InFlight),
+    )
   }
 }

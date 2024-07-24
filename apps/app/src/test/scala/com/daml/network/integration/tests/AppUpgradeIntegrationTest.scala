@@ -326,7 +326,7 @@ class AppUpgradeIntegrationTest
             "Old and new amulet get merged together into a new amulet",
             _ => {
               val amulet = bobWalletClient.list().amulets.loneElement.contract
-              amulet.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
+              amulet.contract.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
               BigDecimal(amulet.payload.amount.initialAmount) should beWithin(
                 walletUsdToAmulet(30 - smallAmount),
                 walletUsdToAmulet(30),

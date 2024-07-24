@@ -551,7 +551,7 @@ components:
         - effective_amount
       properties:
         contract:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
         round:
           type: integer
           format: int64

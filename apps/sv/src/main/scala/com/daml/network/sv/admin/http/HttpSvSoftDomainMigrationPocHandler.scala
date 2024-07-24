@@ -177,7 +177,8 @@ class HttpSvSoftDomainMigrationPocHandler(
         )
         domainParameters = DomainParametersState(
           domainId,
-          parameters.mapping.parameters,
+          // TODO(#13715) Support traffic management
+          parameters.mapping.parameters.tryUpdate(trafficControlParameters = None),
         )
         sequencerDomainState = SequencerDomainState
           .create(

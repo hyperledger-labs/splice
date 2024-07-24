@@ -6,7 +6,7 @@ package com.daml.network.wallet.admin.http
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Update}
 import com.daml.network.environment.SpliceLedgerConnection.CommandId
-import com.daml.network.environment.CommandPriority
+import com.daml.network.environment.{CommandPriority, SpliceLedgerConnection}
 import com.daml.network.environment.ledger.api.DedupConfig
 import com.daml.network.util.{Contract, DisclosedContracts}
 import com.daml.network.http.v0.definitions as d0
@@ -74,7 +74,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
   )(
       user: String,
       dedup: Option[(CommandId, DedupConfig)] = None,
-      dislosedContracts: DisclosedContracts = DisclosedContracts(),
+      dislosedContracts: SpliceLedgerConnection => DisclosedContracts = _ => DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Response] = {
     for {
@@ -89,7 +89,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
         case None =>
           userWallet.connection
             .submit(Seq(validatorParty), Seq(userParty), update, priority = priority)
-            .withDisclosedContracts(dislosedContracts)
+            .withDisclosedContracts(dislosedContracts(userWallet.connection))
             .noDedup
             .yieldResult()
         case Some((commandId, dedupConfig)) =>
@@ -101,7 +101,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
               priority = priority,
             )
             .withDedup(commandId, dedupConfig)
-            .withDisclosedContracts(dislosedContracts)
+            .withDisclosedContracts(dislosedContracts(userWallet.connection))
             .yieldResult()
       }
     } yield result

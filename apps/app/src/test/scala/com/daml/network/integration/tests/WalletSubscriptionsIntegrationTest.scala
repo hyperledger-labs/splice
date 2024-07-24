@@ -150,10 +150,12 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand,
-                disclosedContracts = DisclosedContracts(
-                  transferContext.amuletRules,
-                  roundContract,
-                ).toLedgerApiDisclosedContracts,
+                disclosedContracts = DisclosedContracts
+                  .forTesting(
+                    transferContext.amuletRules,
+                    roundContract,
+                  )
+                  .toLedgerApiDisclosedContracts,
               )
           },
         )(
@@ -195,10 +197,12 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand2,
-                disclosedContracts = DisclosedContracts(
-                  transferContext.amuletRules,
-                  roundContract,
-                ).toLedgerApiDisclosedContracts,
+                disclosedContracts = DisclosedContracts
+                  .forTesting(
+                    transferContext.amuletRules,
+                    roundContract,
+                  )
+                  .toLedgerApiDisclosedContracts,
               )
           },
         )(

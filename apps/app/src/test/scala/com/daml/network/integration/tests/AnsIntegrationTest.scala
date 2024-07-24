@@ -290,7 +290,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
               actAs = Seq(aliceUserParty),
               readAs = Seq.empty,
               update = cmd,
-              disclosedContracts = DisclosedContracts(ansRules).toLedgerApiDisclosedContracts,
+              disclosedContracts =
+                DisclosedContracts.forTesting(ansRules).toLedgerApiDisclosedContracts,
             )
             .exerciseResult
             .requestCid
@@ -364,7 +365,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
               actAs = Seq(aliceUserParty),
               readAs = Seq.empty,
               update = cmd,
-              disclosedContracts = DisclosedContracts(ansRules).toLedgerApiDisclosedContracts,
+              disclosedContracts =
+                DisclosedContracts.forTesting(ansRules).toLedgerApiDisclosedContracts,
             )
             .exerciseResult
             .requestCid

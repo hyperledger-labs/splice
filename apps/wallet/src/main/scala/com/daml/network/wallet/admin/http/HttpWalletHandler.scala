@@ -27,7 +27,7 @@ import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
-import com.daml.network.util.{SpliceUtil, Codec, Contract, DisclosedContracts}
+import com.daml.network.util.{SpliceUtil, Codec, ContractWithState}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
@@ -91,8 +91,8 @@ class HttpWalletHandler(
         )
       } yield r0.ListResponseOK(
         d0.ListResponse(
-          amulets.map(c => amuletToAmuletPosition(c.contract, currentRound)).toVector,
-          lockedAmulets.map(c => lockedAmuletToAmuletPosition(c.contract, currentRound)).toVector,
+          amulets.map(c => amuletToAmuletPosition(c, currentRound)).toVector,
+          lockedAmulets.map(c => lockedAmuletToAmuletPosition(c, currentRound)).toVector,
         )
       )
     }
@@ -292,7 +292,7 @@ class HttpWalletHandler(
               )
               .map(_.exerciseResult.featuredAppRight)
           )
-        )(user, dislosedContracts = DisclosedContracts(amuletRules))
+        )(user, dislosedContracts = _.disclosedContracts(amuletRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
   }
@@ -648,7 +648,7 @@ class HttpWalletHandler(
   }
 
   private def amuletToAmuletPosition(
-      amulet: Contract[Amulet.ContractId, Amulet],
+      amulet: ContractWithState[Amulet.ContractId, Amulet],
       round: Long,
   )(implicit errorLoggingContext: ErrorLoggingContext): d0.AmuletPosition = {
     d0.AmuletPosition(
@@ -660,7 +660,7 @@ class HttpWalletHandler(
   }
 
   private def lockedAmuletToAmuletPosition(
-      lockedAmulet: Contract[LockedAmulet.ContractId, LockedAmulet],
+      lockedAmulet: ContractWithState[LockedAmulet.ContractId, LockedAmulet],
       round: Long,
   )(implicit errorLoggingContext: ErrorLoggingContext): d0.AmuletPosition =
     d0.AmuletPosition(

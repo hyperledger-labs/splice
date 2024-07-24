@@ -101,7 +101,7 @@ trait TimeTestUtil extends TestCommon {
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
 
-    val disclosure = DisclosedContracts(amuletRules, openRound)
+    val disclosure = DisclosedContracts.forTesting(amuletRules, openRound)
 
     userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       applicationId = userId,

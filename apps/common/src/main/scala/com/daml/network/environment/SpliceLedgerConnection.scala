@@ -31,7 +31,7 @@ import com.daml.network.environment.ledger.api.{
   NoDedup,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.{AssignedContract, Contract, DisclosedContracts}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, DisclosedContracts}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -607,6 +607,13 @@ class SpliceLedgerConnection(
 
   private[this] def timeouts = retryProvider.timeouts
 
+  def disclosedContracts(
+      arg: ContractWithState[?, ?],
+      args: ContractWithState[?, ?]*
+  ): DisclosedContracts.NE = {
+    DisclosedContracts(inactiveContractCallbacks.get(), arg, args*)
+  }
+
   def trafficBalanceService: Option[TrafficBalanceService] = trafficBalanceServiceO.get()
 
   private def callCallbacksOnCompletion[T, U](
@@ -852,14 +859,14 @@ class SpliceLedgerConnection(
           def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
             callCallbacksOnCompletionAndWaitForOffset(
               client.submitAndWait(
-                domainId = domainId.toProtoPrimitive,
+                domainId = disclosedContracts.overwriteDomain(domainId).toProtoPrimitive,
                 applicationId = applicationId,
                 commandId = commandId,
                 deduplicationConfig = deduplicationConfig,
                 actAs = actAs.map(_.toProtoPrimitive),
                 readAs = readAs.map(_.toProtoPrimitive),
                 commands = commands,
-                disclosedContracts = disclosedContracts assertOnDomain domainId,
+                disclosedContracts = disclosedContracts,
                 waitFor = waitFor,
                 deadline = deadline,
               )

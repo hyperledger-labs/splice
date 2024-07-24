@@ -36,6 +36,11 @@ sealed abstract class DisclosedContracts {
   @throws[Ex]
   private[network] def inferDomain(ifExpected: Option[DomainId]): Option[DomainId]
 
+  /** Overwrite the domain id with the domain id of the disclosed contracts as those cannot be reassigned.
+    */
+  // TODO(#13713) Remove this once our domain selection logic works properly with soft domain migrations
+  private[network] def overwriteDomain(target: DomainId): DomainId
+
   /** Throw if any contracts with known state are not assigned to `domainId`.
     */
   @throws[Ex]
@@ -54,18 +59,33 @@ object DisclosedContracts {
   def apply(): Empty.type = Empty
 
   @throws[Ex]
-  def apply(arg: ContractWithState[?, ?], args: ContractWithState[?, ?]*): NE = {
+  def apply(
+      callbacks: Seq[String => Unit],
+      arg: ContractWithState[?, ?],
+      args: ContractWithState[?, ?]*
+  ): NE = {
     val contracts = arg +-: args
     contracts.map(_.state).toSet match {
       case Singleton(ContractState.Assigned(onlyDomain)) =>
         NE(contracts.map(_.contract), onlyDomain)
       case variousStates =>
-        // TODO (#8135) invalidate contracts
+        // We expect there to be background automation that ensures that
+        // all disclosed contracts are eventually on the same domain.
+        // We thus invalidate all caches so that the disclosed contracts get re-fetched.
+        contracts.foreach { c =>
+          callbacks.foreach(f => f(c.contractId.contractId))
+        }
         retryableError(
           show"contracts must be assigned to a single domain to be disclosed, not $variousStates: $contracts"
         )
     }
   }
+
+  // This should only be used for testing, otherwise use SpliceLedgerConnection.disclosedContracts
+  // which does the right cache invalidation.
+  @throws[Ex]
+  def forTesting(arg: ContractWithState[?, ?], args: ContractWithState[?, ?]*): NE =
+    DisclosedContracts(Seq.empty, arg, args*)
 
   private type Ex = StatusRuntimeException
 
@@ -76,6 +96,8 @@ object DisclosedContracts {
   case object Empty extends DisclosedContracts {
     private[network] override def inferDomain(ifExpected: Option[DomainId]): ifExpected.type =
       ifExpected
+
+    private[network] override def overwriteDomain(target: DomainId) = target
   }
 
   final case class NE(
@@ -89,6 +111,8 @@ object DisclosedContracts {
           it
         case None => Some(assignedDomain)
       }
+
+    private[network] override def overwriteDomain(target: DomainId) = assignedDomain
 
     @throws[Ex]
     def addAll(other: Seq[ContractWithState[?, ?]]): NE = {

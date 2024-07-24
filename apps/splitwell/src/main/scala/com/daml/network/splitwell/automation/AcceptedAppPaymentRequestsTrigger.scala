@@ -65,7 +65,7 @@ class AcceptedAppPaymentRequestsTrigger(
     }
     for {
       transferContextE <- scanConnection
-        .getAppTransferContextForRound(store.key.providerParty, round)
+        .getAppTransferContextForRound(connection, store.key.providerParty, round)
       result <- transferContextE match {
         case Right((transferContext, disclosedContracts)) =>
           for {
@@ -94,7 +94,7 @@ class AcceptedAppPaymentRequestsTrigger(
           } yield TaskSuccess("accepted payment and completed transfer")
         case Left(err) =>
           scanConnection
-            .getAppTransferContext(store.key.providerParty)
+            .getAppTransferContext(connection, store.key.providerParty)
             .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",

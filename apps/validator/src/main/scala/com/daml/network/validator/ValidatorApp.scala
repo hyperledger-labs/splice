@@ -660,6 +660,7 @@ class ValidatorApp(
               validatorTopupConfig,
               config.walletSweep,
               config.autoAcceptTransfers,
+              config.supportsSoftDomainMigrationPoc,
             )
           )
         else {

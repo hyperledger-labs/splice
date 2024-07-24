@@ -50,6 +50,12 @@ private[onboarding] object SetupUtil {
       RetryFor.WaitingOnInitDependency,
     )
 
+  // We just need readAs for command submissions since they always act as
+  // the SV party but reassignments for contracts with only the DSO as a stakeholder
+  // require actAs.
+  // The PartyToParticipant topology mapping will still prevent any command submission
+  // that tries to actAs=DSO if there is > 1 SV. This is tested in
+  // https://github.com/DACH-NY/canton-network-node/blob/96268016b57344c70e54133a97998a73245aa6b0/apps/app/src/test/scala/com/daml/network/integration/tests/SvOnboardingAddlIntegrationTest.scala#L350
   def grantSvUserRightActAsDso(
       connection: SpliceLedgerConnection,
       user: String,

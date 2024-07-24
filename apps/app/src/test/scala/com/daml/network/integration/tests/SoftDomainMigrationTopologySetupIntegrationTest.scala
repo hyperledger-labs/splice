@@ -13,7 +13,7 @@ import com.daml.network.scan.config.ScanSynchronizerConfig
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
-import com.daml.network.util.{Codec, ConfigScheduleUtil}
+import com.daml.network.util.{Codec, ConfigScheduleUtil, WalletTestUtil}
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -28,7 +28,11 @@ import scala.jdk.OptionConverters.*
 
 class SoftDomainMigrationTopologySetupIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil {
+    with ConfigScheduleUtil
+    with WalletTestUtil {
+
+  // Does not currently handle multiple synchronizers.
+  override def runUpdateHistorySanityCheck = false
 
   override def environmentDefinition =
     EnvironmentDefinition
@@ -38,7 +42,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       )
       .withAllocatedUsers()
       .withInitializedNodes()
-      .withTrafficTopupsEnabled
+      // TODO(#13715) Reenable this
+      .withTrafficTopupsDisabled
       .addConfigTransformsToFront(
         (_, conf) =>
           ConfigTransforms.updateAllSvAppConfigs_ { conf =>
@@ -68,8 +73,10 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             )
           }(conf),
         (_, conf) =>
-          ConfigTransforms.updateAllValidatorAppConfigs_(
-            _.copy(supportsSoftDomainMigrationPoc = true)
+          ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+            c.copy(
+              supportsSoftDomainMigrationPoc = true
+            )
           )(conf),
         (_, conf) =>
           ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
@@ -79,6 +86,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       )
 
   "SVs can bootstrap new domain" in { implicit env =>
+    val (_, bob) = onboardAliceAndBob()
     env.scans.local should have size 4
     val prefix = "global-domain-new"
     eventually() {
@@ -87,7 +95,6 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
       ) should have size 4
     }
-
     // Enough time that the voting flow can go through
     val scheduledTime = env.environment.clock.now.plus(java.time.Duration.ofSeconds(30)).toInstant
     val amuletConfig =
@@ -110,6 +117,9 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
       )
+
+    // tap before the migration
+    aliceWalletClient.tap(100)
 
     val (_, voteRequest) = actAndCheck(
       "Creating vote request",
@@ -235,6 +245,29 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       }
       forAll(issuingRounds) { round =>
         round.state shouldBe ContractState.Assigned(newDomainId)
+      }
+    }
+
+    p2pTransfer(
+      aliceWalletClient,
+      bobWalletClient,
+      bob,
+      42.0,
+    )
+
+    val aliceAmulets = aliceWalletClient.list().amulets
+    aliceAmulets should not be empty
+    forAll(aliceAmulets) {
+      _.contract.state shouldBe ContractState.Assigned(newDomainId)
+    }
+
+    // Eventually to allow merging to also reassign
+    // any other contracts.
+    eventually() {
+      val bobAmulets = bobWalletClient.list().amulets
+      bobAmulets should not be empty
+      forAll(bobAmulets) {
+        _.contract.state shouldBe ContractState.Assigned(newDomainId)
       }
     }
   }

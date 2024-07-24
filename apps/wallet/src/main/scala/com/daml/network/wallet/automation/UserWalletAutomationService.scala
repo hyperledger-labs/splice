@@ -36,6 +36,7 @@ class UserWalletAutomationService(
     ledgerClient: SpliceLedgerClient,
     decentralizedSynchronizer: GetTargetDomain,
     automationConfig: AutomationConfig,
+    supportsSoftDomainMigrationPoc: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
@@ -111,22 +112,24 @@ class UserWalletAutomationService(
 
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
 
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      store,
-      connection,
-      store.key.endUserParty,
-      implicit tc =>
-        scanConnection.getAmuletRulesWithState() flatMap { amuletRules =>
-          amuletRules.toAssignedContract map { amuletRules =>
-            store
-              .listLaggingAmuletRulesFollowers(amuletRules.domain)
-              .map(_ map (FollowTask(amuletRules, _)))
-          } getOrElse Future.successful(Seq.empty)
-        },
+  if (!supportsSoftDomainMigrationPoc) {
+    registerTrigger(
+      new TransferFollowTrigger(
+        triggerContext,
+        store,
+        connection,
+        store.key.endUserParty,
+        implicit tc =>
+          scanConnection.getAmuletRulesWithState() flatMap { amuletRules =>
+            amuletRules.toAssignedContract map { amuletRules =>
+              store
+                .listLaggingAmuletRulesFollowers(amuletRules.domain)
+                .map(_ map (FollowTask(amuletRules, _)))
+            } getOrElse Future.successful(Seq.empty)
+          },
+      )
     )
-  )
+  }
 
   walletSweep.foreach { config =>
     registerTrigger(

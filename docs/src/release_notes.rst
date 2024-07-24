@@ -21,6 +21,11 @@ Upcoming
 
    * You can turn off this behavior for each component by adding the following env variable in the `additionalEnvVars` helm values: `ADDITIONAL_CONFIG_DISABLE_NATIVE_HISTOGRAMS="canton.monitoring.metrics.histograms=[]"`
 
+* Wallet API
+
+  * The ``list`` API in ``wallet-internal.yaml`` now exposes contracts
+    as ``ContractWithState`` instead of just as a ``Contract``.
+
 0.1.16
 ------
 

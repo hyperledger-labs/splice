@@ -54,6 +54,7 @@ class UserWalletManager(
     validatorTopupConfig: ValidatorTopupConfig,
     walletSweep: Map[String, WalletSweepConfig],
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
+    supportsSoftDomainMigrationPoc: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -226,6 +227,7 @@ class UserWalletManager(
       // TODO(#12554): make it easier to configure the sweep functionality and guard better against operator errors (typos, etc.)
       walletSweep.get(endUserParty.toProtoPrimitive),
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
+      supportsSoftDomainMigrationPoc,
     )
     (userRetryProvider, walletService)
   }

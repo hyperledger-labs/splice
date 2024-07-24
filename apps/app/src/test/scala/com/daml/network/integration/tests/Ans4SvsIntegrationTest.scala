@@ -57,7 +57,8 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
               actAs = Seq(aliceUserParty),
               readAs = Seq.empty,
               update = cmd,
-              disclosedContracts = DisclosedContracts(ansRules).toLedgerApiDisclosedContracts,
+              disclosedContracts =
+                DisclosedContracts.forTesting(ansRules).toLedgerApiDisclosedContracts,
             )
             .exerciseResult
             .requestCid

@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority}
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.util.{AssignedContract, ContractWithState, DisclosedContracts}
+import com.daml.network.util.{AssignedContract, ContractWithState}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
@@ -114,7 +114,7 @@ class ReceiveFaucetCouponTrigger(
           priority = commandPriority,
         )
         .noDedup
-        .withDisclosedContracts(DisclosedContracts(unclaimedRound))
+        .withDisclosedContracts(spliceLedgerConnection.disclosedContracts(unclaimedRound))
         .yieldUnit()
         .map(_ =>
           TaskSuccess(s"Received faucet coupon for Round ${unclaimedRound.payload.round.number}")

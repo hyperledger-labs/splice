@@ -61,14 +61,17 @@ object HttpWalletAppClient {
   }
 
   final case class AmuletPosition(
-      contract: Contract[amuletCodegen.Amulet.ContractId, amuletCodegen.Amulet],
+      contract: ContractWithState[amuletCodegen.Amulet.ContractId, amuletCodegen.Amulet],
       round: Long,
       accruedHoldingFee: BigDecimal,
       effectiveAmount: BigDecimal,
   )
 
   final case class LockedAmuletPosition(
-      contract: Contract[amuletCodegen.LockedAmulet.ContractId, amuletCodegen.LockedAmulet],
+      contract: ContractWithState[
+        amuletCodegen.LockedAmulet.ContractId,
+        amuletCodegen.LockedAmulet,
+      ],
       round: Long,
       accruedHoldingFee: BigDecimal,
       effectiveAmount: BigDecimal,
@@ -148,7 +151,7 @@ object HttpWalletAppClient {
     ) = { case http.ListResponse.OK(response) =>
       def decodePositions(position: definitions.AmuletPosition) =
         for {
-          contract <- Contract
+          contract <- ContractWithState
             .fromHttp(amuletCodegen.Amulet.COMPANION)(position.contract)
             .leftMap(_.toString)
 
@@ -165,7 +168,7 @@ object HttpWalletAppClient {
 
       def decodeLockedPositions(lockedPosition: definitions.AmuletPosition) =
         for {
-          contract <- Contract
+          contract <- ContractWithState
             .fromHttp(amuletCodegen.LockedAmulet.COMPANION)(lockedPosition.contract)
             .leftMap(_.toString)
 

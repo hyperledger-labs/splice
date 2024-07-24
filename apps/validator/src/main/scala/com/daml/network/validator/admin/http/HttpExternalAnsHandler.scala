@@ -8,7 +8,6 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.external.ans.AnsResource as r0
 import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.util.DisclosedContracts
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -75,7 +74,7 @@ class HttpExternalAnsHandler(
           )
           res <- connection
             .submit(Seq(partyId), Seq(partyId), update)
-            .withDisclosedContracts(DisclosedContracts(ansRules))
+            .withDisclosedContracts(connection.disclosedContracts(ansRules))
             .noDedup
             .yieldResult()
         } yield res,
