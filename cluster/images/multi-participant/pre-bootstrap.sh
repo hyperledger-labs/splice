@@ -76,7 +76,6 @@ canton.participants.participant_$index = {
     }
 
     parameters {
-        dev-version-support = yes
         # tune the synchronisation protocols contract store cache
         caching {
             contract-store {
