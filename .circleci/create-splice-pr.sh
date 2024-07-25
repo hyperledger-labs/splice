@@ -27,6 +27,7 @@ fi
 splice_dir=$1
 
 commit=$(git rev-parse --short HEAD)
+version=$(get-snapshot-version)
 
 cd "$splice_dir"
 
@@ -51,13 +52,12 @@ git checkout -b "$branch"
 git add .
 git commit -m "Update Splice from CCI" --allow-empty
 
-date=$(date +%Y-%m-%d)
 push_with_retries
 
 n=0
 until [ "$n" -ge 5 ]; do
-  gh pr create --title "Update Splice from CCI ($date)" \
-    --body "This PR updates Splice from the latest changes as of commit DACH-NY/canton-network-node@$commit" \
+  gh pr create --title "Update Splice to version $version (automatic PR)" \
+    --body "This PR updates Splice from the latest changes as of version $version, commit DACH-NY/canton-network-node@$commit" \
     --base "$base_branch" \
     --reviewer isegall-da,moritzkiefer-da,nicu-da,martinflorian-da,ray-roestenburg-da && break
    n=$((n+1))
