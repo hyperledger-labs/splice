@@ -7,7 +7,7 @@ workflow:
           filters:
             branches:
               only:
-                - release-line-0.1.15
+                - /release-line-.*/
           include_splitwell: false
           include_validator1: false
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
