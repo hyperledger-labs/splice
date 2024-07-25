@@ -62,6 +62,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*")
 -(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients")
 -(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"channel.*shutdown did not complete gracefully in allotted")
+-(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message")
 -(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
