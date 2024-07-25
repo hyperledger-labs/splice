@@ -18,7 +18,7 @@ import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.store.MultiDomainAcsStore.ConstrainedTemplate
-import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -60,6 +60,7 @@ class SvDsoAutomationService(
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
     localSynchronizerNode: Option[LocalSynchronizerNode],
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     upgradesConfig: UpgradesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -355,6 +356,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
+        extraSynchronizerNodes,
         config.trafficBalanceReconciliationDelay,
       )
     )

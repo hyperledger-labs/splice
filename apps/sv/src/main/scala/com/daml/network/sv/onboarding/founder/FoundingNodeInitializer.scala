@@ -22,7 +22,7 @@ import com.daml.network.store.{
   DomainUnpausedSynchronization,
 }
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
@@ -80,6 +80,7 @@ import scala.jdk.CollectionConverters.*
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
     localSynchronizerNode: LocalSynchronizerNode,
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     foundingConfig: SvOnboardingConfig.FoundDso,
     requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
@@ -220,6 +221,7 @@ class FoundingNodeInitializer(
         svStore,
         dsoStore,
         Some(localSynchronizerNode),
+        extraSynchronizerNodes,
         upgradesConfig,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)

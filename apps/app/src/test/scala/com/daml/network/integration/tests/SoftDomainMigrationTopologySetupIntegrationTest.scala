@@ -16,6 +16,7 @@ import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
 import com.daml.network.util.{Codec, ConfigScheduleUtil, WalletTestUtil}
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -42,8 +43,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       )
       .withAllocatedUsers()
       .withInitializedNodes()
-      // TODO(#13715) Reenable this
-      .withTrafficTopupsDisabled
+      .withTrafficTopupsEnabled
       .addConfigTransformsToFront(
         (_, conf) =>
           ConfigTransforms.updateAllSvAppConfigs_ { conf =>
@@ -268,6 +268,14 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       bobAmulets should not be empty
       forAll(bobAmulets) {
         _.contract.state shouldBe ContractState.Assigned(newDomainId)
+      }
+    }
+
+    clue("Alice validator tops up its traffic on new domain") {
+      eventually() {
+        aliceValidatorBackend.participantClient.traffic_control
+          .traffic_state(newDomainId)
+          .extraTrafficPurchased shouldBe >(NonNegativeLong.zero)
       }
     }
   }

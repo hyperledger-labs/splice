@@ -21,7 +21,7 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
 import com.daml.network.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
@@ -57,6 +57,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
     localSynchronizerNode: LocalSynchronizerNode,
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
     cometBftConfig: Option[CometBftConfig],
@@ -184,6 +185,7 @@ class DomainMigrationInitializer(
           retryProvider,
           newCometBftNode,
           Some(localSynchronizerNode),
+          extraSynchronizerNodes,
           upgradesConfig,
           loggerFactory,
         )

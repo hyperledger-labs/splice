@@ -11,6 +11,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.SequencerAdminConnection
+import com.daml.network.sv.ExtraSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -33,6 +34,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     ec: ExecutionContext,
@@ -61,6 +63,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         },
         memberId => {
           val domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
+          val sequencerAdminConnection = getSequencerAdminConnection(domainId)
           sequencerAdminConnection.getStatus
             .map(_.successOption.map(_.domainId))
             .flatMap {
@@ -96,7 +99,12 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                         rulesAndStates.dsoRules.payload.initialTrafficState.asScala
                           .get(memberId.toProtoPrimitive)
                           .fold(0L)(_.consumedTraffic)
-                      reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)
+                      reconcileExtraTrafficLimitForMember(
+                        memberId,
+                        domainId,
+                        trafficLimitOffset,
+                        sequencerAdminConnection,
+                      )
                     }
                   })
             }
@@ -108,6 +116,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       memberId: Member,
       domainId: DomainId,
       trafficLimitOffset: Long,
+      sequencerAdminConnection: SequencerAdminConnection,
   )(implicit tc: TraceContext): Future[TaskSuccess] = {
     sequencerAdminConnection.lookupSequencerTrafficControlState(memberId).flatMap {
       case None =>
@@ -154,10 +163,16 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
     }
   }
 
-  private def sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
+  // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
+  def getSequencerAdminConnection[T](domainId: DomainId) =
+    extraSynchronizerNodes.get(domainId.uid.identifier.str) match {
+      case Some(synchronizer) => synchronizer.sequencerAdminConnection
+      case None => primarySequencerAdminConnection
+    }
+
+  private def primarySequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
     throw Status.FAILED_PRECONDITION
       .withDescription("No sequencer admin connection configured for SV App")
       .asRuntimeException()
   )
-
 }

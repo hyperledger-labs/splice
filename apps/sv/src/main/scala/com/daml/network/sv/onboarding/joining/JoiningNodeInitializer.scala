@@ -40,7 +40,7 @@ import com.daml.network.sv.onboarding.{
 }
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -63,6 +63,7 @@ import scala.jdk.CollectionConverters.*
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
     localSynchronizerNode: Option[LocalSynchronizerNode],
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
     requiredDars: Seq[UploadablePackage],
@@ -202,6 +203,7 @@ class JoiningNodeInitializer(
                 svStore,
                 dsoStore,
                 localSynchronizerNode,
+                extraSynchronizerNodes,
                 upgradesConfig,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -649,6 +651,7 @@ class JoiningNodeInitializer(
                   svStore,
                   dsoStore,
                   localSynchronizerNode,
+                  extraSynchronizerNodes,
                   upgradesConfig,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(

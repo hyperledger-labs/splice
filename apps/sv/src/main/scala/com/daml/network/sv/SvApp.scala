@@ -208,16 +208,27 @@ class SvApp(
           retryProvider,
         )
       )
+    val extraSynchronizerNodes = config.synchronizerNodes.view.mapValues { c =>
+      ExtraSynchronizerNode.fromConfig(
+        c,
+        amuletAppParameters.loggingConfig.api,
+        loggerFactory,
+        metrics.grpcClientMetrics,
+        retryProvider,
+      )
+    }.toMap
     initialize(
       participantAdminConnection,
       ledgerClient,
       localSynchronizerNode,
+      extraSynchronizerNodes,
     )
       .recoverWith { case err =>
         // TODO(#3474) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
         localSynchronizerNode.foreach(_.close())
+        extraSynchronizerNodes.values.foreach(_.close())
         Future.failed(err)
       }
   }
@@ -226,6 +237,7 @@ class SvApp(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: SpliceLedgerClient,
       localSynchronizerNode: Option[LocalSynchronizerNode],
+      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
 
@@ -274,6 +286,7 @@ class SvApp(
       ) =>
         new JoiningNodeInitializer(
           localSynchronizerNode,
+          extraSynchronizerNodes,
           joiningConfig,
           participantId,
           Seq.empty, // A joining SV does not initially upload any DARs, they will be vetted by PackageVettingTrigger instead
@@ -323,6 +336,7 @@ class SvApp(
                 localSynchronizerNode.getOrElse(
                   sys.error("Founding node must always specify a domain config")
                 ),
+                extraSynchronizerNodes,
                 foundingConfig,
                 darFilesToBootstrapNetwork,
                 participantId,
@@ -362,6 +376,7 @@ class SvApp(
               localSynchronizerNode.getOrElse(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
+              extraSynchronizerNodes,
               domainMigrationConfig,
               participantId,
               cometBftConfig,
@@ -521,13 +536,12 @@ class SvApp(
             new HttpSvSoftDomainMigrationPocHandler(
               dsoAutomation,
               localSynchronizerNode,
-              config.synchronizerNodes,
+              extraSynchronizerNodes,
               participantAdminConnection,
               clock,
               retryProvider,
               loggerFactory,
               amuletAppParameters,
-              metrics,
             )
           )
         else Seq.empty
@@ -587,6 +601,7 @@ class SvApp(
       SvApp.State(
         participantAdminConnection,
         localSynchronizerNode,
+        extraSynchronizerNodes,
         storage,
         domainTimeAutomationService,
         domainParamsAutomationService,
@@ -754,6 +769,7 @@ object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
       localSynchronizerNode: Option[LocalSynchronizerNode],
+      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       storage: Storage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
@@ -775,6 +791,10 @@ object SvApp {
         SyncCloseable(
           s"Domain connections",
           localSynchronizerNode.foreach(_.close()),
+        ),
+        SyncCloseable(
+          s"Extra synchronizer nodes",
+          extraSynchronizerNodes.values.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",

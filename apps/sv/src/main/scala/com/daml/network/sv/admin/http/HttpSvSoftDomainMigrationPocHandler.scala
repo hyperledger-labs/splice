@@ -5,13 +5,7 @@ package com.daml.network.sv.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.config.{Thresholds, NetworkAppClientConfig, SharedSpliceAppParameters}
-import com.daml.network.environment.{
-  MediatorAdminConnection,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SequencerAdminConnection,
-}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.sv_soft_domain_migration_poc as v0
@@ -19,13 +13,11 @@ import com.daml.network.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrati
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.scan.admin.api.client.SingleScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.LocalSynchronizerNode
-import com.daml.network.sv.config.SvSynchronizerNodeConfig
-import com.daml.network.sv.metrics.SvAppMetrics
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{ClientConfig, CommunityCryptoConfig, CommunityCryptoProvider}
+import com.digitalasset.canton.config.{CommunityCryptoConfig, CommunityCryptoProvider}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -62,13 +54,12 @@ import scala.jdk.OptionConverters.*
 class HttpSvSoftDomainMigrationPocHandler(
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     localSynchronizerNode: Option[LocalSynchronizerNode],
-    synchronizerNodes: Map[String, SvSynchronizerNodeConfig],
+    synchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     val amuletAppParameters: SharedSpliceAppParameters,
-    metrics: SvAppMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -177,8 +168,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         )
         domainParameters = DomainParametersState(
           domainId,
-          // TODO(#13715) Support traffic management
-          parameters.mapping.parameters.tryUpdate(trafficControlParameters = None),
+          parameters.mapping.parameters,
         )
         sequencerDomainState = SequencerDomainState
           .create(
@@ -329,32 +319,6 @@ class HttpSvSoftDomainMigrationPocHandler(
     }
   }
 
-  private def withSequencerAdminConnection[T](
-      config: ClientConfig
-  )(f: SequencerAdminConnection => Future[T]): Future[T] = {
-    val connection = new SequencerAdminConnection(
-      config,
-      amuletAppParameters.loggingConfig.api,
-      loggerFactory,
-      metrics.grpcClientMetrics,
-      retryProvider,
-    )
-    f(connection).andThen { _ => connection.close() }
-  }
-
-  private def withMediatorAdminConnection[T](
-      config: ClientConfig
-  )(f: MediatorAdminConnection => Future[T]): Future[T] = {
-    val connection = new MediatorAdminConnection(
-      config,
-      amuletAppParameters.loggingConfig.api,
-      loggerFactory,
-      metrics.grpcClientMetrics,
-      retryProvider,
-    )
-    f(connection).andThen { _ => connection.close() }
-  }
-
   // Takes a list of (ordered) signed topology transactions and turns them into
   // StoredTopologyTransactions ensuring that only the latest serial has validUntil = None
   private def toStoredTopologyBootstrapTransactions(
@@ -440,20 +404,16 @@ class HttpSvSoftDomainMigrationPocHandler(
           throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
         )
       _ = logger.info(s"Initializing sequencer")
-      _ <- withSequencerAdminConnection(node.sequencer.adminApi)(
-        _.initializeFromBeginning(
-          StoredTopologyTransactions(
-            bootstrapTransactions
-          ),
-          staticDomainParameters,
-        )
+      _ <- node.sequencerAdminConnection.initializeFromBeginning(
+        StoredTopologyTransactions(
+          bootstrapTransactions
+        ),
+        staticDomainParameters,
       )
       _ = logger.info(s"Initializing mediator")
-      _ <- withMediatorAdminConnection(node.mediator.adminApi)(
-        _.initialize(
-          domainId,
-          LocalSynchronizerNode.toSequencerConnection(node.sequencer.internalApi),
-        )
+      _ <- node.mediatorAdminConnection.initialize(
+        domainId,
+        LocalSynchronizerNode.toSequencerConnection(node.sequencerPublicApi),
       )
     } yield SvSoftDomainMigrationPocResource.InitializeSynchronizerResponse.OK
   }

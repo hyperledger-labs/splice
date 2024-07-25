@@ -482,11 +482,20 @@ object SpliceConfig {
             case _: SvOnboardingConfig.DomainMigration => true
           }
         }
-        Either.cond(
-          foundingNodeHasSynchronizerConfig,
-          conf,
-          ConfigValidationFailed("Founding node must always specify a domain config"),
-        )
+        for {
+          _ <- Either.cond(
+            foundingNodeHasSynchronizerConfig,
+            (),
+            ConfigValidationFailed("Founding node must always specify a domain config"),
+          )
+          _ <- Either.cond(
+            conf.synchronizerNodes.isEmpty || conf.supportsSoftDomainMigrationPoc,
+            (),
+            ConfigValidationFailed(
+              "synchronizerNodes must be empty unless supportsSoftDomainMigrationPoc is set to true"
+            ),
+          )
+        } yield conf
       }
 
     implicit val spliceAppParametersReader: ConfigReader[SharedSpliceAppParameters] =

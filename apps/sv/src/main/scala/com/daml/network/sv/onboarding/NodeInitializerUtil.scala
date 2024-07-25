@@ -13,7 +13,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.HttpClient
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -106,6 +106,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
       localSynchronizerNode: Option[LocalSynchronizerNode],
+      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       upgradesConfig: UpgradesConfig,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -126,6 +127,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       cometBftNode,
       localSynchronizerNode,
+      extraSynchronizerNodes,
       upgradesConfig,
       loggerFactory,
     )
