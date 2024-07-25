@@ -6133,7 +6133,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: 2
@@ -6151,7 +6151,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6160,7 +6160,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6179,7 +6179,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6188,7 +6188,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6207,7 +6207,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6216,7 +6216,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - canton-network-vpn
@@ -6236,7 +6236,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - slack-context
@@ -6245,7 +6245,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           context:
             - artifactory
             - canton-network-vpn
@@ -6264,7 +6264,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.16
+                - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: << pipeline.parameters.migration-id >>
@@ -6291,7 +6291,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/mainnet
+                - /release-line-.*/
           include_splitwell: false
           include_validator1: false
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
@@ -6331,7 +6331,7 @@ workflows:
           filters:
             branches:
               only:
-                - release-line-0.1.15
+                - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
           migration_id: << pipeline.parameters.migration-id >>

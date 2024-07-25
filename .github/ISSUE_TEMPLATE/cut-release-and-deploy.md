@@ -48,7 +48,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Pay particular attention to deleted or newly created resources.
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
-  - [ ] Update the branch references in `.circleci/configs/*/${cluster}.yml` and the branch references in `.circleci/triggers/*/${cluster}-*.json`.
+  - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
   - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes` and `cluster: devnet`
     - Review the changes to the `deployment` stack.
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
