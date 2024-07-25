@@ -373,12 +373,12 @@ trait UserWalletStore extends AppStore with NamedLogging {
       val offersFilteredFrom = fromParty match {
         case None => transferOffers
         case Some(fromParty) =>
-          transferOffers.filter(_.payload.sender == fromParty)
+          transferOffers.filter(_.payload.sender == fromParty.toProtoPrimitive)
       }
       val offersFilteredTo = toParty match {
         case None => offersFilteredFrom
         case Some(toParty) =>
-          offersFilteredFrom.filter(_.payload.receiver == toParty)
+          offersFilteredFrom.filter(_.payload.receiver == toParty.toProtoPrimitive)
       }
       offersFilteredTo
     }

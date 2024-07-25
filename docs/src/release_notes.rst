@@ -26,6 +26,12 @@ Upcoming
   * The ``list`` API in ``wallet-internal.yaml`` now exposes contracts
     as ``ContractWithState`` instead of just as a ``Contract``.
 
+* Wallet automation
+
+  * Fix an issue in the wallet sweep automation where it created
+    additional transfer offers even if there were already sufficient
+    transfer offers to cover the sweep.
+
 0.1.16
 ------
 

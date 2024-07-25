@@ -16,7 +16,9 @@ import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, WalletSweepCon
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
+import org.slf4j.event.Level
 
 import scala.concurrent.duration.DurationInt
 
@@ -121,20 +123,38 @@ class WalletSweepIntegrationTest
           triggersToPauseAtStart = autoAcceptTransferOffersTriggers,
           Seq.empty,
         ) {
-          val (_, firstTransferAmountUsd) = actAndCheck(
-            "SV1 receives funds and exceeds the maximum balance",
-            sv1WalletClient.tap(maxBalanceUsd + 2),
+          val firstTransferAmountUsd = loggerFactory.assertEventuallyLogsSeq(
+            SuppressionRule.LevelAndAbove(Level.INFO) && SuppressionRule.LoggerNameContains(
+              "WalletSweepTrigger"
+            )
           )(
-            "Alice sees exactly one transfer offer",
-            { _ =>
-              eventually() {
-                sv1Balance() shouldBe >(maxBalanceUsd)
-                val txOffers = aliceValidatorWalletClient.listTransferOffers()
-                txOffers should have size 1
-                aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
-                ccToDollars(txOffers.headOption.value.payload.amount.amount, amuletPrice.bigDecimal)
-              }
+            {
+              val (_, firstTransferAmountUsd) = actAndCheck(
+                "SV1 receives funds and exceeds the maximum balance",
+                sv1WalletClient.tap(maxBalanceUsd + 2),
+              )(
+                "Alice sees exactly one transfer offer",
+                { _ =>
+                  eventually() {
+                    sv1Balance() shouldBe >(maxBalanceUsd)
+                    val txOffers = aliceValidatorWalletClient.listTransferOffers()
+                    txOffers should have size 1
+                    aliceValidatorWalletClient.listAcceptedTransferOffers() shouldBe empty
+                    ccToDollars(
+                      txOffers.headOption.value.payload.amount.amount,
+                      amuletPrice.bigDecimal,
+                    )
+                  }
+                },
+              )
+              firstTransferAmountUsd
             },
+            logs =>
+              forAtLeast(1, logs) {
+                _.infoMessage should include regex (
+                  "but there are outstanding transfer offers with a sum of 1\\d\\."
+                )
+              },
           )
           actAndCheck(
             "SV1 receives more funds and exceeds the maximum balance again",
