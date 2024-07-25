@@ -42,7 +42,7 @@ spec:
       {{- end }}
       containers:
         - name: "cometbft"
-          image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Chart.AppVersion }}"
+          image: {{ $.Values.imageRepo }}/cometbft:{{ $.Chart.AppVersion }}{{ (($.Values.imageDigests).cometbft) }}
           imagePullPolicy: Always
           ports:
             - name: p2p

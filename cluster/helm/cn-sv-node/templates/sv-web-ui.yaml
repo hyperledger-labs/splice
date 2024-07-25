@@ -53,7 +53,7 @@ spec:
               value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
             - name: CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
               value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
-          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).sv_web_ui) }}"
           imagePullPolicy: Always
           name: sv-web-ui
           ports:

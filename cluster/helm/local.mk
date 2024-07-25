@@ -21,6 +21,7 @@ app_charts := \
 all_charts := $(app_charts) cn-util-lib
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
+IMAGE_DIGESTS := cluster/helm/.image-digests
 
 # Makefile for each file in cluster/helm/target run `helm push $file`
 .PHONY: cluster/helm/push
@@ -33,6 +34,10 @@ cluster/helm/push:
 cluster/helm/write-version:
 	overwrite-if-changed '$(shell get-snapshot-version)' $(HELM_VERSION_TAG)
 
+.PHONY: cluster/helm/write-digests
+cluster/helm/write-digests:
+	get-docker-image-digests.sh > $(IMAGE_DIGESTS)
+
 .PHONY: cluster/helm/build
 cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-build)
 
@@ -40,8 +45,12 @@ cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-bui
 cluster/helm/clean: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
 
-%/values.yaml: %/values-template.yaml cluster/helm/write-version
-	@version-tag-subst "$$(< $(HELM_VERSION_TAG))" < $< > $@
+%/values.yaml: %/values-template.yaml
+  # We do not automatically run write-digests, as we do not want that for local dev, only for published artifacts
+	cp $< $@
+	if [ -f "$(IMAGE_DIGESTS)" ]; then \
+		cat "$(IMAGE_DIGESTS)" >> $@ ; \
+	fi
 
 %/Chart.yaml: %/Chart-template.yaml cluster/helm/write-version
 	@version-tag-subst "$$(< $(HELM_VERSION_TAG))" < $< > $@

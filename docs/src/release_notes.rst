@@ -32,6 +32,10 @@ Upcoming
     additional transfer offers even if there were already sufficient
     transfer offers to cover the sweep.
 
+* Deployment
+
+  * Image versions in Helm charts are now pinned to digests for extra security
+
 0.1.16
 ------
 

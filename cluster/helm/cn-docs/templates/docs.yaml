@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: docs
-          image: "{{ .Values.imageRepo }}/docs:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.imageRepo }}/docs:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).docs) }}"
           imagePullPolicy: "Always"
           ports:
             - name: http
@@ -86,7 +86,7 @@ spec:
     spec:
       containers:
         - name: gcs-proxy
-          image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).gcs_proxy) }}"
           imagePullPolicy: "Always"
           ports:
             - name: http

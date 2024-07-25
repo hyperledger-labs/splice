@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
       - name: cns-web-ui
-        image: "{{ .Values.imageRepo }}/cns-web-ui:{{ .Chart.AppVersion }}"
+        image: "{{ .Values.imageRepo }}/cns-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).cns_web_ui) }}"
         imagePullPolicy: Always
         env:
         - name: CN_APP_UI_AUTH_CLIENT_ID

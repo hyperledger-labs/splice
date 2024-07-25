@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: scan-app
-        image: "{{ .Values.imageRepo }}/scan-app:{{ .Chart.AppVersion }}"
+        image: "{{ .Values.imageRepo }}/scan-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_app) }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
@@ -189,7 +189,7 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
         - name: CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
-        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}"
+        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_web_ui) }}"
         imagePullPolicy: Always
         name: scan-web-ui
         ports:

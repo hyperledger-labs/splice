@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: {{ .Release.Name }}
-        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Chart.AppVersion }}"
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_domain) }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
