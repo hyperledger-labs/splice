@@ -15,6 +15,8 @@ import com.digitalasset.canton.topology.PartyId
 import java.net.URI
 import scala.collection.mutable
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.MapHasAsScala
+import scala.jdk.OptionConverters.RichOptional
 
 /** Base for preflight tests running against a deployed validator
   */
@@ -114,14 +116,18 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
   }
 
+  protected def checkValidatorIsConnectedToSvRunbook() = {}
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
-    EnvironmentDefinition.preflightTopology(
+    EnvironmentDefinition.svPreflightTopology(
       this.getClass.getSimpleName()
     )
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
+
+  checkValidatorIsConnectedToSvRunbook()
 
   "run through runbook against cluster validator" in { _ =>
     val aliceUser = auth0Users.get("alice-validator").value
@@ -467,6 +473,25 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
 
   // TODO(tech-debt): consider de-hardcoding this
   override protected val validatorWalletUser = "auth0|6526fab5214c99a9a8e1e3cc"
+
+  // TODO(#8300): remove this check once canton handles sequencer connections more gracefully
+  override def checkValidatorIsConnectedToSvRunbook() = "Validator is connected to SV runbook" in {
+    implicit env =>
+      val sv = sv_client("sv")
+      eventually() {
+        val dsoInfo = sv.getDsoInfo()
+        val nodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
+        val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
+        val (svSequencerEndpoint, _) = Endpoint
+          .fromUris(NonEmpty.from(Seq(new URI(domainConfig.sequencer.toScala.value.url))).value)
+          .value
+        val domainConnectionConfig = validatorClient.decentralizedSynchronizerConnectionConfig()
+        val connectedEndpointSet =
+          domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
+        connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)
+      }
+  }
+
 }
 
 class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {

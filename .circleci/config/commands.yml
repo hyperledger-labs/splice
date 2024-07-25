@@ -1275,3 +1275,33 @@ commands:
           command: |
             mkdir -p ../splice/.circleci
             cp -r .circleci/canton-scripts ../splice/.circleci
+
+  wait_for_sv_runbook_deployment:
+    parameters:
+        <<: *cluster-parameter
+        check_cluster_version:
+          type: boolean
+          default: true
+        migration_id:
+          type: integer
+          default: 0
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: wait for sv-runbook deployment to finish
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          cmd: |
+            if [[ << parameters.check_cluster_version >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+              cncluster wait_version $VERSION
+            fi
+            # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
+            cncluster wait sv validator-app << parameters.migration_id >>
+            echo "Done waiting. All pods in the cluster are:"
+            kubectl get pods -A
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
+
