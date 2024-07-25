@@ -911,6 +911,42 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     }
   }
 
+  "getOutstandingTransferOffers" in {
+    for {
+      store <- mkStore(user1)
+      offer1 = transferOffer(user1, user2, 10.0, paymentCodegen.Unit.AMULETUNIT, time(1))
+      _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
+        store.multiDomainAcsStore
+      )
+      unfiltered <- store.getOutstandingTransferOffers(
+        None,
+        None,
+      )
+      filteredSenderMatch <- store.getOutstandingTransferOffers(
+        Some(user1),
+        None,
+      )
+      filteredSenderNoMatch <- store.getOutstandingTransferOffers(
+        Some(user2),
+        None,
+      )
+      filteredReceiverMatch <- store.getOutstandingTransferOffers(
+        None,
+        Some(user2),
+      )
+      filteredReceiverNoMatch <- store.getOutstandingTransferOffers(
+        None,
+        Some(user1),
+      )
+    } yield {
+      unfiltered.map(_.contractId) shouldBe Seq(offer1.contractId)
+      filteredSenderMatch.map(_.contractId) shouldBe Seq(offer1.contractId)
+      filteredSenderNoMatch.map(_.contractId) shouldBe Seq()
+      filteredReceiverMatch.map(_.contractId) shouldBe Seq(offer1.contractId)
+      filteredReceiverNoMatch.map(_.contractId) shouldBe Seq()
+    }
+  }
+
   private lazy val provider1 = providerParty(1)
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)

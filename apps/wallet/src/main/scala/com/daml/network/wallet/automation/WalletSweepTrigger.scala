@@ -62,8 +62,14 @@ class WalletSweepTrigger(
       if (balanceUsd - sumOfOutstandingTransfersOffersUsd > config.maxBalanceUsd.value) {
         val trackingId = UUID.randomUUID.toString
         Seq(WalletSweepTrigger.Task(trackingId))
-      } else
+      } else {
+        if (balanceUsd > config.maxBalanceUsd.value) {
+          logger.info(
+            s"Balance $balanceUsd is above max balance ${config.maxBalanceUsd.value} but there are outstanding transfer offers with a sum of ${sumOfOutstandingTransfersOffersUsd}, not creating additional transfer offers"
+          )
+        }
         Seq.empty
+      }
     }
   }
 
