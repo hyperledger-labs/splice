@@ -69,7 +69,7 @@ trait SvSvStore extends AppStore {
 
   def listExpiredValidatorOnboardings()
       : ListExpiredContracts[ValidatorOnboarding.ContractId, ValidatorOnboarding] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(ValidatorOnboarding.COMPANION)(_.expiresAt)
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(ValidatorOnboarding.COMPANION)
 
   def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]

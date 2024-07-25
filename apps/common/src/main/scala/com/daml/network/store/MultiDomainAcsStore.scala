@@ -180,8 +180,6 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C
-  )(
-      expiresAt: T => java.time.Instant
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): ListExpiredContracts[TCid, T]

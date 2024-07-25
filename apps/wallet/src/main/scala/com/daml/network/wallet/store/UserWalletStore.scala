@@ -74,17 +74,13 @@ trait UserWalletStore extends AppStore with NamedLogging {
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(transferOffersCodegen.TransferOffer.COMPANION)(
-      _.expiresAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(transferOffersCodegen.TransferOffer.COMPANION)
 
   def listExpiredAcceptedTransferOffers: ListExpiredContracts[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
     transferOffersCodegen.AcceptedTransferOffer.COMPANION
-  )(
-    _.expiresAt
   )
 
   def getLatestTransferOfferEventByTrackingId(
@@ -98,8 +94,6 @@ trait UserWalletStore extends AppStore with NamedLogging {
     trafficRequestCodegen.BuyTrafficRequest,
   ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
     trafficRequestCodegen.BuyTrafficRequest.COMPANION
-  )(
-    _.expiresAt
   )
 
   def getLatestBuyTrafficRequestEventByTrackingId(
@@ -135,9 +129,7 @@ trait UserWalletStore extends AppStore with NamedLogging {
   def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,
     walletCodegen.AppPaymentRequest,
-  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(walletCodegen.AppPaymentRequest.COMPANION)(
-    _.expiresAt
-  )
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(walletCodegen.AppPaymentRequest.COMPANION)
 
   def listSubscriptionStatesReadyForPayment: ListExpiredContracts[
     subsCodegen.SubscriptionIdleState.ContractId,

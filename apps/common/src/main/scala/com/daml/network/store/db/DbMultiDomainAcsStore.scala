@@ -40,7 +40,6 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
-import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.{Seq, SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -243,11 +242,9 @@ final class DbMultiDomainAcsStore[TXE](
     } yield assigned
   }
 
-  // TODO (#3822) `expiresAt` is unused here, but necessary for the in-memory version to work.
-  // With an ExpiredContract interface it can be dropped from both.
   override private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[
     T
-  ], T <: Template](companion: C)(expiresAt: T => Instant)(implicit
+  ], T <: Template](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): ListExpiredContracts[TCid, T] = { (now, limit) => implicit traceContext =>
     val templateId = companionClass.typeId(companion)

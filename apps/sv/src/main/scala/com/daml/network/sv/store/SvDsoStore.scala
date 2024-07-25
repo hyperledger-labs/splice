@@ -199,7 +199,7 @@ trait SvDsoStore
     listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION)(_.amulet)
 
   def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.voteBefore)
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)
 
   def listConfirmations(
       action: splice.dsorules.ActionRequiringConfirmation,
@@ -551,23 +551,17 @@ trait SvDsoStore
 
   def listExpiredSvOnboardingRequests
       : ListExpiredContracts[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingRequest.COMPANION)(
-      _.expiresAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingRequest.COMPANION)
 
   def listExpiredSvOnboardingConfirmed
       : ListExpiredContracts[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingConfirmed.COMPANION)(
-      _.expiresAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingConfirmed.COMPANION)
 
   def listExpiredAnsEntries: ListExpiredContracts[
     splice.ans.AnsEntry.ContractId,
     splice.ans.AnsEntry,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.ans.AnsEntry.COMPANION)(
-      _.expiresAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.ans.AnsEntry.COMPANION)
 
   def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
@@ -653,18 +647,14 @@ trait SvDsoStore
     splice.round.IssuingMiningRound.ContractId,
     splice.round.IssuingMiningRound,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.round.IssuingMiningRound.COMPANION)(
-      _.targetClosesAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.round.IssuingMiningRound.COMPANION)
 
   /** List stale confirmations past their expiresAt */
   def listStaleConfirmations: ListExpiredContracts[
     splice.dsorules.Confirmation.ContractId,
     splice.dsorules.Confirmation,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.dsorules.Confirmation.COMPANION)(
-      _.expiresAt
-    )
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.dsorules.Confirmation.COMPANION)
 
   /** List all the current amulet price votes. */
   final def listAllAmuletPriceVotes(
