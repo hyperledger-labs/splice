@@ -40,13 +40,16 @@ for instance in $instances
 do
 
     if [[ $instance =~ ^sv-[0-9]+ ]]; then
-        sv=$(echo "$instance" | grep -oP 'sv-\d+')
+        namespace=$(echo "$instance" | grep -oP 'sv-\d+')
         secret_suffix="secrets"
     elif [[ $instance =~ ^sv ]]; then
-        sv="sv"
+        namespace="sv"
         secret_suffix="secret"
+    elif [[ $instance =~ ^.*-participant-.* ]]; then
+        namespace=${instance%%-*}
+        secret_suffix="secrets"
     else
-        echo "# Could not extract sv from instance $instance. Skipping."
+        echo "# Could not extract namespace from instance $instance. Skipping."
         continue
     fi
     if [[ $instance == *sequencer* ]]; then
@@ -63,7 +66,7 @@ do
     fi
 
     # Get password from K8s secret
-    password=$(get_password "$sv" "$secret_name")
+    password=$(get_password "$namespace" "$secret_name")
 
     if [[ -z "$password" ]]; then
         echo "# Could not retrieve password for instance $instance. Skipping."
