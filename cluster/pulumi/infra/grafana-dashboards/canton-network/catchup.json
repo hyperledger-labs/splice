@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1138,
+  "id": 1596,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -449,6 +449,24 @@
           "legendFormat": "{{namespace}} migration $migration",
           "range": true,
           "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "delta(daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}[5m]) / 5",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "processing time {{namespace}} migration $migration",
+          "range": true,
+          "refId": "B",
           "useBackend": false
         }
       ],
@@ -1416,7 +1434,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {},
