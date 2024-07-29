@@ -28,7 +28,9 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
   RemoteParticipantReference,
+  RemoteSequencerReference,
 }
+import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -256,5 +258,10 @@ class ParticipantClientReference(
       discard[String](this.dars.upload(path))
     }
   }
-
 }
+
+class SequencerClientReference(
+    consoleEnvironment: SpliceConsoleEnvironment,
+    override val name: String,
+    override val config: RemoteSequencerConfig,
+) extends RemoteSequencerReference(consoleEnvironment, name) {}

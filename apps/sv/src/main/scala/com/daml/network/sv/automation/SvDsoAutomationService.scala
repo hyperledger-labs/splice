@@ -365,6 +365,7 @@ class SvDsoAutomationService(
         onboardingTriggerContext,
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
+        extraSynchronizerNodes,
         config.trafficBalanceReconciliationDelay,
       )
     )

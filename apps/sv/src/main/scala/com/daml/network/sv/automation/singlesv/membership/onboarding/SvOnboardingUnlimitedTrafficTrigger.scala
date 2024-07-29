@@ -13,13 +13,15 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
+import com.daml.network.sv.ExtraSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.util.SvUtil
+import com.daml.network.util.AmuletConfigSchedule
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -34,6 +36,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
@@ -48,6 +51,21 @@ class SvOnboardingUnlimitedTrafficTrigger(
   ): Future[Seq[Task]] = {
     for {
       dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      amuletRules <- dsoStore.getAmuletRules()
+      decentralizedSynchronizerConfig = AmuletConfigSchedule(amuletRules)
+        .getConfigAsOf(context.clock.now)
+        .decentralizedSynchronizer
+      // We assume that we can switch over immediately to the new domain. The one case where this might break
+      // is if there is a new SV being onboarded just around the time of the domain migration. This seems
+      // like an acceptable limitation.
+      activeSynchronizerId = DomainId.tryFromString(
+        decentralizedSynchronizerConfig.activeSynchronizer
+      )
+      sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
+        activeSynchronizerId,
+        sequencerAdminConnectionO,
+        extraSynchronizerNodes,
+      )
       svMembersWithTrafficState <- dsoRulesAndStates
         .activeSvParticipantAndMediatorIds()
         .traverseFilter { memberId =>
@@ -65,14 +83,19 @@ class SvOnboardingUnlimitedTrafficTrigger(
       // Sorting here so we have a better chance of all SVs working on the same set traffic balance request around the same time.
       svMembersWithTrafficState.sortBy(_._1).collect {
         case (memberId, trafficState) if trafficState.extraTrafficLimit != UnlimitedTraffic =>
-          Task(memberId)
+          Task(activeSynchronizerId, memberId)
       }
     }
   }
 
   override protected def completeTask(task: SvOnboardingUnlimitedTrafficTrigger.Task)(implicit
       tc: TraceContext
-  ): Future[TaskOutcome] =
+  ): Future[TaskOutcome] = {
+    val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
+      task.synchronizerId,
+      sequencerAdminConnectionO,
+      extraSynchronizerNodes,
+    )
     for {
       // We must read the state here again to pick up on new serials
       (trafficState, sequencerState) <- (
@@ -89,23 +112,24 @@ class SvOnboardingUnlimitedTrafficTrigger(
     } yield TaskSuccess(
       s"Updated traffic limit for ${task.memberId} to NonNegativeLong.maxValue"
     )
+  }
 
   override protected def isStaleTask(task: Task)(implicit
       tc: TraceContext
-  ): Future[Boolean] = for {
-    dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
-    trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
-  } yield {
-    !dsoRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
-    || trafficState.extraTrafficLimit == UnlimitedTraffic
+  ): Future[Boolean] = {
+    val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
+      task.synchronizerId,
+      sequencerAdminConnectionO,
+      extraSynchronizerNodes,
+    )
+    for {
+      dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
+    } yield {
+      !dsoRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
+      || trafficState.extraTrafficLimit == UnlimitedTraffic
+    }
   }
-
-  private def sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
-    throw Status.FAILED_PRECONDITION
-      .withDescription("No sequencer admin connection configured for SV App")
-      .asRuntimeException()
-  )
-
 }
 
 object SvOnboardingUnlimitedTrafficTrigger {
@@ -113,11 +137,13 @@ object SvOnboardingUnlimitedTrafficTrigger {
   val UnlimitedTraffic: NonNegativeLong = NonNegativeLong.maxValue
 
   final case class Task(
-      memberId: Member
+      synchronizerId: DomainId,
+      memberId: Member,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("memberId", _.memberId)
+        param("synchronizerId", _.synchronizerId),
+        param("memberId", _.memberId),
       )
   }
 }

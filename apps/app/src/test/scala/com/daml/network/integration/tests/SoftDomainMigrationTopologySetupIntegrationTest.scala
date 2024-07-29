@@ -278,5 +278,38 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           .extraTrafficPurchased shouldBe >(NonNegativeLong.zero)
       }
     }
+    clue("All SV paritcipants have unlimited traffic on new domain") {
+      eventually() {
+        env.svs.local.foreach { sv =>
+          val participantId = sv.participantClient.id
+          clue(s"participant $participantId has unlimited traffic on new domain") {
+            sv1Backend
+              .sequencerClient(newDomainId)
+              .traffic_control
+              .traffic_state_of_members(
+                Seq(participantId)
+              )
+              .trafficStates
+              .values
+              .loneElement
+              .extraTrafficPurchased shouldBe NonNegativeLong.maxValue
+          }
+        }
+      }
+    }
+  // TODO(#13806) Enable this, currently fails because the new mediators are not properly
+  // exposed in the Daml state.
+  // clue("All mediators have unlimited traffic on new domain") {
+  //   eventually() {
+  //     val mediatorState = sv1Backend.participantClient.topology.mediators.list(filterStore = TopologyStoreId.DomainStore(newDomainId).filterName).loneElement
+  //     val mediators = mediatorState.item.active.forgetNE
+  //     mediators should have size 4
+  //     forAll(mediators) { mediator =>
+  //       sv1Backend.sequencerClient(newDomainId).traffic_control.traffic_state_of_members(
+  //         Seq(mediator)
+  //       ).trafficStates.values.loneElement.extraTrafficPurchased shouldBe NonNegativeLong.maxValue
+  //     }
+  //   }
+  // }
   }
 }

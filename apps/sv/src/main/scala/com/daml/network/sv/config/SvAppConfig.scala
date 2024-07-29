@@ -24,6 +24,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveNumeric,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -243,7 +244,15 @@ final case class SvSequencerConfig(
     // TODO (#8282): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
-)
+) {
+  def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
+    adminApi,
+    SequencerConnectionConfig.Grpc(
+      internalApi.address,
+      internalApi.port,
+    ),
+  )
+}
 
 final case class SvMediatorConfig(
     adminApi: ClientConfig

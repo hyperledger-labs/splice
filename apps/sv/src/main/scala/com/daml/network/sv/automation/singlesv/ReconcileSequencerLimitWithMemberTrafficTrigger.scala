@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.ExtraSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -63,7 +64,11 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         },
         memberId => {
           val domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
-          val sequencerAdminConnection = getSequencerAdminConnection(domainId)
+          val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
+            domainId,
+            sequencerAdminConnectionO,
+            extraSynchronizerNodes,
+          )
           sequencerAdminConnection.getStatus
             .map(_.successOption.map(_.domainId))
             .flatMap {
@@ -162,17 +167,4 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         } yield taskOutcome
     }
   }
-
-  // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
-  def getSequencerAdminConnection[T](domainId: DomainId) =
-    extraSynchronizerNodes.get(domainId.uid.identifier.str) match {
-      case Some(synchronizer) => synchronizer.sequencerAdminConnection
-      case None => primarySequencerAdminConnection
-    }
-
-  private def primarySequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
-    throw Status.FAILED_PRECONDITION
-      .withDescription("No sequencer admin connection configured for SV App")
-      .asRuntimeException()
-  )
 }
