@@ -208,7 +208,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -600,7 +600,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "global-domain-1-cometbft",
     "provider": "",
@@ -677,7 +677,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "global-domain-1",
     "provider": "",
@@ -745,7 +745,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "loopback",
     "provider": "",
@@ -889,7 +889,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "participant-1",
     "provider": "",
@@ -956,7 +956,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "scan",
     "provider": "",
@@ -1188,7 +1188,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-app",
     "provider": "",
@@ -1585,7 +1585,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "validator",
     "provider": "",
