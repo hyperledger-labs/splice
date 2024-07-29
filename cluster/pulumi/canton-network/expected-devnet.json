@@ -2122,7 +2122,6 @@
           "chainId": "dev-0",
           "chainIdSuffix": "1"
         },
-        "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
@@ -3203,7 +3202,6 @@
           "chainId": "dev-0",
           "chainIdSuffix": "1"
         },
-        "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
@@ -4247,7 +4245,6 @@
           "chainId": "dev-0",
           "chainIdSuffix": "1"
         },
-        "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
@@ -5291,7 +5288,6 @@
           "chainId": "dev-0",
           "chainIdSuffix": "1"
         },
-        "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,

@@ -1437,7 +1437,6 @@
           "chainId": "test-2",
           "chainIdSuffix": "0"
         },
-        "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,

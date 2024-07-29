@@ -65,7 +65,6 @@ export function installCometBftNode(
     'cn-cometbft',
     {
       nodeName: onboardingName,
-      imageName: 'cometbft',
       founder: configs.founder,
       istioVirtualService: {
         enabled: true,

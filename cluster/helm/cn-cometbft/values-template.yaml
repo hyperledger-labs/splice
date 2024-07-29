@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 imageRepo: digitalasset-canton-network-docker.jfrog.io/digitalasset
-imageName: cometbft
 
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""
@@ -89,3 +88,4 @@ metrics:
 enableAntiAffinity: true
 
 logLevel: debug
+

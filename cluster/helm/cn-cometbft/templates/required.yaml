@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
-{{ $_ := required ".Values.imageName is required." .Values.imageName }}
 
 {{ $_ := required ".Values.nodeName is required." .Values.nodeName }}
 

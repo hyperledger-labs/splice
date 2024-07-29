@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: sv-app
-          image: "{{ .Values.imageRepo }}/sv-app:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.imageRepo }}/sv-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).sv_app) }}"
           imagePullPolicy: "Always"
           env:
             - name: JAVA_TOOL_OPTIONS

@@ -2694,6 +2694,7 @@ jobs:
              curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
            }
 
+           make cluster/helm/write-digests
            make cluster/helm/build -j
 
            for chart in cluster/helm/target/*.tgz; do
