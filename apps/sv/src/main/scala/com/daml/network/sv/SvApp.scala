@@ -538,6 +538,7 @@ class SvApp(
               localSynchronizerNode,
               extraSynchronizerNodes,
               participantAdminConnection,
+              config.domainMigrationId,
               clock,
               retryProvider,
               loggerFactory,

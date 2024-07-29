@@ -67,7 +67,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
         extraSynchronizerNodes,
       )
       svMembersWithTrafficState <- dsoRulesAndStates
-        .activeSvParticipantAndMediatorIds()
+        .activeSvParticipantAndMediatorIds(activeSynchronizerId)
         .traverseFilter { memberId =>
           for {
             stateO <- sequencerAdminConnection.lookupSequencerTrafficControlState(memberId)
@@ -126,7 +126,9 @@ class SvOnboardingUnlimitedTrafficTrigger(
       dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
       trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
     } yield {
-      !dsoRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
+      !dsoRulesAndStates
+        .activeSvParticipantAndMediatorIds(task.synchronizerId)
+        .contains(task.memberId)
       || trafficState.extraTrafficLimit == UnlimitedTraffic
     }
   }

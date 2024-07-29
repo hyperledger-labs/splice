@@ -90,7 +90,4 @@ unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetr
 # TODO (#13145): investigate what task is it still running and see if we can somehow fix it
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
-# TODO(#13714) Remove this once we properly configure the sequencer urls for soft domain migrations
-global domain sequencer list not found.*SoftDomainMigrationTopologySetupIntegrationTest
-
 # Make sure to have a trailing newline

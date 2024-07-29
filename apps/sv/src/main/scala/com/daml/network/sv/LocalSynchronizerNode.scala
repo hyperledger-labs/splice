@@ -42,12 +42,12 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 final class LocalSynchronizerNode(
     participantAdminConnection: ParticipantAdminConnection,
-    val sequencerAdminConnection: SequencerAdminConnection,
-    val mediatorAdminConnection: MediatorAdminConnection,
+    override val sequencerAdminConnection: SequencerAdminConnection,
+    override val mediatorAdminConnection: MediatorAdminConnection,
     val staticDomainParameters: StaticDomainParameters,
     val sequencerInternalConfig: ClientConfig,
-    val sequencerExternalPublicUrl: String,
-    val sequencerAvailabilityDelay: Duration,
+    override val sequencerExternalPublicUrl: String,
+    override val sequencerAvailabilityDelay: Duration,
     val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
@@ -56,7 +56,13 @@ final class LocalSynchronizerNode(
     httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
-) extends RetryProvider.Has
+) extends SynchronizerNode(
+      sequencerAdminConnection,
+      mediatorAdminConnection,
+      sequencerExternalPublicUrl,
+      sequencerAvailabilityDelay,
+    )
+    with RetryProvider.Has
     with FlagCloseable
     with NamedLogging {
 

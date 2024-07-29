@@ -129,7 +129,7 @@ object DsoRulesStore {
         .toSeq
     }
 
-    def activeSvParticipantAndMediatorIds(): Seq[Member] = {
+    def activeSvParticipantAndMediatorIds(synchronizerId: DomainId): Seq[Member] = {
       val svParticipants = dsoRules.contract.payload.svs
         .values()
         .asScala
@@ -143,7 +143,9 @@ object DsoRulesStore {
         .toSeq
         .map(ParticipantId.tryFromProtoPrimitive)
       val svMediators = svNodeStates.values
-        .flatMap(_.payload.state.synchronizerNodes.values().asScala)
+        .flatMap(
+          _.payload.state.synchronizerNodes.asScala.get(synchronizerId.toProtoPrimitive).toList
+        )
         .flatMap(_.mediator.toScala)
         .map(m =>
           MediatorId

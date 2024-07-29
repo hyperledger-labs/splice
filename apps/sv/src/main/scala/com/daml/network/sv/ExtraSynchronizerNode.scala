@@ -16,17 +16,26 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
 
 // TODO(#13301) Unify this with LocalSynchronizerNode
 final class ExtraSynchronizerNode(
-    val sequencerAdminConnection: SequencerAdminConnection,
-    val mediatorAdminConnection: MediatorAdminConnection,
+    override val sequencerAdminConnection: SequencerAdminConnection,
+    override val mediatorAdminConnection: MediatorAdminConnection,
     val parameters: DomainParametersConfig,
     val sequencerPublicApi: ClientConfig,
+    override val sequencerExternalPublicUrl: String,
+    override val sequencerAvailabilityDelay: Duration,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
-) extends FlagCloseable
+) extends SynchronizerNode(
+      sequencerAdminConnection,
+      mediatorAdminConnection,
+      sequencerExternalPublicUrl,
+      sequencerAvailabilityDelay,
+    )
+    with FlagCloseable
     with NamedLogging {
 
   override protected def onClosed(): Unit = {
@@ -61,6 +70,8 @@ object ExtraSynchronizerNode {
       mediatorAdminConnection,
       conf.parameters,
       conf.sequencer.internalApi,
+      conf.sequencer.externalPublicApiUrl,
+      conf.sequencer.sequencerAvailabilityDelay.asJava,
       loggerFactory,
       retryProvider.timeouts,
     )

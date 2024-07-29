@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.splice.dsorules.DsoRulesConfig
 import com.daml.network.codegen.java.splice.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.SequencerAdminConnection
-import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SynchronizerNode}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{BeneficiaryConfig, SvScanConfig}
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
@@ -127,11 +127,10 @@ object SvUtil {
 
   case class LocalSequencerConfig(sequencerId: String, url: String, migrationId: Long)
 
-  def getSequencerConfig(localSynchronizerNode: Option[LocalSynchronizerNode], migrationId: Long)(
-      implicit
+  def getSequencerConfig(synchronizerNode: Option[SynchronizerNode], migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[LocalSequencerConfig]] = localSynchronizerNode.map { node =>
+  ): Future[Option[LocalSequencerConfig]] = synchronizerNode.map { node =>
     node.sequencerAdminConnection.getSequencerId.map { sequencerId =>
       LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
@@ -143,10 +142,10 @@ object SvUtil {
 
   case class LocalMediatorConfig(mediatorId: String)
 
-  def getMediatorConfig(localSynchronizerNode: Option[LocalSynchronizerNode])(implicit
+  def getMediatorConfig(synchronizerNode: Option[SynchronizerNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[LocalMediatorConfig]] = localSynchronizerNode.map { node =>
+  ): Future[Option[LocalMediatorConfig]] = synchronizerNode.map { node =>
     node.mediatorAdminConnection.getMediatorId.map { mediatorId =>
       LocalMediatorConfig(
         mediatorId.toProtoPrimitive

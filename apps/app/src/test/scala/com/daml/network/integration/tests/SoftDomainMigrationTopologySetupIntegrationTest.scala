@@ -4,8 +4,18 @@ import com.daml.network.automation.AssignTrigger
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.AmuletDecentralizedSynchronizerConfig
-import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+  ARC_AmuletRules,
+  ARC_DsoRules,
+}
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
+  DsoDecentralizedSynchronizerConfig,
+  SynchronizerConfig,
+  SynchronizerState,
+}
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.splice.dsorules.{DsoRulesConfig, DsoRules_SetConfig}
 import com.daml.network.config.{ConfigTransforms, Thresholds}
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
@@ -14,6 +24,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
 import com.daml.network.util.{Codec, ConfigScheduleUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -22,8 +33,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{SequencerConnections, SubmissionRequestAmplification}
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 
 import java.time.temporal.ChronoUnit
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -86,6 +99,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       )
 
   "SVs can bootstrap new domain" in { implicit env =>
+    implicit val ec: ExecutionContext = env.executionContext
     val (_, bob) = onboardAliceAndBob()
     env.scans.local should have size 4
     val prefix = "global-domain-new"
@@ -122,7 +136,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     aliceWalletClient.tap(100)
 
     val (_, voteRequest) = actAndCheck(
-      "Creating vote request",
+      "Creating amulet config vote request",
       eventuallySucceeds() {
         sv1Backend.createVoteRequest(
           sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
@@ -141,9 +155,9 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
         )
       },
-    )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+    )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-    clue(s"sv2-4 accept") {
+    clue(s"sv2-4 accept amulet config vote request") {
       Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
         eventuallySucceeds() {
           sv.castVote(
@@ -160,12 +174,90 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       sv1ScanBackend.getAmuletRules().payload.configSchedule.futureValues should not be empty
     }
 
+    val dsoRules = sv1Backend.getDsoInfo().dsoRules
+
     clue("Bootstrap new domain") {
-      env.svs.local.foreach { sv =>
-        sv.signSynchronizerBootstrappingState(prefix)
+      clue("Sign bootstrapping state") {
+        val signed = env.svs.local.map { sv =>
+          Future { sv.signSynchronizerBootstrappingState(prefix) }
+        }
+        signed.foreach(_.futureValue)
       }
-      env.svs.local.foreach { sv =>
-        sv.initializeSynchronizer(prefix)
+      clue("Initialize synchronizer nodes") {
+        val initialized = env.svs.local.map { sv =>
+          Future { sv.initializeSynchronizer(prefix) }
+        }
+        initialized.foreach(_.futureValue)
+      }
+      clue("New synchronizer is registered in DsoRules config") {
+        val (_, dsoRulesVoteRequest) = actAndCheck(
+          "Creating dso rules config vote request",
+          eventuallySucceeds() {
+            sv1Backend.createVoteRequest(
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              new ARC_DsoRules(
+                new SRARC_SetConfig(
+                  new DsoRules_SetConfig(
+                    new DsoRulesConfig(
+                      dsoRules.payload.config.numUnclaimedRewardsThreshold,
+                      dsoRules.payload.config.numMemberTrafficContractsThreshold,
+                      dsoRules.payload.config.actionConfirmationTimeout,
+                      dsoRules.payload.config.svOnboardingRequestTimeout,
+                      dsoRules.payload.config.svOnboardingConfirmedTimeout,
+                      dsoRules.payload.config.voteRequestTimeout,
+                      dsoRules.payload.config.dsoDelegateInactiveTimeout,
+                      dsoRules.payload.config.synchronizerNodeConfigLimits,
+                      dsoRules.payload.config.maxTextLength,
+                      new DsoDecentralizedSynchronizerConfig(
+                        (dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala.toMap + (newDomainId.toProtoPrimitive -> new SynchronizerConfig(
+                          SynchronizerState.DS_OPERATIONAL,
+                          // Keep the cometbft state empty, we don't support bootstrapping the new domain with cometbft.
+                          "",
+                          dsoRules.payload.config.decentralizedSynchronizer.synchronizers.values.loneElement.acsCommitmentReconciliationInterval,
+                        ))).asJava,
+                        newDomainId.toProtoPrimitive,
+                        newDomainId.toProtoPrimitive,
+                      ),
+                      dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
+                    )
+                  )
+                )
+              ),
+              "url",
+              "description",
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            )
+          },
+        )(
+          "dsorules config vote request has been created",
+          _ => sv1Backend.listVoteRequests().loneElement,
+        )
+        clue(s"sv2-4 accept dsorules config vote request") {
+          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+            eventuallySucceeds() {
+              sv.castVote(
+                dsoRulesVoteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
+            }
+          )
+        }
+      }
+      // TODO(#13714) Reenable once the connection trigger is fixed.
+      clue("Disable sequencer connection triggers") {
+        env.validators.local.map { validator =>
+          if (!validator.name.startsWith("sv")) {
+            validator.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger].pause()
+          }
+        }
+      }
+      clue("Reconcile Daml synchronizer state") {
+        val reconciled = env.svs.local.map { sv =>
+          Future { sv.reconcileSynchronizerDamlState(prefix) }
+        }
+        reconciled.foreach(_.futureValue)
       }
     }
     clue("All participants connect to new domain") {
@@ -297,19 +389,26 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         }
       }
     }
-  // TODO(#13806) Enable this, currently fails because the new mediators are not properly
-  // exposed in the Daml state.
-  // clue("All mediators have unlimited traffic on new domain") {
-  //   eventually() {
-  //     val mediatorState = sv1Backend.participantClient.topology.mediators.list(filterStore = TopologyStoreId.DomainStore(newDomainId).filterName).loneElement
-  //     val mediators = mediatorState.item.active.forgetNE
-  //     mediators should have size 4
-  //     forAll(mediators) { mediator =>
-  //       sv1Backend.sequencerClient(newDomainId).traffic_control.traffic_state_of_members(
-  //         Seq(mediator)
-  //       ).trafficStates.values.loneElement.extraTrafficPurchased shouldBe NonNegativeLong.maxValue
-  //     }
-  //   }
-  // }
+    clue("All mediators have unlimited traffic on new domain") {
+      eventually() {
+        val mediatorState = sv1Backend.participantClient.topology.mediators
+          .list(filterStore = TopologyStoreId.DomainStore(newDomainId).filterName)
+          .loneElement
+        val mediators = mediatorState.item.active.forgetNE
+        mediators should have size 4
+        forAll(mediators) { mediator =>
+          sv1Backend
+            .sequencerClient(newDomainId)
+            .traffic_control
+            .traffic_state_of_members(
+              Seq(mediator)
+            )
+            .trafficStates
+            .values
+            .loneElement
+            .extraTrafficPurchased shouldBe NonNegativeLong.maxValue
+        }
+      }
+    }
   }
 }

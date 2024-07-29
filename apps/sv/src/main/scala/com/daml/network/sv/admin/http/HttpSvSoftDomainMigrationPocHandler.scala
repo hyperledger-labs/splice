@@ -15,6 +15,7 @@ import com.daml.network.scan.admin.api.client.SingleScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.onboarding.SynchronizerNodeReconciler
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{CommunityCryptoConfig, CommunityCryptoProvider}
@@ -56,6 +57,7 @@ class HttpSvSoftDomainMigrationPocHandler(
     localSynchronizerNode: Option[LocalSynchronizerNode],
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
+    migrationId: Long,
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -416,6 +418,42 @@ class HttpSvSoftDomainMigrationPocHandler(
         LocalSynchronizerNode.toSequencerConnection(node.sequencerPublicApi),
       )
     } yield SvSoftDomainMigrationPocResource.InitializeSynchronizerResponse.OK
+  }
+
+  override def reconcileSynchronizerDamlState(
+      respond: SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse.type
+  )(domainIdPrefix: String)(
+      extracted: TracedUser
+  ): Future[SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse] = {
+    implicit val TracedUser(_, traceContext) = extracted
+    val domainId = DomainId(
+      UniqueIdentifier.tryCreate(
+        domainIdPrefix,
+        dsoStore.key.dsoParty.uid.namespace,
+      )
+    )
+    val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
+      dsoStore,
+      dsoStoreWithIngestion.connection,
+      clock,
+      retryProvider,
+      logger,
+    )
+    val node = synchronizerNodes
+      .get(domainIdPrefix)
+      .getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"No synchronizer node for $domainIdPrefix configured")
+          .asRuntimeException()
+      )
+    synchronizerNodeReconciler
+      .reconcileSynchronizerNodeConfigIfRequired(
+        Some(node),
+        domainId,
+        SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately,
+        migrationId,
+      )
+      .map(_ => SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse.OK)
   }
 
   override def signDsoPartyToParticipant(

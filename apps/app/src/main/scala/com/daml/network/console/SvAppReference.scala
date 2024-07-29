@@ -404,6 +404,13 @@ class SvAppBackendReference(
       httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
     }
 
+  def reconcileSynchronizerDamlState(domainIdPrefix: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvSoftDomainMigrationPocAppClient.ReconcileSynchronizerDamlState(domainIdPrefix)
+      )
+    }
+
   def signDsoPartyToParticipant(domainIdPrefix: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvSoftDomainMigrationPocAppClient.SignDsoPartyToParticipant(domainIdPrefix))

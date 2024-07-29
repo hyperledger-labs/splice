@@ -476,7 +476,7 @@ class FoundingNodeInitializer(
       synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
         localSynchronizerNode,
         domainId,
-        SynchronizerNodeState.Onboarded,
+        SynchronizerNodeState.OnboardedImmediately,
         migrationId,
       )
     }

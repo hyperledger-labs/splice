@@ -90,7 +90,9 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                 store
                   .getDsoRulesWithMemberNodeStates()
                   .flatMap(rulesAndStates => {
-                    if (rulesAndStates.activeSvParticipantAndMediatorIds().contains(memberId)) {
+                    if (
+                      rulesAndStates.activeSvParticipantAndMediatorIds(domainId).contains(memberId)
+                    ) {
                       // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
                       // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
                       // SV related MemberTraffic contracts here as a safeguard for the case of 3rd party top-ups

@@ -29,7 +29,7 @@ import com.daml.network.sv.cometbft.{
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.{
-  Onboarded,
+  OnboardedAfterDelay,
   Onboarding,
 }
 import com.daml.network.sv.onboarding.{
@@ -325,7 +325,7 @@ class JoiningNodeInitializer(
         .reconcileSynchronizerNodeConfigIfRequired(
           localSynchronizerNode,
           decentralizedSynchronizer,
-          Onboarded,
+          OnboardedAfterDelay,
           config.domainMigrationId,
         )
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
