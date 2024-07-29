@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+
+0.1.17
+--------
+
 * Wallet automation
 
   * Fix an issue in the wallet sweep automation where it created

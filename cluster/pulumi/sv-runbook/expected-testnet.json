@@ -207,7 +207,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -458,7 +458,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "global-domain-2-cometbft",
     "provider": "",
@@ -537,7 +537,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "global-domain-2",
     "provider": "",
@@ -605,7 +605,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "loopback",
     "provider": "",
@@ -683,7 +683,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "participant-2",
     "provider": "",
@@ -751,7 +751,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "scan",
     "provider": "",
@@ -830,7 +830,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -975,7 +975,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-app",
     "provider": "",
@@ -1096,7 +1096,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1173,7 +1173,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1250,7 +1250,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1363,7 +1363,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "validator",
     "provider": "",
