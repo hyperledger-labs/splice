@@ -538,6 +538,7 @@ commands:
           when: always
           cmd: |
             export KUBECONFIG=$PWD/.kubecfg
+            export CLUSTER_LOCK_REAPER_RUN="true"
 
             cncluster activate
             cncluster show
