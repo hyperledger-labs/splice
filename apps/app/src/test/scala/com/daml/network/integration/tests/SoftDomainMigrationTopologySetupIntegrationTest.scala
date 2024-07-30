@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
 }
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.splice.dsorules.{DsoRulesConfig, DsoRules_SetConfig}
-import com.daml.network.config.{ConfigTransforms, Thresholds}
+import com.daml.network.config.ConfigTransforms
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.scan.config.ScanSynchronizerConfig
@@ -24,14 +24,12 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
 import com.daml.network.util.{Codec, ConfigScheduleUtil, WalletTestUtil}
-import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.{SequencerConnections, SubmissionRequestAmplification}
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 
@@ -245,14 +243,6 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           )
         }
       }
-      // TODO(#13714) Reenable once the connection trigger is fixed.
-      clue("Disable sequencer connection triggers") {
-        env.validators.local.map { validator =>
-          if (!validator.name.startsWith("sv")) {
-            validator.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger].pause()
-          }
-        }
-      }
       clue("Reconcile Daml synchronizer state") {
         val reconciled = env.svs.local.map { sv =>
           Future { sv.reconcileSynchronizerDamlState(prefix) }
@@ -260,57 +250,27 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         reconciled.foreach(_.futureValue)
       }
     }
-    clue("All participants connect to new domain") {
-      val domainAlias = DomainAlias.tryCreate(prefix)
-      val connections = clue("SV participants connect to new domain") {
-        env.svs.local.map { sv =>
-          val participant = sv.participantClient
-          val connection =
-            LocalSynchronizerNode.toSequencerConnection(
-              sv.config.synchronizerNodes(prefix).sequencer.internalApi,
-              SequencerAlias.tryCreate(sv.config.onboarding.value.name),
-            )
-          participant.domains.register_with_config(
-            DomainConnectionConfig(
-              domainAlias,
-              SequencerConnections.single(connection),
-            ),
-            handshakeOnly = false,
+    val domainAlias = DomainAlias.tryCreate(prefix)
+    clue("SV participants connect to new domain") {
+      env.svs.local.map { sv =>
+        val participant = sv.participantClient
+        val connection =
+          LocalSynchronizerNode.toSequencerConnection(
+            sv.config.synchronizerNodes(prefix).sequencer.internalApi,
+            SequencerAlias.tryCreate(sv.config.onboarding.value.name),
           )
-          val domainId = participant.domains.id_of(domainAlias)
-          participant.health.ping(
-            participant.id,
-            domainId = Some(domainId),
-          )
-          connection
-        }
-      }
-      clue("Non-SV validator participants connect to new domain") {
-        val sequencerConnections = SequencerConnections.tryMany(
-          connections,
-          Thresholds.sequencerConnectionsSizeThreshold(connections.size),
-          SubmissionRequestAmplification(
-            Thresholds.sequencerSubmissionRequestAmplification(connections.size),
-            NonNegativeFiniteDuration.ofSeconds(10),
+        participant.domains.register_with_config(
+          DomainConnectionConfig(
+            domainAlias,
+            SequencerConnections.single(connection),
           ),
+          handshakeOnly = false,
         )
-        env.validators.local.map { validator =>
-          if (!validator.name.startsWith("sv")) {
-            val participant = validator.participantClient
-            participant.domains.register_with_config(
-              DomainConnectionConfig(
-                domainAlias,
-                sequencerConnections,
-              ),
-              handshakeOnly = false,
-            )
-            val domainId = participant.domains.id_of(domainAlias)
-            participant.health.ping(
-              participant.id,
-              domainId = Some(domainId),
-            )
-          }
-        }
+        val domainId = participant.domains.id_of(domainAlias)
+        participant.health.ping(
+          participant.id,
+          domainId = Some(domainId),
+        )
       }
     }
     clue("Sign DSO PartToParticipant mapping") {

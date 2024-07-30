@@ -24,7 +24,6 @@ import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUserPartyTrigger, WalletAppInstallTrigger}
 import com.daml.network.wallet.util.ValidatorTopupConfig
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -44,7 +43,6 @@ class ValidatorAutomationService(
     appManagerConfig: Option[AppManagerConfig],
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
-    decentralizedSynchronizerAlias: DomainAlias,
     isSvValidator: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
@@ -191,9 +189,9 @@ class ValidatorAutomationService(
         triggerContext,
         participantAdminConnection,
         scanConnection,
-        decentralizedSynchronizerAlias,
         domainConnector,
         sequencerSubmissionAmplificationPatience,
+        supportsSoftDomainMigrationPoc,
       )
     )
 

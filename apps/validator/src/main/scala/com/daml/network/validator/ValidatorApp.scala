@@ -186,7 +186,17 @@ class ValidatorApp(
                   loggerFactory,
                 )
                 domainConnector.getDecentralizedSynchronizerSequencerConnections.flatMap {
-                  sequencerConnections =>
+                  allSequencerConnections =>
+                    val sequencerConnections = allSequencerConnections.values.toSeq match {
+                      case Seq() =>
+                        sys.error("Expected at least one sequencer connection but got 0")
+                      case Seq(connections) => connections
+                      // TODO (#13301) handle this in a cleaner way (or just drop hard domain migration support at some point)
+                      case _ =>
+                        sys.error(
+                          s"Hard domain migrations and soft domain migrations are incompatible, got sequencer connections: $allSequencerConnections"
+                        )
+                    }
                     appInitStep("Connecting domain and restoring data") {
                       decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
                         connection,
@@ -675,7 +685,6 @@ class ValidatorApp(
         config.appManager,
         config.domains.global.url.isEmpty,
         config.prevetDuration,
-        config.domains.global.alias,
         config.svValidator,
         clock,
         domainTimeAutomationService.domainTimeSync,
@@ -706,9 +715,7 @@ class ValidatorApp(
         config.supportsSoftDomainMigrationPoc,
         loggerFactory,
       )
-      domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {
-        store.domains.waitForDomainConnection(config.domains.global.alias)
-      }
+      domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
           setupAppInstance(

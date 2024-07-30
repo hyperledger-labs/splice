@@ -361,6 +361,28 @@ class ParticipantAdminConnection(
       }
     } yield configModified
 
+  def modifyOrRegisterDomainConnectionConfig(
+      config: DomainConnectionConfig,
+      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Boolean] =
+    for {
+      configO <- lookupDomainConnectionConfig(config.domain)
+      needsReconnect <- configO match {
+        case Some(config) =>
+          modifyDomainConnectionConfig(
+            config.domain,
+            f,
+          )
+        case None =>
+          logger.info(s"Domain ${config.domain} is new, registering")
+          ensureDomainRegisteredAndConnected(
+            config,
+            retryFor,
+          ).map(_ => false)
+      }
+    } yield needsReconnect
+
   def modifyDomainConnectionConfigAndReconnect(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
@@ -373,6 +395,22 @@ class ParticipantAdminConnection(
             s"reconnect to the domain $domain for new sequencer configuration to take effect"
           )
           reconnectDomain(domain)
+        } else Future.unit
+    } yield ()
+
+  def modifyOrRegisterDomainConnectionConfigAndReconnect(
+      config: DomainConnectionConfig,
+      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    for {
+      configModified <- modifyOrRegisterDomainConnectionConfig(config, f, retryFor)
+      _ <-
+        if (configModified) {
+          logger.info(
+            s"reconnect to the domain ${config.domain} for new sequencer configuration to take effect"
+          )
+          reconnectDomain(config.domain)
         } else Future.unit
     } yield ()
 

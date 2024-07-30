@@ -67,21 +67,31 @@ class DomainConnector(
   def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    val decentralizedSynchronizerAlias = config.domains.global.alias
     getDecentralizedSynchronizerSequencerConnections.flatMap(
-      ensureDomainRegistered(decentralizedSynchronizerAlias, _)
+      _.toList.traverse_ { case (alias, connections) =>
+        ensureDomainRegistered(alias, connections)
+      }
     )
   }
 
   def getDecentralizedSynchronizerSequencerConnections(implicit
       tc: TraceContext
-  ): Future[SequencerConnections] = {
-    // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
+  ): Future[Map[DomainAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
         sequencerConnectionsFromScan()
       case Some(url) =>
-        SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)).pure[Future]
+        if (config.supportsSoftDomainMigrationPoc) {
+          // TODO (#13301) Make this work by making the config more flexible.
+          sys.error(
+            "Soft domain migration PoC is incompatible with manually specified sequencer connections"
+          )
+        } else {
+          Map(
+            config.domains.global.alias -> SequencerConnections
+              .single(GrpcSequencerConnection.tryCreate(url))
+          ).pure[Future]
+        }
     }
   }
 
@@ -112,22 +122,24 @@ class DomainConnector(
   }
 
   private def sequencerConnectionsFromScan(
-  )(implicit tc: TraceContext) = for {
+  )(implicit tc: TraceContext): Future[Map[DomainAlias, SequencerConnections]] = for {
     _ <- waitForSequencerConnectionsFromScan(logger, retryProvider)
     sequencerConnections <- getSequencerConnectionsFromScan(clock.now)
-  } yield NonEmpty.from(sequencerConnections) match {
-    case None =>
-      sys.error("sequencer connections from scan is not expected to be empty.")
-    case Some(nonEmptyConnections) =>
-      SequencerConnections.tryMany(
-        nonEmptyConnections.forgetNE,
-        Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-        submissionRequestAmplification = SubmissionRequestAmplification(
-          Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
-          config.sequencerRequestAmplificationPatience,
-        ),
-      )
-  }
+  } yield sequencerConnections.view.mapValues { connections =>
+    NonEmpty.from(connections) match {
+      case None =>
+        sys.error("sequencer connections from scan is not expected to be empty.")
+      case Some(nonEmptyConnections) =>
+        SequencerConnections.tryMany(
+          nonEmptyConnections.forgetNE,
+          Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+          submissionRequestAmplification = SubmissionRequestAmplification(
+            Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
+            config.sequencerRequestAmplificationPatience,
+          ),
+        )
+    }
+  }.toMap
 
   private def waitForSequencerConnectionsFromScan(
       logger: TracedLogger,
@@ -154,16 +166,27 @@ class DomainConnector(
       domainTime: CantonTimestamp
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[GrpcSequencerConnection]] = {
+  ): Future[Map[DomainAlias, Seq[GrpcSequencerConnection]]] = {
     for {
-      decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       domainSequencers <- scanConnection.listDsoSequencers()
-      maybeSequencers = domainSequencers.find(_.domainId == decentralizedSynchronizerId)
-    } yield maybeSequencers.fold {
-      logger.warn("global domain sequencer list not found.")
-      Seq.empty[GrpcSequencerConnection]
-    } { domainSequencer =>
-      extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
+      decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+    } yield {
+      val filteredSequencers = domainSequencers
+        .filter(sequencers =>
+          if (config.supportsSoftDomainMigrationPoc) true
+          // This filter should be a noop since we only ever expect to have one synchronizer here without soft domain migrations
+          // so this is just an extra safeguard.
+          else sequencers.domainId == decentralizedSynchronizerId
+        )
+      filteredSequencers.map { domainSequencer =>
+        val alias = if (config.supportsSoftDomainMigrationPoc)
+          DomainAlias.tryCreate(
+            s"${config.domains.global.alias.unwrap}-${domainSequencer.domainId.uid.identifier.unwrap}"
+          )
+        else config.domains.global.alias
+        alias ->
+          extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
+      }.toMap
     }
   }
 
@@ -192,4 +215,11 @@ class DomainConnector(
       }
     validConnections
   }
+}
+
+object DomainConnector {
+  final case class DomainConnection(
+      alias: DomainAlias,
+      connections: Seq[GrpcSequencerConnection],
+  )
 }

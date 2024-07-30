@@ -249,5 +249,4 @@ private[validator] object ValidatorUtil {
         )
       case Some(wallet) => Future.successful(wallet)
     }
-
 }
