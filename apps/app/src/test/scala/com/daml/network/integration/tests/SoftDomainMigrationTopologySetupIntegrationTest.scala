@@ -370,7 +370,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           .extraTrafficPurchased shouldBe >(NonNegativeLong.zero)
       }
     }
-    clue("All SV paritcipants have unlimited traffic on new domain") {
+    clue("All SV participants have unlimited traffic on new domain") {
       eventually() {
         env.svs.local.foreach { sv =>
           val participantId = sv.participantClient.id
@@ -378,7 +378,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             sv1Backend
               .sequencerClient(newDomainId)
               .traffic_control
-              .traffic_state_of_members(
+              .last_traffic_state_update_of_members(
                 Seq(participantId)
               )
               .trafficStates
@@ -400,7 +400,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           sv1Backend
             .sequencerClient(newDomainId)
             .traffic_control
-            .traffic_state_of_members(
+            .last_traffic_state_update_of_members(
               Seq(mediator)
             )
             .trafficStates
