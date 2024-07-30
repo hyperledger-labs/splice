@@ -99,9 +99,4 @@ Submission was refused because traffic control validation failed: IncorrectEvent
 The domain Domain 'global' failed the following topology transactions
 INCORRECT_EVENT_COST.*: Missing or incorrect event cost provided by member
 
-
-# TODO(#13301) Drop this once Canton stops issuing these warnings
-Using approximate topology snapshot.*EnterpriseSequencerRateLimitManager.*SequencerNew
-The desired timestamp.*TrafficPurchasedManager.*SequencerNew
-
 # Make sure to have a trailing newline
