@@ -112,5 +112,6 @@ workflow:
           is_shared_cluster: false
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - restore_node

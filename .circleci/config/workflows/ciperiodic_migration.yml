@@ -234,6 +234,7 @@ workflow:
           is_shared_cluster: false
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - preflight_sv_check_redeployed
       - autoscaler_allow_scaledown:

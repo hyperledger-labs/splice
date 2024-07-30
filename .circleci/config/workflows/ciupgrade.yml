@@ -21,6 +21,7 @@ workflow:
           silence_deployment_alerts: true
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - wait_for_previous_pipeline
       - deploy_cluster:
@@ -321,6 +322,7 @@ workflow:
           cluster: "ciupgrade"
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - preflight_sv_check_after_sv_redeploy
             - preflight_validator_runbook_after_redeploy

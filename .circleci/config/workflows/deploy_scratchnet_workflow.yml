@@ -159,6 +159,7 @@
           cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - preflight_validator_check
             - preflight_sv_check
@@ -290,6 +291,7 @@
           cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
+            - slack-context
           requires:
             - preflight_check_DR
             - preflight_sv_check_DR
