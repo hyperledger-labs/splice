@@ -3064,6 +3064,8 @@ jobs:
               cncluster wait $ns validator-app << parameters.migration_id >>
             done
             cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
