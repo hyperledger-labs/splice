@@ -41,12 +41,11 @@ jobs:
             else
               cncluster reset
             fi
-          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-          cmd_retry_count: 2
-          cmd_before_retry: |-
-            echo "VPN connection seems to have died, restarting VPN and retrying..."
-            /tmp/vpn-scripts/restart-vpn.sh
-            cncluster prefresh
+          cmd_retry_count: 3
+          cmd_before_retry: .circleci/post-slack-message.sh "Reset of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+      - notify-cluster-fail:
+          channel_notify: << parameters.channel_notify >>
+          cluster: << parameters.cluster >>
 
   reset_sv_runbook:
     machine:

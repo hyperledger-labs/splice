@@ -70,6 +70,7 @@ jobs:
                 cmd_name: Reset SV runbook
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
+                cmd_retry_count: 3
                 cmd: |
                   cncluster activate
 
@@ -190,6 +191,7 @@ jobs:
                 cmd_name: Reset Validator runbook
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
+                cmd_retry_count: 3
                 cmd: |
                   cncluster activate
 
@@ -275,6 +277,7 @@ jobs:
                 cmd_name: Reset multi-validator pulumi stack
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
+                cmd_retry_count: 3
                 cmd: |
                   cncluster activate
                   cncluster ci_pdown_multi
