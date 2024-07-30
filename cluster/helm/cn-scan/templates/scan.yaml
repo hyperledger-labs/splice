@@ -53,11 +53,11 @@ spec:
               name: {{ $.Values.persistence.secretName }}
               key: postgresPassword
         {{- end }}
-        {{- if .Values.isFounder }}
-        - name: ADDITIONAL_CONFIG_IS_FOUNDER
+        {{- if .Values.isFirstSv }}
+        - name: ADDITIONAL_CONFIG_IS_SV1
           value: |
             canton.scan-apps.scan-app {
-              is-founder = true
+              is-first-sv = true
             }
         {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID

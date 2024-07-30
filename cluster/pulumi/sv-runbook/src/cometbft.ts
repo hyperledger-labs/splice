@@ -105,7 +105,7 @@ export function installCometBftNode(
             retainBlocks: cometbftRetainBlocks,
           },
           // TODO(#12361): Avoid duplicating these config values here by moving them into pulumi/common.
-          founder: isMainNet
+          sv1: isMainNet
             ? {
                 nodeId: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
                 keyAddress: '9473617BBC80C12F68CC25B5A754D1ED9035886C',

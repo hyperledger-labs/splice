@@ -63,7 +63,7 @@ object DbScanStore {
 class DbScanStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
-    isFounder: Boolean,
+    isFirstSv: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
@@ -128,7 +128,7 @@ class DbScanStore(
       new ScanAggregator(
         storage,
         storeId,
-        isFounder,
+        isFirstSv,
         createScanAggregatesReader(this),
         loggerFactory,
         domainMigrationId,

@@ -141,13 +141,13 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     loggerFactory,
   )
 
-  protected def rotateGenesisGovernanceKeyForFounder(
+  protected def rotateGenesisGovernanceKeyForSV1(
       cometBftNode: Option[CometBftNode],
       name: String,
   )(implicit tc: TraceContext): Future[Unit] =
     cometBftNode match {
       case Some(cometBftNode) =>
-        cometBftNode.rotateGenesisGovernanceKeyForFounder(name)
+        cometBftNode.rotateGenesisGovernanceKeyForSV1(name)
       case _ => Future.unit
     }
 

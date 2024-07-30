@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.onboarding.founder
+package com.daml.network.sv.onboarding.sv1
 
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
@@ -33,7 +33,7 @@ import com.daml.network.sv.onboarding.{
   SynchronizerNodeReconciler,
 }
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
-import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
+import com.daml.network.sv.onboarding.sv1.SV1Initializer.bootstrapTransactionOrdering
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
@@ -77,11 +77,11 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
-/** Container for the methods required by the SvApp to initialize the founding SV node. */
-class FoundingNodeInitializer(
+/** Container for the methods required by the SvApp to initialize sv1. */
+class SV1Initializer(
     localSynchronizerNode: LocalSynchronizerNode,
     extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
-    foundingConfig: SvOnboardingConfig.FoundDso,
+    sv1Config: SvOnboardingConfig.FoundDso,
     requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -117,13 +117,13 @@ class FoundingNodeInitializer(
     )
   ] = {
     for {
-      _ <- rotateGenesisGovernanceKeyForFounder(cometBftNode, foundingConfig.name)
+      _ <- rotateGenesisGovernanceKeyForSV1(cometBftNode, sv1Config.name)
       initConnection = ledgerClient.readOnlyConnection(
         this.getClass.getSimpleName,
         loggerFactory,
       )
       (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
-      _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
+      _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         DomainConnectionConfig(
           config.domains.global.alias,
@@ -145,12 +145,12 @@ class FoundingNodeInitializer(
         ),
         retryProvider.ensureThatB(
           RetryFor.WaitingOnInitDependency,
-          "founder_initial_package_upload",
-          "Founder has uploaded the initial set of packages",
+          "sv1_initial_package_upload",
+          "SV1 has uploaded the initial set of packages",
           initConnection
             .lookupUserMetadata(
               config.ledgerApiUser,
-              BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+              BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
             )
             .map(_.nonEmpty),
           participantAdminConnection
@@ -161,7 +161,7 @@ class FoundingNodeInitializer(
             .flatMap { _ =>
               initConnection.ensureUserMetadataAnnotation(
                 config.ledgerApiUser,
-                BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+                BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
                 "true",
                 RetryFor.WaitingOnInitDependency,
               )
@@ -172,8 +172,7 @@ class FoundingNodeInitializer(
       storeKey = SvStore.Key(svParty, dsoParty)
       migrationInfo =
         DomainMigrationInfo(
-          currentMigrationId =
-            config.domainMigrationId, // Note: not guaranteed to be 0 for the founding node
+          currentMigrationId = config.domainMigrationId, // Note: not guaranteed to be 0 for sv1
           acsRecordTime = None, // No previous migration, we're starting the network
         )
       svStore = newSvStore(storeKey, migrationInfo, participantId)
@@ -247,7 +246,7 @@ class FoundingNodeInitializer(
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore, domainId)
       // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
-      // for example if the founding SV node restarted after bootstrapping the DsoRules.
+      // for example if sv1 restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
       _ <- withDsoStore.reconcileSequencerConfigIfRequired(
         Some(localSynchronizerNode),
@@ -295,7 +294,7 @@ class FoundingNodeInitializer(
     for {
       dso <- connection.ensurePartyAllocated(
         TopologyStoreId.DomainStore(domain),
-        foundingConfig.dsoPartyHint,
+        sv1Config.dsoPartyHint,
         Some(namespace),
         participantAdminConnection,
       )
@@ -309,11 +308,11 @@ class FoundingNodeInitializer(
 
   private def initialTrafficControlParameters: TrafficControlParameters = {
     TrafficControlParameters(
-      foundingConfig.initialSynchronizerFeesConfig.baseRateBurstAmount,
-      foundingConfig.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
+      sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount,
+      sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
       NonNegativeFiniteDuration.tryOfMillis(
-        foundingConfig.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toMillis
+        sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toMillis
       ),
     )
   }
@@ -322,7 +321,7 @@ class FoundingNodeInitializer(
       tc: TraceContext
   ): Future[(Namespace, DomainId)] = {
     withSpan("bootstrapDomain") { implicit tc => _ =>
-      logger.info("Bootstrapping the domain as the founding node")
+      logger.info("Bootstrapping the domain as sv1")
 
       (
         participantAdminConnection.getParticipantId(),
@@ -503,18 +502,18 @@ class FoundingNodeInitializer(
                 )
               case None =>
                 val amuletConfig = defaultAmuletConfig(
-                  foundingConfig.initialTickDuration,
-                  foundingConfig.initialMaxNumInputs,
+                  sv1Config.initialTickDuration,
+                  sv1Config.initialMaxNumInputs,
                   domainId,
-                  foundingConfig.initialSynchronizerFeesConfig.extraTrafficPrice.value,
-                  foundingConfig.initialSynchronizerFeesConfig.minTopupAmount.value,
-                  foundingConfig.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
-                  foundingConfig.initialSynchronizerFeesConfig.baseRateBurstWindow,
-                  foundingConfig.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
-                  foundingConfig.initialHoldingFee,
+                  sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
+                  sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
+                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
+                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
+                  sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
+                  sv1Config.initialHoldingFee,
                 )
                 for {
-                  founderSynchronizerNodes <- SvUtil.getFounderSynchronizerNodeConfig(
+                  sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
                     localSynchronizerNode,
                     config.scan,
@@ -524,7 +523,7 @@ class FoundingNodeInitializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping DSO as $dsoParty and BFT nodes $founderSynchronizerNodes"
+                      s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes"
                     )
                   _ <- dsoStoreWithIngestion.connection
                     .submit(
@@ -533,24 +532,24 @@ class FoundingNodeInitializer(
                       new splice.dsobootstrap.DsoBootstrap(
                         dsoParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
-                        foundingConfig.name,
-                        foundingConfig.founderSvRewardWeightBps,
+                        sv1Config.name,
+                        sv1Config.firstSvRewardWeightBps,
                         participantId.toProtoPrimitive,
-                        founderSynchronizerNodes,
+                        sv1SynchronizerNodes,
                         new RelTime(
                           TimeUnit.NANOSECONDS.toMicros(
-                            foundingConfig.roundZeroDuration
-                              .getOrElse(foundingConfig.initialTickDuration)
+                            sv1Config.roundZeroDuration
+                              .getOrElse(sv1Config.initialTickDuration)
                               .duration
                               .toNanos
                           )
                         ),
                         amuletConfig,
-                        foundingConfig.initialAmuletPrice.bigDecimal,
+                        sv1Config.initialAmuletPrice.bigDecimal,
                         defaultAnsConfig(
-                          foundingConfig.initialAnsConfig.renewalDuration,
-                          foundingConfig.initialAnsConfig.entryLifetime,
-                          foundingConfig.initialAnsConfig.entryFee,
+                          sv1Config.initialAnsConfig.renewalDuration,
+                          sv1Config.initialAnsConfig.entryLifetime,
+                          sv1Config.initialAnsConfig.entryFee,
                         ),
                         dsoRulesConfig,
                         trafficStateForAllMembers
@@ -561,7 +560,7 @@ class FoundingNodeInitializer(
                           )
                           .toMap
                           .asJava,
-                        foundingConfig.isDevNet,
+                        sv1Config.isDevNet,
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
@@ -578,13 +577,13 @@ class FoundingNodeInitializer(
               case Some(amuletRules) =>
                 if (dsoRules.payload.svs.keySet.contains(svParty.toProtoPrimitive)) {
                   logger.info(
-                    "AmuletRules and DsoRules already exist and founding party is an SV; doing nothing." +
+                    "AmuletRules and DsoRules already exist and sv1 party is an SV; doing nothing." +
                       show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
                   Future.successful(())
                 } else {
                   sys.error(
-                    "AmuletRules and DsoRules already exist but party tasked with founding the DSO isn't member." +
+                    "AmuletRules and DsoRules already exist but party tasked with sv1 the DSO isn't member." +
                       "Is more than one SV app configured to `found-dso`?" +
                       show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
@@ -603,7 +602,7 @@ class FoundingNodeInitializer(
 
 }
 
-object FoundingNodeInitializer {
+object SV1Initializer {
 
   /** Same ordering as https://github.com/DACH-NY/canton/blob/2fc1a37d815623cb68dcb4b75bc33a498065990e/enterprise/app-base/src/main/scala/com/digitalasset/canton/console/EnterpriseConsoleMacros.scala#L160
     */

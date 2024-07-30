@@ -224,7 +224,7 @@ object SpliceUtil {
   val defaultLockHolderFee = new splice.fees.FixedFee(damlDecimal(0.005))
 
   // These are dummy values only made use of by some unit tests.
-  // The synchronizer fees parameters are provided in the founding SV App config with the defaults in SynchronizerFeesConfig
+  // The synchronizer fees parameters are provided in sv1 App config with the defaults in SynchronizerFeesConfig
   private val dummyExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
   private val dummyMinTopupAmount = 1_000_000L
   private val dummyBaseRateBurstAmount = 10 * 20 * 1000L

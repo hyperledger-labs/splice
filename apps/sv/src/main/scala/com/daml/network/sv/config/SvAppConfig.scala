@@ -72,7 +72,7 @@ object SvBootstrapDumpConfig {
 object SvOnboardingConfig {
   case class FoundDso(
       name: String,
-      founderSvRewardWeightBps: Long,
+      firstSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
       initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
@@ -161,7 +161,7 @@ case class SvAppBackendConfig(
     override val storage: SpliceDbConfig,
     ledgerApiUser: String,
     // The SV app shares the primary party with the validator app. To discover it we query the
-    // validator user. Additionally, the founding SV app is expected to create that user,
+    // validator user. Additionally, sv1 app is expected to create that user,
     // so it needs to know the expected user name.
     validatorLedgerApiUser: String,
     auth: AuthConfig,
@@ -213,8 +213,8 @@ case class SvAppBackendConfig(
     }
     .orElse {
       onboarding match {
-        case Some(founder: SvOnboardingConfig.FoundDso) if founder.name == name =>
-          Some(founder.founderSvRewardWeightBps)
+        case Some(sv1: SvOnboardingConfig.FoundDso) if sv1.name == name =>
+          Some(sv1.firstSvRewardWeightBps)
         case _ => None
       }
     }

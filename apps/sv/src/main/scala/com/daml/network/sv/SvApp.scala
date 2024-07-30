@@ -48,7 +48,7 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, SynchronizerNodeIdentities}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
-import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
+import com.daml.network.sv.onboarding.sv1.SV1Initializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.DsoPartyMigration
 import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
@@ -315,7 +315,7 @@ class SvApp(
       // We branch here on the type of onboarding config, as bootstrapping
       // a fresh dso is fundamentally different from joining an existing dso
       config.onboarding match {
-        case Some(foundingConfig: SvOnboardingConfig.FoundDso) =>
+        case Some(sv1Config: SvOnboardingConfig.FoundDso) =>
           for {
             signer <- CometBftRequestSigner.getOrGenerateSigner(
               "cometbft-governance-keys",
@@ -331,13 +331,13 @@ class SvApp(
                 retryProvider,
               )
             )
-            res <- appInitStep("FoundingNodeInitializer founding Dso") {
-              val initializer = new FoundingNodeInitializer(
+            res <- appInitStep("SV1Initializer bootstrapping Dso") {
+              val initializer = new SV1Initializer(
                 localSynchronizerNode.getOrElse(
-                  sys.error("Founding node must always specify a domain config")
+                  sys.error("SV1 must always specify a domain config")
                 ),
                 extraSynchronizerNodes,
-                foundingConfig,
+                sv1Config,
                 darFilesToBootstrapNetwork,
                 participantId,
                 config,

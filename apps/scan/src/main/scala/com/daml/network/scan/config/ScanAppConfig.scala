@@ -34,7 +34,7 @@ case class ScanAppBackendConfig(
     // This is for the Poc from #13301
     synchronizers: Map[String, ScanSynchronizerConfig] = Map.empty,
     override val automation: AutomationConfig = AutomationConfig(),
-    isFounder: Boolean = false,
+    isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,

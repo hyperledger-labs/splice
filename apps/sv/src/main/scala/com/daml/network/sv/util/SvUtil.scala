@@ -46,8 +46,8 @@ import scala.jdk.OptionConverters.*
 
 object SvUtil {
 
-  // Assumption: the founder node is run by the foundation
-  val DefaultFoundingNodeWeight: Long = 10_000L
+  // Assumption: the sv1 node is run by the foundation
+  val DefaultSV1Weight: Long = 10_000L
 
   // We set the reconciliation interval for ACS commitments to 30 mins by default to ensure that
   // frequent ACS commitments do not eat up the base rate traffic and prevent validators from topping up
@@ -116,7 +116,7 @@ object SvUtil {
       Map(
         domainId.toProtoPrimitive -> new SynchronizerConfig(
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
-          "TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.",
+          "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
           // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
           Optional.of(defaultAcsCommitmentReconciliationInterval.duration.toSeconds),
         )
@@ -153,7 +153,7 @@ object SvUtil {
     }
   }.sequence
 
-  def getFounderSynchronizerNodeConfig(
+  def getSV1SynchronizerNodeConfig(
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
       scanConfig: Option[SvScanConfig],

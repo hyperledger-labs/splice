@@ -75,7 +75,7 @@ spec:
             - name: HOME
               value: /cometbft
             - name: STATE_SYNC_ENABLE
-              value: "{{ and $.Values.stateSync.enable (ne $.Values.founder.nodeId $.Values.node.id) }}"
+              value: "{{ and $.Values.stateSync.enable (ne $.Values.sv1.nodeId $.Values.node.id) }}"
             - name: STATE_SYNC_RPC_SERVERS
               value: "{{ $.Values.stateSync.rpcServers }}"
             # the trust height will be set to these many blocks earlier than the latest block height

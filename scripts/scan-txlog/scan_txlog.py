@@ -3308,8 +3308,8 @@ async def _process_transaction(args, app_state, scan_client, transaction):
 
     if transaction.is_acs_import():
         # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
-        # Note that this also ignores the ACS import of non-founding SVs atm. This would be correct once we do backfilling of history
-        # but until then this script can only run against the founding SV.
+        # Note that this also ignores the ACS import of non-sv1 SVs atm. This would be correct once we do backfilling of history
+        # but until then this script can only run against sv1.
         LOG.debug(
             f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
         )

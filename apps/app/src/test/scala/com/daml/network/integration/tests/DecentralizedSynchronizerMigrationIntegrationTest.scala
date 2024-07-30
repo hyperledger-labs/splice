@@ -726,7 +726,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
 
             withClueAndLog("migrate the late joining node") {
-              // sv1 is the founder so specifically join it later to validate our replay
+              // sv1 is the sv1 so specifically join it later to validate our replay
               sv1LocalBackend.startSync()
 
               val changeSerial = namespaceChangeResult.map(_.base.serial).max
@@ -907,7 +907,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     new DsoRules_AddSv(
                       "bob",
                       "Bob",
-                      SvUtil.DefaultFoundingNodeWeight,
+                      SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
                       new Round(42),
                     )

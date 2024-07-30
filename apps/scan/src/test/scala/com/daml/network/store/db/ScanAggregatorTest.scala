@@ -67,7 +67,7 @@ class ScanAggregatorTest
       }
     }
 
-    "get aggregates from DSO when no previous round totals exist and not founder" in {
+    "get aggregates from DSO when no previous round totals exist and not sv1" in {
       val firstOpenMiningRound = 4L
       val dsoAggregatedRound = firstOpenMiningRound - 1
       val dsoRoundTotals = RoundTotals(
@@ -128,7 +128,7 @@ class ScanAggregatorTest
       }
     }
 
-    "start from round zero when no previous round totals exist and founder, not read from DSO" in {
+    "start from round zero when no previous round totals exist and sv1, not read from DSO" in {
       for {
         (aggr, store) <- mkAggregator(dsoParty, ingestFromParticipantBegin = true)
         _ <- addOpenRound(store, 0L)
@@ -144,7 +144,7 @@ class ScanAggregatorTest
       }
     }
 
-    "Not start from round zero when round zero closes, no first open mining round is found, not founder and no previous aggregates exist" in {
+    "Not start from round zero when round zero closes, no first open mining round is found, not sv1 and no previous aggregates exist" in {
       val closedRound = closedMiningRound(dsoParty, round = 0L)
       for {
         (aggr, store) <- mkAggregator(dsoParty, ingestFromParticipantBegin = false)
@@ -669,7 +669,7 @@ class ScanAggregatorTest
     val store = new DbScanStore(
       key = ScanStore.Key(dsoParty),
       storage = storage,
-      isFounder = ingestFromParticipantBegin,
+      isFirstSv = ingestFromParticipantBegin,
       loggerFactory,
       RetryProvider(
         loggerFactory,

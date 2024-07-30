@@ -39,7 +39,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       onboardingName: string;
       nodeConfigs: {
         self: StaticCometBftConfigWithNodeName;
-        founder: StaticCometBftConfigWithNodeName;
+        sv1: StaticCometBftConfigWithNodeName;
         peers: StaticCometBftConfigWithNodeName[];
       };
       syncSource?: Release;
@@ -129,7 +129,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     return `${this.name}-mediator`;
   }
 
-  get founderInternalSequencerAddress(): string {
+  get sv1InternalSequencerAddress(): string {
     return `http://${this.namespaceInternalSequencerAddress}.sv-1:5008`;
   }
 }

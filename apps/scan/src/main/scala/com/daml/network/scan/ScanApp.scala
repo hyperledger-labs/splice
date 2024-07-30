@@ -136,7 +136,7 @@ class ScanApp(
       store = ScanStore(
         key = ScanStore.Key(dsoParty = dsoParty),
         storage,
-        isFounder = config.isFounder,
+        isFirstSv = config.isFirstSv,
         loggerFactory,
         retryProvider,
         { store =>

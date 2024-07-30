@@ -211,13 +211,13 @@ external_address = "{{ .Values.node.externalAddress }}"
 # Comma separated list of seed nodes to connect to
 seeds = ""
 
-{{- $peers := print .Values.founder.nodeId "@" .Values.founder.externalAddress -}}
+{{- $peers := print .Values.sv1.nodeId "@" .Values.sv1.externalAddress -}}
 {{- range $index, $item := .Values.peers -}}
   {{- $peers = print $peers "," $item.nodeId "@" $item.externalAddress -}}
 {{- end -}}
 
 # Comma separated list of nodes to keep persistent connections to
-{{- if ne .Values.founder.nodeId .Values.node.id }}
+{{- if ne .Values.sv1.nodeId .Values.node.id }}
 persistent_peers = "{{ $peers }}"
 {{- else }}
 persistent_peers = ""
@@ -240,8 +240,8 @@ max_num_inbound_peers = 40
 max_num_outbound_peers = 10
 
 # List of node IDs, to which a connection will be (re)established ignoring any existing limits
-{{- if ne .Values.founder.nodeId .Values.node.id }}
-unconditional_peer_ids = "{{ .Values.founder.nodeId }}"
+{{- if ne .Values.sv1.nodeId .Values.node.id }}
+unconditional_peer_ids = "{{ .Values.sv1.nodeId }}"
 {{- else }}
 unconditional_peer_ids = ""
 {{- end }}

@@ -232,7 +232,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
               new dsorules.DsoRules_AddSv(
                 "alice",
                 "Alice",
-                SvUtil.DefaultFoundingNodeWeight,
+                SvUtil.DefaultSV1Weight,
                 "alice-participant-id",
                 dummyRound,
               )
@@ -300,7 +300,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         new so.SvOnboardingConfirmed(
           sv1Party.toProtoPrimitive,
           "irrelevant name",
-          SvUtil.DefaultFoundingNodeWeight,
+          SvUtil.DefaultSV1Weight,
           "PAR::sv::1220f3e2",
           "observing domain migration",
           dsoParty.toProtoPrimitive,

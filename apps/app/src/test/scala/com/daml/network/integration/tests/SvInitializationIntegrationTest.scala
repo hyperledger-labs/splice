@@ -36,14 +36,14 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   "can start before its validator app" in { implicit env =>
     // we want this so we can have a clear init dependency validator app -> sv app
-    clue("Starting founding SV's SV app") {
+    clue("Starting sv1's SV app") {
       sv1Backend.startSync()
     }
-    clue("Starting founding SV's scan app") {
+    clue("Starting sv1's scan app") {
       // validators need this
       sv1ScanBackend.startSync()
     }
-    clue("Starting founding SV's validator app") {
+    clue("Starting sv1's validator app") {
       sv1ValidatorBackend.startSync()
     }
     clue("Starting joining SV's SV app") {
@@ -185,7 +185,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     clue("The four SV apps are all SVs and there are no other SVs") {
       sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet() should equal(svParties.toSet.asJava)
     }
-    clue("The founding SV app (sv1) is the first delegate") {
+    clue("The sv1 app (sv1) is the first delegate") {
       sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate should equal(
         dsoRules.svParty.toProtoPrimitive
       )

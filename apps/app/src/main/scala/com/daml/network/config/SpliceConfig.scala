@@ -474,8 +474,8 @@ object SpliceConfig {
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
-        // the founding node must alway configure one to bootstrap the domain.
-        val foundingNodeHasSynchronizerConfig = conf.onboarding.fold(true) {
+        // sv1 must alway configure one to bootstrap the domain.
+        val sv1NodeHasSynchronizerConfig = conf.onboarding.fold(true) {
           _ match {
             case _: SvOnboardingConfig.FoundDso => conf.localSynchronizerNode.isDefined
             case _: SvOnboardingConfig.JoinWithKey => true
@@ -484,9 +484,9 @@ object SpliceConfig {
         }
         for {
           _ <- Either.cond(
-            foundingNodeHasSynchronizerConfig,
+            sv1NodeHasSynchronizerConfig,
             (),
-            ConfigValidationFailed("Founding node must always specify a domain config"),
+            ConfigValidationFailed("SV1 must always specify a domain config"),
           )
           _ <- Either.cond(
             conf.synchronizerNodes.isEmpty || conf.supportsSoftDomainMigrationPoc,

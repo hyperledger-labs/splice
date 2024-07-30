@@ -131,11 +131,11 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         storeKey.svParty,
       )
-      // User metadata gets reset on domain migrations so to guard against the onboarding config being set back to the founding one
+      // User metadata gets reset on domain migrations so to guard against the onboarding config being set back to sv1 one
       // and avoiding premature package uploads we set the metadata field here as well.
       _ <- readOnlyConnection.ensureUserMetadataAnnotation(
         config.ledgerApiUser,
-        BaseLedgerConnection.FOUNDER_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+        BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
         "true",
         RetryFor.WaitingOnInitDependency,
       )
@@ -201,7 +201,7 @@ class DomainMigrationInitializer(
         dsoStore,
         dsoAutomationService,
       )
-      _ <- rotateGenesisGovernanceKeyForFounder(newCometBftNode, domainMigrationConfig.name)
+      _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

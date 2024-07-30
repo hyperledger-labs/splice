@@ -27,10 +27,10 @@
   },
   "validators": [
     {
-      "address": "{{ $.Values.founder.keyAddress }}",
+      "address": "{{ $.Values.sv1.keyAddress }}",
       "pub_key": {
         "type": "tendermint/PubKeyEd25519",
-        "value": "{{ $.Values.founder.publicKey }}"
+        "value": "{{ $.Values.sv1.publicKey }}"
       },
       "power": "10",
       "name": ""

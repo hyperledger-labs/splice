@@ -46,9 +46,9 @@ class CometBftNode(
 
   import com.daml.network.sv.cometbft.CometBftNode.*
 
-  /** Rotate the founder keys of the CometBFT network.
+  /** Rotate the sv1 keys of the CometBFT network.
     */
-  def rotateGenesisGovernanceKeyForFounder(
+  def rotateGenesisGovernanceKeyForSV1(
       owningSvNode: String
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
@@ -62,7 +62,7 @@ class CometBftNode(
       _ =
         if (currentKeysSetToGenesisKeys) {
           logger.info(
-            s"Rotating founder governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints) as they are set to the genesis keys."
+            s"Rotating sv1 governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints) as they are set to the genesis keys."
           )
           val governanceKeysToKeep = actualConfig.svNodeConfigStates
             .get(owningSvNode)
@@ -121,11 +121,11 @@ class CometBftNode(
     } yield {
       if (currentKeysSetToGenesisKeys) {
         logger.info(
-          s"Successfully rotated founder governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints)"
+          s"Successfully rotated sv1 governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints)"
         )
       } else {
         logger.info(
-          s"Skipping rotating founder governance keys as they are not set to the genesis keys."
+          s"Skipping rotating sv1 governance keys as they are not set to the genesis keys."
         )
       }
     }
