@@ -1234,6 +1234,8 @@ components:
         - package_name
         - create_arguments
         - created_at
+        - signatories
+        - observers
       properties:
         event_type:
           type: string
@@ -1262,6 +1264,22 @@ components:
             Ledger effective time of the transaction that created the contract.
           type: string
           format: date-time
+        signatories:
+          description: |
+            Signatories to the contract.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract.
+          type: array
+          items:
+            type: string
+        contractKey:
+          description: |
+            Contract key of the created contract.
+          type: object
     ExercisedEvent:
       type: object
       required:
@@ -1275,6 +1293,7 @@ components:
         - child_event_ids
         - exercise_result
         - consuming
+        - acting_parties
       properties:
         event_type:
           type: string
@@ -1318,6 +1337,16 @@ components:
           description: |
             If true, the target contract may no longer be exercised.
           type: boolean
+        acting_parties:
+          description: |
+            The parties that exercised the choice.
+          type: array
+          items:
+            type: string
+        interface_id:
+          description: |
+            The interface where the choice is defined, if inherited.
+          type: string
     AcsSnapshotTimestampResponse:
       type: object
       required:
