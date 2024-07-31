@@ -1477,13 +1477,14 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Deactivate our periodic health checks and backups for the target cluster by merging a PR to `main`
    (close to the scheduled synchronizer pausing date).
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
+1. Take down the `multi-validator` stack. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
 1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
    If unsure, check the SV app logs for an entry such as "Wrote domain migration dump"
    (e.g., via [GCE Log Explorer](#gce-log-explorer)).
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
-1. Backup our SVs and validators: 
+1. Backup our SVs and validators:
    ```
    cncluster backup_nodes <old_migration_id> sv-1
    cncluster backup_nodes <old_migration_id> sv-2
@@ -1491,7 +1492,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    cncluster backup_nodes <old_migration_id> sv-4
    cncluster backup_nodes <old_migration_id> validator1
    cncluster backup_nodes <old_migration_id> splitwell
-   ``` 
+   ```
    You want to launch the commands in parallel, as it can be very slow if done sequentially.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
