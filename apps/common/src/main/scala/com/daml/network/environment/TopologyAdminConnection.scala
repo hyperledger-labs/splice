@@ -445,6 +445,7 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
       serial: PositiveInt,
       isProposal: Boolean,
+      change: TopologyChangeOp = TopologyChangeOp.Replace,
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
       TopologyAdminCommands.Write.Propose(
@@ -453,6 +454,7 @@ abstract class TopologyAdminConnection(
         store = store.filterName,
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
+        change = change,
       )
     )
 
@@ -1333,6 +1335,97 @@ abstract class TopologyAdminConnection(
     runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name, password = None))
   }
 
+  def listDomainTrustCertificate(domainId: DomainId, member: Member)(implicit
+      tc: TraceContext
+  ): Future[Seq[TopologyResult[DomainTrustCertificate]]] =
+    runCmd(
+      TopologyAdminCommands.Read.ListDomainTrustCertificate(
+        BaseQuery(
+          TopologyStoreId.DomainStore(domainId).filterName,
+          proposals = false,
+          timeQuery = TimeQuery.HeadState,
+          ops = Some(TopologyChangeOp.Replace),
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        member.filterString,
+      )
+    ).map(
+      _.map(r =>
+        TopologyResult(
+          r.context,
+          r.item,
+        )
+      )
+    )
+
+  def ensureDomainTrustCertificateRemoved(
+      retryFor: RetryFor,
+      domainId: DomainId,
+      member: Member,
+      signedBy: Fingerprint,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThat(
+      retryFor,
+      "ensure_domain_trust_certificate_removed",
+      s"Remove domain trust certificate for $member on $domainId",
+      listDomainTrustCertificate(domainId, member).map {
+        case Seq() => Right(())
+        case Seq(cert) => Left(cert)
+        case certs =>
+          throw Status.INTERNAL
+            .withDescription(
+              s"Expected at most one DomainTrustCertificate for $member but got: $certs"
+            )
+            .asRuntimeException()
+      },
+      (previous: TopologyResult[DomainTrustCertificate]) =>
+        proposeMapping(
+          TopologyStoreId.DomainStore(domainId),
+          previous.mapping,
+          signedBy,
+          previous.base.serial + PositiveInt.one,
+          isProposal = false,
+          change = TopologyChangeOp.Remove,
+        ).map(_ => ()),
+      logger,
+    )
+
+  def ensurePartyToParticipantRemoved(
+      retryFor: RetryFor,
+      domainId: DomainId,
+      partyId: PartyId,
+      signedBy: Fingerprint,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThat(
+      retryFor,
+      "ensure_party_to_participant_removed",
+      s"Remove party to participant for $partyId on $domainId",
+      listPartyToParticipant(
+        TopologyStoreId.DomainStore(domainId).filterName,
+        Some(TopologyChangeOp.Replace),
+        filterParty = partyId.filterString,
+      ).map {
+        case Seq() => Right(())
+        case Seq(mapping) => Left(mapping)
+        case mappings =>
+          throw Status.INTERNAL
+            .withDescription(
+              s"Expected at most one PartyToParticipant mapping for $partyId but got: $mappings"
+            )
+            .asRuntimeException()
+      },
+      (previous: TopologyResult[PartyToParticipant]) =>
+        proposeMapping(
+          TopologyStoreId.DomainStore(domainId),
+          previous.mapping,
+          signedBy,
+          previous.base.serial + PositiveInt.one,
+          isProposal = false,
+          change = TopologyChangeOp.Remove,
+        ).map(_ => ()),
+      logger,
+    )
 }
 
 object TopologyAdminConnection {

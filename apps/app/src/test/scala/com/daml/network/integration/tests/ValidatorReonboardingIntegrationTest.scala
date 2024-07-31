@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.ConfigTransforms.bumpUrl
 import com.daml.network.config.{
+  AuthTokenSourceConfig,
   SpliceDbConfig,
   ParticipantClientConfig,
   NetworkAppClientConfig,
@@ -37,6 +38,7 @@ class ValidatorReonboardingIntegrationTest
   override def dbsSuffix = "validator_reonboard"
   override def usesDbs =
     Seq(
+      "participant_alice_validator",
       "participant_alice_validator_reonboard_new",
       "cn_apps_reonboard",
     ) ++ super.usesDbs
@@ -61,25 +63,39 @@ class ValidatorReonboardingIntegrationTest
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
+      .withPreSetup(_ => ())
+      .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq("aliceValidator"))
+      .addConfigTransforms((_, config) => {
+        val defaultAliceValidatorConfig =
+          config.validatorApps(InstanceName.tryCreate("aliceValidator"))
+        val aliceValidatorConfig =
+          defaultAliceValidatorConfig
+            .copy(
+              // We deliberately set the user to the participant name
+              // to produce a collision between the participant admin party
+              // and our validator operator party to check
+              // that we revoke the domain trust cert.
+              ledgerApiUser = "extraStandaloneParticipant",
+              participantClient = ParticipantClientConfig(
+                ClientConfig(port = Port.tryCreate(27502)),
+                defaultAliceValidatorConfig.participantClient.ledgerApi.copy(
+                  clientConfig =
+                    defaultAliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                      port = Port.tryCreate(27501)
+                    ),
+                  // The nodes run without ledger API auth to simplify the test setup.
+                  authConfig = AuthTokenSourceConfig.None(),
+                ),
+              ),
+            )
         config.copy(
           validatorApps = config.validatorApps +
+            (InstanceName.tryCreate("aliceValidator") -> aliceValidatorConfig) +
             (InstanceName.tryCreate("aliceValidatorLocal") -> {
-              val aliceValidatorConfig =
-                config.validatorApps(InstanceName.tryCreate("aliceValidator"))
               aliceValidatorConfig
                 .copy(
                   adminApi =
                     aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
-                  participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27502)),
-                    aliceValidatorConfig.participantClient.ledgerApi.copy(
-                      clientConfig =
-                        aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
-                          port = Port.tryCreate(27501)
-                        )
-                    ),
-                  ),
                   storage = aliceValidatorConfig.storage match {
                     case c: SpliceDbConfig.Postgres =>
                       c.copy(
@@ -93,7 +109,11 @@ class ValidatorReonboardingIntegrationTest
                   },
                   participantBootstrappingDump = Some(
                     ParticipantBootstrapDumpConfig
-                      .File(dumpPath, Some("aliceValidatorLocalNewForValidatorReonboardingIT"))
+                      .File(
+                        dumpPath,
+                        newParticipantIdentifier =
+                          Some("aliceValidatorLocalNewForValidatorReonboardingIT"),
+                      )
                   ),
                   migrateValidatorParty = Some(
                     MigrateValidatorPartyConfig(
@@ -141,49 +161,72 @@ class ValidatorReonboardingIntegrationTest
             }
           ),
         )
-      )
+      })
       .withTrafficTopupsDisabled
       .withManualStart
 
   "re-onboard validator" in { implicit env =>
+    aliceValidatorBackend.config.ledgerApiUser shouldBe "extraStandaloneParticipant"
     initDsoWithSv1Only()
-    aliceValidatorBackend.startSync()
-    val aliceValidatorWalletParty =
-      PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
-    aliceValidatorWalletClient.tap(100)
-
-    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-    aliceWalletClient.tap(150)
-    val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-    charlieWalletClient.tap(100)
-
-    val lockedAmount = walletUsdToAmulet(BigDecimal(50))
-    actAndCheck(
-      "alice locks a amulet that both aliceParty and aliceValidatorWalletParty are stake holders",
-      lockAmulets(
-        aliceValidatorBackend,
-        aliceParty,
-        aliceValidatorWalletParty,
-        aliceWalletClient.list().amulets,
-        lockedAmount,
-        sv1ScanBackend,
-        java.time.Duration.ofMinutes(5),
-        CantonTimestamp.now(),
+    // We need a standalone instance so we can revoke the domain trust certificate
+    // without breaking the long-running nodes.
+    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty, lockedAmount) = withCanton(
+      Seq(
+        testResourcesPath / "standalone-participant-extra.conf",
+        // lockAmulets does a direct ledger API submission and our usual magic for getting admin tokens
+        // in tests for Canton does not work for standalone instances.
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
       ),
-    )(
-      "Wait for locked amulet to appear",
-      _ => {
-        aliceWalletClient.list().lockedAmulets.loneElement.effectiveAmount shouldBe lockedAmount
-      },
-    )
+      Seq.empty,
+      "alice-participant",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> s"participant_alice_validator",
+      "AUTO_INIT_ALL" -> "true",
+    ) {
+      aliceValidatorBackend.startSync()
+      val aliceValidatorWalletParty =
+        PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+      val aliceParticipantId = aliceValidatorBackend.participantClient.id
+      // check that we have a collision between paritcipant admin party
+      // and validator operator party.
+      aliceValidatorWalletParty.uid shouldBe aliceParticipantId.uid
+      aliceValidatorWalletClient.tap(100)
 
-    val dump = aliceValidatorBackend.dumpParticipantIdentities()
-    clue("Stop aliceValidator") {
-      aliceValidatorBackend.stop()
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(150)
+      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      charlieWalletClient.tap(100)
+
+      val lockedAmount = walletUsdToAmulet(BigDecimal(50))
+      actAndCheck(
+        "alice locks a amulet that both aliceParty and aliceValidatorWalletParty are stake holders",
+        lockAmulets(
+          aliceValidatorBackend,
+          aliceParty,
+          aliceValidatorWalletParty,
+          aliceWalletClient.list().amulets,
+          lockedAmount,
+          sv1ScanBackend,
+          java.time.Duration.ofMinutes(5),
+          CantonTimestamp.now(),
+        ),
+      )(
+        "Wait for locked amulet to appear",
+        _ => {
+          aliceWalletClient.list().lockedAmulets.loneElement.effectiveAmount shouldBe lockedAmount
+        },
+      )
+
+      val dump = aliceValidatorBackend.dumpParticipantIdentities()
+      clue("Stop aliceValidator") {
+        aliceValidatorBackend.stop()
+      }
+      (dump, aliceValidatorWalletParty, aliceParty, charlieParty, lockedAmount)
     }
     withCanton(
       Seq(
-        testResourcesPath / "standalone-participant-extra.conf"
+        testResourcesPath / "standalone-participant-extra.conf",
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
       ),
       Seq(),
       "alice-reonboard-participant",

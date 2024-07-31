@@ -48,7 +48,7 @@ class ParticipantPartyMigrator(
       requiredDars: Seq[DarResource] = Seq.empty,
       overridePartiesToMigrate: Option[Seq[PartyId]],
   ): Future[Unit] = {
-
+    val oldParticipantId = nodeIdentitiesDump.id
     for {
       participantId <- participantAdminConnection.getParticipantId()
       validatorPartyId = toPartyId(validatorPartyHint, participantId)
@@ -56,7 +56,7 @@ class ParticipantPartyMigrator(
       allPartyToParticipants <- participantAdminConnection
         .listPartyToParticipant(
           domainId.filterString,
-          filterParticipant = nodeIdentitiesDump.id.uid.toProtoPrimitive,
+          filterParticipant = oldParticipantId.uid.toProtoPrimitive,
         )
       partyToParticipants =
         overridePartiesToMigrate.fold(allPartyToParticipants) { overrideParties =>
@@ -97,12 +97,31 @@ class ParticipantPartyMigrator(
           logger.info("Party ids already migrated")
           Future.unit
         } else {
-          logger.info(s"Migrating parties $partyIdsToMigrate to new participant")
-          ensurePartiesMigrated(
-            domainAlias,
-            partyIdsToMigrate.toSeq,
-            participantId,
-          )
+          logger.info(s"Unhosting $partyIdsToMigrate on $participantId")
+          for {
+            // This is a prerequisite for removing the domain trust certificate
+            _ <- ensurePartiesUnhosted(
+              domainAlias,
+              partyIdsToMigrate.toSeq,
+              participantId,
+            )
+            // Remove the domain trust certificate of the old participant.
+            // This is required to migrate the admin party of that node.
+            // We just always do it even if the admin party is not migrated
+            // to have fewer special cases
+            _ <- participantAdminConnection.ensureDomainTrustCertificateRemoved(
+              RetryFor.WaitingOnInitDependency,
+              domainId,
+              oldParticipantId.member,
+              participantId.uid.namespace.fingerprint,
+            )
+            _ = logger.info(s"Hosting $partyIdsToMigrate on $participantId")
+            _ <- ensurePartiesMigrated(
+              domainAlias,
+              partyIdsToMigrate.toSeq,
+              participantId,
+            )
+          } yield ()
         }
       // There isn't a great way to check if we already imported the ACS so instead we check if the user already has a primary party
       // which is set afterwards. If things really go wrong during this step, we can always start over on a fresh participant.
@@ -173,6 +192,27 @@ class ParticipantPartyMigrator(
         } yield ()
       }
       .map(_ => ())
+  }
+
+  private def ensurePartiesUnhosted(
+      domainAlias: DomainAlias,
+      partyIds: Seq[PartyId],
+      participantId: ParticipantId,
+  ): Future[Unit] = {
+    participantAdminConnection.getDomainId(domainAlias).flatMap { domainId =>
+      Future
+        .traverse(partyIds) { partyId =>
+          for {
+            _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
+              RetryFor.WaitingOnInitDependency,
+              domainId,
+              partyId,
+              participantId.uid.namespace.fingerprint,
+            )
+          } yield ()
+        }
+        .map(_ => ())
+    }
   }
 
   private def importAcs(
