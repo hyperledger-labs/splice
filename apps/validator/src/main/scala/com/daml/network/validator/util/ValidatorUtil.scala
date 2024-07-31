@@ -6,10 +6,11 @@ package com.daml.network.validator.util
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.{
   BaseLedgerConnection,
-  SpliceLedgerConnection,
   CommandPriority,
   ParticipantAdminConnection,
+  RetryFor,
   RetryProvider,
+  SpliceLedgerConnection,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppStoreWithIngestion
@@ -109,10 +110,21 @@ private[validator] object ValidatorUtil {
             participantAdminConnection,
           )
       }
-      _ <- storeWithIngestion.connection.grantUserRights(
-        validatorUserName,
-        Seq(userPartyId),
-        Seq.empty,
+      _ <- retryProvider.ensureThatB(
+        RetryFor.ClientCalls,
+        "onboard_grant_user_rights",
+        s"Grant user rights for user $validatorUserName to act as $userPartyId",
+        storeWithIngestion.connection
+          .getUserActAs(
+            validatorUserName
+          )
+          .map(_.contains(userPartyId)),
+        storeWithIngestion.connection.grantUserRights(
+          validatorUserName,
+          Seq(userPartyId),
+          Seq.empty,
+        ),
+        logger,
       )
       domainId <- getAmuletRulesDomain()(traceContext)
       _ <- installWalletForUser(

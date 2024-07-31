@@ -426,7 +426,7 @@ final class RetryProvider(
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T, R: Retryable](
       operationId: String,
-      operationName: String,
+      operationDescription: String,
       task: => Future[T],
       logger: TracedLogger,
       retryable: R = Seq.empty,
@@ -437,7 +437,7 @@ final class RetryProvider(
     retry(
       RetryFor.ClientCalls,
       operationId,
-      operationName,
+      operationDescription,
       task,
       logger,
       retryable,
