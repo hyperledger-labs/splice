@@ -1,8 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import * as semver from 'semver';
 import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
-import { defaultVersion } from 'cn-pulumi-common';
 import {
   ExactNamespace,
   isDevNet,
@@ -96,9 +94,21 @@ export function installCometBftNode(
           YOUR_SV_NAME: svName,
           YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
           YOUR_HOSTNAME: CLUSTER_HOSTNAME,
-          'sv1:': `${sv1Label()}:`, // TODO (#13845) remove when ciperiodic version >= 0.1.18
         }
       );
+      // TODO (#13845) remove when ciperiodic version >= 0.1.18
+      cometBftValues.founder = cometBftValues.sv1;
+      const cometbftFounderNodeConfig = isMainNet
+        ? {
+            nodeId: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
+            keyAddress: '9473617BBC80C12F68CC25B5A754D1ED9035886C',
+            publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
+          }
+        : {
+            nodeId: '5af57aa83abcec085c949323ed8538108757be9c',
+            publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+            keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
+          };
       return installCNRunbookHelmChart(
         xns,
         `global-domain-${migrationId}-cometbft`,
@@ -108,17 +118,9 @@ export function installCometBftNode(
             retainBlocks: cometbftRetainBlocks,
           },
           // TODO(#12361): Avoid duplicating these config values here by moving them into pulumi/common.
-          [sv1Label()]: isMainNet
-            ? {
-                nodeId: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
-                keyAddress: '9473617BBC80C12F68CC25B5A754D1ED9035886C',
-                publicKey: 'H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI=',
-              }
-            : {
-                nodeId: '5af57aa83abcec085c949323ed8538108757be9c',
-                publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-                keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-              },
+          sv1: cometbftFounderNodeConfig,
+          // TODO (#13845) remove when ciperiodic version >= 0.1.18
+          founder: cometbftFounderNodeConfig,
           istioVirtualService: {
             enabled: true,
             gateway: 'cluster-ingress/cn-apps-gateway',
@@ -162,17 +164,4 @@ export function installCometBftNode(
       );
     }
   ).activeComponent;
-}
-
-// TODO (#13845) remove when ciperiodic version >= 0.1.18
-function sv1Label() {
-  const supportsRenamedOnboardingType =
-    defaultVersion.type == 'local' ||
-    defaultVersion.version.startsWith('0.1.18') ||
-    semver.gt(defaultVersion.version, '0.1.18');
-
-  if (!supportsRenamedOnboardingType) {
-    return 'founder';
-  }
-  return 'sv1';
 }

@@ -1,5 +1,4 @@
 import * as pulumi from '@pulumi/pulumi';
-import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
@@ -66,7 +65,9 @@ export function installCometBftNode(
     'cn-cometbft',
     {
       nodeName: onboardingName,
-      [sv1Label()]: configs.sv1,
+      sv1: configs.sv1,
+      // TODO (#13845) remove when ciperiodic version >= 0.1.18
+      founder: configs.sv1,
       istioVirtualService: {
         enabled: true,
         gateway: 'cluster-ingress/cn-apps-gateway',
@@ -208,17 +209,3 @@ class CometBftNodeConfig {
       : Number(`26${this._domainMigrationId}${nodeIndex}6`);
   }
 }
-
-// TODO (#13845) remove when ciperiodic base version for hard migrations is >= 0.1.18
-function sv1Label() {
-  if (!supportsRenamedFounder) {
-    return 'founder';
-  }
-  return 'sv1';
-}
-
-// TODO (#13845) remove when ciperiodic version >= 0.1.18
-const supportsRenamedFounder =
-  defaultVersion.type == 'local' ||
-  defaultVersion.version.startsWith('0.1.18') ||
-  semver.gt(defaultVersion.version, '0.1.18');

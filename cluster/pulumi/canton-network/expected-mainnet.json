@@ -457,6 +457,12 @@
         "stateSync": {
           "enable": false
         },
+        "sv1": {
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
+          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
+          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
