@@ -1428,7 +1428,7 @@ trait AmuletTransferUtil { self: StoreTest =>
 
   def dsoRules(
       party: PartyId,
-      members: java.util.Map[String, dsorulesCodegen.SvInfo] = Collections.emptyMap(),
+      svs: java.util.Map[String, dsorulesCodegen.SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
     val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID
@@ -1436,7 +1436,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     val template = new dsorulesCodegen.DsoRules(
       dsoParty.toProtoPrimitive,
       epoch,
-      members,
+      svs,
       Collections.emptyMap(),
       party.toProtoPrimitive,
       new dsorulesCodegen.DsoRulesConfig(

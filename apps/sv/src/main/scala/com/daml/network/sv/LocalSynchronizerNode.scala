@@ -7,7 +7,7 @@ import com.daml.network.admin.api.client.commands.HttpCommandException
 import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
+import com.daml.network.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty

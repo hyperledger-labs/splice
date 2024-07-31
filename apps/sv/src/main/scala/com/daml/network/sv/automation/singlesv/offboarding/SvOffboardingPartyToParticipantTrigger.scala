@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.offboarding
+package com.daml.network.sv.automation.singlesv.offboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{CollectionHasAsScala}
 
 /** Offboard a participant from the hosting of the DSO party.
-  * - Runs when a member part of offboardedSvs still exist on the PartyToParticipant mapping
+  * - Runs when one of offboardedSvs still exist on the PartyToParticipant mapping
   */
 class SvOffboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,

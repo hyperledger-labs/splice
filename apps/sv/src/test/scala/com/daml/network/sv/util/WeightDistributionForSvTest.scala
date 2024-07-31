@@ -16,7 +16,7 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
 
   "weightDistributionForSv" should {
 
-    val memberWeight = 10_000L
+    val svWeight = 10_000L
     def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
     val svParty = mkPartyId("sv1")
     val validator1 = mkPartyId("v1")
@@ -24,8 +24,8 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
     implicit val loggerImpl: TracedLogger = logger
 
     "give all weight to sv if there are no beneficiaries" in {
-      val result = SvUtil.weightDistributionForSv(memberWeight, Seq.empty, svParty)
-      result should be(Map(svParty -> memberWeight))
+      val result = SvUtil.weightDistributionForSv(svWeight, Seq.empty, svParty)
+      result should be(Map(svParty -> svWeight))
     }
 
     "weight is capped at remainder" in {
@@ -33,7 +33,7 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
         {
           val result =
             SvUtil.weightDistributionForSv(
-              memberWeight,
+              svWeight,
               Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator2, 6668L)),
               svParty,
             )
@@ -50,7 +50,7 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
     "remainder goes to SV" in {
       val result =
         SvUtil.weightDistributionForSv(
-          memberWeight,
+          svWeight,
           Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator2, 6000L)),
           svParty,
         )
@@ -62,7 +62,7 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
     "party can be specified multiple times" in {
       val result =
         SvUtil.weightDistributionForSv(
-          memberWeight,
+          svWeight,
           Seq(BeneficiaryConfig(validator1, 3333L), BeneficiaryConfig(validator1, 6667L)),
           svParty,
         )
@@ -76,7 +76,7 @@ class WeightDistributionForSvTest extends AsyncWordSpec with BaseTest {
         {
           val result =
             SvUtil.weightDistributionForSv(
-              memberWeight,
+              svWeight,
               Seq(BeneficiaryConfig(validator1, 10000L), BeneficiaryConfig(validator2, 6668L)),
               svParty,
             )

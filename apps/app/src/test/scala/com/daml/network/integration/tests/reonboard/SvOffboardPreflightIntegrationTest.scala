@@ -82,8 +82,8 @@ class SvOffboardPreflightIntegrationTest
         val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
         dropDownAction.selectByValue("SRARC_OffboardSv")
 
-        val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-        dropDownMember.selectByVisibleText(svRunbookName)
+        val dropDownSv = new Select(webDriver.findElement(By.id("display-members")))
+        dropDownSv.selectByVisibleText(svRunbookName)
 
         click on "tab-panel-in-progress"
         val previousVoteRequestsInProgress = find(id("sv-voting-in-progress-table-body"))

@@ -150,7 +150,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             "description",
           ),
         )(
-          "SV2 is now the only member",
+          "SV2 is now the only sv",
           _ => {
             sv2Backend
               .getDsoInfo()
@@ -186,7 +186,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           "Onboard SV3",
           sv3Backend.startSync(),
         )(
-          "SV3 is now member",
+          "SV3 is now sv",
           _ => {
             sv2Backend
               .getDsoInfo()

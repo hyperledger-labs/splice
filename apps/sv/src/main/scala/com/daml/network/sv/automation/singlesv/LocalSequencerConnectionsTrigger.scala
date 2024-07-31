@@ -59,7 +59,7 @@ class LocalSequencerConnectionsTrigger(
       )
       _ <- dsoRulesActiveSequencerConfig.fold {
         logger.debug(
-          show"Member info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
+          show"Sv info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
         )
         Future.unit
       } { publishedSequencerInfo =>

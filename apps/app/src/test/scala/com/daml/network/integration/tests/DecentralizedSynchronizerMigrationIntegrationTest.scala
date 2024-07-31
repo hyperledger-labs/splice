@@ -43,7 +43,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellDomains, SplitwellSynchronizerConfig}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
+import com.daml.network.sv.automation.singlesv.SvNamespaceMembershipTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{

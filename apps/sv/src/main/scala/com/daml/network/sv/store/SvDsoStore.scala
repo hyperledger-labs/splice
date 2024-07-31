@@ -610,7 +610,7 @@ trait SvDsoStore
     listConfirmations(expectedAction, limit)
   }
 
-  def listSvOnboardingRequestsByDsoMembers(
+  def listSvOnboardingRequestsBySvs(
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
@@ -673,7 +673,7 @@ trait SvDsoStore
     } yield votes map (_.contract)
 
   /** List the current amulet price votes by the SVs. */
-  def listMemberAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  def listSvAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[

@@ -65,7 +65,7 @@ class SponsorDsoPartyHosting(
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, DsoPartyMigrationFailure, TopologyResult[PartyToParticipant]] = {
-    validateProposalForNewMember(domainId, newParticipant).flatMap {
+    validateProposalForNewSv(domainId, newParticipant).flatMap {
       case SponsorDsoPartyHosting.ValidAcceptedState(accepted) =>
         EitherT.right(Future.successful(accepted))
       case SponsorDsoPartyHosting.ValidProposal(proposal) =>
@@ -89,7 +89,7 @@ class SponsorDsoPartyHosting(
     }
   }
 
-  private def validateProposalForNewMember(
+  private def validateProposalForNewSv(
       domainId: DomainId,
       participantId: ParticipantId,
   )(implicit tc: TraceContext): EitherT[

@@ -1,17 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership
+package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.*
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger.{
+import com.daml.network.sv.automation.singlesv.SvNamespaceMembershipTrigger.{
   AddToNamespace,
   NamespaceDiff,
   RemoveFromNamespace,
 }
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -32,7 +32,7 @@ private class NamespaceMembership(
 ) extends DsoRulesTopologyStateReconciler[NamespaceDiff] {
 
   override def diffDsoRulesWithTopology(
-      dsoRulesAndState: DsoRulesWithMemberNodeStates
+      dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[NamespaceDiff]] = {
     val dsoRules = dsoRulesAndState.dsoRules
     participantAdminConnection
@@ -41,15 +41,13 @@ private class NamespaceMembership(
         dsoParty.uid.namespace,
       )
       .map { decentralizedNamespace =>
-        val dsoRulesMembers = dsoRules.contract.payload.svs
+        val dsoRulesSvs = dsoRules.contract.payload.svs
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
-        val namespaceAdditions = dsoRulesMembers
-          .filter(dsoMemberParty =>
-            !decentralizedNamespace.mapping.owners.contains(dsoMemberParty.uid.namespace)
-          )
+        val namespaceAdditions = dsoRulesSvs
+          .filter(svParty => !decentralizedNamespace.mapping.owners.contains(svParty.uid.namespace))
         // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
         // Therefore we remove the namespace from the decentralized namespace only if
         // a namespace is present in the offboardedSvs list and not present in the members list
@@ -58,11 +56,11 @@ private class NamespaceMembership(
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
-          .filter(dsoMemberParty =>
+          .filter(svParty =>
             decentralizedNamespace.mapping.owners
-              .contains(dsoMemberParty.uid.namespace) && !dsoRulesMembers
+              .contains(svParty.uid.namespace) && !dsoRulesSvs
               .map(_.uid.namespace)
-              .contains(dsoMemberParty.uid.namespace)
+              .contains(svParty.uid.namespace)
           )
         namespaceAdditions.map[NamespaceDiff](
           AddToNamespace(dsoRules.domain, _)
@@ -116,7 +114,7 @@ private class NamespaceMembership(
 
 }
 
-/** Trigger that checks the members of the DSO as defined by the DsoRules members property,
+/** Trigger that checks the svs of the DSO as defined by the DsoRules svs property,
   * with the members of the dso decentralized namespace as defined by the DecentralizedNamespaceDefinition,
   * and adds to the decentralized namespace any members that are missing.
   *

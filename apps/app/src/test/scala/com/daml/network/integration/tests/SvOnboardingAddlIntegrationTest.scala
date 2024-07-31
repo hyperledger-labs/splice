@@ -253,7 +253,7 @@ class SvOnboardingAddlIntegrationTest
       actAndCheck(
         "Moving sv2 to confirmed state", {
           val confirmingSvs = getConfirmingSvs(Seq(sv1Backend))
-          confirmActionByAllMembers(
+          confirmActionByAllSvs(
             confirmingSvs,
             new ARC_DsoRules(
               new SRARC_ConfirmSvOnboarding(

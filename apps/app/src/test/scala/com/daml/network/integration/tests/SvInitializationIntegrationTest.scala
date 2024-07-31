@@ -134,7 +134,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       clue("All SVs have reported their Scan URLs in DSO rules") {
         eventually() {
           val rulesAndState =
-            sv1Backend.appState.dsoStore.getDsoRulesWithMemberNodeStates().futureValue
+            sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
           rulesAndState.svNodeStates.values
             .flatMap(
               _.payload.state.synchronizerNodes

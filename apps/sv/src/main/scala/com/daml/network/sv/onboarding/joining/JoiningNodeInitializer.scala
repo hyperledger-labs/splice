@@ -285,7 +285,7 @@ class JoiningNodeInitializer(
       // submission rights.
       _ <- (
         waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
-        waitForDsoMembership(dsoStore),
+        waitForDsoSvRole(dsoStore),
         waitUntilCometBftNodeIsValidator,
         SetupUtil.ensureDsoPartyMetadataAnnotation(
           svSvAutomationService.connection,
@@ -524,7 +524,7 @@ class JoiningNodeInitializer(
                 publicKey,
                 privateKey_,
               )
-              _ <- addConfirmedMemberToDso()
+              _ <- addConfirmedSvToDso()
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
         }
@@ -536,7 +536,7 @@ class JoiningNodeInitializer(
           dsoStore.lookupSvOnboardingConfirmedByParty(dsoStore.key.svParty)
         )
 
-      def addConfirmedMemberToDso(): Future[Unit] = {
+      def addConfirmedSvToDso(): Future[Unit] = {
         val dsoStore = dsoStoreWithIngestion.store
         for {
           // Wait on the DSO store to make sure that we atomically see either the SvOnboardingConfirmed contract
@@ -544,8 +544,8 @@ class JoiningNodeInitializer(
           _ <- waitForSvOnboardingConfirmedInDsoStore()
           _ <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
-            "add_dso_member",
-            "add member to Dso",
+            "add_dso_sv",
+            "add sv to Dso",
             for {
               (dsoRules, amuletRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
                 dsoStore.getDsoRules(),
@@ -555,23 +555,23 @@ class JoiningNodeInitializer(
                   dsoStore.key.svParty
                 ),
               ).tupled
-              svIsDsoMember = dsoRules.payload.svs.asScala
+              svIsSv = dsoRules.payload.svs.asScala
                 .contains(dsoStore.key.svParty.toProtoPrimitive)
               _ <- svOnboardingConfirmedOpt match {
                 case None =>
-                  if (svIsDsoMember) {
-                    logger.info(s"SV is already a member of the DSO")
+                  if (svIsSv) {
+                    logger.info(s"SV is already part of the DSO")
                     Future.unit
                   } else {
                     val msg =
-                      "SV is not a member of the DSO but there is also no confirmed onboarding, giving up"
+                      "SV is not part of the DSO but there is also no confirmed onboarding, giving up"
                     logger.error(msg)
                     Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
                   }
                 case Some(confirmed) =>
-                  if (svIsDsoMember) {
+                  if (svIsSv) {
                     logger.info(
-                      "SvOnboardingConfirmed exists but SV is already a member of the DSO"
+                      "SvOnboardingConfirmed exists but SV is already part of the DSO"
                     )
                     Future.unit
                   } else {
@@ -658,7 +658,7 @@ class JoiningNodeInitializer(
                   config.domains.global.alias
                 )
                 withDsoStore = new WithDsoStore(dsoAutomation)
-                _ <- withDsoStore.addConfirmedMemberToDso()
+                _ <- withDsoStore.addConfirmedSvToDso()
               } yield dsoAutomation
             case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
           }
@@ -793,22 +793,22 @@ class JoiningNodeInitializer(
       svConnection.getDsoInfo().map(_.dsoParty).andThen(_ => svConnection.close())
     }
 
-  private def waitForDsoMembership(dsoStore: SvDsoStore): Future[Unit] = {
+  private def waitForDsoSvRole(dsoStore: SvDsoStore): Future[Unit] = {
     val svParty = dsoStore.key.svParty
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "dso_membership",
-      show"DsoRules are visible and list $svParty as a member",
+      show"DsoRules are visible and list $svParty as an sv",
       for {
         dsoRules <- dsoStore.lookupDsoRules()
         _ <- dsoRules match {
           case Some(c) =>
-            if (SvApp.isDsoMemberParty(dsoStore.key.svParty, c.contract)) {
+            if (SvApp.isSvParty(dsoStore.key.svParty, c.contract)) {
               Future.successful(())
             } else {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  show"DsoRules found but $svParty is not a member"
+                  show"DsoRules found but $svParty is not an sv"
                 )
                 .asRuntimeException()
             }

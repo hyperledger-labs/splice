@@ -46,7 +46,7 @@ object SortOrder {
   case object Ascending extends SortOrder
   case object Descending extends SortOrder
 }
-final case class ScanInfo(publicUrl: String, memberName: String)
+final case class ScanInfo(publicUrl: String, svName: String)
 
 /** Utility class grouping the two kinds of stores managed by the DsoApp. */
 trait ScanStore

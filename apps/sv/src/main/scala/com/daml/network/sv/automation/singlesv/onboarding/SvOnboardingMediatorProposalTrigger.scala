@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.onboarding
+package com.daml.network.sv.automation.singlesv.onboarding
 
 import cats.implicits.{catsSyntaxTuple2Semigroupal, showInterpolator}
 import com.daml.network.automation.{
@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingMediatorProposalTrigger.MediatorToOnboard
+import com.daml.network.sv.automation.singlesv.onboarding.SvOnboardingMediatorProposalTrigger.MediatorToOnboard
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.MemberIdUtil
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -50,7 +50,7 @@ class SvOnboardingMediatorProposalTrigger(
       tc: TraceContext
   ): Future[Seq[MediatorToOnboard]] = {
     for {
-      rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       domainId = rulesAndStates.dsoRules.domain
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(domainId)
     } yield {

@@ -882,7 +882,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       "return all election requests for the given dsoRules" in {
         import scala.jdk.CollectionConverters.*
         val goodDsoRules = dsoRules(
-          members = (1 to 3)
+          svs = (1 to 3)
             .map { n =>
               userParty(n).toProtoPrimitive -> svInfo(n.toString)
             }
@@ -1219,14 +1219,14 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   }
 
   def dsoRules(
-      members: java.util.Map[String, SvInfo] = Collections.emptyMap(),
+      svs: java.util.Map[String, SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
     val newDomainId = "new-domain-id"
     val template = new DsoRules(
       dsoParty.toProtoPrimitive,
       epoch,
-      members,
+      svs,
       Collections.emptyMap(),
       storeSvParty.toProtoPrimitive,
       new DsoRulesConfig(

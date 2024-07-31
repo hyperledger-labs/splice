@@ -27,7 +27,7 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
 }
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.Thresholds
-import com.daml.network.sv.SvApp.{isDevNet, isDsoMemberName, isDsoMemberParty}
+import com.daml.network.sv.SvApp.{isDevNet, isSvName, isSvParty}
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
@@ -159,8 +159,8 @@ class ExecuteConfirmedActionTrigger(
               isSvPartOfDso <- store
                 .getDsoRules()
                 .map(dsoRules =>
-                  isDsoMemberParty(newSvParty, dsoRules) || (
-                    !isDevNet(dsoRules) && isDsoMemberName(newSvName, dsoRules)
+                  isSvParty(newSvParty, dsoRules) || (
+                    !isDevNet(dsoRules) && isSvName(newSvName, dsoRules)
                   )
                 )
             } yield isSvOnboardingConfirmed || isSvPartOfDso

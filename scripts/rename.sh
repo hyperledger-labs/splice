@@ -578,6 +578,27 @@ function subcmd_dso_member() {
 }
 
 
+subcommand_whitelist[dso_member_2]='Rename: more DSO member usages to SV'
+
+function subcmd_dso_member_2() {
+  assert_clean_working_dir
+
+  simple_rename '(\b|[a-z])DsoMember(s)?(?=\b|[A-Z])///\1Sv\2'
+  simple_rename '(\b|[a-z])dsoMember(s)?(?=\b|[A-Z])///\1sv\2'
+  simple_rename '(\b|[a-z])Member(?=NodeState)///\1Sv'
+  simple_rename '(\b|[a-z])member(?=NodeState|Num)///\1sv'
+  simple_rename '(\b|[a-z])DsoMembership?(?=\b|[A-Z])///\1DsoSvRole'
+  simple_rename '(?<=\baddConfirmed)Member(?=ToDso\b)///Sv'
+  simple_rename '(?<=\bvalidateProposalForNew)Member\b///Sv'
+  simple_rename '(?<=\bgetSv)MemberName\b///NameInDso'
+  simple_rename '(?m)([./])membership(\1|$)///\2'
+  simple_rename '(?<=\blist)Member(?=AmuletPriceVotes\b)///Sv'
+  simple_rename '(?<=\bnon )member(?= votes\b)///sv'
+  simple_rename '((?:\b|[a-z])[Dd]soRules)Members(?=\b|[A-Z])///\1Svs'
+  simple_rename '\b(?:a )?member(?= of the DSO)///part'
+}
+
+
 subcommand_whitelist[cc_module_splice]='Rename: CC Module prefix to Splice'
 function subcmd_cc_module_splice() {
   assert_clean_working_dir

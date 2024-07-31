@@ -1,19 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership
+package com.daml.network.sv.automation.singlesv
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import com.daml.network.automation.{SourceBasedTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
-import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePollingAndAssignedTrigger.{
+import com.daml.network.sv.automation.singlesv.SvTopologyStatePollingAndAssignedTrigger.{
   StreamedAssignedContract,
   TaskTrigger,
   Tick,
 }
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -36,11 +36,11 @@ trait DsoRulesTopologyStateReconciler[Task] {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Seq[Task]] = {
-    svDsoStore.getDsoRulesWithMemberNodeStates().flatMap(diffDsoRulesWithTopology)
+    svDsoStore.getDsoRulesWithSvNodeStates().flatMap(diffDsoRulesWithTopology)
   }
 
   protected def diffDsoRulesWithTopology(
-      dsoRulesAndState: DsoRulesWithMemberNodeStates
+      dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,

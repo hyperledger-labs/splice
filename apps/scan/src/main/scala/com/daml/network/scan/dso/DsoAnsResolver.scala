@@ -26,8 +26,8 @@ class DsoAnsResolver(dsoParty: PartyId) {
           case (svPartyId, svInfo) if ansName == svAnsName(svInfo.name) =>
             PartyId.tryFromProtoPrimitive(svPartyId) -> svInfo.name
         }
-        maybeSvPartyId.map { case (svPartyId, memberName) =>
-          svAnsEntry(svPartyId, memberName.toLowerCase())
+        maybeSvPartyId.map { case (svPartyId, svName) =>
+          svAnsEntry(svPartyId, svName.toLowerCase())
         }
       case _ => None
     }

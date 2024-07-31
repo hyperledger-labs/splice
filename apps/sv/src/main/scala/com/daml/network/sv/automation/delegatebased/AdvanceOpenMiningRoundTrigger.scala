@@ -49,7 +49,7 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
       )
-      amuletPriceVotes <- store.listMemberAmuletPriceVotes()
+      amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
           task.work.amuletRulesId,

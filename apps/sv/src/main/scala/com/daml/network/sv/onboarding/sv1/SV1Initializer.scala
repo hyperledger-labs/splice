@@ -583,7 +583,7 @@ class SV1Initializer(
                   Future.successful(())
                 } else {
                   sys.error(
-                    "AmuletRules and DsoRules already exist but party tasked with sv1 the DSO isn't member." +
+                    "AmuletRules and DsoRules already exist but party tasked with creating the DSO isn't an sv." +
                       "Is more than one SV app configured to `found-dso`?" +
                       show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )

@@ -1,19 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.onboarding
+package com.daml.network.sv.automation.singlesv.onboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.config.Thresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.automation.singlesv.membership.onboarding.SequencerOnboarding.SequencerToOnboard
-import com.daml.network.sv.automation.singlesv.membership.{
+import com.daml.network.sv.automation.singlesv.onboarding.SequencerOnboarding.SequencerToOnboard
+import com.daml.network.sv.automation.singlesv.{
   SvTopologyStatePollingAndAssignedTrigger,
   DsoRulesTopologyStateReconciler,
 }
 import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
@@ -31,7 +31,7 @@ class SequencerOnboarding(
     logger: TracedLogger,
 ) extends DsoRulesTopologyStateReconciler[SequencerToOnboard] {
   override def diffDsoRulesWithTopology(
-      dsoRulesAndState: DsoRulesWithMemberNodeStates
+      dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
     val dsoRules = dsoRulesAndState.dsoRules
     participantAdminConnection.getSequencerDomainState(dsoRules.domain).map {

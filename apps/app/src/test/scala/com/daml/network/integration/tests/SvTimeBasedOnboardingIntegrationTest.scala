@@ -85,7 +85,7 @@ class SvTimeBasedOnboardingIntegrationTest
         actAndCheck(
           "Create a new `SvOnboardingConfirmed` Contract with new party \"svY\"", {
             val confirmingSvs = getConfirmingSvs(Seq(sv1Backend, sv2Backend, sv3Backend))
-            confirmActionByAllMembers(
+            confirmActionByAllSvs(
               confirmingSvs,
               new dsorules.actionrequiringconfirmation.ARC_DsoRules(
                 new SRARC_ConfirmSvOnboarding(

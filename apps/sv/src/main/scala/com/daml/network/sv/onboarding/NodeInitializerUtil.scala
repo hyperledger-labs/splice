@@ -212,10 +212,10 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       svcStore: SvDsoStore
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = for {
     dsoRules <- svcStore.lookupDsoRules()
-    isInDsoRulesMembers = dsoRules.exists(
+    isInDsoRulesSvs = dsoRules.exists(
       _.payload.svs.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
     )
-  } yield isInDsoRulesMembers
+  } yield isInDsoRulesSvs
 
   protected def checkIsInDecentralizedNamespaceAndStartTrigger(
       dsoAutomation: SvDsoAutomationService,

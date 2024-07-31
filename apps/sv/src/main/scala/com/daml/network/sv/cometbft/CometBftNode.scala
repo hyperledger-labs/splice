@@ -8,7 +8,7 @@ import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.environment.{RetryFor, RetryProvider}
 import com.daml.network.sv.config.CometBftConfig
-import com.daml.network.store.DsoRulesStore.DsoRulesWithMemberNodeStates
+import com.daml.network.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
 import com.digitalasset.canton.drivers.cometbft.{
@@ -139,7 +139,7 @@ class CometBftNode(
     */
   def reconcileNetworkConfig(
       owningSvNode: String,
-      target: DsoRulesWithMemberNodeStates,
+      target: DsoRulesWithSvNodeStates,
   )(implicit tc: TraceContext): Future[Unit] = {
 
     val ourGovernanceKey = {
@@ -331,7 +331,7 @@ object CometBftNode {
       domainId: DomainId,
       logger: TracedLogger,
   )(implicit tc: TraceContext): NetworkConfigDiff = {
-    val targetConfig = memberNodeStatesToNetworkConfig(targetNodeStates, domainId)
+    val targetConfig = svNodeStatesToNetworkConfig(targetNodeStates, domainId)
     val actualOrPendingConfig =
       getActualOrPendingConfig(owningSvNode, currentNetworkConfig, logger)
 
@@ -471,11 +471,11 @@ object CometBftNode {
         config.sequencingKeys.asScala.map(key => proto.cometbft.SequencingKey(key.pubKey)).toSeq,
     )
 
-  private def memberNodeStatesToNetworkConfig(
-      memberNodeStates: Seq[daml.dso.svstate.SvNodeState],
+  private def svNodeStatesToNetworkConfig(
+      svNodeStates: Seq[daml.dso.svstate.SvNodeState],
       domainId: DomainId,
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
-    memberNodeStates
+    svNodeStates
       .flatMap(state =>
         extractSynchronizerNodeConfig(state, domainId).map(synchronizerNode =>
           state.svName -> svNodeConfigToProto(synchronizerNode.cometBft)
@@ -495,7 +495,7 @@ object CometBftNode {
   @SuppressWarnings(Array("org.wartremover.warts.Product"))
   private case class NetworkDiffSummary(
       actualConfig: proto.cometbft.GetNetworkConfigResponse,
-      memberNodeStates: Seq[daml.dso.svstate.SvNodeState],
+      svNodeStates: Seq[daml.dso.svstate.SvNodeState],
       changes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       domainId: DomainId,
   ) extends PrettyPrinting {
@@ -510,9 +510,8 @@ object CometBftNode {
       PrettyUtil.adHocPrettyInstance
 
     private val targetConfig: Seq[(Shown, proto.cometbft.SvNodeConfig)] =
-      memberNodeStatesToNetworkConfig(memberNodeStates, domainId).view.map {
-        case (memberId, config) =>
-          (memberId.singleQuoted, config)
+      svNodeStatesToNetworkConfig(svNodeStates, domainId).view.map { case (memberId, config) =>
+        (memberId.singleQuoted, config)
       }.toSeq
     override def pretty: Pretty[this.type] = {
       prettyOfClass(

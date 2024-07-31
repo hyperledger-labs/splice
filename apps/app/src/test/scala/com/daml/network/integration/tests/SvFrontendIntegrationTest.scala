@@ -1346,13 +1346,13 @@ class SvFrontendIntegrationTest
           },
         )
 
-        val members: Vector[String] =
+        val svs: Vector[String] =
           sv3Backend.getDsoInfo().dsoRules.payload.svs.keySet().asScala.toVector
 
-        val newLeader = members.head
+        val newLeader = svs.head
 
-        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, members)
-        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, members)
+        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
+        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
 
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           actAndCheck(

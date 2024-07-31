@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.onboarding
+package com.daml.network.sv.automation.singlesv.onboarding
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
@@ -79,14 +79,14 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       tc: TraceContext
   ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
     for {
-      dsoMemberParticipants <- getDsoMemberParticipants(dsoRules)
+      svParticipants <- getSvParticipants(dsoRules)
     } yield {
       val observingParticipantIds = dsoHostingParticipants
         .filter(_.permission == ParticipantPermission.Observation)
         .map(_.participantId)
-      val dsoMemberParticipantIds = dsoMemberParticipants.map(_.participantId)
+      val svParticipantIds = svParticipants.map(_.participantId)
       observingParticipantIds
-        .filter(participantId => dsoMemberParticipantIds.contains(participantId))
+        .filter(participantId => svParticipantIds.contains(participantId))
         .map(participantId =>
           SvOnboardingPromoteParticipantToSubmitterTrigger.Task(dsoRules.domain, participantId)
         )
@@ -112,7 +112,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         proposals = AuthorizedState,
         timeQuery = TimeQuery.Range(None, None),
       )
-      dsoMemberParticipants <- getDsoMemberParticipants(dsoRules)
+      svParticipants <- getSvParticipants(dsoRules)
     } yield {
       val orderedDsoHostingParticipants = dsoHostingParticipants
         .sortBy(
@@ -129,9 +129,9 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         case _ =>
           Seq.empty[ParticipantId]
       }
-      val dsoMemberParticipantIds = dsoMemberParticipants.map(_.participantId)
+      val svParticipantIds = svParticipants.map(_.participantId)
       observingParticipantIds
-        .filter(participantId => dsoMemberParticipantIds.contains(participantId))
+        .filter(participantId => svParticipantIds.contains(participantId))
         .filter(participantId =>
           // Find the first mapping that added the participant and count from there.
           // Note that this relies on the same participant not being readded which is given by our current onboarding procedures.
@@ -151,15 +151,15 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     }
   }
 
-  private def getDsoMemberParticipants(
+  private def getSvParticipants(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules]
   )(implicit tc: TraceContext) = {
-    val dsoMembers = dsoRules.contract.payload.svs
+    val svs = dsoRules.contract.payload.svs
       .keySet()
       .asScala
       .map(PartyId.tryFromProtoPrimitive)
       .toSeq
-    dsoMembers
+    svs
       .parTraverse { svParty =>
         participantAdminConnection
           .getPartyToParticipant(dsoRules.domain, svParty)

@@ -18,7 +18,7 @@ import com.daml.network.integration.tests.SpliceTests.{
 }
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
+import com.daml.network.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }

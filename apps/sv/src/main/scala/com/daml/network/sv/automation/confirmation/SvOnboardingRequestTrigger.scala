@@ -103,7 +103,7 @@ class SvOnboardingRequestTrigger(
         case Right((party, name, weightBps)) => Future.successful((party, name, weightBps))
       }
       outcome <-
-        if (SvApp.isDsoMember(name, party, dsoRules)) {
+        if (SvApp.isSv(name, party, dsoRules)) {
           Future.successful(
             TaskSuccess(
               s"skipping as SV $name is already an SV"

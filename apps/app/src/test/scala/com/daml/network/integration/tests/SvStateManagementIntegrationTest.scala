@@ -36,10 +36,10 @@ import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
-  private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_DsoRules(
+  private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
     new SRARC_OffboardSv(
       new DsoRules_OffboardSv(
-        member
+        sv
       )
     )
   )
@@ -145,7 +145,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
         actionRequiring4VotesForEarlyClosing(),
         "url",
-        "add new member",
+        "add new sv",
         new RelTime(10_000_000L),
       ),
     )(
@@ -247,7 +247,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   }
 
-  "archive duplicated and non-member AmuletPriceVote contracts" in { implicit env =>
+  "archive duplicated and non-sv AmuletPriceVote contracts" in { implicit env =>
     initDso()
     val svParties =
       Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
@@ -264,7 +264,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     actAndCheck(
-      "remove sv3 on dsoRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non member votes", {
+      "remove sv3 on dsoRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non sv votes", {
         val removeAction = new ARC_DsoRules(
           new SRARC_OffboardSv(
             new DsoRules_OffboardSv(

@@ -293,7 +293,7 @@ class HttpSvHandler(
       for {
         latestOpenMiningRound <- dsoStore.getLatestActiveOpenMiningRound()
         amuletRules <- dsoStore.getAmuletRules()
-        rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+        rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
         dsoRules = rulesAndStates.dsoRules
       } yield definitions.GetDsoInfoResponse(
         svUser = svUserName,
@@ -364,11 +364,11 @@ class HttpSvHandler(
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
       } yield {
         val errorMessage =
-          s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
+          s"Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
           dsoRules <- dsoStore.getDsoRules()
-          isCandidateMember = SvApp.isDsoMemberParty(candidateParty, dsoRules)
+          isCandidateSv = SvApp.isSvParty(candidateParty, dsoRules)
           contracts <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
           candidateParticipantId = contracts
             .getOrElse(
@@ -377,7 +377,7 @@ class HttpSvHandler(
                 .asRuntimeException()
             )
           res <-
-            if (!isCandidateOnboardingConfirmed && !isCandidateMember)
+            if (!isCandidateOnboardingConfirmed && !isCandidateSv)
               Future.failed(
                 HttpErrorHandler.unauthorized(
                   errorMessage
@@ -552,7 +552,7 @@ class HttpSvHandler(
       svParty: PartyId,
       dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
-    Option.when(SvApp.isDsoMemberParty(svParty, dsoRules))(
+    Option.when(SvApp.isSvParty(svParty, dsoRules))(
       definitions.SvOnboardingStateCompleted(
         state = "completed",
         name = dsoRules.payload.svs.get(svParty.toProtoPrimitive).name,
@@ -565,7 +565,7 @@ class HttpSvHandler(
       svParty: String,
       dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
-    Option.when(SvApp.isDsoMemberName(svParty, dsoRules))(
+    Option.when(SvApp.isSvName(svParty, dsoRules))(
       definitions.SvOnboardingStateCompleted(
         state = "completed",
         name = svParty,
@@ -615,7 +615,7 @@ class HttpSvHandler(
       confirmedBy = confirmations
         .map(c =>
           dsoRules.payload.svs.asScala.get(c.payload.confirmer) match {
-            case Some(member) => member.name
+            case Some(sv) => sv.name
             case None => c.payload.confirmer
           }
         )

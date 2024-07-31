@@ -1137,7 +1137,7 @@ object SvApp {
     } yield (token.candidateParty, token.candidateName, approvedSv.rewardWeightBps)
   }
 
-  private[sv] def isDsoMember(
+  private[sv] def isSv(
       name: String,
       party: PartyId,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
@@ -1158,7 +1158,7 @@ object SvApp {
   ): Either[Status, Unit] = {
     for {
       _ <- Either.cond(
-        !SvApp.isDsoMemberParty(candidateParty, dsoRules),
+        !SvApp.isSvParty(candidateParty, dsoRules),
         (),
         Status.ALREADY_EXISTS.withDescription(
           s"An SV with party ID $candidateParty already exists."
@@ -1179,12 +1179,12 @@ object SvApp {
     } yield ()
   }
 
-  private[sv] def isDsoMemberParty(
+  private[sv] def isSvParty(
       party: PartyId,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean = dsoRules.payload.svs.containsKey(party.toProtoPrimitive)
 
-  private[sv] def isDsoMemberName(
+  private[sv] def isSvName(
       name: String,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean = getDsoPartyFromName(name, dsoRules).isDefined

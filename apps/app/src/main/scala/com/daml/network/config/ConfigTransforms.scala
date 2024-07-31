@@ -10,7 +10,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
+import com.daml.network.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingPartyToParticipantProposalTrigger,
   SvOffboardingSequencerTrigger,

@@ -86,7 +86,7 @@ class HttpScanHandler(
       for {
         latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
         amuletRules <- store.getAmuletRules()
-        rulesAndStates <- store.getDsoRulesWithMemberNodeStates()
+        rulesAndStates <- store.getDsoRulesWithSvNodeStates()
         dsoRules = rulesAndStates.dsoRules
       } yield definitions.GetDsoInfoResponse(
         svUser = svUserName,
@@ -589,7 +589,7 @@ class HttpScanHandler(
           definitions.ListDsoScansResponse(list.map { case (domainId, scans) =>
             definitions.DomainScans(
               domainId,
-              scans.map(s => definitions.ScanInfo(s.publicUrl, s.memberName)).toVector,
+              scans.map(s => definitions.ScanInfo(s.publicUrl, s.svName)).toVector,
             )
           })
         )

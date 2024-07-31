@@ -61,7 +61,7 @@ class ReceiveSvRewardCouponTrigger(
       )
       rewardState <- OptionT(store.lookupSvRewardState(svInfo.name))
       openRounds <- OptionT.liftF(store.getOpenMiningRoundTriple())
-      lastReceivedForOpt = memberLastReceivedFor(rewardState.payload)
+      lastReceivedForOpt = svLastReceivedFor(rewardState.payload)
       firstOpenNotClaimed <- OptionT.fromOption[Future](
         openRounds.toSeq
           .filter(round =>
@@ -78,7 +78,7 @@ class ReceiveSvRewardCouponTrigger(
     )
   }
 
-  private def memberLastReceivedFor(rewardState: SvRewardState): Option[Long] = {
+  private def svLastReceivedFor(rewardState: SvRewardState): Option[Long] = {
     // -1 is the value set in DsoRules_ConfirmSvOnboarding for new SVs
     Option(rewardState.state.lastRoundCollected.number.longValue()).filter(_ > -1)
   }
@@ -88,7 +88,7 @@ class ReceiveSvRewardCouponTrigger(
   ): Future[TaskOutcome] = {
     val ReceiveSvRewardCouponTrigger.Task(dsoRules, svRewardWeight, rewardState, unclaimedRound) =
       task
-    val lastReceivedForOpt = memberLastReceivedFor(rewardState.payload)
+    val lastReceivedForOpt = svLastReceivedFor(rewardState.payload)
     lastReceivedForOpt match {
       case None =>
         logger.info(

@@ -88,7 +88,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                 )
               case _ =>
                 store
-                  .getDsoRulesWithMemberNodeStates()
+                  .getDsoRulesWithSvNodeStates()
                   .flatMap(rulesAndStates => {
                     if (
                       rulesAndStates.activeSvParticipantAndMediatorIds(domainId).contains(memberId)

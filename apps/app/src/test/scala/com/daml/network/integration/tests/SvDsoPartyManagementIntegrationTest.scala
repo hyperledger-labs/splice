@@ -70,7 +70,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             randomParty,
           ),
           _.errorMessage should include(
-            "Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
+            "Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
           ),
         )
       }

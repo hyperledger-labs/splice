@@ -84,7 +84,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       )
 
       val sv3PartyId = eventually() {
-        val members = sv1Backend
+        val svs = sv1Backend
           .getDsoInfo()
           .dsoRules
           .payload
@@ -92,9 +92,9 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           .asScala
           .toMap
 
-        members should have size 3
+        svs should have size 3
         val sv3PartyId = sv3Backend.getDsoInfo().svParty
-        inside(members.get(sv3PartyId.toProtoPrimitive)) { case Some(svInfo) =>
+        inside(svs.get(sv3PartyId.toProtoPrimitive)) { case Some(svInfo) =>
           svInfo.name shouldBe getSvName(3)
         }
         sv3PartyId

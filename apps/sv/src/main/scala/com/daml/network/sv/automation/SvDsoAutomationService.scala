@@ -25,13 +25,13 @@ import com.daml.network.sv.automation.SvDsoAutomationService.{
 }
 import com.daml.network.sv.automation.confirmation.*
 import com.daml.network.sv.automation.singlesv.*
-import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
+import com.daml.network.sv.automation.singlesv.SvNamespaceMembershipTrigger
+import com.daml.network.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingPartyToParticipantProposalTrigger,
   SvOffboardingSequencerTrigger,
 }
-import com.daml.network.sv.automation.singlesv.membership.onboarding.*
+import com.daml.network.sv.automation.singlesv.onboarding.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import com.daml.network.sv.migration.DecentralizedSynchronizerMigrationTrigger

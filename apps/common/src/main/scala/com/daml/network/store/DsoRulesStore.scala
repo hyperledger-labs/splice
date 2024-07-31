@@ -85,20 +85,20 @@ trait DsoRulesStore extends AppStore {
       )
     )
 
-  def getDsoRulesWithMemberNodeStates()(implicit
+  def getDsoRulesWithSvNodeStates()(implicit
       tc: TraceContext
-  ): Future[DsoRulesStore.DsoRulesWithMemberNodeStates] = {
+  ): Future[DsoRulesStore.DsoRulesWithSvNodeStates] = {
     for {
       // Note: at a certain size of the DSO, we'll be better off doing this join in the DB. We'll find out from our logs and performance tests.
       dsoRules <- getDsoRules()
-      memberSvParties = dsoRules.payload.svs.keySet().asScala.toSeq
+      dsoSvParties = dsoRules.payload.svs.keySet().asScala.toSeq
       svNodeStates <- Future
-        .traverse(memberSvParties) { svPartyStr =>
+        .traverse(dsoSvParties) { svPartyStr =>
           val svParty = PartyId.tryFromProtoPrimitive(svPartyStr)
           getSvNodeState(svParty).map(co => svParty -> co.contract)
         }
         .map(_.toMap)
-    } yield DsoRulesStore.DsoRulesWithMemberNodeStates(dsoRules, svNodeStates)
+    } yield DsoRulesStore.DsoRulesWithSvNodeStates(dsoRules, svNodeStates)
   }
 
   private def noActiveDsoRules =
@@ -107,7 +107,7 @@ trait DsoRulesStore extends AppStore {
 
 object DsoRulesStore {
 
-  case class DsoRulesWithMemberNodeStates(
+  case class DsoRulesWithSvNodeStates(
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       svNodeStates: Map[
         PartyId,
@@ -155,7 +155,7 @@ object DsoRulesStore {
       svParticipants.filterNot(offboardedSvParticipants.contains) ++ svMediators
     }
 
-    def getSvMemberName(svParty: PartyId): Future[String] =
+    def getSvNameInDso(svParty: PartyId): Future[String] =
       dsoRules.contract.payload.svs.asScala
         .get(svParty.toProtoPrimitive)
         .fold(

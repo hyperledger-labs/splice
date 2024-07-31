@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.onboarding
+package com.daml.network.sv.automation.singlesv.onboarding
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.traverseFilter.*
@@ -12,7 +12,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.SequencerAdminConnection
-import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
+import com.daml.network.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import com.daml.network.sv.ExtraSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.SvUtil
@@ -50,7 +50,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       tc: TraceContext
   ): Future[Seq[Task]] = {
     for {
-      dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      dsoRulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       amuletRules <- dsoStore.getAmuletRules()
       decentralizedSynchronizerConfig = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(context.clock.now)
@@ -123,7 +123,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       extraSynchronizerNodes,
     )
     for {
-      dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      dsoRulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
     } yield {
       !dsoRulesAndStates

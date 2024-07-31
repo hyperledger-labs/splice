@@ -25,8 +25,8 @@ class ReconcileCometBftNetworkConfigWithDsoRulesTrigger(
 
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      rulesAndState <- store.getDsoRulesWithMemberNodeStates()
-      owningNodeSvName <- rulesAndState.getSvMemberName(store.key.svParty)
+      rulesAndState <- store.getDsoRulesWithSvNodeStates()
+      owningNodeSvName <- rulesAndState.getSvNameInDso(store.key.svParty)
       _ <- cometBftNode.reconcileNetworkConfig(owningNodeSvName, rulesAndState)
     } yield false
   }

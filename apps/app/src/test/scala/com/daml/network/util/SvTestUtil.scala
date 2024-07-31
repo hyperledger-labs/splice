@@ -60,7 +60,7 @@ trait SvTestUtil extends TestCommon {
     }
   }
 
-  def confirmActionByAllMembers(
+  def confirmActionByAllSvs(
       confirmingSvs: Seq[ConfirmingSv],
       action: ActionRequiringConfirmation,
   )(implicit env: SpliceTestConsoleEnvironment): Seq[TransactionTree] = {

@@ -50,13 +50,13 @@ object Thresholds {
   def requiredNumVotes(
       dsoRules: Contract.Has[DsoRules.ContractId, DsoRules]
   ): Int = {
-    val memberNum = dsoRules.payload.svs.size
-    governanceThreshold(memberNum).value
+    val svNum = dsoRules.payload.svs.size
+    governanceThreshold(svNum).value
   }
 
-  private def governanceThreshold(memberNum: Int) = {
+  private def governanceThreshold(svNum: Int) = {
     // as per `DsoRules` / `summarizeDso`
-    val f = floor((memberNum - 1) / 3.0).toInt
-    PositiveInt.tryCreate(ceil((memberNum + f + 1) / 2.0).toInt)
+    val f = floor((svNum - 1) / 3.0).toInt
+    PositiveInt.tryCreate(ceil((svNum + f + 1) / 2.0).toInt)
   }
 }

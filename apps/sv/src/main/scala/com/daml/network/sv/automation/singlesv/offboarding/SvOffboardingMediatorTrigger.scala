@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv.membership.offboarding
+package com.daml.network.sv.automation.singlesv.offboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{
@@ -25,7 +25,7 @@ import scala.jdk.OptionConverters.RichOptional
 
 /** Offboard a mediator from the current global domain topology state.
   * The offboarding happens if the mediator is present in the topology state but not in DsoRules.
-  * We deliberately do not go through off-boarded member since contrary to the party the mediator id is mutable
+  * We deliberately do not go through off-boarded sv since contrary to the party the mediator id is mutable
   * so for a single SV we would then need to track a list of mediator ids that have been used in the past which gets quite messy.
   * Relying on the diff between topology state and DsoRules does allow for a race:
   * An SV might have seen an updated topology state but not yet the updated DsoRules. However for the topology state to be updated a threshold of SVs must have seen the DsoRules change first so the offboarding proposal will just die.
@@ -48,7 +48,7 @@ class SvOffboardingMediatorTrigger(
       tc: TraceContext
   ): Future[Seq[MediatorId]] = {
     for {
-      rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(
         rulesAndStates.dsoRules.domain
       )

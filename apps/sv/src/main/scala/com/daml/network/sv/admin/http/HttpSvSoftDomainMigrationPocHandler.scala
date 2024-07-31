@@ -78,8 +78,8 @@ class HttpSvSoftDomainMigrationPocHandler(
   private def getScanUrls()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
       // TODO(#13301) We should use the internal URL for the SV’s own scan to avoid a loopback requirement
-      dsoRulesWithMemberNodeStates <- dsoStore.getDsoRulesWithMemberNodeStates()
-    } yield dsoRulesWithMemberNodeStates.svNodeStates.values
+      dsoRulesWithSvNodeStates <- dsoStore.getDsoRulesWithSvNodeStates()
+    } yield dsoRulesWithSvNodeStates.svNodeStates.values
       .flatMap(
         _.payload.state.synchronizerNodes.asScala.values
           .flatMap(_.scan.toScala.toList.map(_.publicUrl))
