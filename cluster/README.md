@@ -1516,6 +1516,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    (you need slightly over 2/3 of SVs to sign this).
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
    Communicate the result of your check to the rest of the DSO to conclude the migration.
+1. Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
 1. [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
    so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
    is set to reflect the expected migration ID after completing the migration.
@@ -1524,6 +1525,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    After merging your patches to the cluster deployment branch,
    the periodic checks and deployments should be able to complete successfully again.
    Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
+1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
 1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps here so that only the following environment variables remain:
    * `export CHARTS_VERSION=` the version we're on after the migration
