@@ -1497,12 +1497,15 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
-1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that reverts all changes from the "prepare" step and then sets the following environment variables for your target cluster:
-   * `export CHARTS_VERSION=` the version we're migrating to
-   * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION`
-   * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
-   * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
-   * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
+1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following environment variables for your target cluster:
+   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_VERSION` which was added in the "prepare" step
+   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID` which was added in the "prepare" step
+   * Set the following environment variables for your target cluster:
+     * `export CHARTS_VERSION=` the version we're migrating to
+     * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION`
+     * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
+     * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
+     * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
