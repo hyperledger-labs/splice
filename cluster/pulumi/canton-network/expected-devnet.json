@@ -2112,6 +2112,12 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
+        "founder": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "genesis": {
           "chainId": "dev-1",
           "chainIdSuffix": "1"
@@ -2166,12 +2172,6 @@
         ],
         "stateSync": {
           "enable": false
-        },
-        "sv1": {
-          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
-          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
-          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -2664,7 +2664,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFirstSv": true,
+        "isFounder": true,
         "metrics": {
           "enable": true
         },
@@ -3192,6 +3192,12 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
+        "founder": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "genesis": {
           "chainId": "dev-1",
           "chainIdSuffix": "1"
@@ -3243,12 +3249,6 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
-        },
-        "sv1": {
-          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
-          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
-          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -3741,7 +3741,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFirstSv": false,
+        "isFounder": false,
         "metrics": {
           "enable": true
         },
@@ -4235,6 +4235,12 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
+        "founder": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "genesis": {
           "chainId": "dev-1",
           "chainIdSuffix": "1"
@@ -4286,12 +4292,6 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
-        },
-        "sv1": {
-          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
-          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
-          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -4784,7 +4784,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFirstSv": false,
+        "isFounder": false,
         "metrics": {
           "enable": true
         },
@@ -5278,6 +5278,12 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
+        "founder": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "genesis": {
           "chainId": "dev-1",
           "chainIdSuffix": "1"
@@ -5329,12 +5335,6 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
-        },
-        "sv1": {
-          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
-          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
-          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
-          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -5827,7 +5827,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFirstSv": false,
+        "isFounder": false,
         "metrics": {
           "enable": true
         },

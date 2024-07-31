@@ -590,7 +590,7 @@ function installScan(
     metrics: {
       enable: true,
     },
-    isFirstSv: isFirstSv,
+    [supportsRenamedFounder ? 'isFirstSv' : 'isFounder']: isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
@@ -606,3 +606,9 @@ function installScan(
   });
   return scan;
 }
+
+// TODO (#13845) remove when ciperiodic version >= 0.1.18
+const supportsRenamedFounder =
+  defaultVersion.type == 'local' ||
+  defaultVersion.version.startsWith('0.1.18') ||
+  semver.gt(defaultVersion.version, '0.1.18');
