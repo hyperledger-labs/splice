@@ -35,7 +35,10 @@ import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.error.MediatorError.Timeout
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.UnknownContractDomain
-import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.NotConnectedToAnyDomain
+import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.{
+  NotConnectedToDomain,
+  NotConnectedToAnyDomain,
+}
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.{
@@ -791,6 +794,7 @@ object HttpWalletHandler {
     ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
       case ErrorInfoDetail(InvalidDomainId.id, _) => true
       case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
+      case ErrorInfoDetail(NotConnectedToDomain.id, _) => true
       case ErrorInfoDetail(UnknownContractDomain.id, _) => true
       case ErrorInfoDetail(UnknownSubmitters.id, _) => true
       case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
