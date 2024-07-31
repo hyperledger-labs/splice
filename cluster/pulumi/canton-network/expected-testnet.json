@@ -931,7 +931,7 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "PAR-splitwell",
+        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1849,7 +1849,7 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "PAR-Digital-Asset-2",
+        "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2697,7 +2697,7 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "PAR-validator1",
+        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",

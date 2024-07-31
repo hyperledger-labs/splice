@@ -41,7 +41,6 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
-  prefixParticipantNodeIdentifier,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -244,7 +243,7 @@ async function installSvAndValidator(
           {
             MIGRATION_ID: migrationId.toString(),
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-            YOUR_NODE_NAME: prefixParticipantNodeIdentifier(onboardingName),
+            YOUR_NODE_NAME: onboardingName,
           }
         ),
         metrics: {

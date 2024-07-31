@@ -7,4 +7,4 @@ set -euo pipefail
 
 #latest_release=$(cat "LATEST_RELEASE")
 # TODO(#13646) - revert to use latest release
-echo "0.2.0-snapshot.20240723.6519.0.vcdce0da8"
+echo "0.2.0-snapshot.20240731.6580.0.v7e036c81"

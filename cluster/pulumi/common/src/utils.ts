@@ -222,12 +222,3 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
-
-// TODO(#13694) Nuke this from low earth orbit
-const shouldPrefixParticipantNodeIdentifier = config.envFlag(
-  'PREFIX_PARTICIPANT_NODE_IDENTIFIER',
-  true
-);
-
-export const prefixParticipantNodeIdentifier = (identifier: string): string =>
-  shouldPrefixParticipantNodeIdentifier ? `PAR-${identifier}` : identifier;

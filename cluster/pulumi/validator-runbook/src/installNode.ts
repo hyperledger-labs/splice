@@ -35,7 +35,6 @@ import {
   clusterSmallDisk,
   daContactPoint,
   spliceInstanceNames,
-  prefixParticipantNodeIdentifier,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -169,7 +168,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      YOUR_NODE_NAME: prefixParticipantNodeIdentifier('validator-runbook'),
+      YOUR_NODE_NAME: 'validator-runbook',
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
