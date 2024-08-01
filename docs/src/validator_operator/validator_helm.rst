@@ -346,12 +346,13 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
+- For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
-If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
+If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <validator-upgrades>`, you will need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
     :language: yaml
