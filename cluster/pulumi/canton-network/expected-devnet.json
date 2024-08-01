@@ -3213,11 +3213,6 @@
             "rewardWeightBps": 440000
           },
           {
-            "name": "Halborn",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnHazsAOXYR8SNX1z6ULTplW2+s57BqVcPymhqp4Ank3Oisr/i9hSNTJbghtawZ+afuzWVK/FQ5wvSGVVn0ZeoQ==",
-            "rewardWeightBps": 10000
-          },
-          {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 10000
@@ -4569,11 +4564,6 @@
             "rewardWeightBps": 440000
           },
           {
-            "name": "Halborn",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnHazsAOXYR8SNX1z6ULTplW2+s57BqVcPymhqp4Ank3Oisr/i9hSNTJbghtawZ+afuzWVK/FQ5wvSGVVn0ZeoQ==",
-            "rewardWeightBps": 10000
-          },
-          {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 10000
@@ -5891,11 +5881,6 @@
             "rewardWeightBps": 440000
           },
           {
-            "name": "Halborn",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnHazsAOXYR8SNX1z6ULTplW2+s57BqVcPymhqp4Ank3Oisr/i9hSNTJbghtawZ+afuzWVK/FQ5wvSGVVn0ZeoQ==",
-            "rewardWeightBps": 10000
-          },
-          {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 10000
@@ -7211,11 +7196,6 @@
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
             "rewardWeightBps": 440000
-          },
-          {
-            "name": "Halborn",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnHazsAOXYR8SNX1z6ULTplW2+s57BqVcPymhqp4Ank3Oisr/i9hSNTJbghtawZ+afuzWVK/FQ5wvSGVVn0ZeoQ==",
-            "rewardWeightBps": 10000
           },
           {
             "name": "MPC-Holding-Inc",
