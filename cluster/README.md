@@ -1605,9 +1605,7 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 
 1. We have our expected amulet balance.
 2. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-3. In the participant logs of one of our SVs, we see `Commitment correct` messages for all SV participants.
-   If we're in sync with all other SVs it's reasonable to assume they're also in sync with each other.
-4. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
+3. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
 See [Network Health](./network-health/NETWORK_HEALTH.md) for further investigation if any of these checks fail.
 

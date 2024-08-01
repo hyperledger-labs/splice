@@ -225,12 +225,8 @@ Specifically, coordinated tests involve:
   For example, verifying that their own coin balance is as expected.
 - Once all SVs (or a governance threshold of SVs) have completed the migration:
   Collectively verifying that the new synchronizer is healthy and operational.
-  Synchronizer health can be inferred from monitoring signals, Canton logs
-  (for example, by scanning participant logs for ``Commitment correct`` messages),
-  and the ability to submit transactions to the new synchronizer (for example, by creating a dummy validator onboarding secret).
+  Synchronizer health can be inferred from monitoring signals such as timely ``SV Status Reports`` from all SVs.
 - Agreeing on a timeline for decommissioning the Canton and CometBFT nodes connected to the original (pre-migration) synchronizer.
-
-.. TODO(#10782): Consider improving the "verify healthy" instructions for partners with specific metrics to check.
 
 .. CN-team internal checklist in: cluster/README.md#participating-in-a-hard-domain-migration
 

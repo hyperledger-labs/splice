@@ -36,6 +36,10 @@ Upcoming
 
   * Image versions in Helm charts are now pinned to digests for extra security
 
+* Documentation
+
+  * Updated recommendations for checking synchronizer health after a :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` to focus exclusively on monitoring signals.
+
 0.1.16
 ------
 
