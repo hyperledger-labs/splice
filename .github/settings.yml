@@ -1,0 +1,17 @@
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+repository:
+  name: splice
+  description: Reference applications for funding, operating, and incentivizing the use of a decentralized, public Canton synchronizer. Includes the Amulet reference application for creating native payment utilities for Canton synchronizers and Daml applications.
+  default_branch: main
+  has_downloads: true
+  has_issues: true
+  has_projects: true
+  has_wiki: true
+  archived: false
+  private: false
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
