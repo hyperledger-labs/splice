@@ -1177,12 +1177,12 @@ components:
           type: string
         migration_id:
           description: |
-            The id of the update.
+            The migration id of the synchronizer.
           type: integer
           format: int64
         workflow_id:
           description: |
-            The id of the update.
+            The id of the workflow to which this transaction belongs.
           type: string
         record_time:
           description: |

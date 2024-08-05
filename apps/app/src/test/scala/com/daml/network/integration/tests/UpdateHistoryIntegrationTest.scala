@@ -45,7 +45,8 @@ class UpdateHistoryIntegrationTest
     with SplitwellTestUtil
     with TimeTestUtil
     with HasActorSystem
-    with HasExecutionContext {
+    with HasExecutionContext
+    with UpdateHistoryComparator {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
@@ -183,6 +184,12 @@ class UpdateHistoryIntegrationTest
           ledgerBeginSv1,
         )
       }
+      eventually() {
+        compareHistoryViaScanApi(
+          sv1Backend.participantClient,
+          ledgerBeginSv1,
+        )
+      }
       // History for Alice, read from aliceValidator (should contain domain transfer because of splitwell)
       eventually() {
         compareHistory(
@@ -218,6 +225,60 @@ class UpdateHistoryIntegrationTest
           ledgerBeginAlice,
         )
       }
+    }
+  }
+
+  private def compareHistoryViaScanApi(
+      participant: ParticipantClientReference,
+      ledgerBegin: ParticipantOffset,
+  )(implicit env: SpliceTestConsoleEnvironment) = {
+    val ledgerEnd = participant.ledger_api.state.end()
+    val dsoParty = sv1Backend.getDsoInfo().dsoParty
+    val actualUpdates = participant.ledger_api.updates
+      .trees(
+        partyIds = Set(dsoParty),
+        completeAfter = Int.MaxValue,
+        beginOffset = ledgerBegin,
+        endOffset = Some(ledgerEnd),
+        verbose = false,
+      )
+      .map {
+        case TransactionTreeWrapper(protoTree) =>
+          LedgerClient.GetTreeUpdatesResponse(
+            TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
+            DomainId.tryFromString(protoTree.domainId),
+          )
+        case UnassignedWrapper(protoReassignment, protoUnassignEvent) =>
+          GetTreeUpdatesResponse(
+            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
+            DomainId.tryFromString(protoUnassignEvent.source),
+          )
+        case AssignedWrapper(protoReassignment, protoAssignEvent) =>
+          GetTreeUpdatesResponse(
+            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
+            DomainId.tryFromString(protoAssignEvent.target),
+          )
+      }
+
+    val sv1ScanClient = scancl("sv1ScanClient")
+
+    val recordedUpdates = sv1ScanClient.getUpdateHistory(
+      actualUpdates.size,
+      Some(
+        (
+          0L,
+          // Note that we deliberately do not start from ledger begin here since the ledgerBeginSv1 variable above
+          // only points at the end after initialization.
+          actualUpdates.head.update.recordTime
+            .minusMillis(1L)
+            .toString, // include the first element, as otherwise it's excluded
+        )
+      ),
+    )
+
+    recordedUpdates should have length actualUpdates.size.toLong
+    actualUpdates.zip(recordedUpdates).foreach { case (actual, recorded) =>
+      actual should matchUpdateHistory(recorded)
     }
   }
 
