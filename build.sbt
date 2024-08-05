@@ -148,7 +148,10 @@ val damlDarsLockCheckerFileArg =
 lazy val `build-tools-dar-lock-checker` = project
   .in(file("build-tools/dar-lock-checker"))
   .settings(
-    libraryDependencies ++= Seq(Dependencies.better_files, Dependencies.daml_lf_archive_reader),
+    libraryDependencies ++= Seq(
+      Dependencies.better_files,
+      Dependencies.daml_lf_archive_reader,
+    ),
     Headers.ApacheDAHeaderSettings,
   )
 

@@ -9,18 +9,24 @@ import com.digitalasset.daml.lf.archive.{DarDecoder, DarParser}
 import scala.sys.process.*
 
 object DarLockChecker {
+  final case class Dar(
+      packageName: String,
+      packageVersion: String,
+      filename: String,
+  )
+
   def main(args: Array[String]): Unit = {
     args.toSeq match {
       case cmd +: outputFileName +: inputFileNames =>
-        val dars = inputFileNames
+        val (dars, nonTestDars) = inputFileNames
           .map(filename => {
             val hash = DarParser.assertReadArchiveFromFile(File(filename).toJava).main.getHash
             val metadata =
               DarDecoder.assertReadArchiveFromFile(File(filename).toJava).main._2.metadata
-            (metadata.name, metadata.version.toString()) -> hash
+            ((metadata.name, metadata.version.toString()) -> hash, filename)
           })
-          .foldLeft(Map.empty[(String, String), String]) {
-            case (map, ((name, version), hash)) => {
+          .foldLeft((Map.empty[(String, String), String], Seq.empty[Dar])) {
+            case ((map, nonTestDars), (((name, version), hash), filename)) => {
               val _ = map
                 .get((name, version))
                 .foreach(_hash =>
@@ -29,7 +35,10 @@ object DarLockChecker {
                       s"Conflicting hashes for version ${version} of package ${name}. If you modified daml models, please bump the package version."
                     )
                 )
-              map + ((name, version) -> hash)
+              val newNonTestDars = Seq(Dar(name, version, filename)).filter(_ =>
+                !name.endsWith("-test") && filename.endsWith("-current.dar")
+              ) ++ nonTestDars
+              (map + ((name, version) -> hash), newNonTestDars)
             }
           }
         val lockStr = dars
@@ -51,9 +60,11 @@ object DarLockChecker {
                 ).mkString(System.lineSeparator())
               )
             checkDarsLockImmutable()
+            checkDarHashes(nonTestDars)
           case "update" =>
             val _ = File(outputFileName).overwrite(lockStr)
             checkDarsLockImmutable()
+            updateDars(nonTestDars)
           case _ =>
             printHelpAndError(s"unknown command '$cmd'")
         }
@@ -88,6 +99,35 @@ object DarLockChecker {
       }
     }
   }
+
+  private def checkedInDarFile(dar: Dar) =
+    File(s"daml/dars/${dar.packageName}-${dar.packageVersion}.dar")
+
+  private def checkDarHashes(dars: Seq[Dar]): Unit = {
+    dars.foreach { dar =>
+      val currentHash = File(dar.filename).sha256
+      val checkedInFile = checkedInDarFile(dar)
+      val checkedInHash = checkedInFile.sha256
+      if (currentHash != checkedInHash) {
+        sys.error(
+          s"Hash of DAR ${dar.filename} is ${currentHash} while the checked in DAR ${checkedInFile} has hash ${checkedInHash}, either update the version or update the checked-in DAR"
+        )
+      }
+    }
+  }
+
+  private def updateDars(dars: Seq[Dar]): Unit = {
+    dars.foreach { dar =>
+      val checkedInFilename = checkedInDarFile(dar)
+      File(dar.filename).copyTo(checkedInFilename, overwrite = true)
+    }
+  }
+
+  private def isTestDar(packageName: String): Boolean =
+    packageName.endsWith("-test")
+
+  private def isCurrentDar(packageName: String): Boolean =
+    packageName.endsWith("-test")
 
   // Parse the contents of the dar lock file into
   // a map of (package name, package version) -> package id
