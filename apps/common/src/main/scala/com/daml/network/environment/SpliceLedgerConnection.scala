@@ -91,7 +91,7 @@ class BaseLedgerConnection(
   def activeContracts(
       filter: IngestionFilter,
       offset: lapi.participant_offset.ParticipantOffset.Value.Absolute,
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     (
         Seq[ActiveContract],
         Seq[IncompleteReassignmentEvent.Unassign],
@@ -125,26 +125,22 @@ class BaseLedgerConnection(
     } yield (active, incompleteOut, incompleteIn)
   }
 
-  def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
+  def getConnectedDomains(party: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Map[DomainAlias, DomainId]] =
     client.getConnectedDomains(party)
 
   def updates(
       beginOffset: lapi.participant_offset.ParticipantOffset,
       filter: IngestionFilter,
-  ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
+  )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
       .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, filter))
-
-  def tryGetTransactionTreeByEventId(
-      parties: Seq[PartyId],
-      id: String,
-  )(implicit traceContext: TraceContext): Future[TransactionTree] =
-    client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
   def getOptionalPrimaryParty(
       user: String,
       identityProviderId: Option[String] = None,
-  ): Future[Option[PartyId]] = {
+  )(implicit tc: TraceContext): Future[Option[PartyId]] = {
     for {
       user <- client
         .getUser(user, identityProviderId)
@@ -153,7 +149,7 @@ class BaseLedgerConnection(
     } yield partyId
   }
 
-  def getPrimaryParty(user: String): Future[PartyId] = {
+  def getPrimaryParty(user: String)(implicit tc: TraceContext): Future[PartyId] = {
     for {
       partyIdO <- getOptionalPrimaryParty(user)
       partyId = partyIdO.getOrElse(
@@ -239,7 +235,9 @@ class BaseLedgerConnection(
       logger,
     )
 
-  def getUser(user: String, identityProviderId: Option[String] = None): Future[User] =
+  def getUser(user: String, identityProviderId: Option[String] = None)(implicit
+      tc: TraceContext
+  ): Future[User] =
     client.getUser(user, identityProviderId)
 
   private def createPartyAndUser(
@@ -262,7 +260,7 @@ class BaseLedgerConnection(
       party: PartyId,
       userRights: Seq[User.Right],
       identityProviderId: Option[String] = None,
-  ): Future[PartyId] = {
+  )(implicit tc: TraceContext): Future[PartyId] = {
     val userId = Ref.UserId.assertFromString(user)
     val userLf = new User(userId, party.toLf)
     for {
@@ -284,7 +282,7 @@ class BaseLedgerConnection(
       user: String,
       party: PartyId,
       identityProviderId: Option[String] = None,
-  ): Future[Unit] =
+  )(implicit tc: TraceContext): Future[Unit] =
     client.setUserPrimaryParty(user, party, identityProviderId)
 
   def ensureUserMetadataAnnotation(userId: String, key: String, value: String, retryFor: RetryFor)(
@@ -362,7 +360,7 @@ class BaseLedgerConnection(
       userId: String,
       key: String,
       identityProviderId: Option[String] = None,
-  ): Future[Option[String]] =
+  )(implicit tc: TraceContext): Future[Option[String]] =
     client.getUserProto(userId, identityProviderId).map { user =>
       if (user.hasMetadata) {
         user.getMetadata.getAnnotationsMap.asScala.get(key)
@@ -392,7 +390,7 @@ class BaseLedgerConnection(
 
   def getUserActAs(
       username: String
-  ): Future[Set[PartyId]] = {
+  )(implicit tc: TraceContext): Future[Set[PartyId]] = {
     val userId = Ref.UserId.assertFromString(username)
     for {
       userRights <- client.listUserRights(userId)
@@ -401,22 +399,11 @@ class BaseLedgerConnection(
     }.toSet
   }
 
-  def getUserReadAs(
-      username: String
-  ): Future[Set[PartyId]] = {
-    val userId = Ref.UserId.assertFromString(username)
-    for {
-      userRights <- client.listUserRights(userId)
-    } yield userRights.collect { case readAs: User.Right.CanReadAs =>
-      PartyId.tryFromProtoPrimitive(readAs.party)
-    }.toSet
-  }
-
   def grantUserRights(
       user: String,
       actAsParties: Seq[PartyId],
       readAsParties: Seq[PartyId],
-  ): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] = {
     val grants =
       actAsParties.map(p => new User.Right.CanActAs(p.toLf)) ++ readAsParties.map(p =>
         new User.Right.CanReadAs(p.toLf)
@@ -428,7 +415,7 @@ class BaseLedgerConnection(
       user: String,
       actAsParties: Seq[PartyId],
       readAsParties: Seq[PartyId],
-  ): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] = {
     val revokes =
       actAsParties.map(p => new User.Right.CanActAs(p.toLf)) ++ readAsParties.map(p =>
         new User.Right.CanReadAs(p.toLf)
@@ -436,7 +423,7 @@ class BaseLedgerConnection(
     client.revokeUserRights(user, revokes)
   }
 
-  def listPackages(): Future[Set[String]] =
+  def listPackages()(implicit tc: TraceContext): Future[Set[String]] =
     client.listPackages().map(_.toSet)
 
   def waitForPackages(
@@ -475,7 +462,9 @@ class BaseLedgerConnection(
     )
 
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def lookupDsoPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
+  def lookupDsoPartyFromUserMetadata(userId: String)(implicit
+      tc: TraceContext
+  ): Future[Option[PartyId]] =
     lookupUserMetadata(userId, DSO_PARTY_USER_METADATA_KEY).map(
       _.map(PartyId.tryFromProtoPrimitive(_))
     )

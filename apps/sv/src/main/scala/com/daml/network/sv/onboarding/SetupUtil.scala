@@ -60,7 +60,7 @@ private[onboarding] object SetupUtil {
       connection: SpliceLedgerConnection,
       user: String,
       dso: PartyId,
-  ): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] = {
     connection.grantUserRights(
       user,
       Seq(dso),
