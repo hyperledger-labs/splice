@@ -2595,7 +2595,6 @@ function subcmd_disaster_recovery_test() {
   export DISABLE_CANTON_AUTO_INIT="true"
   export DISABLE_COMETBFT_STATE_SYNC="true"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
-  export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
   _cluster_apply
 
   _info "Switching to new domain"
