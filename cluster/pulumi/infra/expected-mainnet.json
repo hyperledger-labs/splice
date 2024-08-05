@@ -2555,6 +2555,12 @@
         },
         "prometheus": {
           "prometheusSpec": {
+            "additionalArgs": [
+              {
+                "name": "storage.tsdb.max-block-duration",
+                "value": "1d"
+              }
+            ],
             "affinity": {
               "nodeAffinity": {
                 "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -2580,6 +2586,7 @@
             "externalUrl": "https://prometheus.global.canton.network.digitalasset.com",
             "logFormat": "json",
             "podMonitorSelectorNilUsesHelmValues": false,
+            "remoteWriteDashboards": true,
             "resources": {
               "requests": {
                 "cpu": "4",

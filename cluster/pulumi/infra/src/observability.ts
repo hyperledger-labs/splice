@@ -272,6 +272,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               },
             },
             logFormat: 'json',
+            remoteWriteDashboards: true,
+            // fix for https://github.com/prometheus/prometheus/issues/6857
+            additionalArgs: [{ name: 'storage.tsdb.max-block-duration', value: '1d' }],
             storageSpec: {
               volumeClaimTemplate: {
                 spec: {
