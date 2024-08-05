@@ -37,7 +37,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.util.Using
+import scala.util.{Try, Using}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
@@ -630,9 +630,19 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
       val updateHistory = store.updateHistory
       val afterO = request.after.map { after =>
-        (
-          after.afterMigrationId,
-          CantonTimestamp(Timestamp.assertFromInstant(Instant.parse(after.afterRecordTime))),
+        val afterRecordTime = {
+          for {
+            instant <- Try(Instant.parse(after.afterRecordTime)).toEither.left.map(_.getMessage)
+            ts <- Timestamp.fromInstant(instant)
+          } yield CantonTimestamp(ts)
+        }
+        afterRecordTime.fold(
+          error => throw new IllegalArgumentException(s"Invalid timestamp: $error"),
+          afterRecordTime =>
+            (
+              after.afterMigrationId,
+              afterRecordTime,
+            ),
         )
       }
       updateHistory

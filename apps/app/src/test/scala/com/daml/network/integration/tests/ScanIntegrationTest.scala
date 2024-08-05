@@ -33,8 +33,8 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
-import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 
 import scala.util.Success
@@ -698,7 +698,34 @@ class ScanIntegrationTest
     inside(response) {
       case _ if response.status == StatusCodes.BadRequest =>
         inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
-          response.contains("Invalid unique identifier `None` with missing namespace") shouldBe true
+          response should include("Invalid unique identifier `None` with missing namespace")
+        }
+    }
+  }
+
+  "getUpdateHistory should return 400 for invalid after timestamp" in { implicit env =>
+    import env.{actorSystem, executionContext}
+    registerHttpConnectionPoolsCleanup(env)
+
+    val response = Http()
+      .singleRequest(
+        Post(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/updates"
+        ).withEntity(
+          HttpEntity(
+            ContentTypes.`application/json`,
+            s"""{"after":{"after_migration_id":1,"after_record_time":"Invalid"},"page_size":10}""",
+          )
+        )
+      )
+      .futureValue
+
+    inside(response) {
+      case _ if response.status == StatusCodes.BadRequest =>
+        inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
+          response should include(
+            "Invalid timestamp: Text 'Invalid' could not be parsed at index 0"
+          )
         }
     }
   }
