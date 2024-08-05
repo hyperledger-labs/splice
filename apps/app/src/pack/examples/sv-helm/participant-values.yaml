@@ -15,6 +15,6 @@ enableHealthProbes: true
 # want your validator to be represented as.
 nodeIdentifier: YOUR_NODE_NAME
 # PARTICIPANT_BOOTSTRAP_START
-# Uncomment the line below if you are bootstrapping from a migration dump.
-# disableAutoInit: true
+# Set this to false only for initial onboarding (must be true for synchronizer migrations and disaster recovery)
+disableAutoInit: true
 # PARTICIPANT_BOOTSTRAP_END

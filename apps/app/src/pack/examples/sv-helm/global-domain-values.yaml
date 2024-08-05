@@ -17,6 +17,6 @@ mediator:
     databaseName: mediator_MIGRATION_ID
 nodeIdentifier: YOUR_SV_NAME
 # DOMAIN_BOOTSTRAP_START
-# Uncomment the line below if you are bootstrapping from a migration dump.
-# disableAutoInit: true
+# Set this to false only for initial onboarding (must be true for synchronizer migrations and disaster recovery)
+disableAutoInit: true
 # DOMAIN_BOOTSTRAP_END

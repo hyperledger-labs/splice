@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* Deployment
+
+  * The ``disableAutoInit`` Helm value now defaults to ``true`` wherever it is used and must be explicitly set to ``false`` when onboarding fresh validators or SVs. The installing instructions for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>` have been updated accordingly.
+
 
 0.1.17
 --------
