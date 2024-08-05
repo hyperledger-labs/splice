@@ -2,9 +2,8 @@
 name: Cut release and deploy
 about: Cut release and upgrade DevNet nodes
 title: Cut and deploy release 0.x.y
-labels: ''
-assignees: ''
-
+labels: ""
+assignees: ""
 ---
 
 ## Cut release
@@ -43,13 +42,16 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Run `git diff (git merge-base origin/release-line-0.x.z origin/main) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
     - Run `git log (git merge-base origin/release-line-0.x.z origin/main)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: preview-changes` and `cluster: devnet`.
-    - Review the output together with someone else to see that there are no unexpected changes.
-    - Pay particular attention to deleted or newly created resources.
+  - Review the output together with someone else to see that there are no unexpected changes.
+  - Pay particular attention to deleted or newly created resources.
+  - Keep a URL to the preview job. It'll be required for the PR in the next step
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
   - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes` and `cluster: devnet`
     - Review the changes to the `deployment` stack.
+    - Update the PR with a URL to the preview job on the release line
+    - Update the PR with a URL to the preview job on the PR's branch
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
   - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
