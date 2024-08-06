@@ -98,5 +98,5 @@ groups:
           runbook_url: ""
           summary: Status report creation time lag too high
         labels:
-          "": ""
+          "team": "support"
         isPaused: false

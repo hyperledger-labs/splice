@@ -14,5 +14,14 @@ contactPoints:
             {{ template "slack_title" . }}
           text: |
             {{ template "slack_message" . }}
+  - name: email-to-support-team
+    receivers:
+      - uid: email-to-support-team
+        type: email
+        settings:
+          addresses: $SUPPORT_TEAM_EMAIL
+          singleEmail: false
+          message: '{{ template "support_email_message" . }}'
+        disableResolveMessage: false
 deleteContactPoints:
   - uid: grafana-default-email
