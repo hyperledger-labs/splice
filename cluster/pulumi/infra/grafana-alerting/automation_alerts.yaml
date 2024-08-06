@@ -30,7 +30,7 @@ groups:
               useBackend: false
         dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
         panelId: 8
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 5m
         annotations:

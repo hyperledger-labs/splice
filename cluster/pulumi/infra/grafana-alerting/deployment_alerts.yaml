@@ -59,7 +59,7 @@ groups:
               type: threshold
         dashboardUid: QP_wDqDnz
         panelId: 11
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 2m
         annotations:
@@ -92,7 +92,7 @@ groups:
               refId: A
         dashboardUid: QP_wDqDnz
         panelId: 27
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 1m
         annotations:

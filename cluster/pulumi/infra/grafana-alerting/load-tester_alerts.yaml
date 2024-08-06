@@ -106,7 +106,7 @@ groups:
               maxDataPoints: 43200
               refId: D
               type: threshold
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 1m
         annotations:
@@ -194,7 +194,7 @@ groups:
               type: reduce
         dashboardUid: ccbb2351-2ae2-462f-ae0e-f2c893ad1028
         panelId: 28
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 1m
         annotations:

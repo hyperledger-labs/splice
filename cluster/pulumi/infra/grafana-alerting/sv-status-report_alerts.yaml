@@ -87,7 +87,7 @@ groups:
               type: threshold
         dashboardUid: cdlm6c7fn7vuod
         panelId: 18
-        noDataState: NoData
+        noDataState: $NODATA
         execErrState: Error
         for: 5m
         annotations:

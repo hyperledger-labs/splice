@@ -54,7 +54,7 @@ groups:
               type: threshold
         dashboardUid: 919b92a8e8041bd567af9edab12c840c
         panelId: 2
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 5m
         annotations:

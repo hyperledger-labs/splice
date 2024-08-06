@@ -32,6 +32,8 @@ export type LogLevel = 'INFO' | 'DEBUG';
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
 
+export const ENABLE_NO_DATA_ALERTS = config.envFlag('ENABLE_NO_DATA_ALERTS', false);
+
 const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
 
 export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
