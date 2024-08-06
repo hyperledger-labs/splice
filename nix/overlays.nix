@@ -22,17 +22,17 @@
     doCheck = false;
   });
   geckodriver = super.geckodriver.overrideAttrs (old: rec {
-    version = "0.34.0";
+    version = "0.35.0";
     src = super.fetchFromGitHub {
       owner = "mozilla";
       repo = "geckodriver";
       rev = "refs/tags/v${version}";
-      sha256 = "sha256-jrF55j3/WKpGl7sJzRmPyaNMbxPqAoXWiuQJsxfIYgc=";
+      sha256 = "sha256-3EJP+y+Egz0kj5e+1FRHPGWfneB/tCCVggmgmylMyDE=";
     };
     cargoDeps = old.cargoDeps.overrideAttrs {
       inherit version;
       inherit src;
-      outputHash = "sha256-4on4aBkRI9PiPgNcxVktTDX28qRy3hvV9+glNB6hT1k=";
+      outputHash = "sha256-BFEYZxzbaXmfQUl4EgbpQblTQ5QJmizqsdJnaWxgdaI=";
     };
   });
   git-search-replace = super.callPackage ./git-search-replace.nix {};
