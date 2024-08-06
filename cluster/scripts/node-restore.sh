@@ -90,7 +90,12 @@ function down() {
 
   for deployment_name in $deployment_names; do
     _info "Scaling down $component deployment $deployment_name"
-    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=0
+    if [[ $deployment_name == sv-app || $deployment_name == validator-app ]]
+    then
+        kubectl scale statefulset -n "$namespace" "$deployment_name" --replicas=0
+    else
+        kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=0
+    fi
   done
 }
 
@@ -114,7 +119,12 @@ function up() {
 
   for deployment_name in $deployment_names; do
     _info "Scaling up $component deployment $deployment_name"
-    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+    if [[ $deployment_name == sv-app || $deployment_name == validator-app ]]
+    then
+        kubectl scale statefulset -n "$namespace" "$deployment_name" --replicas=1
+    else
+        kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+    fi
   done
 }
 
