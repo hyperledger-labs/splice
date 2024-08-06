@@ -26,7 +26,7 @@ genesis:
   # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
   chainId: "TARGET_CLUSTER-MIGRATION_ID"
   # Reserved for future use; keep at 0 until further notice
-  chainIdSuffix: "0"
+  chainIdSuffix: "0"  # must be a string value
 
 stateSync:
   # Uncomment the line below to disable state sync
