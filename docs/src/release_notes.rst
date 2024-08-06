@@ -37,6 +37,10 @@ Upcoming
     additional transfer offers even if there were already sufficient
     transfer offers to cover the sweep.
 
+* UI
+
+  * Gzip compression has been enabled for the Scan, Wallet, SV and CNS UIs.
+
 * Deployment
 
   * Image versions in Helm charts are now pinned to digests for extra security
