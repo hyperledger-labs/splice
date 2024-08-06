@@ -4,7 +4,7 @@
     "attribution-actor": "system",
     "parameters": {
       "branch": "release-line-0.1.15",
-      "run-job": "backup_status_check"
+      "run-job": "backup-status-check"
     },
     "timetable": {
       "per-hour": 1,

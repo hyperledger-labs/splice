@@ -52,16 +52,14 @@ parameters:
         backup-devnet,
         backup-testnet,
         backup-mainnet,
-        backup-check-devnet,
-        backup-check-testnet,
-        backup-check-mainnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
         preview-changes,
-        deploy-hard-migration
+        deploy-hard-migration,
+        backup-status-check,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -4032,7 +4030,7 @@ workflows:
   version: 2
   backup_status_check:
     when:
-      equal: [ backup_status_check, << pipeline.parameters.run-job >> ]
+      equal: [ backup-status-check, << pipeline.parameters.run-job >> ]
     jobs:
       - backup_status_cluster:
           cluster: "devnet"

@@ -1,7 +1,7 @@
 workflow:
   backup_status_check:
     when:
-      equal: [ backup_status_check, << pipeline.parameters.run-job >> ]
+      equal: [ backup-status-check, << pipeline.parameters.run-job >> ]
     jobs:
       - backup_status_cluster:
           cluster: "devnet"

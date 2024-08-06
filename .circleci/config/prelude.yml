@@ -47,16 +47,14 @@ parameters:
         backup-devnet,
         backup-testnet,
         backup-mainnet,
-        backup-check-devnet,
-        backup-check-testnet,
-        backup-check-mainnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
         preview-changes,
-        deploy-hard-migration
+        deploy-hard-migration,
+        backup-status-check,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
