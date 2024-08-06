@@ -106,7 +106,7 @@ groups:
               type: math
         dashboardUid: UJyurCTWz
         panelId: 48
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 15m
         annotations:
@@ -233,7 +233,7 @@ groups:
               type: threshold
         dashboardUid: UJyurCTWz
         panelId: 66
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 10m
         annotations:
@@ -423,7 +423,7 @@ groups:
               type: reduce
         dashboardUid: UJyurCTWz
         panelId: 66
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 5m
         annotations:
@@ -519,7 +519,7 @@ groups:
               type: threshold
         dashboardUid: UJyurCTWz
         panelId: 68
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 5m
         annotations:
@@ -610,7 +610,7 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: OK
         for: 5m
         annotations:

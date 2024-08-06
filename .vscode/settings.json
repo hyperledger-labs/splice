@@ -16,5 +16,8 @@
     "./cluster/pulumi/sv-runbook",
     "./cluster/pulumi/validator-runbook"
   ],
-  "python.formatting.provider": "none"
+  "python.formatting.provider": "none",
+  "files.readonlyInclude": {
+    "**/.daml/unpacked-dars/**": true
+  }
 }

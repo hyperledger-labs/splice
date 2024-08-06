@@ -12,6 +12,7 @@ import {
   COMETBFT_RETAIN_BLOCKS,
   config,
   ENABLE_COMETBFT_PRUNING,
+  ENABLE_NO_DATA_ALERTS,
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
@@ -698,6 +699,10 @@ function substituteSlackNotificationTemplate(file: string) {
     .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl);
 }
 
+function defaultAlertSubstitutions(alert: string): string {
+  return alert.replaceAll('$NODATA', ENABLE_NO_DATA_ALERTS ? 'Error' : 'OK');
+}
+
 function createGrafanaAlerting(namespace: Input<string>) {
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
@@ -708,29 +713,33 @@ function createGrafanaAlerting(namespace: Input<string>) {
           grafana_alert: '',
         },
       },
-      data: {
-        ...(enableAlerts
-          ? { 'notification_policies.yaml': readGrafanaAlertingFile('notification_policies.yaml') }
-          : {}),
-        ...{
-          'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
-          'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml').replace(
-            '$LOAD_TESTER_MIN_RATE',
-            LOAD_TESTER_MIN_RATE
-          ),
-          'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
-            .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
-            .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
-            .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-          'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
-          'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
-          'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
-          'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
-          'templates.yaml': substituteSlackNotificationTemplate(
-            readGrafanaAlertingFile('templates.yaml')
-          ),
-        },
-      },
+      data: Object.fromEntries(
+        Object.entries({
+          ...(enableAlerts
+            ? {
+                'notification_policies.yaml': readGrafanaAlertingFile('notification_policies.yaml'),
+              }
+            : {}),
+          ...{
+            'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
+            'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml').replace(
+              '$LOAD_TESTER_MIN_RATE',
+              LOAD_TESTER_MIN_RATE
+            ),
+            'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
+              .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
+              .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
+              .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
+            'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+            'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
+            'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
+            'templates.yaml': substituteSlackNotificationTemplate(
+              readGrafanaAlertingFile('templates.yaml')
+            ),
+          },
+        }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])
+      ),
     },
     {
       // the sidecar reacts to k8s events, so if it deletes it afterward, as it has the same name it will just delete the file
