@@ -42,7 +42,8 @@ Scale down all components in the SV node to 0 replicas
       global-domain-0-mediator \
       global-domain-0-sequencer \
       participant-0 \
-      scan-app \
+      scan-app
+    kubectl scale statefulset --replicas=0 -n sv \
       sv-app \
       validator-app
 
@@ -59,7 +60,8 @@ Once all storage has been restored, scale up all components in the SV node back 
       global-domain-0-mediator \
       global-domain-0-sequencer \
       participant-0 \
-      scan-app \
+      scan-app
+    kubectl scale statefulset --replicas=0 -n sv \
       sv-app \
       validator-app
 
