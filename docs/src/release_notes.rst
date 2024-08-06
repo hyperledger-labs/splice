@@ -21,6 +21,11 @@ Upcoming
 
    * You can turn off this behavior for each component by adding the following env variable in the `additionalEnvVars` helm values: `ADDITIONAL_CONFIG_DISABLE_NATIVE_HISTOGRAMS="canton.monitoring.metrics.histograms=[]"`
 
+* Dashboards
+
+  * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
+    This should should make it easier to diagnose connectivity problems between network peers.
+
 * Wallet API
 
   * The ``list`` API in ``wallet-internal.yaml`` now exposes contracts

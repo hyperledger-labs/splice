@@ -79,7 +79,12 @@ However, to pin down the cause, the primary
 point of investigation is to figure out which SV’s CometBFT nodes are
 not working.
 
-Looking for warnings and errors in the logs can often be a good first start. If this does not
+The [CometBFT Network Status](https://grafana.dev.global.canton.network.digitalasset.com/d/ddsuu1wnxwetcd/cometbft-network-status?orgId=1)
+dashboard can be of use here. It should allow you to quickly check if our SV CometBFT nodes are able to communicate to the nodes of other SVs
+(identified by their CometBFT peer IDs). You can then compare this with the output of `cncluster list_sv_cometbft_addresses` that provides a
+mapping between SV names and CometBFT peer IDs.
+
+If the dashboard does not prove useful, looking for warnings and errors in the logs can often be a good next step. If this also does not
 bring up anything useful, the best option is to check the CometBFT state directly:
 
 ```
