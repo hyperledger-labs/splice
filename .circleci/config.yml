@@ -52,6 +52,9 @@ parameters:
         backup-devnet,
         backup-testnet,
         backup-mainnet,
+        backup-check-devnet,
+        backup-check-testnet,
+        backup-check-mainnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -1505,6 +1508,135 @@ jobs:
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
           cmd_retry_count: 5
 
+
+  backup_cluster:
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      include_sv:
+        type: boolean
+        default: true
+      include_splitwell:
+        type: boolean
+        default: true
+      include_validator1:
+        type: boolean
+        default: true
+      parallelism:
+        type: integer
+        default: 3
+      migration_id:
+        type: integer
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: << parameters.parallelism >>
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Listing nodes for backup
+          cluster: << parameters.cluster >>
+          cmd: |
+            nodes=""
+            if [[ << parameters.include_sv >> != false ]]; then
+              if (env-bool IS_DEVNET); then
+                nodes="sv-1 sv-2 sv-3 sv-4"
+              else
+                nodes="sv-1"
+              fi
+            fi
+            if [[ << parameters.include_validator1 >> != false ]]; then
+              nodes="$nodes validator1"
+            fi
+            if [[ << parameters.include_splitwell >> != false ]]; then
+              nodes="$nodes splitwell"
+            fi
+            echo $nodes > nodes.txt
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run:
+          name: Split backup tasks
+          command: |
+            nodes=$(cat nodes.txt)
+            echo "$nodes" | circleci tests run --command "xargs ./.circleci/grab-tests.sh"
+            if [ -e tests-to-run.txt ]; then
+              echo "Nodes to backup: $(cat tests-to-run.txt)"
+            else
+              echo "No nodes to backup, stopping"
+              circleci-agent step halt
+            fi
+      - run_bash_command_in_nix:
+          cmd_name: Backup nodes
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "20m"
+          cmd: |
+            cncluster activate
+            # We use readiness of validator-app as an approximation to the node's readiness
+            for ns in $(cat tests-to-run.txt); do
+              cncluster wait $ns validator-app << parameters.migration_id >>
+            done
+            cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+
+  backup_status_cluster:
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      namespace_name:
+        type: string
+        default: "sv-1"
+      alert_threshold:
+        type: string
+        default: "8 hours ago"
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Check backup status
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "10m"
+          cmd: |
+            cncluster activate
+            latest_creationTimestamp=$(kubectl get volumesnapshot -n << parameters.namespace_name >> -o json | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.creationTimestamp')
+            msg="The latest backup for namespace << parameters.namespace_name >>"
+            if [ -n "$latest_creationTimestamp" ] && date -d "$latest_creationTimestamp" >/dev/null 2>&1; then
+              latest_creation_epoch=$(date -d "$latest_creationTimestamp" +%s)
+              last_epoch=$(date -d "$alert_threshold" +%s)
+              if [ "$latest_creation_epoch" -lt "$last_epoch" ]; then
+                msg+=" is older than one day with creationTimestamp: ($latest_creationTimestamp)."
+                exit 1
+              else
+                msg+=" is not older than one day with creationTimestamp: ($latest_creationTimestamp)."
+              fi
+              echo $msg
+            else
+              echo "No volumesnapshot found yet."
+            fi
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          event: fail
+          custom: |
+            { "text": "The latest backup for cluster: << parameters.cluster >> and namespace: << parameters.namespace_name >> is older than one day." }
 
   deploy_sv_runbook:
     machine:
@@ -2991,85 +3123,6 @@ jobs:
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
 
-  backup_cluster:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      include_sv:
-        type: boolean
-        default: true
-      include_splitwell:
-        type: boolean
-        default: true
-      include_validator1:
-        type: boolean
-        default: true
-      parallelism:
-        type: integer
-        default: 3
-      migration_id:
-        type: integer
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Listing nodes for backup
-          cluster: << parameters.cluster >>
-          cmd: |
-            nodes=""
-            if [[ << parameters.include_sv >> != false ]]; then
-              if (env-bool IS_DEVNET); then
-                nodes="sv-1 sv-2 sv-3 sv-4"
-              else
-                nodes="sv-1"
-              fi
-            fi
-            if [[ << parameters.include_validator1 >> != false ]]; then
-              nodes="$nodes validator1"
-            fi
-            if [[ << parameters.include_splitwell >> != false ]]; then
-              nodes="$nodes splitwell"
-            fi
-            echo $nodes > nodes.txt
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run:
-          name: Split backup tasks
-          command: |
-            nodes=$(cat nodes.txt)
-            echo "$nodes" | circleci tests run --command "xargs ./.circleci/grab-tests.sh"
-            if [ -e tests-to-run.txt ]; then
-              echo "Nodes to backup: $(cat tests-to-run.txt)"
-            else
-              echo "No nodes to backup, stopping"
-              circleci-agent step halt
-            fi
-      - run_bash_command_in_nix:
-          cmd_name: Backup nodes
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          no_output_timeout: "20m"
-          cmd: |
-            cncluster activate
-            # We use readiness of validator-app as an approximation to the node's readiness
-            for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app << parameters.migration_id >>
-            done
-            cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-          channel_notify: << parameters.channel_notify >>
-
   restore_node:
     parameters:
       <<: *cluster-parameter
@@ -3977,6 +4030,30 @@ jobs:
 
 workflows:
   version: 2
+  backup_status_check:
+    when:
+      equal: [ backup_status_check, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "devnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn
+      - backup_status_cluster:
+          cluster: "testnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn
+      - backup_status_cluster:
+          cluster: "mainnet"
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          alert_threshold: "4 hours ago"
+          context:
+            - slack-context
+            - canton-network-vpn
+
 
   publish_public_artifacts:
     when:
