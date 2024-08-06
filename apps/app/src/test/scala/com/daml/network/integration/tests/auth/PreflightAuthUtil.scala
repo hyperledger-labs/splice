@@ -25,7 +25,7 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
     "sv3_validator" -> "V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh",
     "sv4_validator" -> "FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL",
     "validator1" -> "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
-    "splitwell_validator" -> "hqpZ6P0wGyG2yYwhH6NLpuo0MpJMQZW",
+    "splitwell_validator" -> "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW",
   )
 
   lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
