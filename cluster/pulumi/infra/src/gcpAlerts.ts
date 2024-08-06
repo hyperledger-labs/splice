@@ -73,7 +73,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -jsonPayload.message="The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response."
 -- istio-proxy is spammy with warnings
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
--(resource.labels.container_name="postgres" AND resource.labels.namespace_name="validator")
+-resource.labels.container_name="postgres"
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
