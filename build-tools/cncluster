@@ -2230,6 +2230,11 @@ function subcmd_backup_nodes() {
        exit 1
     fi
 
+    if [[ ! "$1" =~ ^[0-9]+$ ]]; then
+        echo "Usage: $0 <migration_id> [node...]"
+        _error "<migration_id> must be a positive integer"
+    fi
+
     migration_id=$1
 
     if [ $# -eq 1 ]; then
