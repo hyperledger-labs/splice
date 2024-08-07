@@ -14,12 +14,6 @@ Upcoming
 * Deployment
 
   * The ``disableAutoInit`` Helm value now defaults to ``true`` wherever it is used and must be explicitly set to ``false`` when onboarding fresh validators or SVs. The installing instructions for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>` have been updated accordingly.
-  * Switch SV and validator app to use a ``StatefulSet`` instead of a ``Deployment``. This ensures, that the PVC used for hard domain migrations
-    is preserved on ``helm uninstall`` which can be useful to recover from accidental uninstalls. Note: This upgrade will drop the PVC and any data in it.
-    This is ok as you don't try to upgrade to this new version as part of the next hard domain migration. Instead, either:
-
-      1. Perform the next hard domain migration on an older version and upgrade afterwards through a regular upgrade.
-      2. Upgrade to the new version through a regular upgrade before the next hard domain migration.
 
 * Documentation
 

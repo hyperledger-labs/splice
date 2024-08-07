@@ -4,7 +4,7 @@
 ---
 {{- $appIdentifier :=  "sv-app" }}
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
@@ -16,6 +16,8 @@ spec:
   selector:
     matchLabels:
       app: {{ $appIdentifier }}
+  strategy:
+    type: "Recreate"
   template:
     metadata:
       labels:
@@ -287,7 +289,7 @@ spec:
               readOnly: true
           {{- end }}
           {{- if .Values.migration.attachPvc }}
-            - name: sv-app-global-domain-migration-pvc
+            - name: domain-upgrade-dump-volume
               mountPath: /domain-upgrade-dump
           {{- end }}
           {{- with .Values.resources }}
@@ -322,6 +324,11 @@ spec:
           secret:
             secretName: {{ .secretName }}
       {{- end }}
+      {{- if .Values.migration.attachPvc }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            claimName: "sv-app-global-domain-migration-pvc"
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -334,21 +341,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- if .Values.migration.attachPvc }}
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: "sv-app-global-domain-migration-pvc"
-      namespace: {{ $.Release.Namespace }}
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 20G
-      storageClassName: {{ .Values.pvc.volumeStorageClass }}
-  {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -368,6 +360,21 @@ spec:
     - name: metrics
       port: 10013
       protocol: TCP
+{{- if .Values.migration.attachPvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "sv-app-global-domain-migration-pvc"
+  namespace: {{ $.Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20G
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
 ---
 {{- if .Values.enablePostgresMetrics }}
 {{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
