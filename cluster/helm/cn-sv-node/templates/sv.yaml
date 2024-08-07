@@ -367,6 +367,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: "sv-app-global-domain-migration-pvc"
   namespace: {{ $.Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
     - ReadWriteOnce
