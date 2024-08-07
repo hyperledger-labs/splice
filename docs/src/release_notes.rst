@@ -56,6 +56,7 @@ Upcoming
 * Documentation
 
   * Updated recommendations for checking synchronizer health after a :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` to focus exclusively on monitoring signals.
+  * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
 
 0.1.16
 ------
