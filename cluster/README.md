@@ -1575,8 +1575,11 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
    This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that we're running this check from an IP range that should be whitelisted (SBI rightfully don't whitelist our VPN for their CometBFT ingress, for example), that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
    So use this with many grains of salt and clarify with partners for which of the checks fail that our assumptions are correct in their case.
 
-   For CometBFT, you can also check the CometBFT [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-   If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their new CometBFT nodes (add +1 to also count the node you are viewing).
+   For CometBFT, you can also check the [CometBFT Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+   If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their
+   new CometBFT nodes (add +1 to also count the node you are viewing). The related CometBFT Network Status dashboard also provide an easy way to check if
+   our node is seeing any CometBFT traffic from their nodes and if so, from which peers. You can use `cncluster list_sv_cometbft_addresses` to map the
+   peer ids in the dashboard to SV names.
 
    Also note that pre-migration, the sequencer URLs of correctly set up sequencers can return the following (and this is fine):
 

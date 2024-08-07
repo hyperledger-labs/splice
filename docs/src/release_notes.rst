@@ -11,8 +11,18 @@ Release Notes
 Upcoming
 --------
 
+* Dashboards
+
+  * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
+    This should should make it easier to diagnose connectivity problems between network peers.
+
+* UI
+
+  * Gzip compression has been enabled for the Scan, Wallet, SV and CNS UIs.
+
 * Deployment
 
+  * Updated the Cometbft Helm chart to not accept integer values for the `chainIdSuffix`.
   * The ``disableAutoInit`` Helm value now defaults to ``true`` wherever it is used and must be explicitly set to ``false`` when onboarding fresh validators or SVs. The installing instructions for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>` have been updated accordingly.
 
 * Documentation
