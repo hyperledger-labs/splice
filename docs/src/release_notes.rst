@@ -37,6 +37,11 @@ Upcoming
     additional transfer offers even if there were already sufficient
     transfer offers to cover the sweep.
 
+* Scan API
+
+  * Added the ``getUpdateById`` API in ``scan-internal.yaml``.
+    The ``getUpdateById`` API can be used to retrieve an update by its update ID.
+
 * UI
 
   * Gzip compression has been enabled for the Scan, Wallet, SV and CNS UIs.

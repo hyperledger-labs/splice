@@ -772,6 +772,47 @@ final class UpdateHistory(
     }
   }
 
+  def getUpdate(
+      updateId: String
+  )(implicit tc: TraceContext): Future[Option[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
+    val safeUpdateId = lengthLimited(updateId)
+    val query =
+      sql"""
+      select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id
+      from  update_history_transactions
+      where update_id = $safeUpdateId
+      and history_id = $historyId
+        """
+
+    for {
+      rows <- storage
+        .query(
+          query.toActionBuilder.as[SelectFromTransactions],
+          "getUpdate",
+        )
+      creates <- queryCreateEvents(rows.map(_.rowId))
+      exercises <- queryExerciseEvents(rows.map(_.rowId))
+    } yield {
+      rows.map { row =>
+        decodeTransaction(
+          row,
+          creates.getOrElse(row.rowId, Seq.empty),
+          exercises.getOrElse(row.rowId, Seq.empty),
+        ) -> row.migrationId
+      }.headOption
+    }
+  }
+
   // TODO (#13511): implement or remove placeholder
   def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
     queryCreateEvents((1L to 100L).toSeq).map { result =>

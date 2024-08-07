@@ -13,6 +13,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.http.v0.definitions.UpdateHistoryItem.members.UpdateHistoryTransaction
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -279,6 +280,13 @@ class UpdateHistoryIntegrationTest
     recordedUpdates should have length actualUpdates.size.toLong
     actualUpdates.zip(recordedUpdates).foreach { case (actual, recorded) =>
       actual should matchUpdateHistory(recorded)
+    }
+    val recordedTransactions: Seq[UpdateHistoryTransaction] = recordedUpdates.collect {
+      case tx: UpdateHistoryTransaction => tx
+    }
+    recordedUpdates should not be empty
+    forAll(recordedTransactions) { recorded =>
+      sv1ScanClient.getUpdate(recorded.value.updateId) shouldBe recorded
     }
   }
 

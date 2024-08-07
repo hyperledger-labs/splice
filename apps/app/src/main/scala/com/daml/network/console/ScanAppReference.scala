@@ -340,6 +340,14 @@ abstract class ScanAppReference(
       )
     }
   }
+  def getUpdate(updateId: String) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdate(updateId)
+      )
+    }
+  }
+
 }
 
 final class ScanAppBackendReference(

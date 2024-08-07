@@ -943,6 +943,27 @@ class HttpScanHandler(
     }
   }
 
+  override def getUpdateById(
+      respond: ScanResource.GetUpdateByIdResponse.type
+  )(updateId: String)(extracted: TraceContext): Future[ScanResource.GetUpdateByIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateById") { _ => _ =>
+      for {
+        tx <- store.updateHistory.getUpdate(updateId)
+      } yield {
+        tx.fold(
+          v0.ScanResource.GetUpdateByIdResponse.NotFound(
+            definitions.ErrorResponse(s"Transaction with id $updateId not found")
+          )
+        ) { case (tx, migrationId) =>
+          v0.ScanResource.GetUpdateByIdResponse.OK(
+            ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
+          )
+        }
+      }
+    }
+  }
+
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
       f: => Future[T]
   )(implicit tc: com.digitalasset.canton.tracing.TraceContext): Future[T] = {
