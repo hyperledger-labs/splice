@@ -3,7 +3,7 @@
 
 package com.daml.network.scan.admin.http
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TreeEvent, Value}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TreeEvent}
 import com.daml.network.environment.ledger.api.{
   LedgerClient,
   ReassignmentUpdate,
@@ -80,6 +80,11 @@ object ScanHttpEncodings {
   }
 
   def createdEventToHttp(event: CreatedEvent)(implicit elc: ErrorLoggingContext) = {
+    event.getContractKey.toScala.foreach { _ =>
+      throw new IllegalStateException(
+        "Contract keys are unexpected in UpdateHistory http encoded events"
+      )
+    }
     definitions
       .CreatedEvent(
         "created_event",
@@ -91,7 +96,6 @@ object ScanHttpEncodings {
         event.getCreatedAt.atOffset(ZoneOffset.UTC),
         event.getSignatories.asScala.toVector,
         event.getObservers.asScala.toVector,
-        event.getContractKey.map(encodeContractKey(_)).toScala,
       )
   }
 
@@ -106,10 +110,6 @@ object ScanHttpEncodings {
     io.circe.parser
       .parse(validJsonString)
       .fold(err => failedToWriteToJson(err.message), identity)
-
-  private def encodeContractKey(
-      value: Value
-  )(implicit elc: ErrorLoggingContext): io.circe.Json = ???
 
   private def encodeContractPayload(
       event: CreatedEvent

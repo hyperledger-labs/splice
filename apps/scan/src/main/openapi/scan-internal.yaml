@@ -1299,10 +1299,6 @@ components:
           type: array
           items:
             type: string
-        contractKey:
-          description: |
-            Contract key of the created contract.
-          type: object
     ExercisedEvent:
       type: object
       required:

@@ -131,7 +131,6 @@ trait UpdateHistoryComparator extends TestCommon {
             createdAt,
             signatories,
             observers,
-            contractKey,
           ) =>
         compare(
           Seq(
@@ -143,7 +142,6 @@ trait UpdateHistoryComparator extends TestCommon {
             left.getCreatedAt,
             left.getSignatories.asScala.to(Set),
             left.getObservers.asScala.to(Set),
-            left.getContractKey,
           ),
           Seq(
             eventId,
@@ -154,7 +152,6 @@ trait UpdateHistoryComparator extends TestCommon {
             createdAt.toInstant,
             signatories.toSet,
             observers.toSet,
-            contractKey,
           ),
         )
     }
