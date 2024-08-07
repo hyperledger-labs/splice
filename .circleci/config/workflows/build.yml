@@ -72,11 +72,11 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test sv reonboarding"
-          test_names_file: "test-full-class-names-sv-reonboarding.log"
+          name: "scala_test resource intensive"
+          test_names_file: "test-full-class-names-resource-intensive.log"
           start_canton_options: "-w -f -m"
           resource_class: "2xlarge"
-          parallelism: 1
+          parallelism: 2
       - scala_test:
           <<: *notify-fail
           context:
