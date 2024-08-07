@@ -4016,12 +4016,12 @@ jobs:
             # TODO(#12776): remove this once the flow is more robust to ACS changes
             # TODO(#11769): if we activate alerting on ciperiodic we might want to add a silencing here
             echo "scaling down validator1 to prevent it from tainting the SV party's ACS"
-            kubectl scale statefulset --replicas=0 -n validator1 validator-app
+            kubectl scale deployment --replicas=0 -n validator1 validator-app
 
             cncluster ci_apply_validator $VERSION
 
             echo "scaling validator1 back up"
-            kubectl scale statefulset --replicas=1 -n validator1 validator-app
+            kubectl scale deployment --replicas=1 -n validator1 validator-app
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>

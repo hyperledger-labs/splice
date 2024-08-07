@@ -4,7 +4,7 @@
 {{- $validatorAppLabel := "validator-app" }}
 {{- $requiresMigrationPvc := and (not .Values.svValidator) (.Values.migration.attachPvc) }}
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}
@@ -16,6 +16,8 @@ spec:
   selector:
     matchLabels:
       app: {{ $validatorAppLabel }}
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -262,7 +264,7 @@ spec:
             readOnly: true
         {{- end }}
         {{- if $requiresMigrationPvc }}
-          - name: domain-migration-validator-pvc
+          - name: domain-upgrade-dump-volume
             mountPath: /domain-upgrade-dump
         {{- end }}
         {{- end }}
@@ -291,12 +293,17 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- if .Values.participantIdentitiesDumpImport }}
+      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
         - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
+      {{- end }}
+      {{- if $requiresMigrationPvc }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            claimName: "domain-migration-validator-pvc"
       {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
@@ -311,23 +318,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- if $requiresMigrationPvc }}
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: "domain-migration-validator-pvc"
-      namespace: {{ $.Release.Namespace }}
-      labels:
-        app: {{ $validatorAppLabel }}
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 10G
-      storageClassName: {{ .Values.pvc.volumeStorageClass }}
-  {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -346,6 +336,23 @@ spec:
     protocol: TCP
   - name: metrics
     port: 10013
+{{- if $requiresMigrationPvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "domain-migration-validator-pvc"
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $validatorAppLabel }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10G
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
 ---
 {{- if .Values.enablePostgresMetrics }}
 {{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
