@@ -732,6 +732,17 @@ object RetryProvider {
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
             TransientErrorKind
+          case Failure(ex: java.util.concurrent.CompletionException) =>
+            Option(ex.getCause) match {
+              case None =>
+                logger.info(
+                  s"The operation ${operationName.singleQuoted} failed with a non-retryable error (CompletionException without a cause), $fatalBehavior",
+                  ex,
+                )
+                FatalErrorKind
+              case Some(cause) =>
+                retryOK(Failure(cause), logger, lastErrorKind)
+            }
           case Failure(ex: QuietNonRetryableException) =>
             logger.info(
               s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
