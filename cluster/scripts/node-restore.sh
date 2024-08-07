@@ -89,11 +89,12 @@ function down() {
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
-    _info "Scaling down $component deployment $deployment_name"
     if [[ $deployment_name == sv-app || $deployment_name == validator-app ]]
     then
+        _info "Scaling down $component statefulset $deployment_name"
         kubectl scale statefulset -n "$namespace" "$deployment_name" --replicas=0
     else
+        _info "Scaling down $component deployment $deployment_name"
         kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=0
     fi
   done
@@ -121,8 +122,10 @@ function up() {
     _info "Scaling up $component deployment $deployment_name"
     if [[ $deployment_name == sv-app || $deployment_name == validator-app ]]
     then
+        _info "Scaling up $component statefulset $deployment_name"
         kubectl scale statefulset -n "$namespace" "$deployment_name" --replicas=1
     else
+        _info "Scaling up $component deployment $deployment_name"
         kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
     fi
   done
