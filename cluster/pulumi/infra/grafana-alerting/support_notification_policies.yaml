@@ -1,0 +1,16 @@
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: cn-ci-channel-notification
+    routes:
+    - receiver: email-to-support-team
+      object_matchers:
+        - ['team', '=', 'support']
+      # disable grouping of alerts
+      group_by: ['...']
+      continue: true
+    - receiver: cn-ci-channel-notification
+      group_wait: 30s
+      group_interval: 30m
+      repeat_interval: 4h

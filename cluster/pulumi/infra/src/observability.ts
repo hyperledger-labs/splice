@@ -24,9 +24,12 @@ import { infraAffinityAndTolerations } from 'cn-pulumi-common';
 
 import {
   clusterIsBeingReset,
+  enableAlertEmailToSupportTeam,
   enableAlerts,
+  grafanaSmtpHost,
   slackAlertNotificationChannel,
   slackToken,
+  supportTeamEmail,
 } from './alertings';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
@@ -138,7 +141,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   const stackVersion = '61.3.2';
   const prometheusStackCrdVersion = '0.75.1';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
-
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
@@ -382,6 +384,15 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             date_formats: {
               default_timezone: 'UTC',
             },
+            smtp: enableAlertEmailToSupportTeam
+              ? {
+                  enabled: true,
+                  host: grafanaSmtpHost,
+                  from_address: 'noreply@digitalasset.com',
+                  from_name: 'Canton Network Alerts',
+                  skip_verify: true,
+                }
+              : undefined,
           },
           deploymentStrategy: {
             // required for the pvc
@@ -545,11 +556,17 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   // that prevents running expensive queries when the dashboard just loads
   createGrafanaDashboards(namespaceName);
   // enable the slack alerts only for "prod" clusters
-  if (enableAlerts) {
-    grafanaContactPoints(namespaceName, slackToken(), slackAlertNotificationChannel);
-  } else {
-    grafanaContactPoints(namespaceName, 'None', 'None');
-  }
+  const slackAccessToken = enableAlerts ? slackToken() : 'None';
+  const slackNotificationChannel = enableAlerts ? slackAlertNotificationChannel : 'None';
+  const supportTeamEmailAddress =
+    enableAlerts && enableAlertEmailToSupportTeam && supportTeamEmail ? supportTeamEmail : 'None';
+
+  grafanaContactPoints(
+    namespaceName,
+    slackAccessToken,
+    slackNotificationChannel,
+    supportTeamEmailAddress
+  );
   createGrafanaAlerting(namespaceName);
   createGrafanaServiceAccount(
     namespaceName,
@@ -662,7 +679,8 @@ function createGrafanaServiceAccount(
 function grafanaContactPoints(
   namespace: Input<string>,
   slackToken: string,
-  slackAlertNotificationChannel: string
+  slackAlertNotificationChannel: string,
+  supportTeamEmail: string
 ) {
   new k8s.core.v1.Secret(
     'slack-alert-notification-channel',
@@ -674,10 +692,11 @@ function grafanaContactPoints(
         },
       },
       data: {
-        'slackContactPoint.yaml': Buffer.from(
-          readGrafanaAlertingFile('slack_contact_point.yaml')
+        'contactPoints.yaml': Buffer.from(
+          readGrafanaAlertingFile('contact_points.yaml')
             .replaceAll('$SLACK_ACCESS_TOKEN', slackToken)
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
+            .replaceAll('$SUPPORT_TEAM_EMAIL', supportTeamEmail)
         ).toString('base64'),
       },
     },
@@ -714,7 +733,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
         Object.entries({
           ...(enableAlerts
             ? {
-                'notification_policies.yaml': readGrafanaAlertingFile('notification_policies.yaml'),
+                'notification_policies.yaml': readGrafanaAlertingFile(
+                  enableAlertEmailToSupportTeam
+                    ? 'support_notification_policies.yaml'
+                    : 'notification_policies.yaml'
+                ),
               }
             : {}),
           ...{

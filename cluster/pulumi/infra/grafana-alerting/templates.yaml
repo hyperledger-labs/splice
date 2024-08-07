@@ -95,3 +95,10 @@ templates:
           good
         {{- end }}
       {{- end }}
+      
+      {{ define "support_email_message" }}
+      [ MAINNET-DA2-SVN-CRITICAL-ALERT 9f2b7e1a-4c3d-58b9-9f1e-df9c4a5b6e7d ]
+      {{ if gt (len .Alerts.Firing) 0 }}**Firing**
+      {{ template "__text_alert_list" .Alerts.Firing }}{{ if gt (len .Alerts.Resolved) 0 }}
+      {{ end }}{{ end }}{{ if gt (len .Alerts.Resolved) 0 }}**Resolved**
+      {{ template "__text_alert_list" .Alerts.Resolved }}{{ end }}{{ end }}
