@@ -161,7 +161,7 @@ and a `"migration_id": 1` field. You can use the `jq` tool for that as follows:
 
 .. code-block:: bash
 
-    echo "{\"migration_id\": 1, \"created_at\": \"<timestamp>\"}" $id $data" | jq -s add > dump.json
+    echo "$id" "$data" | jq -s add > dump.json
 
 This file can now be copied to the SV app's PVC:
 

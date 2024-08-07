@@ -21,6 +21,9 @@ Upcoming
       1. Perform the next hard domain migration on an older version and upgrade afterwards through a regular upgrade.
       2. Upgrade to the new version through a regular upgrade before the next hard domain migration.
 
+* Documentation
+
+  * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
 
 0.1.17
 --------
