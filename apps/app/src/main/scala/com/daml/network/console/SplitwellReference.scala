@@ -431,7 +431,7 @@ final class SplitwellAppClientReference(
 
   @Help.Summary("List balance updates for the given group")
   def listBalanceUpdates(key: HttpSplitwellAppClient.GroupKey): Seq[
-    Contract[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
+    ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
       httpCommand(HttpSplitwellAppClient.ListBalanceUpdates(userParty, key))

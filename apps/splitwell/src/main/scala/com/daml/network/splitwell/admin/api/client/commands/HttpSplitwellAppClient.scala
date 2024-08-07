@@ -124,7 +124,7 @@ object HttpSplitwellAppClient {
       party: PartyId,
       key: GroupKey,
   ) extends BaseCommand[http.ListBalanceUpdatesResponse, Seq[
-        Contract[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
+        ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
       ]] {
 
     override def submitRequest(
@@ -135,7 +135,7 @@ object HttpSplitwellAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListBalanceUpdatesResponse.OK(response) =>
         response.balanceUpdates
-          .traverse(Contract.fromHttp(splitwellCodegen.BalanceUpdate.COMPANION)(_))
+          .traverse(ContractWithState.fromHttp(splitwellCodegen.BalanceUpdate.COMPANION)(_))
           .leftMap(_.toString)
     }
   }

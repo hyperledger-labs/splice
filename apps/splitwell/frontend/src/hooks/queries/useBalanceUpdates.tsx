@@ -25,7 +25,7 @@ export const useBalanceUpdates = (
           group.payload.owner
         )
       ).balance_updates;
-      return balanceUpdates.map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
+      return balanceUpdates.map(c => Contract.decodeOpenAPI(c.contract, BalanceUpdate));
     },
   });
 };

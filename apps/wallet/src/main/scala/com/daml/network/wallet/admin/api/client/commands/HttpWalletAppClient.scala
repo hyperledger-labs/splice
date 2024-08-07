@@ -352,7 +352,10 @@ object HttpWalletAppClient {
       extends InternalBaseCommand[
         http.ListAcceptedAppPaymentsResponse,
         Seq[
-          Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
+          ContractWithState[
+            walletCodegen.AcceptedAppPayment.ContractId,
+            walletCodegen.AcceptedAppPayment,
+          ]
         ],
       ] {
     def submitRequest(
@@ -365,7 +368,9 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAcceptedAppPaymentsResponse.OK(response) =>
       response.acceptedAppPayments
-        .traverse(req => Contract.fromHttp(walletCodegen.AcceptedAppPayment.COMPANION)(req))
+        .traverse(req =>
+          ContractWithState.fromHttp(walletCodegen.AcceptedAppPayment.COMPANION)(req)
+        )
         .leftMap(_.toString)
     }
   }

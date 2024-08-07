@@ -105,7 +105,7 @@ class HttpWalletHandler(
       respond: v0.WalletResource.ListAcceptedAppPaymentsResponse.type
   )()(tuser: TracedUser): Future[v0.WalletResource.ListAcceptedAppPaymentsResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
-    listContracts(
+    listContractsWithState(
       walletCodegen.AcceptedAppPayment.COMPANION,
       user,
       d0.ListAcceptedAppPaymentsResponse(_),

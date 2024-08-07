@@ -648,7 +648,7 @@ components:
         accepted_app_payments:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
 
     ListSubscriptionRequestsResponse:
       type: object

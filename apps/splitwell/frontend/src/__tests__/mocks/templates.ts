@@ -9,6 +9,8 @@ import {
   GroupInvite,
 } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
+import { ContractWithState } from '../../../../openapi-ts-client/dist/models/ContractWithState';
+
 export const makeGroupInvite = (provider: string, owner: string, groupName: string): Contract => ({
   template_id:
     'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:Splice.Splitwell:GroupInvite',
@@ -62,25 +64,27 @@ export const makeBalanceUpdate = (
   groupName: string,
   update: BalanceUpdateType,
   contractId: string
-): Contract => ({
-  template_id:
-    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:Splice.Splitwell:BalanceUpdate',
-  contract_id: contractId,
-  payload: BalanceUpdate.encode({
-    group: {
-      provider: provider,
-      id: {
-        unpack: groupName,
+): ContractWithState => ({
+  contract: {
+    template_id:
+      'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:Splice.Splitwell:BalanceUpdate',
+    contract_id: contractId,
+    payload: BalanceUpdate.encode({
+      group: {
+        provider: provider,
+        id: {
+          unpack: groupName,
+        },
+        owner: owner,
+        members: [],
+        dso: 'DSO::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+        acceptDuration: {
+          microseconds: '300000000',
+        },
       },
-      owner: owner,
-      members: [],
-      dso: 'DSO::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
-      acceptDuration: {
-        microseconds: '300000000',
-      },
-    },
-    update: update,
-  }),
-  created_event_blob: '',
-  created_at: '2023-10-09T15:00:35.324749Z',
+      update: update,
+    }),
+    created_event_blob: '',
+    created_at: '2023-10-09T15:00:35.324749Z',
+  },
 });

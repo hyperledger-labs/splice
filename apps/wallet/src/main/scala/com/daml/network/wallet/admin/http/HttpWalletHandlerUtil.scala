@@ -41,6 +41,20 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       } yield mkResponse(contracts.map(_.contract.toHttp).toVector)
     }
 
+  protected def listContractsWithState[TCid <: ContractId[T], T <: Template, ResponseT](
+      templateCompanion: Contract.Companion.Template[TCid, T],
+      user: String,
+      mkResponse: Vector[d0.ContractWithState] => ResponseT,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext, tracer: Tracer): Future[ResponseT] =
+    withSpan(s"$workflowId.listContractsWithState") { _ => _ =>
+      for {
+        userStore <- getUserStore(user)
+        contracts <- userStore.multiDomainAcsStore.listContracts(
+          templateCompanion
+        )
+      } yield mkResponse(contracts.map(_.toHttp).toVector)
+    }
+
   protected def getUserStore(
       user: String
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[UserWalletStore] =

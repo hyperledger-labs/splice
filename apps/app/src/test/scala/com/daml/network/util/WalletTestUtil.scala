@@ -264,7 +264,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       participantClient: ParticipantClientReference,
       userId: String,
       signatories: Seq[PartyId],
-      acceptedPayment: Contract[
+      acceptedPayment: ContractWithState[
         paymentCodegen.AcceptedAppPayment.ContractId,
         paymentCodegen.AcceptedAppPayment,
       ],

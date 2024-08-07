@@ -11,19 +11,24 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
-  SynchronizerConfig,
+  SynchronizerConfig as DamlSynchronizerConfig,
   SynchronizerState,
 }
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.splice.dsorules.{DsoRulesConfig, DsoRules_SetConfig}
-import com.daml.network.config.ConfigTransforms
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
+import com.daml.network.config.{ConfigTransforms, SynchronizerConfig}
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.scan.config.ScanSynchronizerConfig
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import com.daml.network.splitwell.automation.AcceptedAppPaymentRequestsTrigger
+import com.daml.network.splitwell.config.SplitwellDomains
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
-import com.daml.network.util.{Codec, ConfigScheduleUtil, WalletTestUtil}
+import com.daml.network.util.{Codec, ConfigScheduleUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -41,10 +46,13 @@ import scala.jdk.OptionConverters.*
 class SoftDomainMigrationTopologySetupIntegrationTest
     extends IntegrationTest
     with ConfigScheduleUtil
+    with SplitwellTestUtil
     with WalletTestUtil {
 
   // Does not currently handle multiple synchronizers.
   override def runUpdateHistorySanityCheck = false
+
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
   override def environmentDefinition =
     EnvironmentDefinition
@@ -94,11 +102,29 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             _.withResumedTrigger[AmuletConfigReassignmentTrigger]
               .withResumedTrigger[AssignTrigger]
           )(conf),
+        (_, conf) =>
+          // At least for now we test the impact of soft domain migrations on an app
+          // running on the global synchronizer not on a separate synchronizer
+          ConfigTransforms.updateAllSplitwellAppConfigs_(c => {
+            c.copy(
+              domains = c.domains.copy(
+                splitwell = SplitwellDomains(
+                  SynchronizerConfig(DomainAlias.tryCreate("global-global-domain")),
+                  Seq.empty,
+                )
+              ),
+              supportsSoftDomainMigrationPoc = true,
+            )
+          })(conf),
       )
+      .withAdditionalSetup(implicit env => {
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+      })
 
   "SVs can bootstrap new domain" in { implicit env =>
     implicit val ec: ExecutionContext = env.executionContext
-    val (_, bob) = onboardAliceAndBob()
+    val (alice, bob) = onboardAliceAndBob()
     env.scans.local should have size 4
     val prefix = "global-domain-new"
     eventually() {
@@ -132,6 +158,55 @@ class SoftDomainMigrationTopologySetupIntegrationTest
 
     // tap before the migration
     aliceWalletClient.tap(100)
+
+    val group = "group1"
+    val groupKey = HttpSplitwellAppClient.GroupKey(
+      group,
+      alice,
+    )
+    clue("Setup splitwell") {
+      Seq((aliceSplitwellClient, alice), (bobSplitwellClient, bob)).foreach {
+        case (splitwell, party) =>
+          createSplitwellInstalls(splitwell, party)
+      }
+      actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
+        "Alice sees 'group1'",
+        _ => aliceSplitwellClient.listGroups() should have size 1,
+      )
+
+      // Wait for the group contract to be visible to Alice's Ledger API
+      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+        .awaitJava(splitwellCodegen.Group.COMPANION)(alice)
+
+      val (_, invite) = actAndCheck(
+        "create a generic invite for 'group1'",
+        aliceSplitwellClient.createGroupInvite(
+          group
+        ),
+      )(
+        "alice observes the invite",
+        _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+      )
+
+      actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
+        "Alice sees the accepted invite",
+        _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
+      )
+
+      actAndCheck(
+        "bob joins 'group1'",
+        inside(aliceSplitwellClient.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
+          aliceSplitwellClient.joinGroup(accepted.contractId)
+        },
+      )(
+        "bob is in 'group1'",
+        _ => {
+          bobSplitwellClient.listGroups() should have size 1
+          aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
+        },
+      )
+
+    }
 
     val (_, voteRequest) = actAndCheck(
       "Creating amulet config vote request",
@@ -207,7 +282,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
                       dsoRules.payload.config.synchronizerNodeConfigLimits,
                       dsoRules.payload.config.maxTextLength,
                       new DsoDecentralizedSynchronizerConfig(
-                        (dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala.toMap + (newDomainId.toProtoPrimitive -> new SynchronizerConfig(
+                        (dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala.toMap + (newDomainId.toProtoPrimitive -> new DamlSynchronizerConfig(
                           SynchronizerState.DS_OPERATIONAL,
                           // Keep the cometbft state empty, we don't support bootstrapping the new domain with cometbft.
                           "",
@@ -369,6 +444,46 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             .extraTrafficPurchased shouldBe NonNegativeLong.maxValue
         }
       }
+    }
+
+    val (_, paymentRequest) =
+      actAndCheck(
+        "alice initiates transfer",
+        aliceSplitwellClient.initiateTransfer(
+          groupKey,
+          Seq(
+            new walletCodegen.ReceiverAmuletAmount(
+              bob.toProtoPrimitive,
+              BigDecimal(10.0).bigDecimal,
+            )
+          ),
+        ),
+      )(
+        "alice sees payment request",
+        _ => {
+          aliceWalletClient.listAppPaymentRequests().loneElement
+        },
+      )
+
+    splitwellBackend.splitwellAutomation
+      .trigger[AcceptedAppPaymentRequestsTrigger]
+      .pause()
+      .futureValue
+    actAndCheck(
+      "Alice accepts payment request",
+      aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
+    )(
+      "alice observers accepted app payment request",
+      _ => {
+        aliceWalletClient.listAcceptedAppPayments().loneElement.state shouldBe ContractState
+          .Assigned(newDomainId)
+      },
+    )
+    splitwellBackend.splitwellAutomation.trigger[AcceptedAppPaymentRequestsTrigger].resume()
+    eventually() {
+      aliceWalletClient.listAcceptedAppPayments() shouldBe empty
+      val balanceUpdates = aliceSplitwellClient.listBalanceUpdates(groupKey)
+      balanceUpdates.loneElement.state shouldBe ContractState.Assigned(newDomainId)
     }
   }
 }

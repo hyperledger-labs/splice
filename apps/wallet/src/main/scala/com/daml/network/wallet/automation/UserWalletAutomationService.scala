@@ -99,20 +99,17 @@ class UserWalletAutomationService(
     )
   }
 
-  registerTrigger(
-    new UnassignTrigger.Template(
-      triggerContext,
-      store,
-      connection,
-      decentralizedSynchronizer,
-      store.key.endUserParty,
-      paymentCodegen.AppPaymentRequest.COMPANION,
-    )
-  )
-
-  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
-
   if (!supportsSoftDomainMigrationPoc) {
+    registerTrigger(
+      new UnassignTrigger.Template(
+        triggerContext,
+        store,
+        connection,
+        decentralizedSynchronizer,
+        store.key.endUserParty,
+        paymentCodegen.AppPaymentRequest.COMPANION,
+      )
+    )
     registerTrigger(
       new TransferFollowTrigger(
         triggerContext,
@@ -129,6 +126,7 @@ class UserWalletAutomationService(
           },
       )
     )
+    registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
   }
 
   walletSweep.foreach { config =>

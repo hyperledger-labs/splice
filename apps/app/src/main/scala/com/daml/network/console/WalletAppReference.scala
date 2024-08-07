@@ -140,7 +140,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("List all accepted app payments the user is a sender on")
   def listAcceptedAppPayments(): Seq[
-    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
+    ContractWithState[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
   ] =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListAcceptedAppPayments)
