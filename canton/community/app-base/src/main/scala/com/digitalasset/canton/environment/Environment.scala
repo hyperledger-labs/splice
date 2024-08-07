@@ -98,7 +98,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     new MetricsRegistry(
       configuredOpenTelemetry.openTelemetry.meterBuilder("canton").build(),
       testingConfig.metricsFactoryType,
-      // TODO(#13042) - remove this once we have exponential histograms
+      // TODO(#13956) - remove this once we have support in canton to not fail if histograms are not registered
       testingSupportAdhocMetrics = true,
       histograms = histograms,
       baseFilter = baseFilter,
