@@ -1416,27 +1416,27 @@ commands:
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
 
-  clone_and_update_splice:
+  clone_and_update_oss:
       steps:
       - run:
-          name: clone splice-staging
+          name: clone DA oss repo
           command: |
             cd ..
             for i in $(seq 1 5)
             do
-              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+              git clone "git@github.com:digital-asset/decentralized-canton-sync.git" oss && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
       - setup_sbt_test_job
       - run_bash_command_in_nix:
-          cmd_name: dump latest into splice-staging
+          cmd_name: dump latest into DA oss
           cmd: |
-            scripts/copy-to-splice.sh ../splice
+            scripts/copy-to-splice.sh ../oss
       - run:
-          name: copy circleci-specific files to the splice directory
+          name: copy circleci-specific files to the DA OSS directory
           command: |
-            mkdir -p ../splice/.circleci
-            cp -r .circleci/canton-scripts ../splice/.circleci
+            mkdir -p ../oss/.circleci
+            cp -r .circleci/canton-scripts ../oss/.circleci
 
   wait_for_sv_runbook_deployment:
     parameters:
@@ -3277,7 +3277,7 @@ jobs:
           custom: |
             { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
-  build_splice:
+  build_oss:
     docker:
       - image: cimg/base:2024.01
     resource_class: "xlarge"
@@ -3285,19 +3285,19 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_splice
+      - clone_and_update_oss
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
-          working_dir: "/home/circleci/splice"
+          working_dir: "/home/circleci/oss"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "update"
           cmd_retry_count: 3
       - execute_sbt_command:
-          working_dir: "/home/circleci/splice"
+          working_dir: "/home/circleci/oss"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
 
-  create_splice_pr:
+  create_oss_pr:
     docker:
       - image: cimg/base:2024.01
     resource_class: "small"
@@ -3305,12 +3305,12 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_splice
+      - clone_and_update_oss
       - run_bash_command_in_nix:
-          cmd_name: Push changes to Splice
+          cmd_name: Push changes to DA OSS
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
-            .circleci/create-splice-pr.sh /home/circleci/splice
+            .circleci/create-splice-pr.sh /home/circleci/oss
 
   deploy_operator:
     circleci_ip_ranges: true
@@ -4096,7 +4096,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-      - create_splice_pr:
+      - create_oss_pr:
           <<: *notify-fail
           context:
             - artifactory
@@ -4282,7 +4282,7 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
-      - build_splice:
+      - build_oss:
           <<: *notify-fail
           context:
             - artifactory
@@ -4336,7 +4336,7 @@ workflows:
             - slack-context
           requires:
             - preflight_check
-      - create_splice_pr:
+      - create_oss_pr:
           <<: *main-branch-only
           <<: *notify-fail
           context:

@@ -1255,27 +1255,27 @@ commands:
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
 
-  clone_and_update_splice:
+  clone_and_update_oss:
       steps:
       - run:
-          name: clone splice-staging
+          name: clone DA oss repo
           command: |
             cd ..
             for i in $(seq 1 5)
             do
-              git clone "git@github.com:DACH-NY/temp-splice-staging.git" splice && s=0 && break || s=$? && sleep 5
+              git clone "git@github.com:digital-asset/decentralized-canton-sync.git" oss && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
       - setup_sbt_test_job
       - run_bash_command_in_nix:
-          cmd_name: dump latest into splice-staging
+          cmd_name: dump latest into DA oss
           cmd: |
-            scripts/copy-to-splice.sh ../splice
+            scripts/copy-to-splice.sh ../oss
       - run:
-          name: copy circleci-specific files to the splice directory
+          name: copy circleci-specific files to the DA OSS directory
           command: |
-            mkdir -p ../splice/.circleci
-            cp -r .circleci/canton-scripts ../splice/.circleci
+            mkdir -p ../oss/.circleci
+            cp -r .circleci/canton-scripts ../oss/.circleci
 
   wait_for_sv_runbook_deployment:
     parameters:

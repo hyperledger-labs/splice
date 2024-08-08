@@ -47,7 +47,7 @@ workflow:
             - slack-context
           requires:
             - preflight_check
-      - create_splice_pr:
+      - create_oss_pr:
           <<: *main-branch-only
           <<: *notify-fail
           context:

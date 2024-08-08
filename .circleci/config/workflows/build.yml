@@ -21,7 +21,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-      - create_splice_pr:
+      - create_oss_pr:
           <<: *notify-fail
           context:
             - artifactory
@@ -207,7 +207,7 @@ workflow:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
-      - build_splice:
+      - build_oss:
           <<: *notify-fail
           context:
             - artifactory

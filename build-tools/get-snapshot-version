@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -euo pipefail
+
 if [ $# -eq 1 ]; then
     OVERRIDE_VERSION=$1
 fi
@@ -17,7 +19,11 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
     exit 0
 fi
 
-prefix=$(git show "$sha":VERSION)
+set +e
+if ! prefix=$(git show "$sha":VERSION 2>&1); then
+    prefix=$(cat VERSION)
+fi
+set -e
 show_commit_message_sha="${show_commit_message_sha:-$sha}"
 git_commit_message=$(git log -1 --pretty=format:%B "$show_commit_message_sha")
 if [[ $git_commit_message == *"[release]"* ]]; then
@@ -30,8 +36,8 @@ commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
 
-if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION}" ]; then
-    if [ -n "${CI}" ]; then
+if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION:-}" ]; then
+    if [ -n "${CI:-}" ]; then
         >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
         exit 1
     fi
@@ -39,12 +45,14 @@ if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION}" ]; then
     exit 0
 fi
 
-if [ -z "${CI}" ]; then
+user_suffix=""
+if [ -z "${CI:-}" ]; then
     user_suffix="-${USER}"
 fi
 
+dirty_suffix=""
 if ! (env-bool CI_IGNORE_DIRTY_REPO) && [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
-    if [ -z "${CI}" ]; then
+    if [ -z "${CI:-}" ]; then
         dirty_suffix="-dirty"
     else
         >&2 echo "Repo was dirty on CI"

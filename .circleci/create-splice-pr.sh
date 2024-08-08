@@ -56,8 +56,8 @@ push_with_retries
 
 n=0
 until [ "$n" -ge 5 ]; do
-  gh pr create --title "Update Splice to version $version (automatic PR)" \
-    --body "This PR updates Splice from the latest changes as of version $version, commit DACH-NY/canton-network-node@$commit" \
+  gh pr create --title "Update Splice $base_branch to version $version (automatic PR)" \
+    --body "This PR updates branch $base_branch of Splice from the latest changes as of version $version, commit DACH-NY/canton-network-node@$commit" \
     --base "$base_branch" \
     --reviewer isegall-da,moritzkiefer-da,nicu-da,martinflorian-da,ray-roestenburg-da && break
    n=$((n+1))
