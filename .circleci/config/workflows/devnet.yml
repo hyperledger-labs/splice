@@ -31,6 +31,7 @@ workflow:
             - slack-context
           workflow_names: "reset_sv_runbook_devnet"
       - reset_sv_runbook:
+          unprotect_dbs: true
           filters:
             branches:
               only:

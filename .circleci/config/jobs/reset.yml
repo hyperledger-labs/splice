@@ -59,6 +59,9 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
+      unprotect_dbs:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - setup_nix
@@ -77,6 +80,9 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            if [[ << parameters.unprotect_dbs >> == true ]]; then
+              cncluster unprotect_dbs sv
+            fi
             cncluster ci_pdown_sv
           cmd_retry_count: 3
       - notify-cluster-fail:
