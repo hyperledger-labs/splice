@@ -11,12 +11,12 @@ import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
 import com.daml.network.codegen.java.splice.round as roundCodegen
 import com.daml.network.config.SharedSpliceAppParameters
 import com.daml.network.environment.{
-  SpliceLedgerClient,
-  Node,
   DarResources,
+  Node,
   ParticipantAdminConnection,
   RetryFor,
   SequencerAdminConnection,
+  SpliceLedgerClient,
 }
 import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
 import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
@@ -30,7 +30,7 @@ import com.daml.network.scan.admin.http.{
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
-import com.daml.network.scan.store.ScanStore
+import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore}
 import com.daml.network.scan.store.db.{ScanAggregatesReader, ScanAggregatesReaderContext}
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.PageLimit
@@ -145,6 +145,12 @@ class ScanApp(
         migrationInfo,
         participantId,
       )
+      acsSnapshotStore = AcsSnapshotStore(
+        storage,
+        store.updateHistory,
+        migrationInfo.currentMigrationId,
+        loggerFactory,
+      )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
         amuletAppParameters.loggingConfig.api,
@@ -153,12 +159,13 @@ class ScanApp(
         retryProvider,
       )
       automation = new ScanAutomationService(
-        config.automation,
+        config,
         clock,
         ledgerClient,
         retryProvider,
         loggerFactory,
         store,
+        acsSnapshotStore,
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
       )
@@ -185,6 +192,7 @@ class ScanApp(
         config.svUser,
         participantAdminConnection,
         store,
+        acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         clock,

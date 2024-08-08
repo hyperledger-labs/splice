@@ -22,8 +22,14 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.{AcsRequest, MaybeCachedContractWithState}
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
-import com.daml.network.util.{Codec, Contract, ContractWithState}
+import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  QualifiedName,
+}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.data.ActiveContract
@@ -57,6 +63,7 @@ class HttpScanHandler(
     svUserName: String,
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
+    snapshotStore: AcsSnapshotStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     clock: Clock,
@@ -900,24 +907,64 @@ class HttpScanHandler(
 
   override def getDateOfMostRecentSnapshotBefore(
       respond: ScanResource.GetDateOfMostRecentSnapshotBeforeResponse.type
-  )(before: OffsetDateTime)(
+  )(before: OffsetDateTime, migrationId: Long)(
       extracted: TraceContext
   ): Future[ScanResource.GetDateOfMostRecentSnapshotBeforeResponse] = {
-    // TODO (#13509): implement
-    Future.successful(
-      ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
-        definitions.AcsSnapshotTimestampResponse(before)
-      )
-    )
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getDateOfMostRecentSnapshotBefore") { _ => _ =>
+      snapshotStore
+        .lookupSnapshotBefore(migrationId, CantonTimestamp.assertFromInstant(before.toInstant))
+        .map {
+          case Some(snapshot) =>
+            ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
+              definitions
+                .AcsSnapshotTimestampResponse(
+                  snapshot.snapshotRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+                )
+            )
+          case None =>
+            ScanResource.GetDateOfMostRecentSnapshotBeforeResponseNotFound(
+              definitions.ErrorResponse(s"No snapshots found before $before")
+            )
+        }
+    }
   }
 
   override def getAcsSnapshotAt(respond: ScanResource.GetAcsSnapshotAtResponse.type)(
       body: AcsRequest
-  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
-    // TODO (#13511): implement
-    Future.failed(
-      HttpErrorHandler.notImplemented("Getting an ACS snapshot is not yet implemented.")
-    )
+  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = body match {
+    case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
+      implicit val tc: TraceContext = extracted
+      snapshotStore
+        .queryAcsSnapshot(
+          migrationId,
+          CantonTimestamp.assertFromInstant(recordTime.toInstant),
+          after,
+          PageLimit.tryCreate(pageSize),
+          partyIds
+            .getOrElse(Seq.empty)
+            .map(PartyId.tryFromProtoPrimitive),
+          templates
+            .getOrElse(Seq.empty)
+            .map(_.split(":") match {
+              case Array(packageName, moduleName, entityName) =>
+                PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+              case _ =>
+                throw HttpErrorHandler.badRequest(
+                  s"Malformed template_id, expected 'package_id:module_name:entity_name'"
+                )
+            }),
+        )
+        .map { result =>
+          ScanResource.GetAcsSnapshotAtResponseOK(
+            definitions.AcsResponse(
+              recordTime,
+              migrationId,
+              result.createdEventsInPage.map(ScanHttpEncodings.createdEventToHttp(_)),
+              result.afterToken,
+            )
+          )
+        }
   }
 
   override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(

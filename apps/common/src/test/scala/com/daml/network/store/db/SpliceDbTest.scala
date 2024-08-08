@@ -70,7 +70,9 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 update_history_creates,
                 update_history_assignments,
                 update_history_unassignments,
-                update_history_backfilling
+                update_history_backfilling,
+                acs_snapshot_data,
+                acs_snapshot
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllAppTables",
       )

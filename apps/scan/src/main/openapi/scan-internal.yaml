@@ -478,7 +478,7 @@ paths:
       x-jvm-package: scan
       operationId: "getDateOfMostRecentSnapshotBefore"
       description: |
-        Returns the timestamp of the most recent snapshot before the given date.
+        Returns the timestamp of the most recent snapshot before the given date, for the given migration_id.
         This corresponds to the record time of the last transaction in the snapshot.
       parameters:
         - name: "before"
@@ -489,6 +489,14 @@ paths:
             format: date-time
             description: |
               The endpoint will return the record time of the most recent snapshot before this parameter.
+        - name: "migration_id"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int64
+            description: |
+              The endpoint will return the record time of the most recent snapshot for this migration id.
       responses:
         "200":
           description: ok
@@ -1526,13 +1534,24 @@ components:
             The maximum number of created events returned for this request.
           type: integer
           format: int32
+        party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts in which these party_ids are stakeholders.
+        templates:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts with these template_ids, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
     AcsResponse:
       type: object
       required:
         - record_time
         - migration_id
         - created_events
-        - next_page_token
       properties:
         record_time:
           type: string
@@ -1549,6 +1568,7 @@ components:
           format: int64
           description: |
             When requesting the next page of results, pass this as `after` to the `AcsRequest`.
+            Will be empty when there's no more pages.
     ListActivityRequest:
       type: object
       required:

@@ -50,7 +50,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-final class UpdateHistory(
+class UpdateHistory(
     storage: DbStorage,
     domainMigrationInfo: DomainMigrationInfo,
     storeName: String,
@@ -73,11 +73,12 @@ final class UpdateHistory(
   private[this] def domainMigrationId = domainMigrationInfo.currentMigrationId
 
   private val state = new AtomicReference[State](State.empty())
-  private def historyId: Long =
+  def historyId: Long =
     state
       .get()
       .historyId
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
+  def isReady: Boolean = state.get().historyId.isDefined
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
     new MultiDomainAcsStore.IngestionSink {
@@ -1102,27 +1103,6 @@ final class UpdateHistory(
       )
     }
 
-  private implicit lazy val GetResultSelectFromCreateEvents: GetResult[SelectFromCreateEvents] =
-    GetResult { prs =>
-      import prs.*
-      (SelectFromCreateEvents.apply _).tupled(
-        (
-          <<[Long],
-          <<[String],
-          <<[String],
-          <<[CantonTimestamp],
-          <<[String],
-          <<[String],
-          <<[String],
-          <<[String],
-          <<[String],
-          <<[Option[Seq[String]]],
-          <<[Option[Seq[String]]],
-          <<[Option[String]],
-        )
-      )
-    }
-
   private implicit lazy val GetResultSelectFromExerciseEvents: GetResult[SelectFromExerciseEvents] =
     GetResult { prs =>
       import prs.*
@@ -1433,7 +1413,7 @@ object UpdateHistory {
       commandId: Option[String],
   )
 
-  private case class SelectFromCreateEvents(
+  case class SelectFromCreateEvents(
       updateRowId: Long,
       eventId: String,
       contractId: String,
@@ -1468,6 +1448,31 @@ object UpdateHistory {
         /*createdAt = */ createdAt.toInstant,
       )
     }
+  }
+
+  object SelectFromCreateEvents {
+    implicit def GetResultSelectFromCreateEvents(implicit
+        optSeqStringGetResult: GetResult[Option[Seq[String]]]
+    ): GetResult[SelectFromCreateEvents] =
+      GetResult { prs =>
+        import prs.*
+        (SelectFromCreateEvents.apply _).tupled(
+          (
+            <<[Long],
+            <<[String],
+            <<[String],
+            <<[CantonTimestamp],
+            <<[String],
+            <<[String],
+            <<[String],
+            <<[String],
+            <<[String],
+            <<[Option[Seq[String]]],
+            <<[Option[Seq[String]]],
+            <<[Option[String]],
+          )
+        )
+      }
   }
 
   private case class SelectFromExerciseEvents(

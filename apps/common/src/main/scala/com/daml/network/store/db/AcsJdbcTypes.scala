@@ -3,7 +3,7 @@
 
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
 import com.digitalasset.daml.lf.data.Ref.HexString
@@ -140,6 +140,18 @@ trait AcsJdbcTypes {
       _.toHexString,
       s => Offset.fromHexString(HexString.assertFromString(s)),
     )
+
+  protected implicit lazy val identifierSetParameter: SetParameter[Identifier] = {
+    (identifier: Identifier, pp: PositionedParameters) =>
+      {
+        implicitly[SetParameter[String2066]].apply(
+          lengthLimited(
+            s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}"
+          ),
+          pp,
+        )
+      }
+  }
 
   protected implicit lazy val qualifiedNameSetParameter: SetParameter[QualifiedName] =
     (v1: QualifiedName, v2: PositionedParameters) =>
