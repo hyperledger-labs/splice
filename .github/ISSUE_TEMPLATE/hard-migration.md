@@ -1,7 +1,7 @@
 ---
-name: Hard migration
-about: Perform a hard migration on a production cluster
-title: NETWORK Hard Synchronizer Migration DATE
+name: [Hard migration|Disaster recovery]
+about: Perform a [hard migration|disaster recovery] on a production cluster
+title: NETWORK [Hard Synchronizer Migration|Disaster Recovery] DATE
 labels: ''
 assignees: ''
 
@@ -11,19 +11,45 @@ Agenda [here](https://docs.google.com/document/d/1AEh9ZMLPxmc9tKn0L7I5S48xHOR4GN
 
 Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#via-the-pulumi-operator).
 
-Checklist:
+## Checklist
 
+### Prepare
+
+- [ ] open or create corresponding [agenda](https://drive.google.com/drive/folders/0ACLduXEo3vM1Uk9PVA)
 - [ ] prepare our staging nodes and tell partners
 - [ ] a sufficient number of partners have reported that they are ready / prepared (or look as if they are); check once and escalate if check failed
-- [ ] vote on scheduled downtime
+- [ ] (only if hard migration) vote on scheduled downtime
 - [ ] disable periodic CI jobs (including sv and validator runbook resets)
 - [ ] (only if DevNet) take down multi-validator stack (does not handle hard domain migrations in its current form): `cncluster pulumi multi-validator down` from release branch
-- [ ] call with all SVs: checks before, backups, actual migration, checks after
+
+### Call with all SVs (hard migrations version; remove me if DR)
+
+- [ ] wait for current synchronizer to pause and dumps to be taken (`Wrote domain migration dump` in SV app / validator app logs)
+- [ ] ensure that apps are sufficiently caught up
+- [ ] take backups with `cncluster backup_nodes`
+- [ ] merge PR to migrate to higher migration ID
+- [ ] check: domain is healthy
+
+### Call with all SVs (DR version; remove me if hard migration)
+
+- [ ] everyone scales down their CometBFT nodes with `kubectl scale deployment --replicas=0 -n <namespace> global-domain-<old-migration-id>-cometbft`
+- [ ] take backups with `cncluster backup_nodes`
+- [ ] agree on a timestamp based on logs (e.g., ask everyone for their latest `Commitment correct for sender` log entry on the participant ans use the min of that)
+- [ ] get the dumps with `cncluster take_disaster_recovery_dumps`
+- [ ] copy the dumps into our PVCs with `cncluster copy_disaster_recovery_dumps`
+- [ ] merge PR to migrate to higher migration ID
+- [ ] check: domain is healthy
+
+### Cleanup
+
 - [ ] unset `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` on the release branch so that future redeploys don't attempt to migrate
 - [ ] patch periodic CI jobs
 - [ ] trigger periodic CI jobs manually once to make sure the patches worked
 - [ ] re-enable periodic CI jobs
 - [ ] make sure that the versions and migration IDs from the release branch are forward ported to the main branch
 - [ ] take down old synchronizer nodes (once we're allowed to based on agreement with other SVs)
+
+### Follow-up
+
 - [ ] make sure that the [next planned production network operation](https://docs.google.com/document/d/14gZQNdXLPUCfqxN4vLK_yGlsptfcHMJZR8e1oOKgqLc/edit) has assignees and will get done; escalate if this is not the case
 - [ ] improve docs (collect ideas here) and other things

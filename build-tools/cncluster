@@ -2677,7 +2677,7 @@ function take_validator_disaster_recovery_dump() {
 subcommand_whitelist[take_disaster_recovery_dumps]='Take disaster recovery dumps of the specified namespaces'
 function subcmd_take_disaster_recovery_dumps() {
     if [ $# -lt 4 ]; then
-        _error "Usage: $SCRIPTNAME take_disaster_recovery_dumps <timestamp> <migration_id> <output_directory> <namespaces>"
+        _error "Usage: $SCRIPTNAME take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> <namespaces>"
     fi
     timestamp=$1
     shift
@@ -2697,7 +2697,7 @@ function subcmd_take_disaster_recovery_dumps() {
 subcommand_whitelist[copy_disaster_recovery_dumps]='Copy disaster recovery dumps into the pods in the cluster'
 function subcmd_copy_disaster_recovery_dumps() {
     if [ $# -lt 2 ]; then
-        _error "Usage: $SCRIPTNAME take_disaster_recovery_dumps <timestamp> <migration_id> <output_directory> <namespaces>"
+        _error "Usage: $SCRIPTNAME copy_disaster_recovery_dumps <dump_directory> <namespaces>"
     fi
     dump_directory="$1"
     shift

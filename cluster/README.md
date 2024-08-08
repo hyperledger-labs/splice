@@ -1450,7 +1450,7 @@ After merging a PR there, bump the submodule in this repo.
 As this process is quite subtle, ask in #team-canton-network-internal to pair with someone that has done this before. You can also deploy your changes to a scratchnet to ensure that you didn't break the config,
 which would prevent our SVs from initializing after the next redeploy.
 
-### Participating in a hard domain migration
+### Participating in a hard domain migration or in a disaster recovery
 
 Our end of the "Synchronizer Upgrades with Downtime" flow.
 Note that this also includes some steps for our non-SV validators.
@@ -1466,7 +1466,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Start a Slack thread on which you document the steps you take.
    Make sure there is at least one CN engineer around for a second pair of eyes.
 1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following environment variables for your target cluster:
-   * `export GLOBAL_DOMAIN_UPGRADE_VERSION=` the version we're migrating to
+   * `export GLOBAL_DOMAIN_UPGRADE_VERSION=` the version we're migrating to (current one in case of disaster recovery)
    * `export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=` the migration ID we're migrating to
    * `export DISABLE_CANTON_AUTO_INIT="true"` for a slightly faster migrate step; will be removed with [#12353](https://github.com/DACH-NY/canton-network-node/issues/12353)
    * `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
@@ -1498,13 +1498,16 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    You want to launch the commands in parallel, as it can be very slow if done sequentially.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
+1. In the event of a disaster recovery, you need to agree on a timestamp (in the format “2024-04-17T19:12:02Z”) with the byzantine majority of the SVs and execute the following commands:
+    - `cncluster take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
+    - `cncluster copy_disaster_recovery_dumps <dump_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
 1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following environment variables for your target cluster:
    * Remove the export of `GLOBAL_DOMAIN_UPGRADE_VERSION` which was added in the "prepare" step
    * Remove the export of `GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID` which was added in the "prepare" step
    * Set the following environment variables for your target cluster:
-     * `export CHARTS_VERSION=` the version we're migrating to
-     * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION`
+     * `export CHARTS_VERSION=` the version we're migrating to (current one in case of disaster recovery)
+     * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION` (current one in case of disaster recovery)
      * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
      * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
      * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
