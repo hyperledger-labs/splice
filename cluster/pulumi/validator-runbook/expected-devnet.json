@@ -311,7 +311,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_3",
           "host": "postgres",
           "postgresName": "postgres",
           "schema": "participant",
@@ -494,7 +494,7 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "2"
+          "id": "3"
         },
         "participantAddress": "participant",
         "persistence": {
