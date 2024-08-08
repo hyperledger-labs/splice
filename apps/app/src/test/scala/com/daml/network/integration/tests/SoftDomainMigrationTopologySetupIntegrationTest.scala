@@ -11,8 +11,8 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
-  SynchronizerConfig as DamlSynchronizerConfig,
   SynchronizerState,
+  SynchronizerConfig as DamlSynchronizerConfig,
 }
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.splice.dsorules.{DsoRulesConfig, DsoRules_SetConfig}
@@ -28,7 +28,13 @@ import com.daml.network.splitwell.config.SplitwellDomains
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
-import com.daml.network.util.{Codec, ConfigScheduleUtil, SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  Codec,
+  ConfigScheduleUtil,
+  SplitwellTestUtil,
+  UpdateHistoryComparator,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -47,7 +53,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     extends IntegrationTest
     with ConfigScheduleUtil
     with SplitwellTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with UpdateHistoryComparator {
 
   // Does not currently handle multiple synchronizers.
   override def runUpdateHistorySanityCheck = false
@@ -124,6 +131,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
 
   "SVs can bootstrap new domain" in { implicit env =>
     implicit val ec: ExecutionContext = env.executionContext
+    val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
     val (alice, bob) = onboardAliceAndBob()
     env.scans.local should have size 4
     val prefix = "global-domain-new"
@@ -485,5 +493,16 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       val balanceUpdates = aliceSplitwellClient.listBalanceUpdates(groupKey)
       balanceUpdates.loneElement.state shouldBe ContractState.Assigned(newDomainId)
     }
+
+    clue("Compare Scan UpdateHistory to the ledger API") {
+      eventually() {
+        compareHistoryViaScanApi(
+          ledgerBeginSv1,
+          sv1Backend,
+          scancl("sv1ScanClient"),
+        )
+      }
+    }
+
   }
 }

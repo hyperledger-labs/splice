@@ -869,12 +869,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exerciseResult: damlValue,
         offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkTx(
         offset,
         Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
         domain,
         txEffectiveAt,
+        recordTime = recordTime,
       )
       store.testIngestionSink
         .ingestUpdate(

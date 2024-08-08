@@ -4,13 +4,11 @@
 package com.daml.network.scan.admin.http
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TreeEvent}
-import com.daml.network.environment.ledger.api.{
-  LedgerClient,
-  ReassignmentUpdate,
-  TransactionTreeUpdate,
-}
+import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
+import com.daml.network.environment.ledger.api.{ReassignmentUpdate, TransactionTreeUpdate}
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.UpdateHistoryItem
+import com.daml.network.store.TreeUpdateWithMigrationId
 import com.daml.network.util.{Contract, ValueJsonCodecCodegen}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -22,32 +20,65 @@ import scala.jdk.OptionConverters.*
 object ScanHttpEncodings {
 
   def ledgerTreeUpdateToHttp(
-      tx: LedgerClient.GetTreeUpdatesResponse,
-      migrationId: Long,
+      updateWithMigrationId: TreeUpdateWithMigrationId
   )(implicit elc: ErrorLoggingContext): UpdateHistoryItem = {
-    val tree = tx.update match {
-      case TransactionTreeUpdate(tree) => tree
-      case ReassignmentUpdate(_) =>
-        // TODO (#12552): deal with this case
-        throw new IllegalStateException("Got an unexpected transfer.")
-    }
 
-    definitions.UpdateHistoryItem.fromUpdateHistoryTransaction(
-      definitions
-        .UpdateHistoryTransaction(
-          tree.getUpdateId,
-          migrationId,
-          tree.getWorkflowId,
-          tree.getRecordTime.toString,
-          tx.domainId.toProtoPrimitive,
-          tree.getEffectiveAt.toString,
-          tree.getOffset,
-          tree.getRootEventIds.asScala.toVector,
-          tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
-            eventId -> treeEventToHttp(treeEvent)
-          }.toMap,
+    updateWithMigrationId.update.update match {
+      case TransactionTreeUpdate(tree) =>
+        definitions.UpdateHistoryItem.fromUpdateHistoryTransaction(
+          definitions
+            .UpdateHistoryTransaction(
+              tree.getUpdateId,
+              updateWithMigrationId.migrationId,
+              tree.getWorkflowId,
+              tree.getRecordTime.toString,
+              updateWithMigrationId.update.domainId.toProtoPrimitive,
+              tree.getEffectiveAt.toString,
+              tree.getOffset,
+              tree.getRootEventIds.asScala.toVector,
+              tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
+                eventId -> treeEventToHttp(treeEvent)
+              }.toMap,
+            )
         )
-    )
+      case ReassignmentUpdate(update) =>
+        update.event match {
+          case Assign(submitter, source, target, unassignId, createdEvent, counter) =>
+            definitions.UpdateHistoryItem.fromUpdateHistoryReassignment(
+              definitions.UpdateHistoryReassignment(
+                update.updateId,
+                update.offset.getOffset,
+                update.recordTime.toString,
+                definitions.UpdateHistoryAssignment(
+                  submitter.toProtoPrimitive,
+                  source.toProtoPrimitive,
+                  target.toProtoPrimitive,
+                  updateWithMigrationId.migrationId,
+                  unassignId,
+                  createdEventToHttp(createdEvent),
+                  counter,
+                ),
+              )
+            )
+          case Unassign(submitter, source, target, unassignId, contractId, counter) =>
+            definitions.UpdateHistoryItem.fromUpdateHistoryReassignment(
+              definitions.UpdateHistoryReassignment(
+                update.updateId,
+                update.offset.getOffset,
+                update.recordTime.toString,
+                definitions.UpdateHistoryUnassignment(
+                  submitter.toProtoPrimitive,
+                  source.toProtoPrimitive,
+                  updateWithMigrationId.migrationId,
+                  target.toProtoPrimitive,
+                  unassignId,
+                  counter,
+                  contractId.contractId,
+                ),
+              )
+            )
+        }
+    }
   }
 
   private def treeEventToHttp(treeEvent: TreeEvent)(implicit elc: ErrorLoggingContext) = {

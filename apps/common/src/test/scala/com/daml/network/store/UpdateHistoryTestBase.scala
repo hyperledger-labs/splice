@@ -17,7 +17,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
-import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.scalatest.Assertion
 
 import java.time.Instant
@@ -115,7 +114,8 @@ abstract class UpdateHistoryTestBase
             rootEvent.getContractId should be(cid)
             rootEvent.getChoice should be(choice)
             domain should be(domainId)
-          case _ => throw new RuntimeException("Unexpected event type")
+          case (event, expected) =>
+            throw new RuntimeException(s"Unexpected event type. event: $event, expected: $expected")
         }
       case (GetTreeUpdatesResponse(ReassignmentUpdate(update), domain), expected) =>
         (update.event, expected) match {
@@ -128,32 +128,14 @@ abstract class UpdateHistoryTestBase
             assign.createdEvent.getContractId should be(expected.cid)
             assign.source should be(expected.sourceDomain)
             assign.target should be(expected.domainId)
-          case _ => throw new RuntimeException("Unexpected reassignment type")
+          case (event, expected) =>
+            throw new RuntimeException(
+              s"Unexpected reassignment type. event: $event, expected: $expected"
+            )
         }
       case _ => throw new RuntimeException("Unexpected update type")
     }
     succeed
-  }
-
-  protected def updates(
-      store: UpdateHistory,
-      migrationId: Long = migration1,
-  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
-    // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
-    for {
-      fromStream <- store
-        .updateStream(beginOffset, endOffset)
-        .toMat(Sink.seq)(Keep.right)
-        .run()
-      fromGetTransactions <- store.getUpdates(None, PageLimit.tryCreate(1000))
-    } yield {
-      fromStream
-        .filter(_.update match {
-          case TransactionTreeUpdate(_) => true
-          case ReassignmentUpdate(_) => false
-        }) should be(fromGetTransactions.filter(_._2 == migrationId).map(_._1))
-      fromStream
-    }
   }
 
   protected def initStore(implicit store: UpdateHistory): Future[Unit] = {

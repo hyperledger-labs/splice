@@ -58,8 +58,8 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           backfillingComplete <- storeB2.destinationHistory.isBackfillingComplete(2)
         } yield {
           backfillingComplete shouldBe true
-          updatesA.map(_._1.update.updateId) should contain theSameElementsAs updatesB.map(
-            _._1.update.updateId
+          updatesA.map(_.update.update.updateId) should contain theSameElementsAs updatesB.map(
+            _.update.update.updateId
           )
         }
       }

@@ -652,9 +652,7 @@ class HttpScanHandler(
         )
         .map { txs =>
           definitions.UpdateHistoryResponse(
-            txs.map { case (tx, migrationId) =>
-              ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
-            }.toVector
+            txs.map(ScanHttpEncodings.ledgerTreeUpdateToHttp(_)).toVector
           )
         }
     }
@@ -955,11 +953,11 @@ class HttpScanHandler(
           v0.ScanResource.GetUpdateByIdResponse.NotFound(
             definitions.ErrorResponse(s"Transaction with id $updateId not found")
           )
-        ) { case (tx, migrationId) =>
+        )(txWithMigration =>
           v0.ScanResource.GetUpdateByIdResponse.OK(
-            ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
+            ScanHttpEncodings.ledgerTreeUpdateToHttp(txWithMigration)
           )
-        }
+        )
       }
     }
   }

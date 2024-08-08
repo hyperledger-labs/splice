@@ -19,10 +19,10 @@ import com.daml.network.codegen.java.splice.{
   wallet as spw,
 }
 import com.daml.network.config.ConfigTransforms.{
+  ConfigurableApp,
   updateAllAutomationConfigs,
   updateAllValidatorConfigs,
   updateAutomationConfig,
-  ConfigurableApp,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.sv.automation.confirmation.ElectionRequestTrigger
@@ -38,6 +38,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   Contract,
   ContractWithState,
+  UpdateHistoryComparator,
   WalletTestUtil,
 }
 import com.daml.network.validator.config.AppManagerConfig
@@ -57,7 +58,8 @@ import scala.jdk.OptionConverters.*
 class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     extends SvIntegrationTestBase
     with ConfigScheduleUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with UpdateHistoryComparator {
 
   // Fails with unexpected CreatedEvent roots
   override protected def runUpdateHistorySanityCheck: Boolean = false
@@ -115,6 +117,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
 
   "scheduled global domain upgrade happens" in { implicit env =>
     initDsoWithSv1Only() withClue "spin up Dso"
+    val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
     val sv1WalletUser = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
     val timeUntilNewRule = 5.seconds
@@ -703,6 +706,14 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
             spw.subscriptions.SubscriptionPayment.COMPANION,
           )
           map (c(_, sv1WalletUser)): _*
+      )
+    }
+
+    eventually() {
+      compareHistoryViaScanApi(
+        ledgerBeginSv1,
+        sv1Backend,
+        scancl("sv1ScanClient"),
       )
     }
 

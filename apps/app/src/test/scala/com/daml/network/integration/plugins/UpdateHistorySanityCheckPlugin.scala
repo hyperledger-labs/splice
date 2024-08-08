@@ -5,6 +5,7 @@ import com.daml.network.config.SpliceConfig
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members
+import com.daml.network.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -90,6 +91,13 @@ class UpdateHistorySanityCheckPlugin(
       case None => () // done
       case Some(members.UpdateHistoryTransaction(last)) =>
         paginateHistory(scan, Some((last.migrationId, last.recordTime)))
+      case Some(members.UpdateHistoryReassignment(last)) =>
+        last.event match {
+          case reassignmentMembers.UpdateHistoryAssignment(event) =>
+            paginateHistory(scan, Some((event.migrationId, last.recordTime)))
+          case reassignmentMembers.UpdateHistoryUnassignment(event) =>
+            paginateHistory(scan, Some((event.migrationId, last.recordTime)))
+        }
     }
   }
 }

@@ -1,5 +1,7 @@
 package com.daml.network.util
 
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.ParticipantOffsetOuterClass.ParticipantOffset as ledgerApiParticipantOffset
 import com.daml.ledger.javaapi.data.{
   Bool,
   ContractId,
@@ -19,27 +21,124 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   Unit,
   Variant,
+  ParticipantOffset as javaApiParticipantOffset,
 }
+import com.daml.network.console.{ScanAppClientReference, SvAppBackendReference}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.{ReassignmentUpdate, TransactionTreeUpdate}
+import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
+import com.daml.network.environment.ledger.api.{
+  LedgerClient,
+  Reassignment,
+  ReassignmentEvent,
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+}
 import com.daml.network.http.v0.definitions
 import com.daml.network.integration.tests.SpliceTests.TestCommon
-
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
+  AssignedWrapper,
+  TransactionTreeWrapper,
+  UnassignedWrapper,
+}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 
 import java.time.Instant
 import java.util
 import java.util.Optional
-
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-
 import org.scalatest.matchers.dsl.MatcherFactory1
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalactic.{Equality, Prettifier}
 
 trait UpdateHistoryComparator extends TestCommon {
+
+  def compareHistoryViaScanApi(
+      ledgerBegin: ParticipantOffset,
+      svAppBackend: SvAppBackendReference,
+      scanClient: ScanAppClientReference,
+  ) = {
+    val participant = svAppBackend.participantClient
+    val ledgerEnd = participant.ledger_api.state.end()
+    val dsoParty = svAppBackend.getDsoInfo().dsoParty
+    val actualUpdates = participant.ledger_api.updates
+      .trees(
+        partyIds = Set(dsoParty),
+        completeAfter = Int.MaxValue,
+        beginOffset = ledgerBegin,
+        endOffset = Some(ledgerEnd),
+        verbose = false,
+      )
+      .map {
+        case TransactionTreeWrapper(protoTree) =>
+          LedgerClient.GetTreeUpdatesResponse(
+            TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
+            DomainId.tryFromString(protoTree.domainId),
+          )
+        case UnassignedWrapper(protoReassignment, protoUnassignEvent) =>
+          GetTreeUpdatesResponse(
+            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
+            DomainId.tryFromString(protoUnassignEvent.source),
+          )
+        case AssignedWrapper(protoReassignment, protoAssignEvent) =>
+          GetTreeUpdatesResponse(
+            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
+            DomainId.tryFromString(protoAssignEvent.target),
+          )
+      }
+
+    val recordedUpdates = scanClient.getUpdateHistory(
+      actualUpdates.size,
+      Some(
+        (
+          0L,
+          // Note that we deliberately do not start from ledger begin here since the ledgerBeginSv1 variable above
+          // only points at the end after initialization.
+          actualUpdates.head.update.recordTime
+            .minusMillis(1L)
+            .toString, // include the first element, as otherwise it's excluded
+        )
+      ),
+    )
+
+    recordedUpdates should have length actualUpdates.size.toLong
+
+    val recordedUpdatesByDomainId = recordedUpdates.groupBy {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(
+            definitions.UpdateHistoryTransaction(_, _, _, _, domainId, _, _, _, _)
+          ) =>
+        domainId
+      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(
+            definitions.UpdateHistoryReassignment(_, _, _, event)
+          ) =>
+        event match {
+          case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(
+                definitions.UpdateHistoryAssignment(_, _, targetDomainId, _, _, _, _)
+              ) =>
+            targetDomainId
+          case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryUnassignment(
+                definitions.UpdateHistoryUnassignment(_, sourceDomainId, _, _, _, _, _)
+              ) =>
+            sourceDomainId
+        }
+    }
+
+    val actualUpdatesByDomainId = actualUpdates.groupBy {
+      case GetTreeUpdatesResponse(_, domainId) => domainId.toProtoPrimitive
+    }
+
+    recordedUpdatesByDomainId.keySet should be(actualUpdatesByDomainId.keySet)
+    recordedUpdatesByDomainId.keySet.foreach { domainId =>
+      val actualForDomain = actualUpdatesByDomainId.get(domainId).value
+      val recordedForDomain = recordedUpdatesByDomainId.get(domainId).value
+      actualForDomain.zip(recordedForDomain).foreach { case (actual, recorded) =>
+        actual should matchUpdateHistory(recorded)
+      }
+    }
+  }
 
   def matchUpdateHistory(right: Any): MatcherFactory1[Any, Equality] =
     new MatcherFactory1[Any, Equality] {
@@ -49,8 +148,11 @@ trait UpdateHistoryComparator extends TestCommon {
             left match {
               case GetTreeUpdatesResponse(TransactionTreeUpdate(tree), _) =>
                 compare(tree, right)
-              case GetTreeUpdatesResponse(ReassignmentUpdate(_), _) =>
-                fail("comparison of reassignments is not yet implemented")
+              case GetTreeUpdatesResponse(
+                    ReassignmentUpdate(reassign),
+                    _,
+                  ) =>
+                compare(reassign, right)
               case _ => fail(s"Unepxected comparison for $left")
             }
           }
@@ -60,20 +162,115 @@ trait UpdateHistoryComparator extends TestCommon {
       override def toString: String = "equal (" + Prettifier.default(right) + ")"
     }
 
+  private def compare(
+      left: Reassignment[ReassignmentEvent],
+      right: Any,
+  ): MatchResult = {
+    right match {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(
+            definitions.UpdateHistoryReassignment(
+              updateId,
+              offset,
+              recordTime,
+              event,
+            )
+          ) =>
+        compare(
+          Seq(left.updateId, left.offset, left.recordTime, left.event),
+          Seq(updateId, offset, CantonTimestamp.tryFromInstant(Instant.parse(recordTime)), event),
+        )
+      case _ => MatchResult(false, s"Left was a reassignment, but right was: $right", "")
+    }
+  }
+
+  private def compare(
+      left: Assign,
+      right: definitions.UpdateHistoryReassignment.Event,
+  ): MatchResult = {
+    right match {
+      case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(
+            definitions.UpdateHistoryAssignment(
+              submitter,
+              sourceSynchronizer,
+              targetSynchronizer,
+              _, // Ignoring MigrationId since ledger API does not include it
+              unassignId,
+              createdEvent,
+              reassignmentCounter,
+            )
+          ) =>
+        compare(
+          Seq(
+            left.submitter,
+            left.source,
+            left.target,
+            left.unassignId,
+            left.createdEvent,
+            left.counter,
+          ),
+          Seq(
+            PartyId.tryFromProtoPrimitive(submitter),
+            DomainId.tryFromString(sourceSynchronizer),
+            DomainId.tryFromString(targetSynchronizer),
+            unassignId,
+            createdEvent,
+            reassignmentCounter,
+          ),
+        )
+      case _ => MatchResult(false, s"Left was an assignment, but right was: $right", "")
+    }
+  }
+
+  private def compare(
+      left: Unassign,
+      right: definitions.UpdateHistoryReassignment.Event,
+  ): MatchResult = {
+    right match {
+      case definitions.UpdateHistoryReassignment.Event.members.UpdateHistoryUnassignment(
+            definitions.UpdateHistoryUnassignment(
+              submitter,
+              sourceSynchronizer,
+              _, // Ignoring MigrationId since ledger API does not include it
+              targetSynchronizer,
+              unassignId,
+              reassignmentCounter,
+              contractId,
+            )
+          ) =>
+        compare(
+          Seq(
+            left.submitter,
+            left.source,
+            left.target,
+            left.unassignId,
+            left.counter,
+            left.contractId.contractId,
+          ),
+          Seq(
+            PartyId.tryFromProtoPrimitive(submitter),
+            DomainId.tryFromString(sourceSynchronizer),
+            DomainId.tryFromString(targetSynchronizer),
+            unassignId,
+            reassignmentCounter,
+            contractId,
+          ),
+        )
+      case _ => MatchResult(false, s"Left was an unassignment, but right was: $right", "")
+    }
+  }
+
   private def compare(left: TransactionTree, right: Any): MatchResult = {
     right match {
-      // Ignoring MigrationId
-      // Ignoring DomainId
       // Ignoring CommandId. They're not in the openAPI spec
       //   since command ids are not properly shared across nodes so
       //   they're not reliably usable for backfilling
       case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(
             definitions.UpdateHistoryTransaction(
               updateId,
-              _,
+              _, // Ignoring MigrationId since ledger API does not include it.
               workflowId,
               recordTime,
-              _,
+              synchronizerId,
               effectiveAt,
               offset,
               rootEventIds,
@@ -85,6 +282,7 @@ trait UpdateHistoryComparator extends TestCommon {
             left.getUpdateId,
             left.getWorkflowId,
             left.getRecordTime,
+            left.getDomainId,
             left.getEffectiveAt,
             left.getOffset,
             left.getRootEventIds.asScala,
@@ -94,6 +292,7 @@ trait UpdateHistoryComparator extends TestCommon {
             updateId,
             workflowId,
             java.time.Instant.parse(recordTime),
+            synchronizerId,
             java.time.Instant.parse(effectiveAt),
             offset,
             rootEventIds,
@@ -350,10 +549,17 @@ trait UpdateHistoryComparator extends TestCommon {
       case (l: ExercisedEvent, r: definitions.TreeEvent.members.ExercisedEvent) => compare(l, r)
       case (_: ExercisedEvent, _: definitions.TreeEvent.members.CreatedEvent) =>
         MatchResult(false, "Left was an exercisedEvent, but Right was a createdEvent", "")
+      case (l: Assign, r: definitions.UpdateHistoryReassignment.Event) => compare(l, r)
+      case (l: Unassign, r: definitions.UpdateHistoryReassignment.Event) => compare(l, r)
+      case (l: javaApiParticipantOffset, right: String) => compare(l.toProto, right)
+      case (l: ledgerApiParticipantOffset, right: String) => compare(l.getAbsolute, right)
       // We explicitly list types that we want compared by ==, in order to easily catch unexpected comparisons
       case (l: Boolean, r: Boolean) => equalityCompare(l, r)
       case (l: String, r: String) => equalityCompare(l, r)
+      case (l: Long, r: Long) => equalityCompare(l, r)
       case (l: Party, r: Party) => equalityCompare(l, r)
+      case (l: PartyId, r: PartyId) => equalityCompare(l, r)
+      case (l: DomainId, r: DomainId) => equalityCompare(l, r)
       case (l: Instant, r: Instant) => equalityCompare(l, r)
       case (l: Identifier, r: Identifier) => equalityCompare(l, r)
       case (l: ContractId, r: ContractId) => equalityCompare(l, r)
@@ -362,6 +568,7 @@ trait UpdateHistoryComparator extends TestCommon {
       case (l: Bool, r: Bool) => equalityCompare(l, r)
       case (l: Unit, r: Unit) => equalityCompare(l, r)
       case (l: Text, r: Text) => equalityCompare(l, r)
+      case (l: CantonTimestamp, r: CantonTimestamp) => equalityCompare(l, r)
       case (l: Timestamp, r: Timestamp) => equalityCompare(l, r)
 
       case (_: DamlRecord, _) => MatchResult(false, "Left was DamlRecord but right was not", "")
