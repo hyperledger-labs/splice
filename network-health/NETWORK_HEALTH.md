@@ -271,6 +271,10 @@ Depending on whether it is a network-wide issue or an SV local issue, investigat
 
 For an SV local issue, the main thing to investigae is whether just the SV app is broken or whether the underlying Canton components might also be broken.
 
+As a general rule, when a component is (suspected to be) failing, look for the earliest error message you can find in its logs.
+(Filter the logs by severity `>= WARNING`.)
+Sometimes a single error can completely brick a component, with no relevant follow-up log messages, so be sure to look sufficiently far back in time.
+
 The easiest way of checking this is to check the periodic acknowledgements from their participant and mediator. This is a message each node
 sends out to acknowledge that it has seen messages up to a certain timestamp. This allows both to see whether the node is active at all (i.e. has it stopped sending out acknowledgements) and whether it as lagging behind.
 
@@ -288,10 +292,12 @@ transactions because it sees the confirmation only after the configured `partici
 
 If you do see a lag, you want to check:
 
-1. Has there been a sudden traffic spike that might have overloaded their sequencer? This is easiest to do using the [sequencer traffic dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/fdjrxql2alblsd/sequencer-traffic?orgId=1) (adjust cluster as needed). E.g., here we can see a spike starting at 6:50
+1. Is it catching up at all or just completely stuck / not completing any acknowledgements? If it is completely stuck, the reason might be a fatal error in the participant. Scan the participant logs for errors and warnings (see general rule above).
+
+2. Has there been a sudden traffic spike that might have overloaded their sequencer? This is easiest to do using the [sequencer traffic dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/fdjrxql2alblsd/sequencer-traffic?orgId=1) (adjust cluster as needed). E.g., here we can see a spike starting at 6:50
 
 ![domain traffic spike](pics/sequencer_traffic_spike.png)
-2. Are they catching up faster than realtime, i.e., do their acknowledgements advance within 10 minutes by more than 10 minutes and they will eventually catch up or do they fall further and further behind. E.g., in the screenshot here we can see that within 10 minutes, the acknowledgements only advance from `2024-04-29T05:02:33.813218Z` to `2024-04-29T05:04:32.392203Z` so SBI is falling further and further behind. Note that even if they can eventually catch up, we likely want to follow up with them to make sure they improve performance of our nodes.
+3. Are they catching up faster than realtime, i.e., do their acknowledgements advance within 10 minutes by more than 10 minutes and they will eventually catch up or do they fall further and further behind. E.g., in the screenshot here we can see that within 10 minutes, the acknowledgements only advance from `2024-04-29T05:02:33.813218Z` to `2024-04-29T05:04:32.392203Z` so SBI is falling further and further behind. Note that even if they can eventually catch up, we likely want to follow up with them to make sure they improve performance of our nodes.
 
 ![sbi lagging further and further](pics/acknowledgement_falling_behind.png)
 
