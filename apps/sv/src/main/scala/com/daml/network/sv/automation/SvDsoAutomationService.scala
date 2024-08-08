@@ -4,6 +4,7 @@
 package com.daml.network.sv.automation
 
 import com.daml.network.automation.{
+  AmuletConfigReassignmentTrigger,
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
@@ -41,6 +42,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
@@ -155,11 +157,13 @@ class SvDsoAutomationService(
           triggerContext,
           dsoStore,
           connection,
+          dsoStore.key.dsoParty,
           Seq[ConstrainedTemplate](
             AmuletRules.COMPANION,
             OpenMiningRound.COMPANION,
             IssuingMiningRound.COMPANION,
           ),
+          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
         )
       )
     } else {
@@ -168,7 +172,9 @@ class SvDsoAutomationService(
           triggerContext,
           dsoStore,
           connection,
+          dsoStore.key.dsoParty,
           Seq(DsoRules.COMPANION),
+          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
         )
       )
       registerTrigger(

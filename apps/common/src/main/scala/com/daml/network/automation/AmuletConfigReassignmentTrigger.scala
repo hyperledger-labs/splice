@@ -1,17 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv
+package com.daml.network.automation
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.SpliceLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
-import com.daml.network.store.MultiDomainAcsStore.ConstrainedTemplate
-import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.util.AmuletConfigSchedule
+import com.daml.network.store.AppStore
+import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, ContractState}
+import com.daml.network.util.{AmuletConfigSchedule, AssignedContract}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -26,9 +27,13 @@ import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand.
   */
 final class AmuletConfigReassignmentTrigger(
     override protected val context: TriggerContext,
-    store: SvDsoStore,
+    store: AppStore,
     connection: SpliceLedgerConnection,
+    submitter: PartyId,
     templates: Seq[ConstrainedTemplate],
+    lookupAmuletRules: TraceContext => Future[Option[
+      AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+    ]],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -38,7 +43,7 @@ final class AmuletConfigReassignmentTrigger(
       tc: TraceContext
   ): Future[Seq[Task]] = {
     val run = for {
-      amuletRules <- OptionT(store.lookupAmuletRules())
+      amuletRules <- OptionT(lookupAmuletRules(tc))
       config = AmuletConfigSchedule(amuletRules.payload.configSchedule).getConfigAsOf(now)
       activeSynchronizer <- OptionT.fromOption[Future](
         DomainId.fromString(config.decentralizedSynchronizer.activeSynchronizer).toOption
@@ -60,16 +65,24 @@ final class AmuletConfigReassignmentTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = for {
     _ <- connection.submitReassignmentAndWaitNoDedup(
-      submitter = store.key.dsoParty,
+      submitter = submitter,
       command = task.work,
     )
   } yield TaskSuccess(show"Submitted transfer ${task.work}")
 
   override protected def isStaleTask(task: ReadyTask)(implicit tc: TraceContext): Future[Boolean] =
     for {
-      dsoRules <- store.lookupDsoRules()
-    } yield dsoRules.forall { rc =>
-      rc.contractId != task.work.contractId || rc.domain != task.work.source
+      contractStateO <- store.multiDomainAcsStore.lookupContractStateById(task.work.contractId)
+      amuletRulesO <- lookupAmuletRules(tc)
+    } yield contractStateO.forall { contractState =>
+      amuletRulesO.forall { amuletRules =>
+        val config =
+          AmuletConfigSchedule(amuletRules.payload.configSchedule).getConfigAsOf(task.readyAt)
+        val activeSynchronizer =
+          DomainId.tryFromString(config.decentralizedSynchronizer.activeSynchronizer)
+        task.work.source != activeSynchronizer ||
+        ContractState.Assigned(task.work.source) != contractState
+      }
     }
 }
 

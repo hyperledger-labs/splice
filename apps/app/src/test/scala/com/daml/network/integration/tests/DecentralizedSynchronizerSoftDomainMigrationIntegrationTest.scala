@@ -25,9 +25,9 @@ import com.daml.network.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.automation.AmuletConfigReassignmentTrigger
 import com.daml.network.sv.automation.confirmation.ElectionRequestTrigger
 import com.daml.network.sv.automation.singlesv.{
-  AmuletConfigReassignmentTrigger,
   ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
 }

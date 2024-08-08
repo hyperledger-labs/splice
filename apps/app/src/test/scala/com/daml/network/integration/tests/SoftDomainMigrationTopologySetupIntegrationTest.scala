@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.automation.AssignTrigger
+import com.daml.network.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.AmuletDecentralizedSynchronizerConfig
@@ -27,7 +27,6 @@ import com.daml.network.splitwell.automation.AcceptedAppPaymentRequestsTrigger
 import com.daml.network.splitwell.config.SplitwellDomains
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.sv.LocalSynchronizerNode
-import com.daml.network.sv.automation.singlesv.AmuletConfigReassignmentTrigger
 import com.daml.network.util.{
   Codec,
   ConfigScheduleUtil,
