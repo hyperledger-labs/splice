@@ -13,7 +13,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.unused
 import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation that runs on a CC Scan app. */
@@ -24,7 +23,7 @@ class ScanAutomationService(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
-    @unused snapshotStore: AcsSnapshotStore,
+    snapshotStore: AcsSnapshotStore,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
 )(implicit
@@ -48,15 +47,14 @@ class ScanAutomationService(
 
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
   registerTrigger(new ScanBackfillAggregatesTrigger(store, triggerContext))
-  // TODO (#13511): Re-enable the AcsSnapshotTrigger once there are tests.
-//  registerTrigger(
-//    new AcsSnapshotTrigger(
-//      snapshotStore,
-//      store.updateHistory,
-//      config.acsSnapshotPeriodHours,
-//      triggerContext,
-//    )
-//  )
+  registerTrigger(
+    new AcsSnapshotTrigger(
+      snapshotStore,
+      store.updateHistory,
+      config.acsSnapshotPeriodHours,
+      triggerContext,
+    )
+  )
 }
 
 object ScanAutomationService extends AutomationServiceCompanion {

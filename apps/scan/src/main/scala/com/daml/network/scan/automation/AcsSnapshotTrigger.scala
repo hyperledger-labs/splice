@@ -36,7 +36,7 @@ class AcsSnapshotTrigger(
 
   private val timesToDoSnapshot = (0 to 23).filter(_ % snapshotPeriodHours == 0)
 
-  override protected def retrieveTasks()(implicit
+  override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[AcsSnapshotTrigger.Task]] = {
     if (!updateHistory.isReady) {
@@ -44,11 +44,9 @@ class AcsSnapshotTrigger(
     } else {
       val now = context.pollingClock.now
       for {
-        lastSnapshot <- store.lookupLastSnapshot()
+        lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
         possibleTask <- lastSnapshot match {
           case None =>
-            firstSnapshotForMigrationIdTask()
-          case Some(snapshot) if snapshot.migrationId != store.migrationId =>
             firstSnapshotForMigrationIdTask()
           case Some(lastSnapshot) => // new snapshot should be created, if ACS for it is complete
             val newSnapshotRecordTime =
@@ -102,7 +100,7 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     store
-      .lookupLastSnapshot()
+      .lookupSnapshotBefore(store.migrationId, task.snapshotRecordTime)
       .map(_.exists(_.snapshotRecordTime == task.snapshotRecordTime))
   }
 

@@ -380,12 +380,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def toCreatedEvent(
       contract: Contract[?, ?],
       signatories: Seq[PartyId] = Seq.empty,
+      packageName: String = dummyPackageName,
   ): CreatedEvent = {
     new CreatedEvent(
       Seq.empty[String].asJava,
       "dummyEventId",
       contract.identifier,
-      dummyPackageName,
+      packageName,
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
@@ -462,7 +463,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         created.getWitnessParties,
         eventId,
         created.getTemplateId,
-        dummyPackageName,
+        created.getPackageName,
         created.getContractId,
         created.getArguments,
         created.getCreatedEventBlob,
@@ -599,9 +600,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       domainId: DomainId,
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
+      packageName: String = dummyPackageName,
   ) = mkTx(
     offset,
-    createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories)),
+    createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories, packageName)),
     domainId,
     effectiveAt,
     workflowId,

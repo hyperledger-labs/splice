@@ -192,6 +192,7 @@ class ScanApp(
         config.svUser,
         participantAdminConnection,
         store,
+        acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         clock,

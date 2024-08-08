@@ -3,42 +3,51 @@
 
 package com.daml.network.scan.store
 
-import com.daml.network.scan.store.AcsSnapshotStore.AcsSnapshot
-import com.daml.network.store.UpdateHistory
-import com.daml.network.store.db.AcsJdbcTypes
+import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.network.scan.store.AcsSnapshotStore.{AcsSnapshot, QueryAcsSnapshotResult}
+import com.daml.network.store.UpdateHistory.SelectFromCreateEvents
+import com.daml.network.store.{PageLimit, UpdateHistory}
+import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
+import com.daml.network.util.PackageQualifiedName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class AcsSnapshotStore(
     storage: DbStorage,
     updateHistory: UpdateHistory,
     val migrationId: Long,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit closeContext: CloseContext)
+)(implicit ec: ExecutionContext, closeContext: CloseContext)
     extends AcsJdbcTypes
+    with AcsQueries
     with NamedLogging {
 
   override val profile: JdbcProfile = storage.profile.jdbc
 
   private def historyId = updateHistory.historyId
 
-  def lookupLastSnapshot()(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
+  def lookupSnapshotBefore(
+      migrationId: Long,
+      before: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
     storage
       .querySingle(
         sql"""select snapshot_record_time, migration_id, first_row_id, last_row_id
             from acs_snapshot
+            where snapshot_record_time <= $before and migration_id = $migrationId
             order by snapshot_record_time desc
             limit 1""".as[AcsSnapshot].headOption,
-        "lookupLastSnapshot",
+        "lookupSnapshotBefore",
       )
       .value
   }
@@ -91,7 +100,7 @@ class AcsSnapshotStore(
                     into acs_snapshot_data (create_id, template_id, stakeholder)
                         select
                            creates.row_id,
-                           concat(template_id_package_id, ':', template_id_module_name, ':', template_id_entity_name),
+                           concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
                            stakeholder
                         from contracts_to_insert contracts
                            join update_history_creates creates
@@ -111,6 +120,96 @@ class AcsSnapshotStore(
         having min(row_id) is not null;
              """).toActionBuilder.asUpdate,
       "insertNewSnapshot",
+    )
+  }
+
+  def queryAcsSnapshot(
+      migrationId: Long,
+      snapshot: CantonTimestamp,
+      after: Option[Long],
+      limit: PageLimit,
+      partyIds: Seq[PartyId],
+      templates: Seq[PackageQualifiedName],
+  )(implicit tc: TraceContext): Future[QueryAcsSnapshotResult] = {
+    for {
+      snapshot <- storage
+        .querySingle(
+          sql"""select snapshot_record_time, migration_id, first_row_id, last_row_id
+            from acs_snapshot
+            where snapshot_record_time = $snapshot and migration_id = $migrationId
+            limit 1""".as[AcsSnapshot].headOption,
+          "queryAcsSnapshot.getSnapshot",
+        )
+        .getOrElseF(
+          Future.failed(
+            io.grpc.Status.NOT_FOUND
+              .withDescription(
+                s"Failed to find ACS snapshot for migration id $migrationId at $snapshot"
+              )
+              .asRuntimeException()
+          )
+        )
+      begin <- after match {
+        case Some(value) if value < snapshot.firstRowId || value > snapshot.lastRowId =>
+          Future.failed(
+            io.grpc.Status.INVALID_ARGUMENT
+              .withDescription(
+                s"Invalid after token, outside of snapshot range (${snapshot.firstRowId} to ${snapshot.lastRowId})."
+              )
+              .asRuntimeException()
+          )
+        case Some(value) => Future.successful(value + 1)
+        case None => Future.successful(snapshot.firstRowId)
+      }
+      end = snapshot.lastRowId
+      partyIdsFilter = partyIds match {
+        case Nil => sql""
+        case partyIds =>
+          (sql" and stakeholder in " ++ inClause(partyIds)).toActionBuilder
+      }
+      templatesFilter = templates match {
+        case Nil => sql""
+        case _ =>
+          (sql" and template_id in " ++ inClause(
+            templates.map(t =>
+              lengthLimited(
+                s"${t.packageName}:${t.qualifiedName.moduleName}:${t.qualifiedName.entityName}"
+              )
+            )
+          )).toActionBuilder
+      }
+      events <- storage
+        .query(
+          (sql"""
+               select
+                 snapshot.row_id,
+                 update_row_id,
+                 event_id,
+                 contract_id,
+                 created_at,
+                 template_id_package_id,
+                 template_id_module_name,
+                 template_id_entity_name,
+                 package_name,
+                 create_arguments,
+                 signatories,
+                 observers,
+                 contract_key
+              from acs_snapshot_data snapshot
+              join update_history_creates creates on creates.row_id = snapshot.create_id
+              where snapshot.row_id between $begin and $end
+            """
+            ++ partyIdsFilter
+            ++ templatesFilter
+            ++ sql" order by snapshot.row_id limit ${limit.limit}").toActionBuilder
+            .as[(Long, SelectFromCreateEvents)],
+          "queryAcsSnapshot.getCreatedEvents",
+        )
+    } yield QueryAcsSnapshotResult(
+      migrationId = migrationId,
+      snapshotRecordTime = snapshot.snapshotRecordTime,
+      createdEventsInPage = events.map(_._2.toCreatedEvent),
+      afterToken = events.lastOption.map(_._1),
     )
   }
 
@@ -144,12 +243,19 @@ object AcsSnapshotStore {
     )
   }
 
+  case class QueryAcsSnapshotResult(
+      migrationId: Long,
+      snapshotRecordTime: CantonTimestamp,
+      createdEventsInPage: Vector[CreatedEvent],
+      afterToken: Option[Long],
+  )
+
   def apply(
       storage: Storage,
       updateHistory: UpdateHistory,
       migrationId: Long,
       loggerFactory: NamedLoggerFactory,
-  )(implicit closeContext: CloseContext): AcsSnapshotStore =
+  )(implicit ec: ExecutionContext, closeContext: CloseContext): AcsSnapshotStore =
     storage match {
       case db: DbStorage => new AcsSnapshotStore(db, updateHistory, migrationId, loggerFactory)
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
