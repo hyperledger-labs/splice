@@ -55,7 +55,7 @@ const ValidatorLicenses: React.FC = () => {
             {validatorLicenses.map(license => {
               return (
                 <LicenseRow
-                  key={`${license.payload.validator}-${license.payload.sponsor}`}
+                  key={license.contractId}
                   validator={license.payload.validator}
                   sponsor={license.payload.sponsor}
                   createdAt={new Date(license.createdAt)}
