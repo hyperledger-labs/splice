@@ -18,3 +18,13 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
+  preview_pulumi_operator_changes:
+    when:
+      equal: [ preview-operator-changes, << pipeline.parameters.run-job >> ]
+    jobs:
+      - preview_pulumi_operator_changes:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>

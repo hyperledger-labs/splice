@@ -29,9 +29,6 @@ jobs:
           project: "infra"
       - preview_pulumi:
           cluster: << parameters.cluster >>
-          project: "deployment"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
           project: "sv-runbook"
           when_env: "CN_DEPLOY_SV_RUNBOOK"
       - preview_pulumi:
@@ -42,3 +39,27 @@ jobs:
           cluster: << parameters.cluster >>
           project: "validator-runbook"
           when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
+  preview_pulumi_operator_changes:
+    parameters:
+      <<: *cluster-parameter
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - preview_pulumi:
+          cluster: << parameters.cluster >>
+          project: "deployment"
