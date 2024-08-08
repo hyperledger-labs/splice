@@ -39,6 +39,7 @@ import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.DomainTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -132,6 +133,9 @@ class SV1Initializer(
           ),
           manualConnect = false,
           domainId = None,
+          timeTracker = DomainTimeTrackerConfig(
+            minObservationDuration = config.timeTrackerMinObservationDuration
+          ),
         ),
         RetryFor.WaitingOnInitDependency,
       )

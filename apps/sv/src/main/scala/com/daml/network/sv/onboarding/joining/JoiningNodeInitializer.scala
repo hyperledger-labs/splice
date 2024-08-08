@@ -42,6 +42,7 @@ import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
+import com.digitalasset.canton.config.DomainTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -124,6 +125,9 @@ class JoiningNodeInitializer(
       // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
       // This is changed to false after SV onboarding completes.
       manualConnect = true,
+      timeTracker = DomainTimeTrackerConfig(
+        minObservationDuration = config.timeTrackerMinObservationDuration
+      ),
     )
     for {
       (dsoPartyId, darUploads) <- (

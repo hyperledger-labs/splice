@@ -183,6 +183,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 val decentralizedSynchronizerInitializer = new DomainDataRestorer(
                   participantAdminConnection,
+                  config.timeTrackerMinObservationDuration,
                   loggerFactory,
                 )
                 domainConnector.getDecentralizedSynchronizerSequencerConnections.flatMap {

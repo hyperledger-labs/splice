@@ -93,6 +93,7 @@ class DomainMigrationInitializer(
   )
   private val domainDataRestorer = new DomainDataRestorer(
     participantAdminConnection,
+    config.timeTrackerMinObservationDuration,
     loggerFactory,
   )
 

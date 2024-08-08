@@ -6,6 +6,7 @@ package com.daml.network.migration
 import cats.implicits.catsSyntaxParallelTraverse_
 import com.daml.network.environment.{BaseLedgerConnection, ParticipantAdminConnection, RetryFor}
 import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.config.{DomainTimeTrackerConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.DomainAlias
@@ -19,6 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
+    timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -52,6 +54,9 @@ class DomainDataRestorer(
             sequencerConnections = sequencerConnections,
             manualConnect = false,
             initializeFromTrustedDomain = true,
+            timeTracker = DomainTimeTrackerConfig(
+              timeTrackerMinObservationDuration
+            ),
           )
           // We rely on the calls here being idempotent
           for {
