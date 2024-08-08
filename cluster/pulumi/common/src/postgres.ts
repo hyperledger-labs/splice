@@ -67,6 +67,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletionProtection: false,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
+          databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
           backupConfiguration: {
             enabled: true,
             pointInTimeRecoveryEnabled: true,
