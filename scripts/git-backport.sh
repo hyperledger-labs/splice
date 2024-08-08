@@ -67,8 +67,7 @@ function git-backport() {
     _info "Calculating diff against 'main'. Diff summary:"
     local ancestor_commit; ancestor_commit=$(git merge-base origin/main "$originalbranch")
 
-    git diff --summary "$ancestor_commit"
-    git diff --shortstat "$ancestor_commit"
+    git diff --compact-summary "$ancestor_commit"
     _confirm "Continue?"
 
     _info "Creating primary PR against main"
