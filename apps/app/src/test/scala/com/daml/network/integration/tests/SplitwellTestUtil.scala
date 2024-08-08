@@ -34,6 +34,14 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
     }
 
     participant.domains.connect(splitwellUpgradeAlias, url)
+
+    eventually() {
+      splitwellBackend
+        .getConnectedDomains(
+          splitwellBackend.getProviderPartyId()
+        )
+        .map(_.uid.identifier.str) should contain("splitwellUpgrade")
+    }
   }
 
   protected def disconnectSplitwellUpgradeDomain(participant: ParticipantClientReference) =
