@@ -3,7 +3,12 @@ package com.daml.network.store
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
 import com.daml.lf.data.Bytes
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.{ReassignmentUpdate, TransactionTreeUpdate}
+import com.daml.network.environment.ledger.api.{
+  LedgerClient,
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+}
+import com.daml.network.store.TreeUpdateWithMigrationId
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
@@ -18,6 +23,15 @@ import scala.jdk.OptionConverters.*
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
   import UpdateHistoryTestBase.*
+
+  protected def updates(
+      store: UpdateHistory,
+      migrationId: Long = migration1,
+  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+    store
+      .getUpdates(None, PageLimit.tryCreate(1000))
+      .map(_.filter(_.migrationId == migrationId).map(_.update))
+  }
 
   "UpdateHistory" should {
 
@@ -120,7 +134,11 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         val c = appRewardCoupon(1, party1, contractId = cid1)
         for {
           _ <- initStore(store)
-          _ <- domain1.create(c, txEffectiveAt = CantonTimestamp.Epoch.plusMillis(1).toInstant)
+          _ <- domain1.create(
+            c,
+            txEffectiveAt = CantonTimestamp.Epoch.plusMillis(1).toInstant,
+            recordTime = CantonTimestamp.Epoch.plusMillis(1).toInstant,
+          )
           _ <- domain1.unassign(
             c -> domain2,
             reassignmentId1,
@@ -135,6 +153,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             txEffectiveAt = CantonTimestamp.Epoch.plusMillis(4).toInstant,
+            recordTime = CantonTimestamp.Epoch.plusMillis(4).toInstant,
           )
           updates <- updates(store)
         } yield checkUpdates(
@@ -382,7 +401,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               .futureValue
           result.lastOption match {
             case None => acc // done
-            case Some((last, migrationId)) =>
+            case Some(TreeUpdateWithMigrationId(last, migrationId)) =>
               last.update match {
                 case tree: TransactionTreeUpdate =>
                   allHistoryPaginated(
@@ -429,14 +448,18 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         } yield {
           // It doesn't matter through which store we query since the migration id only matters for ingestion
           all shouldBe all2
-          allHistoryPaginated(storeMigrationId1, None, Seq.empty) should be(all.map(_._1.update))
+          allHistoryPaginated(storeMigrationId1, None, Seq.empty) should be(
+            all.map(_.update.update)
+          )
           val expected = ((1 to 10).map(i =>
             (1L, CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong)))
           ) ++
             (1 to 10).map(i =>
               (2L, CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong)))
             ))
-          all.map { case (u, migrationId) => (migrationId, u.update.recordTime) } shouldBe expected
+          all.map { case TreeUpdateWithMigrationId(u, migrationId) =>
+            (migrationId, u.update.recordTime)
+          } shouldBe expected
         }
       }
 

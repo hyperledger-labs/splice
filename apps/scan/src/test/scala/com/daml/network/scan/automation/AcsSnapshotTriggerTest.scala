@@ -9,10 +9,9 @@ import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesRespon
 import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
 import com.daml.network.scan.store.AcsSnapshotStore
 import com.daml.network.scan.store.AcsSnapshotStore.AcsSnapshot
-import com.daml.network.store.{PageLimit, UpdateHistory}
+import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.DomainId
@@ -71,7 +70,19 @@ class AcsSnapshotTriggerTest
             eqTo(Some((migrationId, lastSnapshotTime.plusSeconds(3600L)))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
-        ).thenReturn(Future.successful(Seq((GetTreeUpdatesResponse(null, null), 1L))))
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(
+                  treeUpdate(lastSnapshotTime.plusSeconds(3700L)),
+                  dummyDomain,
+                ),
+                1L,
+              )
+            )
+          )
+        )
 
         trigger.retrieveTasks().futureValue should be(
           Seq(AcsSnapshotTrigger.Task(lastSnapshotTime.plusSeconds(3600L), Some(lastSnapshot)))
@@ -109,7 +120,12 @@ class AcsSnapshotTriggerTest
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
-            Seq((GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain), 1L))
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
           )
         )
         val firstSnapshotTime =
@@ -139,7 +155,12 @@ class AcsSnapshotTriggerTest
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
-            Seq((GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain), 1L))
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
           )
         )
 
@@ -154,7 +175,12 @@ class AcsSnapshotTriggerTest
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
-            Seq((GetTreeUpdatesResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain), 1L))
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
           )
         )
 
@@ -199,7 +225,7 @@ class AcsSnapshotTriggerTest
       TriggerEnabledSynchronization.Noop,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       loggerFactory,
-      CantonLabeledMetricsFactory.NoOpMetricsFactory,
+      NoOpMetricsFactory,
     )
     val store: AcsSnapshotStore = mock[AcsSnapshotStore]
     val migrationId: Long = 0L

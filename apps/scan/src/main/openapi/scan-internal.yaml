@@ -426,7 +426,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/updates:
     post:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "getUpdateHistory"
       description: |
@@ -448,10 +448,33 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
+  /v0/updates/{update_id}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdateById"
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateHistoryItem'
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/state/acs/snapshot-timestamp:
     get:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "getDateOfMostRecentSnapshotBefore"
       description: |
@@ -490,7 +513,7 @@ paths:
 
   /v0/state/acs:
     post:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "getAcsSnapshotAt"
       description: |
@@ -517,7 +540,7 @@ paths:
 
   /v0/ans-entries:
     get:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "listAnsEntries"
       parameters:
@@ -673,7 +696,6 @@ paths:
                 "$ref": "#/components/schemas/MigrationSchedule"
         "404":
           description: "No migration scheduled"
-
 
   # TODO(#13386) Move to SV app
   /v0/synchronizer-identities/{domain_id_prefix}:
@@ -906,7 +928,7 @@ components:
           type: string
     GetTopValidatorsByValidatorFaucetsResponse:
       type: object
-      required: [ "validatorsByReceivedFaucets" ]
+      required: ["validatorsByReceivedFaucets"]
       properties:
         validatorsByReceivedFaucets:
           type: array
@@ -914,7 +936,14 @@ components:
             $ref: "#/components/schemas/ValidatorReceivedFaucets"
     ValidatorReceivedFaucets:
       type: object
-      required: [ "validator", "numRoundsCollected", "numRoundsMissed", "firstCollectedInRound", "lastCollectedInRound" ]
+      required:
+        [
+          "validator",
+          "numRoundsCollected",
+          "numRoundsMissed",
+          "firstCollectedInRound",
+          "lastCollectedInRound",
+        ]
       properties:
         validator:
           type: string
@@ -940,7 +969,14 @@ components:
             $ref: "#/components/schemas/ValidatorPurchasedTraffic"
     ValidatorPurchasedTraffic:
       type: object
-      required: ["validator", "numPurchases", "totalTrafficPurchased", "totalCcSpent", "lastPurchasedInRound"]
+      required:
+        [
+          "validator",
+          "numPurchases",
+          "totalTrafficPurchased",
+          "totalCcSpent",
+          "lastPurchasedInRound",
+        ]
       properties:
         validator:
           type: string
@@ -974,7 +1010,7 @@ components:
             $ref: "#/components/schemas/DomainSequencers"
     DomainSequencers:
       type: object
-      required: [ "domainId", "sequencers" ]
+      required: ["domainId", "sequencers"]
       properties:
         domainId:
           type: string
@@ -1000,7 +1036,7 @@ components:
           format: date-time
     ListDsoScansResponse:
       type: object
-      required: [ "scans" ]
+      required: ["scans"]
       properties:
         scans:
           type: array
@@ -1008,7 +1044,7 @@ components:
             $ref: "#/components/schemas/DomainScans"
     DomainScans:
       type: object
-      required: [ "domainId", "scans" ]
+      required: ["domainId", "scans"]
       properties:
         domainId:
           type: string
@@ -1018,7 +1054,7 @@ components:
             $ref: "#/components/schemas/ScanInfo"
     ScanInfo:
       type: object
-      required: [ "publicUrl", "svName" ]
+      required: ["publicUrl", "svName"]
       properties:
         publicUrl:
           type: string
@@ -1162,16 +1198,125 @@ components:
     UpdateHistoryItem:
       type: object
       description: |
-        Currently only includes transactions.
-      # TODO (#12552): include reassignments
+        An individual item in the update history. May be a transaction or a contract reassignment.
       oneOf:
-        - $ref: '#/components/schemas/UpdateHistoryTransaction'
+        - $ref: "#/components/schemas/UpdateHistoryTransaction"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
+    UpdateHistoryReassignment:
+      type: object
+      description: A contract reassignment between synchronizer. May be an assignment or unassignment.
+      required:
+        - update_id
+        - offset
+        - record_time
+        - event
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        event:
+          description: |
+            The reassignment event. May be an assignment or unassignment.
+          type: object
+          oneOf:
+            - $ref: "#/components/schemas/UpdateHistoryAssignment"
+            - $ref: "#/components/schemas/UpdateHistoryUnassignment"
+    UpdateHistoryAssignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - target_synchronizer
+        - migration_id
+        - unassign_id
+        - created_event
+        - reassignment_counter
+      properties:
+        submitter:
+          description: |
+            The party who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the target synchronizer
+          type: integer
+          format: int64
+        unassign_id:
+          description: |
+            The id of the corresponding unassign event
+          type: string
+        created_event:
+          description: |
+            The corresponding contract create event
+          $ref: "#/components/schemas/CreatedEvent"
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+    UpdateHistoryUnassignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - migration_id
+        - target_synchronizer
+        - unassign_id
+        - reassignment_counter
+        - contract_id
+      properties:
+        submitter:
+          description: |
+            The party who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer from which the contract was reassigned
+          type: integer
+          format: int64
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        unassign_id:
+          description: |
+            The id of the unassign event, to later be correlated to an assign event
+          type: string
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+        contract_id:
+          description: |
+            The id of the unassigned contract
+          type: string
     UpdateHistoryTransaction:
       type: object
       required:
         - update_id
         - migration_id
         - workflow_id
+        - command_id
         - record_time
         - synchronizer_id
         - effective_at
@@ -1185,12 +1330,12 @@ components:
           type: string
         migration_id:
           description: |
-            The id of the update.
+            The migration id of the synchronizer.
           type: integer
           format: int64
         workflow_id:
           description: |
-            The id of the update.
+            The id of the workflow to which this transaction belongs.
           type: string
         record_time:
           description: |
@@ -1219,19 +1364,19 @@ components:
             Changes to the ledger that were caused by this transaction. Nodes of the transaction tree.
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/TreeEvent'
+            $ref: "#/components/schemas/TreeEvent"
     TreeEvent:
       type: object
       description: |
         Either a creation or an exercise of a contract.
       oneOf:
-        - $ref: '#/components/schemas/CreatedEvent'
-        - $ref: '#/components/schemas/ExercisedEvent'
+        - $ref: "#/components/schemas/CreatedEvent"
+        - $ref: "#/components/schemas/ExercisedEvent"
       discriminator:
         propertyName: event_type
         mapping:
-          created_event: '#/components/schemas/CreatedEvent'
-          exercised_event: '#/components/schemas/ExercisedEvent'
+          created_event: "#/components/schemas/CreatedEvent"
+          exercised_event: "#/components/schemas/ExercisedEvent"
     CreatedEvent:
       type: object
       required:
@@ -1242,6 +1387,8 @@ components:
         - package_name
         - create_arguments
         - created_at
+        - signatories
+        - observers
       properties:
         event_type:
           type: string
@@ -1270,6 +1417,18 @@ components:
             Ledger effective time of the transaction that created the contract.
           type: string
           format: date-time
+        signatories:
+          description: |
+            Signatories to the contract.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract.
+          type: array
+          items:
+            type: string
     ExercisedEvent:
       type: object
       required:
@@ -1283,6 +1442,7 @@ components:
         - child_event_ids
         - exercise_result
         - consuming
+        - acting_parties
       properties:
         event_type:
           type: string
@@ -1317,7 +1477,7 @@ components:
             The order of the children is the same as the event order in the transaction.
           type: array
           items:
-              type: string
+            type: string
         exercise_result:
           description: |
             The result of exercising the choice.
@@ -1326,6 +1486,16 @@ components:
           description: |
             If true, the target contract may no longer be exercised.
           type: boolean
+        acting_parties:
+          description: |
+            The parties that exercised the choice.
+          type: array
+          items:
+            type: string
+        interface_id:
+          description: |
+            The interface where the choice is defined, if inherited.
+          type: string
     AcsSnapshotTimestampResponse:
       type: object
       required:
@@ -1347,7 +1517,7 @@ components:
           type: integer
           format: int64
           description: |
-              The migration id for which to return the ACS.
+            The migration id for which to return the ACS.
         record_time:
           type: string
           format: date-time
@@ -1407,8 +1577,8 @@ components:
         begin_after_id:
           type: string
           description: |
-             Minimal event_id for returned activities.
-             Note that all activities carry some monotonically-increasing event_id. begin_after_id sets the minimum value for event_id's for the query.
+            Minimal event_id for returned activities.
+            Note that all activities carry some monotonically-increasing event_id. begin_after_id sets the minimum value for event_id's for the query.
         page_size:
           description: |
             The maximum number of activity items returned for this request.
@@ -1617,7 +1787,7 @@ components:
           type: string
     ListEntriesResponse:
       type: object
-      required: [ "entries" ]
+      required: ["entries"]
       properties:
         entries:
           type: array
@@ -1625,26 +1795,26 @@ components:
             "$ref": "#/components/schemas/AnsEntry"
     LookupEntryByPartyResponse:
       type: object
-      required: [ "entry" ]
+      required: ["entry"]
       properties:
         entry:
           "$ref": "#/components/schemas/AnsEntry"
     LookupEntryByNameResponse:
       type: object
-      required: [ "entry" ]
+      required: ["entry"]
       properties:
         entry:
           "$ref": "#/components/schemas/AnsEntry"
     GetAcsSnapshotResponse:
       type: object
-      required: [ "acs_snapshot" ]
+      required: ["acs_snapshot"]
       properties:
         acs_snapshot:
           description: base64-encoded ACS snapshot for the intersection of the DSO party and the requested party’s ACS
           type: string
     AnsEntry:
       type: object
-      required: [ "user", "name", "url", "description" ]
+      required: ["user", "name", "url", "description"]
       properties:
         contract_id:
           type: string
@@ -1661,7 +1831,7 @@ components:
           format: date-time
     GetAggregatedRoundsResponse:
       type: object
-      required: [ "start", "end" ]
+      required: ["start", "end"]
       properties:
         start:
           type: integer
@@ -1695,7 +1865,7 @@ components:
           format: int64
     ListRoundTotalsResponse:
       type: object
-      required: [ "entries" ]
+      required: ["entries"]
       properties:
         entries:
           type: array
@@ -1703,7 +1873,7 @@ components:
             "$ref": "#/components/schemas/RoundTotals"
     ListRoundPartyTotalsResponse:
       type: object
-      required: [ "entries" ]
+      required: ["entries"]
       properties:
         entries:
           type: array

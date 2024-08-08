@@ -649,9 +649,7 @@ class HttpScanHandler(
         )
         .map { txs =>
           definitions.UpdateHistoryResponse(
-            txs.map { case (tx, migrationId) =>
-              ScanHttpEncodings.ledgerTreeUpdateToHttp(tx, migrationId)
-            }.toVector
+            txs.map(ScanHttpEncodings.ledgerTreeUpdateToHttp(_)).toVector
           )
         }
     }
@@ -974,6 +972,27 @@ class HttpScanHandler(
         )(range =>
           v0.ScanResource.GetAggregatedRoundsResponse.OK(
             definitions.GetAggregatedRoundsResponse(start = range.start, end = range.end)
+          )
+        )
+      }
+    }
+  }
+
+  override def getUpdateById(
+      respond: ScanResource.GetUpdateByIdResponse.type
+  )(updateId: String)(extracted: TraceContext): Future[ScanResource.GetUpdateByIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateById") { _ => _ =>
+      for {
+        tx <- store.updateHistory.getUpdate(updateId)
+      } yield {
+        tx.fold(
+          v0.ScanResource.GetUpdateByIdResponse.NotFound(
+            definitions.ErrorResponse(s"Transaction with id $updateId not found")
+          )
+        )(txWithMigration =>
+          v0.ScanResource.GetUpdateByIdResponse.OK(
+            ScanHttpEncodings.ledgerTreeUpdateToHttp(txWithMigration)
           )
         )
       }

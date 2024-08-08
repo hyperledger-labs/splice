@@ -7,6 +7,7 @@ import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomati
 import com.daml.network.console.ParticipantClientReference
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   LedgerClient,
   Reassignment,
@@ -33,7 +34,6 @@ import com.digitalasset.canton.topology.DomainId
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
@@ -45,7 +45,8 @@ class UpdateHistoryIntegrationTest
     with SplitwellTestUtil
     with TimeTestUtil
     with HasActorSystem
-    with HasExecutionContext {
+    with HasExecutionContext
+    with UpdateHistoryComparator {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
@@ -182,6 +183,13 @@ class UpdateHistoryIntegrationTest
           ledgerBeginSv1,
         )
       }
+      eventually() {
+        compareHistoryViaScanApi(
+          ledgerBeginSv1,
+          sv1Backend,
+          scancl("sv1ScanClient"),
+        )
+      }
       // History for Alice, read from aliceValidator (should contain domain transfer because of splitwell)
       eventually() {
         compareHistory(
@@ -194,6 +202,7 @@ class UpdateHistoryIntegrationTest
             .store
             .updateHistory,
           ledgerBeginAlice,
+          true,
         )
       }
       eventually() {
@@ -224,6 +233,7 @@ class UpdateHistoryIntegrationTest
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
       ledgerBegin: ParticipantOffset,
+      mustIncludeReassignments: Boolean = false,
   ): Assertion = {
     val ledgerEnd = participant.ledger_api.state.end()
 
@@ -251,42 +261,42 @@ class UpdateHistoryIntegrationTest
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
             DomainId.tryFromString(protoAssignEvent.target),
           )
-        case _ => throw new RuntimeException("This test should not use domain reassignments")
       }
 
-    val recordedUpdates =
-      updateHistory
-        .updateStream(ledgerBegin.getAbsolute, ledgerEnd.getAbsolute)
-        .toMat(Sink.seq)(Keep.right)
-        .run()
-        .futureValue
-
-    // TODO (#12552): this checks that getTransactions behaves like updateStream, which won't be necessary once updateStream is removed
-    val transactionsOnly = updateHistory
+    val recordedUpdates = updateHistory
       .getUpdates(
         Some(
           (
             0L,
             // Note that we deliberately do not start from ledger begin here since the ledgerBeginSv1 variable above
             // only points at the end after initialization.
-            recordedUpdates.head.update.recordTime
+            actualUpdates.head.update.recordTime
               .minusMillis(1L), // include the first element, as otherwise it's excluded
           )
         ),
-        PageLimit.tryCreate(recordedUpdates.size),
+        PageLimit.tryCreate(actualUpdates.size),
       )
       .futureValue
-    val recordedUpdatesTxOnly = recordedUpdates
-      .filter(_.update match {
-        case TransactionTreeUpdate(_) => true
-        case ReassignmentUpdate(_) => false
-      })
-    recordedUpdatesTxOnly should be(transactionsOnly.map(_._1))
+
+    if (mustIncludeReassignments) {
+      recordedUpdates.filter(_.update match {
+        case LedgerClient
+              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Assign)), _) =>
+          true
+        case _ => false
+      }) should not be empty
+      recordedUpdates.filter(_.update match {
+        case LedgerClient
+              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Unassign)), _) =>
+          true
+        case _ => false
+      }) should not be empty
+    }
 
     // Note: UpdateHistory does not preserve all information in updates,
     // so remove fields that are not preserved before comparing.
     val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTestBase.withoutLostData)
-    val recordedUpdatesWithoutLostData = recordedUpdates.map(UpdateHistoryTestBase.withoutLostData)
+    val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
   }
 }

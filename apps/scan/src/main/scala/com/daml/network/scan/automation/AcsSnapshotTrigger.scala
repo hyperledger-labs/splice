@@ -124,9 +124,9 @@ class AcsSnapshotTrigger(
         case None =>
           logger.info(s"No updates other than ACS imports found. Retrying snapshot creation later.")
           None
-        case Some((firstNonAcsImport, _)) =>
+        case Some(firstNonAcsImport) =>
           val firstNonAcsImportRecordTime =
-            firstNonAcsImport.update.recordTime.toInstant.atOffset(ZoneOffset.UTC)
+            firstNonAcsImport.update.update.recordTime.toInstant.atOffset(ZoneOffset.UTC)
           val hourForSnapshot = timesToDoSnapshot
             .find(_ > firstNonAcsImportRecordTime.get(ChronoField.HOUR_OF_DAY))
             .getOrElse(0)

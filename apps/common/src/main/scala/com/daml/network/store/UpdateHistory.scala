@@ -38,8 +38,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -631,49 +629,11 @@ class UpdateHistory(
     storage.update(action, "deleteRolledBackUpdateHistory")
   }
 
-  private def queryTransactions(
-      beginOffset: String,
-      endOffset: String,
-      count: Int,
-  )(implicit tc: TraceContext) = {
-    val safeBegin = lengthLimited(beginOffset)
-    val safeEnd = lengthLimited(endOffset)
-    for {
-      rows <- storage
-        .query(
-          sql"""
-      select
-        row_id,
-        update_id,
-        record_time,
-        participant_offset,
-        domain_id,
-        migration_id,
-        effective_at,
-        root_event_ids,
-        workflow_id,
-        command_id
-      from update_history_transactions
-      where
-        history_id = $historyId and
-        migration_id = $domainMigrationId and
-        participant_offset > $safeBegin and
-        participant_offset <= $safeEnd
-      order by participant_offset
-      limit $count
-    """.as[SelectFromTransactions],
-          "queryTransactions",
-        )
-    } yield {
-      rows.lastOption.map(last => (last.participantOffset, rows))
-    }
-  }
-
-  // TODO (#12552): include reassignments
-  def getUpdates(
+  private def updatesQuery(
       afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,
-  )(implicit tc: TraceContext): Future[Seq[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
+      makeSubQuery: SQLActionBuilder => SQLActionBuilderChain,
+  ) = {
     val afterFilters = afterO match {
       case None =>
         NonEmptyList.of(sql"migration_id >= 0 and record_time >= ${CantonTimestamp.MinValue}")
@@ -686,6 +646,17 @@ class UpdateHistory(
           sql"migration_id > ${afterMigrationId} and record_time >= ${CantonTimestamp.MinValue}",
         )
     }
+
+    val unionAll = afterFilters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
+
+    sql"select * from (" ++ unionAll ++ sql") all_queries " ++
+      sql"""order by migration_id, record_time, domain_id limit ${limit.limit}"""
+  }
+
+  def getTxUpdates(
+      afterO: Option[(Long, CantonTimestamp)],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
       (select
@@ -704,25 +675,125 @@ class UpdateHistory(
         history_id = $historyId and """ ++ afterFilter ++
         sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
     }
-    val unionAll = afterFilters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
-    val finalQuery = (sql"select * from (" ++ unionAll ++ sql") all_queries " ++
-      sql"""order by migration_id, record_time, domain_id limit ${limit.limit}""")
+
+    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
     for {
       rows <- storage
         .query(
           finalQuery.toActionBuilder.as[SelectFromTransactions],
-          "getUpdates",
+          "getTxUpdates",
         )
       creates <- queryCreateEvents(rows.map(_.rowId))
       exercises <- queryExerciseEvents(rows.map(_.rowId))
     } yield {
       rows.map { row =>
-        decodeTransaction(
-          row,
-          creates.getOrElse(row.rowId, Seq.empty),
-          exercises.getOrElse(row.rowId, Seq.empty),
-        ) -> row.migrationId
+        TreeUpdateWithMigrationId(
+          decodeTransaction(
+            row,
+            creates.getOrElse(row.rowId, Seq.empty),
+            exercises.getOrElse(row.rowId, Seq.empty),
+          ),
+          row.migrationId,
+        )
       }
+    }
+  }
+
+  def getAssignmentUpdates(
+      afterO: Option[(Long, CantonTimestamp)],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
+
+    // TODO(#13976): this probably does not hit the indices
+    def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
+      sql"""
+    (select
+      update_id,
+      record_time,
+      participant_offset,
+      domain_id,
+      migration_id,
+      reassignment_counter,
+      source_domain,
+      reassignment_id,
+      submitter,
+      contract_id,
+      event_id,
+      created_at,
+      template_id_package_id,
+      template_id_module_name,
+      template_id_entity_name,
+      package_name,
+      create_arguments,
+      signatories,
+      observers,
+      contract_key
+    from update_history_assignments
+    where
+      history_id = $historyId and """ ++ afterFilter ++
+        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+    }
+
+    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
+    for {
+      rows <- storage
+        .query(
+          finalQuery.toActionBuilder.as[SelectFromAssignments],
+          "getAssignmentUpdates",
+        )
+    } yield {
+      rows.map { row => TreeUpdateWithMigrationId(decodeAssignment(row), row.migrationId) }
+    }
+  }
+
+  def getUnassignmentUpdates(
+      afterO: Option[(Long, CantonTimestamp)],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
+
+    // TODO(#13976): this probably does not hit the indices
+    def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
+      sql"""
+    (select
+      update_id,
+      record_time,
+      participant_offset,
+      domain_id,
+      migration_id,
+      reassignment_counter,
+      target_domain,
+      reassignment_id,
+      submitter,
+      contract_id
+    from update_history_unassignments
+    where
+      history_id = $historyId and """ ++ afterFilter ++
+        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+    }
+
+    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
+    for {
+      rows <- storage
+        .query(
+          finalQuery.toActionBuilder.as[SelectFromUnassignments],
+          "getUnassignmentUpdates",
+        )
+    } yield {
+      rows.map { row => TreeUpdateWithMigrationId(decodeUnassignment(row), row.migrationId) }
+    }
+  }
+
+  def getUpdates(
+      afterO: Option[(Long, CantonTimestamp)],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
+
+    for {
+      txs <- getTxUpdates(afterO, limit)
+      assignments <- getAssignmentUpdates(afterO, limit)
+      unassignments <- getUnassignmentUpdates(afterO, limit)
+    } yield {
+      (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
     }
   }
 
@@ -770,6 +841,57 @@ class UpdateHistory(
           exercises.getOrElse(row.rowId, Seq.empty),
         ) -> row.migrationId
       }
+    }
+  }
+
+  def getUpdate(
+      updateId: String
+  )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
+    val safeUpdateId = lengthLimited(updateId)
+    val query =
+      sql"""
+      select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id
+      from  update_history_transactions
+      where update_id = $safeUpdateId
+      and history_id = $historyId
+        """
+
+    for {
+      rows <- storage
+        .query(
+          query.toActionBuilder.as[SelectFromTransactions],
+          "getUpdate",
+        )
+      creates <- queryCreateEvents(rows.map(_.rowId))
+      exercises <- queryExerciseEvents(rows.map(_.rowId))
+    } yield {
+      rows.map { row =>
+        TreeUpdateWithMigrationId(
+          decodeTransaction(
+            row,
+            creates.getOrElse(row.rowId, Seq.empty),
+            exercises.getOrElse(row.rowId, Seq.empty),
+          ),
+          row.migrationId,
+        )
+      }.headOption
+    }
+  }
+
+  // TODO (#13511): implement or remove placeholder
+  def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
+    queryCreateEvents((1L to 100L).toSeq).map { result =>
+      result.values.flatten.map(_.toCreatedEvent).toSeq
     }
   }
 
@@ -838,141 +960,6 @@ class UpdateHistory(
         )
         .map(_.groupBy(_.updateRowId))
     }
-  }
-
-  private def queryAssignments(
-      beginOffset: String,
-      endOffset: String,
-      count: Int,
-  )(implicit tc: TraceContext) = {
-    val safeBegin = lengthLimited(beginOffset)
-    val safeEnd = lengthLimited(endOffset)
-    for {
-      rows <- storage
-        .query(
-          sql"""
-      select
-        update_id,
-        record_time,
-        participant_offset,
-        domain_id,
-        migration_id,
-        reassignment_counter,
-        source_domain,
-        reassignment_id,
-        submitter,
-        contract_id,
-        event_id,
-        created_at,
-        template_id_package_id,
-        template_id_module_name,
-        template_id_entity_name,
-        package_name,
-        create_arguments,
-        signatories,
-        observers,
-        contract_key
-      from update_history_assignments
-      where
-        history_id = $historyId and
-        migration_id = $domainMigrationId and
-        participant_offset > $safeBegin and
-        participant_offset <= $safeEnd
-      order by participant_offset
-      limit $count
-    """.as[SelectFromAssignments],
-          "queryAssignments",
-        )
-    } yield {
-      rows.lastOption.map(last => (last.participantOffset, rows))
-    }
-  }
-
-  private def queryUnassignments(
-      beginOffset: String,
-      endOffset: String,
-      count: Int,
-  )(implicit tc: TraceContext) = {
-    val safeBegin = lengthLimited(beginOffset)
-    val safeEnd = lengthLimited(endOffset)
-    for {
-      rows <- storage
-        .query(
-          sql"""
-      select
-        update_id,
-        record_time,
-        participant_offset,
-        domain_id,
-        migration_id,
-        reassignment_counter,
-        target_domain,
-        reassignment_id,
-        submitter,
-        contract_id
-      from update_history_unassignments
-      where
-        history_id = $historyId and
-        migration_id = $domainMigrationId and
-        participant_offset > $safeBegin and
-        participant_offset <= $safeEnd
-      order by participant_offset
-      limit $count
-    """.as[SelectFromUnassignments],
-          "queryUnassignments",
-        )
-    } yield {
-      rows.lastOption.map(last => (last.participantOffset, rows))
-    }
-  }
-
-  // TODO (#12552): this method should be unnecessary once getTransactions includes reassignments
-  def updateStream(
-      beginOffset: String,
-      endOffset: String,
-  )(implicit
-      tc: TraceContext
-  ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
-    val transactions = Source
-      // Fetch transactions in batches of 10
-      .unfoldAsync(beginOffset)(queryTransactions(_, endOffset, 10))
-      .mapConcat(x => x.iterator)
-      // For each transaction, fetch all corresponding events
-      .mapAsync(parallelism = 4)(updateRow =>
-        for {
-          creates <- queryCreateEvents(Seq(updateRow.rowId))
-          exercises <- queryExerciseEvents(Seq(updateRow.rowId))
-        } yield decodeTransaction(
-          updateRow,
-          creates.getOrElse(updateRow.rowId, Seq.empty),
-          exercises.getOrElse(updateRow.rowId, Seq.empty),
-        )
-      )
-
-    val assignments = Source
-      // Fetch assignments in batches of 10
-      .unfoldAsync(beginOffset)(queryAssignments(_, endOffset, 10))
-      .mapConcat(x => x.iterator)
-      // For each transaction, fetch all corresponding events
-      .map(decodeAssignment)
-
-    val unassignments = Source
-      // Fetch assignments in batches of 10
-      .unfoldAsync(beginOffset)(queryUnassignments(_, endOffset, 10))
-      .mapConcat(x => x.iterator)
-      // For each transaction, fetch all corresponding events
-      .map(decodeUnassignment)
-
-    // Merge transactions and assignments by offset
-    transactions
-      .mergeSorted(assignments)(updateOrdering)
-      .mergeSorted(unassignments)(updateOrdering)
-  }
-
-  private val updateOrdering = Ordering.by[LedgerClient.GetTreeUpdatesResponse, String] {
-    case LedgerClient.GetTreeUpdatesResponse(TransactionTreeUpdate(tree), _) => tree.getOffset
-    case LedgerClient.GetTreeUpdatesResponse(ReassignmentUpdate(update), _) =>
-      update.offset.getOffset
   }
 
   private def decodeTransaction(
@@ -1562,4 +1549,18 @@ object UpdateHistory {
   // so we read them back as an arbitrary value.
   private def missingString: String = ""
   private def missingStringSeq: Seq[String] = Seq.empty
+}
+
+case class TreeUpdateWithMigrationId(
+    update: LedgerClient.GetTreeUpdatesResponse,
+    migrationId: Long,
+)
+
+object TreeUpdateWithMigrationId {
+  def apply(update: LedgerClient.GetTreeUpdatesResponse, migrationId: Long) =
+    new TreeUpdateWithMigrationId(update, migrationId)
+
+  implicit val ordering: Ordering[TreeUpdateWithMigrationId] = Ordering.by(x =>
+    (x.migrationId, x.update.update.recordTime, x.update.domainId.toProtoPrimitive)
+  )
 }

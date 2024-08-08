@@ -856,4 +856,25 @@ object HttpScanAppClient {
         Right(response.transactions)
     }
   }
+
+  case class GetUpdate(updateId: String)
+      extends InternalBaseCommand[http.GetUpdateByIdResponse, definitions.UpdateHistoryItem] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateByIdResponse] = {
+      client.getUpdateById(
+        updateId,
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateByIdResponse.OK(response) =>
+        Right(response)
+    }
+  }
 }
