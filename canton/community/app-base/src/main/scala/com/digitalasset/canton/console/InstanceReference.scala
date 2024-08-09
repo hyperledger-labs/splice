@@ -200,7 +200,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     private def filterByNodeAndAttribute(
         attributes: Map[String, String]
     )(value: MetricValue): Boolean = {
-      value.attributes.get("node").contains(name) && attributes.forall { case (k, v) =>
+      value.attributes.get("node_name").contains(name) && attributes.forall { case (k, v) =>
         value.attributes.get(k).contains(v)
       }
     }

@@ -14,4 +14,4 @@ import com.digitalasset.canton.metrics.DbStorageHistograms
 class ValidatorAppMetrics(
     metricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
-) extends BaseSpliceMetrics("validator", metricsFactory, storageHistograms)
+) extends BaseSpliceMetrics("validator", metricsFactory, storageHistograms) {}

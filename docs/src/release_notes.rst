@@ -60,6 +60,11 @@ Upcoming
   * Updated recommendations for checking synchronizer health after a :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` to focus exclusively on monitoring signals.
   * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
 
+* Metrics
+
+  * Added ``cn_wallet_unlocked_amulet_balance`` and ``cn_wallet_locked_amulet_balance`` metrics to expose the effective per party balance of locked and unlocked
+    amulets.
+
 0.1.16
 ------
 

@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.SpliceTests.{
 }
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{SpliceUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.wallet.automation.AmuletMetricsTrigger
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -35,10 +36,16 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // for testing that input limits are respected.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
-      .addConfigTransform((_, config) =>
-        // for testing that input limits are respected.
-        ConfigTransforms
-          .updateAllSvAppFoundDsoConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
+      .addConfigTransforms(
+        (_, config) =>
+          // for testing that input limits are respected.
+          ConfigTransforms
+            .updateAllSvAppFoundDsoConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config),
+        (_, config) =>
+          // Pausing since this makes scan requests which then messes with the cache assertions
+          ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Validator)(
+            _.withPausedTrigger[AmuletMetricsTrigger]
+          )(config),
       )
   }
 
@@ -393,7 +400,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
       clue("check that issuing round 1 is cached") {
 
-        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        loggerFactory.assertLogsSeq(
+          SuppressionRule.LevelAndAbove(Level.DEBUG) && (SuppressionRule.LoggerNameContains(
+            "HttpScanHandler"
+          ) || SuppressionRule.LoggerNameContains("ScanConnection"))
+        )(
           {
             aliceWalletClient.tap(5)
           },

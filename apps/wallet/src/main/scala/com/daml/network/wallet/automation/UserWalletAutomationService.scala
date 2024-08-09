@@ -154,6 +154,8 @@ class UserWalletAutomationService(
       )
     )
   }
+
+  registerTrigger(new AmuletMetricsTrigger(triggerContext, store, scanConnection))
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
@@ -181,5 +183,6 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[TransferFollowTrigger],
       aTrigger[WalletSweepTrigger],
       aTrigger[AutoAcceptTransferOffersTrigger],
+      aTrigger[AmuletMetricsTrigger],
     )
 }
