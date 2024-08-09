@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "svValidator": {
+      "type": "boolean",
+      "description": "Whether this validator is part of an SV node"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "svValidator": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "validatorPartyHint"
+        ],
+        "properties": {
+          "validatorPartyHint": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-_]+$",
+            "description": "The validator party hint to use for the validator"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -233,7 +233,6 @@ class ValidatorApp(
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
-
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,

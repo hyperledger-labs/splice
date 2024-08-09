@@ -549,7 +549,20 @@ object SpliceConfig {
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
-      deriveReader[ValidatorAppBackendConfig]
+      deriveReader[ValidatorAppBackendConfig].emap { conf =>
+        for {
+          _ <- Either.cond(
+            !conf.svValidator || conf.validatorPartyHint.isEmpty,
+            (),
+            ConfigValidationFailed("Validator party hint must not be specified for SV validators"),
+          )
+          _ <- Either.cond(
+            conf.svValidator || conf.validatorPartyHint.isDefined,
+            (),
+            ConfigValidationFailed("Validator party hint must be specified for non-SV validators"),
+          )
+        } yield conf
+      }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
       deriveReader[ValidatorAppClientConfig]
     implicit val walletvalidatorClientConfigReader: ConfigReader[WalletValidatorAppClientConfig] =

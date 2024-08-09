@@ -76,6 +76,7 @@ class ValidatorReonboardingIntegrationTest
               // and our validator operator party to check
               // that we revoke the domain trust cert.
               ledgerApiUser = "extraStandaloneParticipant",
+              validatorPartyHint = Some("extraStandaloneParticipant"),
               participantClient = ParticipantClientConfig(
                 ClientConfig(port = Port.tryCreate(27502)),
                 defaultAliceValidatorConfig.participantClient.ledgerApi.copy(
