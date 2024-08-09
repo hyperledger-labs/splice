@@ -14,7 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.FutureInstances.*
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
-import org.scalatest.time.{Minute, Span}
+import org.scalatest.time.{Minutes, Span}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, ZoneOffset}
@@ -38,7 +38,7 @@ class SvOffboardPreflightIntegrationTest
       this.getClass.getSimpleName
     )
 
-  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minute)))
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
   private val svRunbookName = "DA-Helm-Test-Node"
   private val walletUrl = s"https://wallet.sv.${sys.env("NETWORK_APPS_ADDRESS")}/"
