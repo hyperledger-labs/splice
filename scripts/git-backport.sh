@@ -37,13 +37,32 @@ function git-backport() {
 
     read -r -p "PR title: " pr_title
     read -r -p "PR reviewers (comma-separated): " reviewers
+    read -r -p "Fixed issue numbers if any (comma-separated): " fixed_issues
 
     mkdir -p "$(dirname "$patchfile")"
+
+    function pr_body() {
+        local title="$1"
+        local issues="$2"
+        local refpr="$3"
+
+        echo "$title"
+        echo
+        if [ -n "$refpr" ]; then
+          echo "Backport of $refpr"
+          echo
+        fi
+        for issue in ${issues//,/ }; do
+          echo "Fixes #$issue"
+        done
+    }
 
     function push_pr() {
         local basebranch="$1"
         local workingbranch="$2"
         local title="$3"
+        local issues="$4"
+        local refpr="$5"
 
         git push --force-with-lease -u origin "$workingbranch"
 
@@ -56,7 +75,7 @@ function git-backport() {
             gh pr create \
                 --base "$basebranch" \
                 --title "$title" \
-                --body "$title" \
+                --body "$(pr_body "$title" "$issues" "$refpr")" \
                 --reviewer "$reviewers"
         else
             _info "PR already exists for $workingbranch"
@@ -71,7 +90,34 @@ function git-backport() {
     _confirm "Continue?"
 
     _info "Creating primary PR against main"
-    push_pr main "$originalbranch" "$pr_title"
+    push_pr main "$originalbranch" "$pr_title" "$fixed_issues" ""
+    primary_pr="$(gh pr list --head "$originalbranch" --base main --json url | jq -r '.[].url')"
+
+    function clusters_based_on_branch() {
+        local releasebranch="$1"
+        local prod_clusters="devnet testnet mainnet"
+        local affected_clusters=""
+        for cluster in $prod_clusters
+        do
+          if git show "main:cluster/deployment/${cluster}/.envrc.vars" | grep -q "CN_DEPLOYMENT_FLUX_REF=.*${releasebranch}[^-_./a-zA-Z0-9]"
+          then
+            affected_clusters="$affected_clusters $cluster"
+          fi
+        done
+        echo "$affected_clusters"
+    }
+
+    function trigger_preview_job() {
+        local branch="$1"
+        local cluster="$2"
+
+        endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline"
+        pipeline_url=$(curl -fsSL "$endpoint" -X POST \
+            -H "Content-Type: application/json" -H "circle-token: $CIRCLECI_TOKEN" \
+            -d '{"branch": "'"$branch"'", "parameters": {"run-job": "preview-changes", "cluster": "'"$cluster"'"}}' | \
+            jq -r '"https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/\(.number)"')
+        echo "$pipeline_url"
+    }
 
     for basebranch in "$@"
     do
@@ -92,7 +138,23 @@ function git-backport() {
         git cherry-pick "$ancestor_commit..$originalbranch"
 
         _info "Committing and pushing on $workingbranch"
-        push_pr "$basebranch" "$workingbranch" "[backport] $pr_title ($basebranch)"
+        push_pr "$basebranch" "$workingbranch" "[backport] $pr_title ($basebranch)" "" "$primary_pr"
+        backport_pr="$(gh pr list --head "$workingbranch" --base "$basebranch" --json url | jq -r '.[].url')"
+
+        affected_clusters=$(clusters_based_on_branch "$basebranch")
+        if [ -n "$affected_clusters" ]
+        then
+            _info "Clusters dependent on branch: $affected_clusters"
+            for cluster in $affected_clusters
+            do
+                _info "Triggering preview job for $cluster"
+                pipeline_url=$(trigger_preview_job "$workingbranch" "$cluster")
+                _info "Adding PR comment with preview job link"
+                gh pr comment "$backport_pr" -b "$cluster preview: $pipeline_url"
+            done
+
+        fi
+
     done
 
     _info "Done backporting!"
