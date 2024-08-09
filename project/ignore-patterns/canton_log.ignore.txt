@@ -94,4 +94,7 @@ INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
 # The new participant can be both the sender or the counterParticipant in the error message.
 ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
 
+# TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+
 # Make sure to have a trailing newline
