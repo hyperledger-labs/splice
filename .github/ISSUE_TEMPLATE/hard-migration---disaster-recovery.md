@@ -1,7 +1,7 @@
 ---
-name: [Hard migration|Disaster recovery]
-about: Perform a [hard migration|disaster recovery] on a production cluster
-title: NETWORK [Hard Synchronizer Migration|Disaster Recovery] DATE
+name: 'Hard migration / Disaster recovery'
+about: 'Perform a hard migration or disaster recovery on a production cluster'
+title: 'NETWORK [Hard Synchronizer Migration|Disaster Recovery] DATE'
 labels: ''
 assignees: ''
 
