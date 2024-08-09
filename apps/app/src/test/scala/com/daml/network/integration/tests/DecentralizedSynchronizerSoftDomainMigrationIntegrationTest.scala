@@ -27,6 +27,7 @@ import com.daml.network.config.ConfigTransforms.{
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.automation.AmuletConfigReassignmentTrigger
 import com.daml.network.sv.automation.confirmation.ElectionRequestTrigger
+import com.daml.network.sv.automation.delegatebased.PruneAmuletConfigScheduleTrigger
 import com.daml.network.sv.automation.singlesv.{
   ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
@@ -82,6 +83,8 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
               .withResumedTrigger[TransferFollowTrigger]
               // DsoRules gets replaced during create phase with this on
               .withPausedTrigger[ElectionRequestTrigger]
+              // concurrent modification of AmuletRules can cause tests to fail with `LOCAL_VERDICT_INACTIVE_CONTRACTS` (see #13939)
+              .withPausedTrigger[PruneAmuletConfigScheduleTrigger]
               // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
               .withPausedTrigger[SubmitSvStatusReportTrigger]
               .withPausedTrigger[ReceiveSvRewardCouponTrigger]
