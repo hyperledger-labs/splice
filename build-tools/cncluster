@@ -1994,6 +1994,10 @@ spec:
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
   restartPolicy: Never
+  tolerations:
+  - key: "cn_apps"
+    operator: "Exists"
+    effect: "NoSchedule"
 EOF
 
   ( _info "Waiting for debug pod to become ready" && \
