@@ -376,11 +376,14 @@ function installMigrationIdSpecificComponents(
   },
   svConfig: SvConfig
 ) {
+  const databaseSuffix = decentralizedSynchronizerMigrationConfig.activeDatabaseId
+    ? `${decentralizedSynchronizerMigrationConfig.activeDatabaseId}-pg`
+    : 'pg';
   const sequencerPostgres =
     defaultPostgres ||
     postgres.installPostgres(
       xns,
-      'sequencer-pg',
+      `sequencer-${databaseSuffix}`,
       `sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
       true
     );
@@ -388,7 +391,7 @@ function installMigrationIdSpecificComponents(
     defaultPostgres ||
     postgres.installPostgres(
       xns,
-      'mediator-pg',
+      `mediator-${databaseSuffix}`,
       `mediator-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
       true
     );
@@ -396,13 +399,49 @@ function installMigrationIdSpecificComponents(
     defaultPostgres ||
     postgres.installPostgres(
       xns,
-      'participant-pg',
+      `participant-${databaseSuffix}`,
       `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
       true
     );
   return installMigrationIdSpecificComponent(
     decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
+      let participantDb = undefined,
+        sequencerDb = undefined,
+        mediatorDb = undefined;
+      if (
+        migrationId === decentralizedSynchronizerMigrationConfig.upgrade?.migrationId &&
+        decentralizedSynchronizerMigrationConfig.useNewDatabasesForMigration
+      ) {
+        participantDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `participant-${migrationId}-pg`,
+            `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+        sequencerDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `sequencer-${migrationId}-pg`,
+            `sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+        mediatorDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `mediator-${migrationId}-pg`,
+            `mediator-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+      } else {
+        participantDb = participantPostgres;
+        sequencerDb = sequencerPostgres;
+        mediatorDb = mediatorPostgres;
+      }
       const logLevel =
         config.envFlag('CN_DEPLOYMENT_NO_SV_DEBUG') ||
         (config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') &&
@@ -428,7 +467,7 @@ function installMigrationIdSpecificComponents(
       const participant = installParticipant(
         xns,
         `participant-${migrationId}`,
-        participantPostgres,
+        participantDb,
         auth0UserNameEnvVarSource('sv'),
         isParticipantRestoringFromDump || mustBeManuallyInitialized,
         svConfig.onboardingName,
@@ -441,8 +480,8 @@ function installMigrationIdSpecificComponents(
       const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(
         migrationId,
         xns,
-        sequencerPostgres,
-        mediatorPostgres,
+        sequencerDb,
+        mediatorDb,
         canSyncFromCometBft ? cometbft : { ...cometbft, syncSource: undefined },
         mustBeManuallyInitialized,
         isActive,

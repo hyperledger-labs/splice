@@ -14,17 +14,23 @@ export class DecentralizedSynchronizerMigrationConfig {
   // indicates that during this run we are actually migrating from this id to the active migration ID
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
+  useNewDatabasesForMigration: boolean;
+  activeDatabaseId?: DomainMigrationIndex;
 
   constructor(
     active: MigrationInfo,
     legacy?: MigrationInfo,
     upgrade?: MigrationInfo,
-    migratingFromActiveId?: DomainMigrationIndex
+    migratingFromActiveId?: DomainMigrationIndex,
+    migratingDatabasesToNewInstances?: boolean,
+    activeDatabaseId?: DomainMigrationIndex
   ) {
     this.active = active;
     this.legacy = legacy;
     this.upgrade = upgrade;
     this.migratingFromActiveId = migratingFromActiveId;
+    this.useNewDatabasesForMigration = migratingDatabasesToNewInstances || false;
+    this.activeDatabaseId = activeDatabaseId;
   }
 
   // TODO(#10074) read this from current deployment if available
@@ -43,7 +49,9 @@ export class DecentralizedSynchronizerMigrationConfig {
         config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID'),
         config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_VERSION')
       ),
-      processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID'))
+      processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID')),
+      config.envFlag('GLOBAL_DOMAIN_USE_SEPARATE_DATABASES'),
+      processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_DATABASE_ACTIVE_ID'))
     );
   }
 
