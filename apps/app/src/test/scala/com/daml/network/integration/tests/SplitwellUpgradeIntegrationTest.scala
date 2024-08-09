@@ -19,6 +19,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import org.slf4j.event.Level
+import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
 class SplitwellUpgradeIntegrationTest
@@ -104,7 +105,10 @@ class SplitwellUpgradeIntegrationTest
         connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
         disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
-        actAndCheck("alice creates install requests", createInstalls(aliceSplitwellClient))(
+        actAndCheck(timeUntilSuccess = 40.seconds)(
+          "alice creates install requests",
+          createInstalls(aliceSplitwellClient),
+        )(
           "alice sees one install contracts",
           _ => {
             val (contracts, newInstall) = twoInstalls(alice, install)
