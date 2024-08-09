@@ -2509,7 +2509,7 @@ function subcmd_disaster_recovery_test() {
     fi
   done
 
-  local sortableDateFormat="+%Y-%m-%dT%R:%S.%NZ"
+  local sortableDateFormat="+%Y-%m-%dT%R:%SZ"
   local timeAfterTaps
   timeAfterTaps=$(date "$sortableDateFormat")
   _info "Completed taps at $timeAfterTaps"

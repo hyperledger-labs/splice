@@ -104,7 +104,7 @@ The data dump can be fetched from the validator app by running the following com
     cat dump_response.json | jq '.data_snapshot' > dump.json
 
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app, as obtained from your OAuth provider, and `<timestamp>` is the timestamp provided by the SVs,
-in the format `"2024-04-17T19:12:02.000000000Z"`.
+in the format `"2024-04-17T19:12:02Z"`.
 
 If the `curl` command fails with a 400 error, that typically means that your participant has been pruned beyond the chosen timestamp,
 and your node cannot generate the requested dump.
