@@ -31,9 +31,11 @@ import com.daml.network.util.{
   Codec,
   ConfigScheduleUtil,
   SplitwellTestUtil,
+  TriggerTestUtil,
   UpdateHistoryComparator,
   WalletTestUtil,
 }
+import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -52,6 +54,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     extends IntegrationTest
     with ConfigScheduleUtil
     with SplitwellTestUtil
+    with TriggerTestUtil
     with WalletTestUtil
     with UpdateHistoryComparator {
 
@@ -171,48 +174,59 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       group,
       alice,
     )
-    clue("Setup splitwell") {
-      Seq((aliceSplitwellClient, alice), (bobSplitwellClient, bob)).foreach {
-        case (splitwell, party) =>
-          createSplitwellInstalls(splitwell, party)
+    // TODO(#13199) Remove this once our test code does retries
+    // Splitwell does direct ledger API submissions through test code which do not have retries so it is quite
+    // sensitive domain reconnects. We disable the trigger temporarily to avoid any weird interactions.
+    setTriggersWithin(triggersToPauseAtStart =
+      Seq(
+        aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
+        bobValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
+        splitwellValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
+      )
+    ) {
+      clue("Setup splitwell") {
+        Seq((aliceSplitwellClient, alice), (bobSplitwellClient, bob)).foreach {
+          case (splitwell, party) =>
+            createSplitwellInstalls(splitwell, party)
+        }
+        actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
+          "Alice sees 'group1'",
+          _ => aliceSplitwellClient.listGroups() should have size 1,
+        )
+
+        // Wait for the group contract to be visible to Alice's Ledger API
+        aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+          .awaitJava(splitwellCodegen.Group.COMPANION)(alice)
+
+        val (_, invite) = actAndCheck(
+          "create a generic invite for 'group1'",
+          aliceSplitwellClient.createGroupInvite(
+            group
+          ),
+        )(
+          "alice observes the invite",
+          _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+        )
+
+        actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
+          "Alice sees the accepted invite",
+          _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
+        )
+
+        actAndCheck(
+          "bob joins 'group1'",
+          inside(aliceSplitwellClient.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
+            aliceSplitwellClient.joinGroup(accepted.contractId)
+          },
+        )(
+          "bob is in 'group1'",
+          _ => {
+            bobSplitwellClient.listGroups() should have size 1
+            aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
+          },
+        )
+
       }
-      actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
-        "Alice sees 'group1'",
-        _ => aliceSplitwellClient.listGroups() should have size 1,
-      )
-
-      // Wait for the group contract to be visible to Alice's Ledger API
-      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.Group.COMPANION)(alice)
-
-      val (_, invite) = actAndCheck(
-        "create a generic invite for 'group1'",
-        aliceSplitwellClient.createGroupInvite(
-          group
-        ),
-      )(
-        "alice observes the invite",
-        _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
-      )
-
-      actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
-        "Alice sees the accepted invite",
-        _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
-      )
-
-      actAndCheck(
-        "bob joins 'group1'",
-        inside(aliceSplitwellClient.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
-          aliceSplitwellClient.joinGroup(accepted.contractId)
-        },
-      )(
-        "bob is in 'group1'",
-        _ => {
-          bobSplitwellClient.listGroups() should have size 1
-          aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
-        },
-      )
-
     }
 
     val (_, voteRequest) = actAndCheck(
