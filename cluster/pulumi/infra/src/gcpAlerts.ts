@@ -38,6 +38,9 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -- https://github.com/DACH-NY/canton-network-node/issues/10475
 -(resource.labels.container_name="cometbft" AND jsonPayload.err="error adding vote")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopping peer for error")
+-(resource.labels.container_name="cometbft" AND (jsonPayload.error="already stopped" OR jsonPayload.err="already stopped"))
+-(resource.labels.container_name="cometbft" AND jsonPayload.err=~"use of closed network connection")
+-(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopped accept routine, as transport is closed")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Failed to write PacketMsg")
 -(resource.labels.container_name="cometbft" AND jsonPayload._msg="Connection failed @ sendRoutine")
 -- execution context overload
