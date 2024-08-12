@@ -15,6 +15,11 @@ Upcoming
 
   * Remove support for deprecated ``bootstrapTXs`` field on node identity dumps. Node identity dumps taken on a 0.1.2 snapshot or earlier version are no longer supported.
 
+  * Fix a rare race condition where the SV app uses the wrong
+    timestamp to export the topology state on a hard domain migration
+    resulting in the sequencer failing to initialize after the
+    migration. We recommend upgrading before the next hard domain migration.
+
 * Metrics: All the histograms default to using `native histograms <https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#exponential-histograms>`_.
 
    * Dashboards were also adjusted to use the PromQL functions for native histograms in all the queries

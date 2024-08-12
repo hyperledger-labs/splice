@@ -49,6 +49,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     sequencerAdminConnection,
     dsoStore,
     new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
+    context.retryProvider,
     loggerFactory,
   )
 

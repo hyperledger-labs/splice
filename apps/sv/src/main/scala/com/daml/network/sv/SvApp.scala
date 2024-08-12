@@ -523,6 +523,7 @@ class SvApp(
           ),
           dsoStore,
           new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          retryProvider,
           loggerFactory,
         ),
         clock,
