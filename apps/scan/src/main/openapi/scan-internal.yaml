@@ -1186,6 +1186,12 @@ components:
             The maximum number of transactions returned for this request.
           type: integer
           format: int32
+        lossless:
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          type: boolean
     UpdateHistoryResponse:
       type: object
       required:

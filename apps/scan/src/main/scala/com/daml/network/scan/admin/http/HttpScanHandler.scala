@@ -648,9 +648,16 @@ class HttpScanHandler(
           PageLimit.tryCreate(request.pageSize),
         )
         .map { txs =>
-          definitions.UpdateHistoryResponse(
-            txs.map(ScanHttpEncodings.ledgerTreeUpdateToHttp(_)).toVector
-          )
+          {
+            val lossless = request.lossless.getOrElse(false)
+            val encodings: ScanHttpEncodings =
+              if (lossless) LosslessScanHttpEncodings else LossyScanHttpEncodings
+            definitions.UpdateHistoryResponse(
+              txs
+                .map(encodings.ledgerTreeUpdateToHttp(_))
+                .toVector
+            )
+          }
         }
     }
   }
@@ -950,7 +957,7 @@ class HttpScanHandler(
             definitions.AcsResponse(
               recordTime,
               migrationId,
-              result.createdEventsInPage.map(ScanHttpEncodings.createdEventToHttp(_)),
+              result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
               result.afterToken,
             )
           )
@@ -992,7 +999,7 @@ class HttpScanHandler(
           )
         )(txWithMigration =>
           v0.ScanResource.GetUpdateByIdResponse.OK(
-            ScanHttpEncodings.ledgerTreeUpdateToHttp(txWithMigration)
+            LossyScanHttpEncodings.ledgerTreeUpdateToHttp(txWithMigration)
           )
         )
       }

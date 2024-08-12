@@ -86,7 +86,7 @@ class UpdateHistorySanityCheckPlugin(
       scan: ScanAppBackendReference,
       after: Option[(Long, String)],
   ): Unit = {
-    val result = scan.getUpdateHistory(10, after)
+    val result = scan.getUpdateHistory(10, after, false)
     result.lastOption match {
       case None => () // done
       case Some(members.UpdateHistoryTransaction(last)) =>

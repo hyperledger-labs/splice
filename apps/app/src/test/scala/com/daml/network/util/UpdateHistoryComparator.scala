@@ -102,6 +102,7 @@ trait UpdateHistoryComparator extends TestCommon {
             .toString, // include the first element, as otherwise it's excluded
         )
       ),
+      false,
     )
 
     recordedUpdates should have length actualUpdates.size.toLong

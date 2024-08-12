@@ -201,20 +201,30 @@ object UpdateHistoryTestBase {
   final case class ExpectedUnassign(cid: String, domainId: DomainId, targetDomain: DomainId)
       extends ExpectedUpdate
 
-  def withoutLostData(response: GetTreeUpdatesResponse): GetTreeUpdatesResponse = {
+  // Discards data that is not maintained in the update history DB, thus cannot be compared to ledger API.
+  // If forBackfill is true, drops also data we do not preserve for backfilling Scan, at the time of writing,
+  // this is only the commandId. Not that for debug purposes, it is useful to have this field in the DB, but
+  // since it's participant-local, it does not make sense for backfilling.
+  def withoutLostData(
+      response: GetTreeUpdatesResponse,
+      forBackfill: Boolean = false,
+  ): GetTreeUpdatesResponse = {
     response match {
       case GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain) =>
-        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree)), domain)
+        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree, forBackfill)), domain)
       case GetTreeUpdatesResponse(ReassignmentUpdate(transfer), domain) =>
         GetTreeUpdatesResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
       case _ => throw new RuntimeException("Invalid update type")
     }
   }
 
-  private def withoutLostData(tree: TransactionTree): TransactionTree = {
+  private def withoutLostData(tree: TransactionTree, forBackfill: Boolean): TransactionTree = {
     new TransactionTree(
       /*updateId = */ tree.getUpdateId,
-      /*commandId = */ tree.getCommandId,
+      /*commandId = */ if (forBackfill) { "" }
+      else {
+        tree.getCommandId
+      }, // Command IDs are participant-local, so not preserved for backfills
       /*workflowId = */ tree.getWorkflowId,
       /*effectiveAt = */ tree.getEffectiveAt,
       /*offset = */ tree.getOffset,

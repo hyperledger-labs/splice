@@ -333,10 +333,10 @@ abstract class ScanAppReference(
       )
     }
 
-  def getUpdateHistory(count: Int, after: Option[(Long, String)]) = {
+  def getUpdateHistory(count: Int, after: Option[(Long, String)], lossless: Boolean) = {
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetUpdateHistory(count, after)
+        HttpScanAppClient.GetUpdateHistory(count, after, lossless)
       )
     }
   }
