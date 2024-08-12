@@ -78,6 +78,8 @@ data SequencerConfig = SequencerConfig with
 
 -- | Config for a legacy sequencer, i.e., a migration id that is still up but paused. This is useful to allow validators to catch up.
 data LegacySequencerConfig = LegacySequencerConfig with
+    migrationId : Int
+      -- ^ The synchronizer migration id corresponding to this sequencer.
     sequencerId : Text
       -- ^ The id of the sequencer.
     url : Text
@@ -114,8 +116,8 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
     scan: Optional ScanConfig
       -- ^ The configuration of this sv's optional Scan instance.
 
-    legacySequencerConfigs: Optional (Map.Map Int LegacySequencerConfig)
-      -- ^ Map of migration id to legacy sequencer config for migration ids that are still up but paused to allow validators to catchup
+    legacySequencerConfig: Optional LegacySequencerConfig
+      -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
 
   deriving (Eq, Show)
 

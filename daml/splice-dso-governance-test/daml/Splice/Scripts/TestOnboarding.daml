@@ -230,7 +230,7 @@ testSvOnboarding = do
         sequencer = sequencerConfig
         mediator = mediatorConfig
         scan = scanConfig
-        legacySequencerConfigs = None
+        legacySequencerConfig = None
 
   setSynchronizerNodeConfig app svX dsoRules.config.decentralizedSynchronizer.lastSynchronizerId newNodeConfig
 
