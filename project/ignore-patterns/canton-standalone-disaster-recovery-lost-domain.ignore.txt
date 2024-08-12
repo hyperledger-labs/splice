@@ -6,6 +6,4 @@ Using approximate topology snapshot.*.*StandaloneSequencer
 
 Response message for request.*timed out
 
-SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*Discarding List(\\"\\") with all ancestors...
-
 # Make sure to have a trailing newline
