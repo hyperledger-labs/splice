@@ -97,6 +97,7 @@ initDecentralizedSynchronizer isDevNet = do
                   mediatorId = "mediator-id"
                 scan = Some ScanConfig with
                   publicUrl = "https://sv1.example.com"
+                legacySequencerConfigs = None
         )]
       amuletConfig
       amuletPrice = 1.0

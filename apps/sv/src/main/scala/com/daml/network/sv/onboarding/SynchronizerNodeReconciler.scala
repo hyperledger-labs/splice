@@ -4,11 +4,11 @@
 package com.daml.network.sv.onboarding
 
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
-  SynchronizerNodeConfig,
   MediatorConfig,
   SequencerConfig,
+  SynchronizerNodeConfig,
 }
-import com.daml.network.environment.{SpliceLedgerConnection, RetryFor, RetryProvider}
+import com.daml.network.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
 import com.daml.network.sv.SynchronizerNode
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
@@ -131,6 +132,7 @@ class SynchronizerNodeReconciler(
               )
               .toJava,
             existingScanConfig,
+            Optional.empty(),
           )
           setConfig(domainId, rulesAndState, nodeConfig)
         } else {

@@ -28,7 +28,7 @@ testSynchronizerMigration = do
         sequencingKeys = []
         governanceKeys = []
       sequencer = Some SequencerConfig with
-        migrationId = 0
+        migrationId = 1
         sequencerId = "sequencer-id-" <> partyToText sv
         url = "sequencer-" <> partyToText sv <> ".address:1234"
         availableAfter = Some now
@@ -36,13 +36,23 @@ testSynchronizerMigration = do
         mediatorId = "mediator-id-" <> partyToText sv
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
+      legacySequencerConfigs = Some (Map.fromList [(
+          0, LegacySequencerConfig with
+                url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
+                sequencerId = "legacy-sequencer-id-" <> partyToText sv
+        )])
 
   -- sequencer info are published to DsoRules and AmuletRules
   forA_ svs $ \sv -> do
     (_, nodeState) <- getSvNodeState app sv
     let  Some synchronizerConfig = Map.lookup synchronizerId nodeState.state.synchronizerNodes
     synchronizerConfig.sequencer === Some SequencerConfig with
-      migrationId = 0
+      migrationId = 1
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
       availableAfter = Some now
+    synchronizerConfig.legacySequencerConfigs === Some (Map.fromList [(
+        0, LegacySequencerConfig with
+            url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
+            sequencerId = "legacy-sequencer-id-" <> partyToText sv
+      )])

@@ -211,6 +211,7 @@ object SvUtil {
           sequencerConfig.toJava,
           mediatorConfig.toJava,
           scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
+          Optional.empty(),
         )
       ).asJava
     }
