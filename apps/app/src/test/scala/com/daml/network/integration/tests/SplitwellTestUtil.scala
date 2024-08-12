@@ -22,7 +22,8 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
   protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
   protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
   protected def connectSplitwellUpgradeDomain(
-      participant: ParticipantClientReference
+      participant: ParticipantClientReference,
+      ensurePartyIsOnNewDomain: PartyId,
   )(implicit env: SpliceTestConsoleEnvironment) = {
     val upgradeConfig =
       splitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
@@ -37,9 +38,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
 
     eventually() {
       splitwellBackend
-        .getConnectedDomains(
-          splitwellBackend.getProviderPartyId()
-        )
+        .getConnectedDomains(ensurePartyIsOnNewDomain)
         .map(_.uid.identifier.str) should contain("splitwellUpgrade")
     }
   }

@@ -47,7 +47,7 @@ class SplitwellUpgradeFrontendIntegrationTest
     "create per domain install contracts" in { implicit env =>
       val (splitwellPreferred, oldSplitwellDomain) = preferredAndPriorDomains
 
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceUser = aliceSplitwellClient.config.ledgerApiUser
       withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
         login(aliceSplitwellUIPort, aliceUser)
@@ -58,7 +58,7 @@ class SplitwellUpgradeFrontendIntegrationTest
       }
 
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient, alice),
         disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
@@ -85,7 +85,7 @@ class SplitwellUpgradeFrontendIntegrationTest
     }
 
     "fully upgrade an active model" in { implicit env =>
-      val (alice, _) = clue("Setup some users on the old domain") {
+      val (alice, bob) = clue("Setup some users on the old domain") {
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
         (alice, bob)
@@ -178,11 +178,11 @@ class SplitwellUpgradeFrontendIntegrationTest
 
       // Switch splitwell preferred domain
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient, alice),
         disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         bracket(
-          connectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
+          connectSplitwellUpgradeDomain(bobValidatorBackend.participantClient, bob),
           disconnectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
         ) {
           val (preferred, old) = preferredAndPriorDomains
