@@ -35,6 +35,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   protected val auth0: Auth0Util
 
   protected val validatorName: String
+  protected val validatorPartyHint: String
   protected val validatorAuth0Secret: String
   protected val validatorAuth0Audience: String
   protected val validatorWalletUser: String
@@ -181,7 +182,7 @@ abstract class ValidatorPreflightIntegrationTestBase
             inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
               val transaction = readTransactionFromRow(tx)
               transaction.action should matchText("Received")
-              val partyR = s"${alicePartyId}.*${validatorName}_validator_service_user::.*".r
+              val partyR = s"${alicePartyId}.*${validatorPartyHint}::.*".r
               val description =
                 transaction.partyDescription.getOrElse(fail("There should be a party."))
               description should fullyMatch regex partyR
@@ -461,6 +462,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
     auth0UtilFromEnvVars("https://canton-network-validator-test.us.auth0.com", "validator")
 
   override protected val validatorName = "validator"
+  override protected val validatorPartyHint = "digitalasset-testValidator-1"
   override protected val validatorAuth0Secret = "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z"
   override protected val validatorAuth0Audience = "https://validator.example.com/api"
   override protected val includeSplitwellTests = false
@@ -475,6 +477,7 @@ class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTe
   override protected val auth0 =
     auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
   override protected val validatorName = "validator1"
+  override protected val validatorPartyHint = "digitalasset-validator1-1"
   override protected val validatorAuth0Secret = "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq"
   override protected val validatorAuth0Audience = "https://canton.network.global"
 

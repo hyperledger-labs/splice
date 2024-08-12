@@ -7,7 +7,9 @@ onboardingSecretFrom:
     name: cn-app-validator-onboarding-validator
     key: secret
     optional: false
-validatorPartyHint: validator_validator_service_user
+# Party ID hint for the validator operator party, should be of format <organization>-<function>-<enumerator>,
+# e.g. digitalAsset-finance-1
+validatorPartyHint: ""
 
 # MIGRATION_START
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.

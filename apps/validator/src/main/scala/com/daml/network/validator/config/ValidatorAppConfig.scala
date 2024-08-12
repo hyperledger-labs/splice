@@ -156,9 +156,9 @@ case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: SpliceDbConfig,
     ledgerApiUser: String,
-    // If not set the ledgerApiUser name is used.
-    // This can be used to give a nicer name to the validator party.
-    validatorPartyHint: Option[String] = None,
+    // The hint to be used for the validator operator's party ID
+    // Must be None for SV validators, Some(hint) for non-SV validators
+    validatorPartyHint: Option[String],
     // An optional separate user name for the validator operator to be used as its user in the
     // wallet. May be useful if the IAM provider does not allow tokens that are used both by
     // machine-to-machine services and login users - in that case, set ledgerApiUser to the m2m

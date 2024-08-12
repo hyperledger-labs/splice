@@ -143,6 +143,7 @@ export async function installSplitwell(
       auth0AppName: 'splitwell_validator',
     },
     validatorWalletUser,
+    validatorPartyHint: 'digitalasset-splitwell-1',
   });
 
   return validator;

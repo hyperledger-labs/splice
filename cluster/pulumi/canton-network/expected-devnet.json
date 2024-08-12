@@ -2093,6 +2093,7 @@
           "targetThroughput": 100000
         },
         "useSequencerConnectionsFromScan": true,
+        "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
       "version": "0.1.17"
@@ -8387,7 +8388,7 @@
           "targetThroughput": 1000000
         },
         "useSequencerConnectionsFromScan": true,
-        "validatorPartyHint": "validator1_validator_service_user",
+        "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
       "version": "0.1.17"

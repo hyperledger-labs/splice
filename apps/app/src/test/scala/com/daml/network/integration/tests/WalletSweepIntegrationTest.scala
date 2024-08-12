@@ -41,11 +41,11 @@ class WalletSweepIntegrationTest
         val aliceParticipant =
           ConfigTransforms
             .getParticipantIds(config.parameters.clock)("alice_validator_user")
-        val aliceLedgerApiUser =
-          config.validatorApps(InstanceName.tryCreate("aliceValidator")).ledgerApiUser
+        val alicePartyHint =
+          config.validatorApps(InstanceName.tryCreate("aliceValidator")).validatorPartyHint.value
         val alicePartyId = PartyId
           .tryFromProtoPrimitive(
-            s"${BaseLedgerConnection.sanitizeUserIdToPartyString(aliceLedgerApiUser)}::${aliceParticipant.split("::").last}"
+            s"${alicePartyHint}::${aliceParticipant.split("::").last}"
           )
         val sv1Participant =
           ConfigTransforms

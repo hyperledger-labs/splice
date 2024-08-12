@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.environment.BaseLedgerConnection
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
@@ -40,11 +39,14 @@ class SvTimeBasedRewardCouponIntegrationTest
               val aliceParticipant =
                 ConfigTransforms
                   .getParticipantIds(config.parameters.clock)("alice_validator_user")
-              val aliceLedgerApiUser =
-                config.validatorApps(InstanceName.tryCreate("aliceValidator")).ledgerApiUser
+              val aliceValidatorPartyHint =
+                config
+                  .validatorApps(InstanceName.tryCreate("aliceValidator"))
+                  .validatorPartyHint
+                  .value
               val alicePartyId = PartyId
                 .tryFromProtoPrimitive(
-                  s"${BaseLedgerConnection.sanitizeUserIdToPartyString(aliceLedgerApiUser)}::${aliceParticipant.split("::").last}"
+                  s"$aliceValidatorPartyHint::${aliceParticipant.split("::").last}"
                 )
               svConfig
                 .copy(extraBeneficiaries =

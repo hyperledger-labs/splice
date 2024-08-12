@@ -32,6 +32,9 @@ Upcoming
   * Added ``helm.sh/resource-policy: keep`` to validator and SV app domain migration PVCs
     to ensure they don't accidentally get deleted by a ``helm uninstall``. You can
     still fully delete them with a ``kubectl delete pvc``.
+  * `validatorPartyHint` is now mandatory for non-SV validators. For an existing validator, it should be set to the current party hint
+    (otherwise, the value will be ignored, and a warning will be printed to log).
+    For new validators, it should be of format `<organization>-<function>-<enumerator>`.
 
 * Documentation
 

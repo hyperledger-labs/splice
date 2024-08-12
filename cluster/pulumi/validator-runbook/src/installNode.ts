@@ -256,7 +256,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
-    validatorPartyHint: VALIDATOR_PARTY_HINT || validatorValuesFromYamlFiles.validatorPartyHint,
+    validatorPartyHint: VALIDATOR_PARTY_HINT || 'digitalasset-testValidator-1',
     migrateValidatorParty: VALIDATOR_MIGRATE_PARTY,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? {

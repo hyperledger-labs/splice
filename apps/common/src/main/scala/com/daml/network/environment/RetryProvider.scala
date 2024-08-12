@@ -332,7 +332,7 @@ final class RetryProvider(
 
   /** Ensure that a particular condition holds as part of an init-like process.
     *
-    * Checks the condition and establishes it, if it does not host;
+    * Checks the condition and establishes it, if it does not hold;
     * and waits until the condition holds after establishing it.
     */
   def ensureThat[A, B, R](
