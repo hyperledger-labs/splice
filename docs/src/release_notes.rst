@@ -11,6 +11,14 @@ Release Notes
 Upcoming
 --------
 
+* SV apps
+
+  * Fix a rare race condition where the SV app uses the wrong
+    timestamp to export the topology state on a hard domain migration
+    resulting in the seq
+    uencer failing to initialize after the
+    migration. We recommend upgrading before the next hard domain migration.
+
 * Dashboards
 
   * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
