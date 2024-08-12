@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1650,
+  "id": 1676,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -970,8 +970,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1075,8 +1074,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1174,8 +1172,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1273,8 +1270,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1340,8 +1336,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1498,7 +1493,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_block_acknowledgments_micros,sender)",
+        "definition": "label_values(daml_sequencer_block_acknowledgments_micros,sender)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
@@ -1506,7 +1501,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_block_acknowledgments_micros,sender)",
+          "query": "label_values(daml_sequencer_block_acknowledgments_micros,sender)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
