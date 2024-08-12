@@ -123,9 +123,10 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               domain1,
             )
           )
-          updates.map(withoutLostData) should contain theSameElementsInOrderAs expectedUpdates.map(
-            withoutLostData
-          )
+          updates.map(withoutLostData(_)) should contain theSameElementsInOrderAs expectedUpdates
+            .map(
+              withoutLostData(_)
+            )
         }
       }
 

@@ -4,7 +4,11 @@ import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.console.ParticipantClientReference
+import com.daml.network.console.{
+  ParticipantClientReference,
+  ScanAppBackendReference,
+  ScanAppClientReference,
+}
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
@@ -14,17 +18,24 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.http.v0.definitions
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
+import com.daml.network.scan.admin.http.LosslessScanHttpEncodings
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
+import com.daml.network.store.{
+  PageLimit,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+  UpdateHistoryTestBase,
+}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
   TransactionTreeWrapper,
@@ -185,10 +196,15 @@ class UpdateHistoryIntegrationTest
         )
       }
       eventually() {
+        val scanClient = scancl("sv1ScanClient")
         compareHistoryViaScanApi(
           ledgerBeginSv1,
           sv1Backend,
-          scancl("sv1ScanClient"),
+          scanClient,
+        )
+        compareHistoryViaLosslessScanApi(
+          sv1ScanBackend,
+          scanClient,
         )
       }
       // History for Alice, read from aliceValidator (should contain domain transfer because of splitwell)
@@ -228,6 +244,41 @@ class UpdateHistoryIntegrationTest
         )
       }
     }
+  }
+
+  private def compareHistoryViaLosslessScanApi(
+      scanBackend: ScanAppBackendReference,
+      scanClient: ScanAppClientReference,
+  ) = {
+    val historyFromStore = scanBackend.appState.store.updateHistory
+      .getUpdates(
+        None,
+        PageLimit.tryCreate(1000),
+      )
+      .futureValue
+    val historyThroughApi = scanClient
+      .getUpdateHistory(
+        1000,
+        None,
+        true,
+      )
+      .map {
+        case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(http) =>
+          LosslessScanHttpEncodings.httpToTxTreeUpdate(http)
+        case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(_) =>
+          // TODO(#14067): Support decoding reasssignments, and test this also in the soft migration test where we actually have them
+          fail("Unexpected reassignment")
+      }
+
+    val historyFromStoreWithoutLostData = historyFromStore.map {
+      case TreeUpdateWithMigrationId(update, migrationId) =>
+        TreeUpdateWithMigrationId(
+          UpdateHistoryTestBase.withoutLostData(update, forBackfill = true),
+          migrationId,
+        )
+    }
+
+    historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
   }
 
   private def compareHistory(
@@ -296,7 +347,7 @@ class UpdateHistoryIntegrationTest
 
     // Note: UpdateHistory does not preserve all information in updates,
     // so remove fields that are not preserved before comparing.
-    val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTestBase.withoutLostData)
+    val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
   }
