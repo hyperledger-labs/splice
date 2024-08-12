@@ -36,7 +36,6 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   defaultVersion,
-  disableCantonAutoInit,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
@@ -243,7 +242,6 @@ async function installSvAndValidator(
           {
             MIGRATION_ID: migrationId.toString(),
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-            YOUR_NODE_NAME: onboardingName,
           }
         ),
         metrics: {
@@ -253,11 +251,6 @@ async function installSvAndValidator(
             active: isActive,
           },
         },
-        disableAutoInit:
-          disableCantonAutoInit ||
-          !!participantBootstrapDumpSecret ||
-          decentralizedSynchronizerMigrationConfig.isRunningMigration() ||
-          !isActive,
       };
 
       const participantValuesWithSpecifiedAud: ChartValues = {
@@ -426,6 +419,7 @@ async function installSvAndValidator(
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        YOUR_SV_NAME: onboardingName,
       }
     ),
     metrics: {

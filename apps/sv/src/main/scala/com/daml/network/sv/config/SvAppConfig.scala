@@ -205,6 +205,8 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofMinutes(1),
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
+    // Identifier for all Canton nodes controlled by this application
+    cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -271,3 +273,19 @@ final case class SvSynchronizerNodeConfig(
     mediator: SvMediatorConfig,
     parameters: DomainParametersConfig = DomainParametersConfig(),
 )
+
+final case class SvCantonIdentifierConfig(
+    participant: String,
+    sequencer: String,
+    mediator: String,
+)
+object SvCantonIdentifierConfig {
+  def default(config: SvAppBackendConfig): SvCantonIdentifierConfig = {
+    val identifier = config.onboarding.fold("unnamedSv")(_.name)
+    SvCantonIdentifierConfig(
+      participant = identifier,
+      sequencer = identifier,
+      mediator = identifier,
+    )
+  }
+}

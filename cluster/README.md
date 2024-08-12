@@ -1605,9 +1605,9 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
    Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: 111
    ```
 
-   We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer should have been deployed with `autoInit=false`.
+   We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer's public API should not be initialized yet.
    Other errors on this connection might also be fine.
-   Results of this check that are certainly not fine include the sequencer reporting to be `SERVING` (they probably started it with `autoInit=true`) or us hitting an HTML page instead of an gRPC endpoint (possible ingress misconfiguration).
+   Results of this check that are certainly not fine include the sequencer reporting to be `SERVING` (check whether the sv app was properly configured to perform a migration) or us hitting an HTML page instead of an gRPC endpoint (possible ingress misconfiguration).
 
 #### New domain readiness checks
 

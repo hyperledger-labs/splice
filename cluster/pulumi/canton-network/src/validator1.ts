@@ -70,7 +70,6 @@ export async function installValidator1(
     xns,
     defaultPostgres,
     participantBootstrapDump,
-    'validator1',
     auth0Client.getCfg(),
     undefined,
     dependsOn.concat([loopback])
@@ -107,6 +106,7 @@ export async function installValidator1(
     scanAddress,
     secrets: validatorSecrets,
     autoAcceptTransfers: autoAcceptTransfers,
+    nodeIdentifier: 'validator1',
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

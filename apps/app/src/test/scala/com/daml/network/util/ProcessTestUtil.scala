@@ -118,11 +118,16 @@ trait ProcessTestUtil { this: BaseTest =>
       args: Seq[String],
       logSuffix: String,
       extraEnv: (String, String)*
-  ): Process =
+  ): Process = {
+    logger.trace(
+      s"${extraEnv.map(e => s"${e._1}=${e._2}").mkString(" ")} ${(defaultArgsCanton(logSuffix) ++ args)
+          .mkString(" ")}"
+    )
     startProcess(
       defaultArgsCanton(logSuffix) ++ args,
       extraEnv = extraEnv,
     )
+  }
 
   private def defaultArgsCanton(logSuffix: String) =
     Seq(

@@ -412,6 +412,11 @@ object SpliceConfig {
       deriveReader[SvBootstrapDumpConfig.Gcp]
     implicit val svBootstrapDumpConfigReader: ConfigReader[SvBootstrapDumpConfig] =
       deriveReader[SvBootstrapDumpConfig]
+    implicit val svCantonIdentifierConfigReader: ConfigReader[SvCantonIdentifierConfig] =
+      deriveReader[SvCantonIdentifierConfig]
+    implicit val validatorCantonIdentifierConfigReader
+        : ConfigReader[ValidatorCantonIdentifierConfig] =
+      deriveReader[ValidatorCantonIdentifierConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigReader: ConfigReader[InitialAnsConfig] =
@@ -697,6 +702,11 @@ object SpliceConfig {
       deriveWriter[SvBootstrapDumpConfig.Gcp]
     implicit val svBootstrapDumpConfigWriter: ConfigWriter[SvBootstrapDumpConfig] =
       deriveWriter[SvBootstrapDumpConfig]
+    implicit val svCantonIdentifierConfigWriter: ConfigWriter[SvCantonIdentifierConfig] =
+      deriveWriter[SvCantonIdentifierConfig]
+    implicit val validatorCantonIdentifierConfigWriter
+        : ConfigWriter[ValidatorCantonIdentifierConfig] =
+      deriveWriter[ValidatorCantonIdentifierConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigWriter: ConfigWriter[InitialAnsConfig] =

@@ -19,7 +19,7 @@ function write_participant_config() {
 
     cat <<EOF >> /app/app.conf
 canton.participants.participant_$index = {
-    init.auto-init=\${?CANTON_PARTICIPANT_AUTO_INIT}
+    init.auto-init=false
 
     monitoring.grpc-health-server {
         address = "0.0.0.0"

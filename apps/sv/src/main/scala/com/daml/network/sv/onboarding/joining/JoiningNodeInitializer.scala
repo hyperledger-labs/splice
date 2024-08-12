@@ -27,7 +27,7 @@ import com.daml.network.sv.cometbft.{
   CometBftHttpRpcClient,
   CometBftNode,
 }
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.{
   OnboardedAfterDelay,
   Onboarding,
@@ -36,6 +36,7 @@ import com.daml.network.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
   SetupUtil,
+  SynchronizerNodeInitializer,
   SynchronizerNodeReconciler,
 }
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
@@ -246,7 +247,24 @@ class JoiningNodeInitializer(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
-      _ <- onboard(decentralizedSynchronizerId, dsoAutomation, svAutomation, Some(withSvStore))
+      cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+        SvCantonIdentifierConfig.default(config)
+      )
+      _ <- localSynchronizerNode.traverse(lsn =>
+        SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+          cantonIdentifierConfig,
+          lsn,
+          clock,
+          loggerFactory,
+          retryProvider,
+        )
+      )
+      _ <- onboard(
+        decentralizedSynchronizerId,
+        dsoAutomation,
+        svAutomation,
+        Some(withSvStore),
+      )
     } yield {
       (
         decentralizedSynchronizerId,

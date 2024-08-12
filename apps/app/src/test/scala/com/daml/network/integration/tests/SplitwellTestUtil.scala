@@ -48,7 +48,13 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
     participant.domains.disconnect(splitwellUpgradeAlias)
 
   protected def createSplitwellInstalls(splitwell: SplitwellAppClientReference, party: PartyId) = {
-    actAndCheck("Creating splitwell requests", splitwell.createInstallRequests())(
+    actAndCheck(
+      "Creating splitwell requests",
+      // Eventually, because the install might fail while domains are being reconnected
+      eventuallySucceeds() {
+        splitwell.createInstallRequests()
+      },
+    )(
       "Wait for splitwell installs",
       requests => {
         splitwell.listSplitwellInstalls().keys shouldBe requests.keys

@@ -5,6 +5,9 @@ migration:
 # replace MIGRATION_ID with the current migration ID of the global synchronizer
 participantAddress: "participant-MIGRATION_ID"
 
+# Replace YOUR_SV_NAME with the name you provided for your SV identity
+nodeIdentifier: YOUR_SV_NAME
+
 svValidator: true
 useSequencerConnectionsFromScan: false
 # Replace MIGRATION_ID with the current migration ID of the global synchronizer.

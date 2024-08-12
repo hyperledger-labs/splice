@@ -1,7 +1,12 @@
 joinWithKeyOnboarding:
   sponsorApiUrl: "https://sv.sv-2.TARGET_HOSTNAME"
+
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
+
+# Replace YOUR_SV_NAME with the name you provided for your SV identity
+nodeIdentifier: YOUR_SV_NAME
+
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
 decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNAME"
 auth:

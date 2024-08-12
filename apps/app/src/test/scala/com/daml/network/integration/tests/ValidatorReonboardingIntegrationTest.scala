@@ -3,10 +3,10 @@ package com.daml.network.integration.tests
 import com.daml.network.config.ConfigTransforms.bumpUrl
 import com.daml.network.config.{
   AuthTokenSourceConfig,
-  SpliceDbConfig,
-  ParticipantClientConfig,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
+  ParticipantClientConfig,
+  SpliceDbConfig,
 }
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.integration.EnvironmentDefinition
@@ -16,7 +16,10 @@ import com.daml.network.integration.tests.SpliceTests.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
-import com.daml.network.validator.config.MigrateValidatorPartyConfig
+import com.daml.network.validator.config.{
+  MigrateValidatorPartyConfig,
+  ValidatorCantonIdentifierConfig,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -75,8 +78,13 @@ class ValidatorReonboardingIntegrationTest
               // to produce a collision between the participant admin party
               // and our validator operator party to check
               // that we revoke the domain trust cert.
-              ledgerApiUser = "extraStandaloneParticipant",
-              validatorPartyHint = Some("extraStandaloneParticipant"),
+              ledgerApiUser = "aliceValidatorLocalForValidatorReonboardingIT",
+              validatorPartyHint = Some("aliceValidatorLocalForValidatorReonboardingIT"),
+              cantonIdentifierConfig = Some(
+                ValidatorCantonIdentifierConfig(
+                  participant = "aliceValidatorLocalForValidatorReonboardingIT"
+                )
+              ),
               participantClient = ParticipantClientConfig(
                 ClientConfig(port = Port.tryCreate(27502)),
                 defaultAliceValidatorConfig.participantClient.ledgerApi.copy(
@@ -167,7 +175,7 @@ class ValidatorReonboardingIntegrationTest
       .withManualStart
 
   "re-onboard validator" in { implicit env =>
-    aliceValidatorBackend.config.ledgerApiUser shouldBe "extraStandaloneParticipant"
+    aliceValidatorBackend.config.ledgerApiUser shouldBe "aliceValidatorLocalForValidatorReonboardingIT"
     initDsoWithSv1Only()
     // We need a standalone instance so we can revoke the domain trust certificate
     // without breaking the long-running nodes.
@@ -233,7 +241,6 @@ class ValidatorReonboardingIntegrationTest
       "alice-reonboard-participant",
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> s"participant_alice_validator_reonboard_new",
-      "AUTO_INIT_ALL" -> "false",
     ) {
       better.files
         .File(dumpPath)

@@ -500,7 +500,6 @@
             }
           }
         },
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "logLevel": "DEBUG",
         "mediator": {
@@ -661,7 +660,6 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
-        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -671,7 +669,6 @@
             "id": 0
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_0",
           "host": "participant-pg.sv.svc.cluster.local",
@@ -953,6 +950,7 @@
         "migration": {
           "id": "0"
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
         "participantAddress": "participant-0",
         "persistence": {
@@ -1325,6 +1323,7 @@
         "migration": {
           "id": "0"
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "participantAddress": "participant-0",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",

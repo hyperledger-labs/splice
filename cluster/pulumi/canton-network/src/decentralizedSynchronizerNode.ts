@@ -44,7 +44,6 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
       };
       syncSource?: Release;
     },
-    disableAutoInit: boolean,
     active: boolean,
     nodeIdentifier: string,
     logLevel: LogLevel,
@@ -112,7 +111,6 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
           },
         },
         additionalJvmOptions: jmxOptions(),
-        disableAutoInit: disableAutoInit,
         nodeIdentifier,
         enablePostgresMetrics: true,
       },

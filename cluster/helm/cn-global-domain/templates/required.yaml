@@ -17,5 +17,4 @@
 {{- else if eq .Values.sequencer.driver.type "cometbft"}}
 {{ $_ := required ".Values.sequencer.driver.host is required." (.Values.sequencer.driver).host }}
 {{ $_ := required ".Values.sequencer.driver.port is required." (.Values.sequencer.driver).port }}
-{{ $_ := required ".Values.nodeIdentifier is required." .Values.nodeIdentifier }}
 {{- end}}

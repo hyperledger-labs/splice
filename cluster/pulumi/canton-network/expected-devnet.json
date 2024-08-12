@@ -1618,7 +1618,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1628,7 +1627,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1973,6 +1971,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "splitwell",
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",
@@ -2305,7 +2304,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2567,7 +2565,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2578,7 +2575,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2985,6 +2981,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
@@ -3080,6 +3077,7 @@
         "migration": {
           "id": 3
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "validator_sv_1",
@@ -3407,7 +3405,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3669,7 +3666,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3680,7 +3676,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -4062,6 +4057,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "Digital-Asset-Eng-2",
         "onboardingName": "Digital-Asset-Eng-2",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-3",
@@ -4155,6 +4151,7 @@
         "migration": {
           "id": 3
         },
+        "nodeIdentifier": "Digital-Asset-Eng-2",
         "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "validator_sv_2",
@@ -4475,7 +4472,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4737,7 +4733,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4748,7 +4743,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-3",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -5130,6 +5124,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "Digital-Asset-Eng-3",
         "onboardingName": "Digital-Asset-Eng-3",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-3",
@@ -5223,6 +5218,7 @@
         "migration": {
           "id": 3
         },
+        "nodeIdentifier": "Digital-Asset-Eng-3",
         "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "validator_sv_3",
@@ -5543,7 +5539,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5805,7 +5800,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5816,7 +5810,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "Digital-Asset-Eng-4",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -6198,6 +6191,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "Digital-Asset-Eng-4",
         "onboardingName": "Digital-Asset-Eng-4",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-3",
@@ -6291,6 +6285,7 @@
         "migration": {
           "id": 3
         },
+        "nodeIdentifier": "Digital-Asset-Eng-4",
         "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "validator_sv_4",
@@ -6818,7 +6813,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -6828,7 +6822,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -7092,6 +7085,7 @@
           "id": 3,
           "migrating": false
         },
+        "nodeIdentifier": "validator1",
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",

@@ -523,7 +523,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         Some(sv4LocalBackend),
       ),
       logSuffix = "global-domain-migration",
-      autoInit = false,
       extraParticipantsConfigFileName = Some("standalone-participant-extra-splitwell.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,

@@ -70,7 +70,7 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig] extends 
                         ),
                       result => result,
                     )
-                  jsonDump.id.toProtoPrimitive should startWith("PAR::aliceParticipant")
+                  jsonDump.id.toProtoPrimitive should startWith("PAR::aliceValidator")
               }
             })
           },

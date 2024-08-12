@@ -89,8 +89,6 @@ While doing so, please note the following:
 * You don't need to wait for the existing synchronizer to have paused before performing these steps.
   Performing them well in advance of the scheduled downtime can reduce the downtime (s.a. :ref:`sv-upgrades-testing-preparation`).
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
-* Please modify the files ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` and ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` so that ``disableAutoInit`` is set to ``true`` in each of them.
-  This will ensure that the Canton components do not generate new :ref:`identities <sv-upgrades-state>` for themselves and instead remain ready to be initialized with the identities from the migration dump.
 * Please make sure that all new Helm charts you install as part of this step have the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
 * Please don't uninstall any Helm charts installed as part of the original deployment run (with the smaller migration ID).
   We deliberately keep SV participants and core synchronizer components running longer so that validators get a chance to sync up to the latest state from before the pause,

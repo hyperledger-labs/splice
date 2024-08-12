@@ -22,3 +22,5 @@
 {{ $_ := required ".Values.domain.sequencerPruningConfig.pruningInterval is required if sequencerPruningConfig is enabled." ((.Values.domain).sequencerPruningConfig).pruningInterval }}
 {{ $_ := required ".Values.domain.sequencerPruningConfig.retentionPeriod is required if sequencerPruningConfig is enabled." ((.Values.domain).sequencerPruningConfig).retentionPeriod }}
 {{- end }}
+
+{{ $_ := required ".Values.nodeIdentifier is required." .Values.nodeIdentifier }}

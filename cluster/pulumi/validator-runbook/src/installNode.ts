@@ -107,6 +107,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
     otherDeps: [passwordSecret],
+    nodeIdentifier: 'validator-runbook',
   });
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
@@ -140,6 +141,7 @@ type ValidatorConfig = {
   otherDeps: CnInput<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
+  nodeIdentifier: string;
 };
 
 async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Release> {
@@ -239,6 +241,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       {
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
+        YOUR_VALIDATOR_NAME: config.nodeIdentifier,
       }
     ),
   };

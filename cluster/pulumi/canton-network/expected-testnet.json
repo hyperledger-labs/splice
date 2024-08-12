@@ -921,7 +921,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -931,7 +930,6 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1276,6 +1274,7 @@
           "id": 2,
           "migrating": false
         },
+        "nodeIdentifier": "splitwell",
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",
@@ -1607,7 +1606,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -1869,7 +1867,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -1880,7 +1877,6 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2257,6 +2253,7 @@
           "id": 2,
           "migrating": false
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
@@ -2352,6 +2349,7 @@
         "migration": {
           "id": 2
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
@@ -2730,7 +2728,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -2740,7 +2737,6 @@
             "id": 2
           }
         },
-        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -3004,6 +3000,7 @@
           "id": 2,
           "migrating": false
         },
+        "nodeIdentifier": "validator1",
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",

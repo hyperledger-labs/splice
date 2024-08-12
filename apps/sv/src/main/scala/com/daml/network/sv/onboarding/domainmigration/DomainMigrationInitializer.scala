@@ -8,29 +8,30 @@ import cats.syntax.either.*
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
   BaseLedgerConnection,
-  SpliceLedgerClient,
   MediatorAdminConnection,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
   StatusAdminConnection,
 }
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
-import com.daml.network.setup.NodeInitializer
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
 import com.daml.network.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
-import com.daml.network.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil, SetupUtil}
-import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
-  loadDomainMigrationDump,
+import com.daml.network.sv.onboarding.{
+  DsoPartyHosting,
+  NodeInitializerUtil,
+  SetupUtil,
   SynchronizerNodeInitializer,
 }
+import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
@@ -464,25 +465,5 @@ object DomainMigrationInitializer {
           ),
         result => result,
       )
-  }
-
-  case class SynchronizerNodeInitializer(
-      synchronizerNode: LocalSynchronizerNode,
-      clock: Clock,
-      logger: NamedLoggerFactory,
-      retryProvider: RetryProvider,
-  ) {
-    val sequencerInitializer = new NodeInitializer(
-      synchronizerNode.sequencerAdminConnection,
-      retryProvider,
-      logger,
-    )
-
-    val mediatorInitializer = new NodeInitializer(
-      synchronizerNode.mediatorAdminConnection,
-      retryProvider,
-      logger,
-    )
-
   }
 }

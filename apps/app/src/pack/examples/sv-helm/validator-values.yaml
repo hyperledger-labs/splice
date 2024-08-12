@@ -61,3 +61,4 @@ enableWallet: true
 # This can be a slack username or an email address.
 # If you do not wish to share this, set it to an empty string.
 contactPoint: "YOUR_CONTACT_POINT"
+

@@ -66,7 +66,6 @@ export function installDecentralizedSynchronizerNode(
             active: isActive,
           },
         },
-        disableAutoInit: decentralizedSynchronizerMigrationConfig.isRunningMigration() || !isActive,
       };
 
       return installCNRunbookHelmChart(

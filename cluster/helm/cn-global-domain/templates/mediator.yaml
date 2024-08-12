@@ -44,17 +44,6 @@ spec:
         - name: CANTON_MEDIATOR_POSTGRES_DB
           value: {{ .Values.mediator.persistence.databaseName }}
         {{- end }}
-        # Use the same way to disable auto-init as we do in the sequencer and participant once https://github.com/DACH-NY/canton/issues/16179 is fixed
-        {{- if .Values.disableAutoInit }}
-        - name: CANTON_MEDIATOR_AUTO_INIT
-          value: "false"
-        {{- end }}
-        - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
-          value: |
-            canton.mediators.mediator.init.identity.node-identifier {
-              type = explicit
-              name = "{{ .Values.nodeIdentifier }}"
-            }
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "cn-util-lib.log-level" .Values | indent 8}}
         imagePullPolicy: Always

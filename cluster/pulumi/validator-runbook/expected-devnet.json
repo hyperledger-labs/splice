@@ -302,7 +302,6 @@
         "metrics": {
           "enable": true
         },
-        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -496,6 +495,7 @@
         "migration": {
           "id": "3"
         },
+        "nodeIdentifier": "validator-runbook",
         "participantAddress": "participant",
         "persistence": {
           "host": "postgres",

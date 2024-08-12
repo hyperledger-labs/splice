@@ -432,7 +432,6 @@ class DisasterRecoveryIntegrationTest
         s"disaster-recovery-$cantonInstanceSuffix",
         overrideSvDbsSuffix = Some("disaster_recovery_new"),
         overrideSequencerDriverDbSuffix = Some("disaster_recovery_new"),
-        autoInit = false,
         portsRange = Some(28),
         extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
@@ -440,7 +439,6 @@ class DisasterRecoveryIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> "participant_extra_disaster_recovery_new",
           "EXTRA_PARTICIPANT_ADMIN_API_PORT" -> "28502",
           "EXTRA_PARTICIPANT_LEDGER_API_PORT" -> "28501",
-          "EXTRA_PARTICIPANT_AUTO_INIT" -> "false",
         ),
       )(
       ) {

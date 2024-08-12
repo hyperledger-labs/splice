@@ -4,7 +4,6 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   auth0UserNameEnvVarSource,
   BootstrappingDumpConfig,
-  disableCantonAutoInit,
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
   installCNHelmChart,
@@ -25,7 +24,6 @@ export function installMigrationSpecificValidatorParticipant(
   xns: ExactNamespace,
   defaultPostgres: postgres.Postgres | undefined,
   participantBootstrapDump: BootstrappingDumpConfig | undefined,
-  nodeIdentifier: string,
   auth0Cfg: Auth0Config,
   logLevel?: LogLevel,
   dependsOn: pulumi.Resource[] = []
@@ -46,12 +44,6 @@ export function installMigrationSpecificValidatorParticipant(
         `participant-${migrationId}`,
         participantPostgres,
         auth0UserNameEnvVarSource('validator'),
-        // We disable auto-init if we have a dump to bootstrap from.
-        disableCantonAutoInit ||
-          !!participantBootstrapDump ||
-          !isActive ||
-          decentralizedSynchronizerMigrationConfig.isRunningMigration(),
-        nodeIdentifier,
         version,
         auth0Cfg,
         migrationId,
@@ -68,8 +60,6 @@ export function installParticipant(
   name: string,
   postgres: Postgres,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
-  disableAutoInit = false,
-  nodeIdentifier: string,
   version: CnChartVersion,
   auth0Cfg: Auth0Config,
   migrationId: DomainMigrationIndex,
@@ -93,7 +83,6 @@ export function installParticipant(
         postgresName: postgres.instanceName,
       },
       participantAdminUserNameFrom,
-      disableAutoInit,
       metrics: {
         enable: true,
         migration: {
@@ -101,7 +90,6 @@ export function installParticipant(
           active: isActiveDomain,
         },
       },
-      nodeIdentifier: nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       auth: {

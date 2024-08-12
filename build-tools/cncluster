@@ -2363,7 +2363,6 @@ function subcmd_hard_domain_migration_prepare() {
 
   # this ensures we redeploy the pods on the old domain during the prepare step already
   # so the actual migrate step does not have to redeploy them and is therefore faster.
-  export DISABLE_CANTON_AUTO_INIT="true"
   export DISABLE_COMETBFT_STATE_SYNC="true"
 
   # pulumi will show a preview and ask us to confirm each deployment step
@@ -2601,7 +2600,6 @@ function subcmd_disaster_recovery_test() {
   kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
 
   _info "Deploying new domain"
-  export DISABLE_CANTON_AUTO_INIT="true"
   export DISABLE_COMETBFT_STATE_SYNC="true"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   _cluster_apply

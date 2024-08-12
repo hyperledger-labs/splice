@@ -25,11 +25,12 @@ import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
   SetupUtil,
+  SynchronizerNodeInitializer,
   SynchronizerNodeReconciler,
 }
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
@@ -122,6 +123,16 @@ class SV1Initializer(
       initConnection = ledgerClient.readOnlyConnection(
         this.getClass.getSimpleName,
         loggerFactory,
+      )
+      cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+        SvCantonIdentifierConfig.default(config)
+      )
+      _ <- SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+        cantonIdentifierConfig,
+        localSynchronizerNode,
+        clock,
+        loggerFactory,
+        retryProvider,
       )
       (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")

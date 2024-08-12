@@ -352,13 +352,6 @@ Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/s
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
-If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <validator-upgrades>`, you will need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_END
-
 To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
@@ -645,10 +638,6 @@ Repeat the steps described in :ref:`helm-validator-install` for installing the v
 
 While doing so, please note the following:
 
-.. TODO(#12353) the disableAutoInit step should become obsolete
-
-* Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` so that ``disableAutoInit`` is set to ``true``.
-  This will ensure that the Canton participant does not generate new :ref:`identities <validator-upgrades-state>` for itself and instead remains ready to be initialized with the identities from the backup.
 * Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
   Use the separate JSON file prepared previously.
 

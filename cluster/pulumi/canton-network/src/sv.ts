@@ -15,7 +15,6 @@ import {
   CLUSTER_HOSTNAME,
   CnInput,
   defaultVersion,
-  disableCantonAutoInit,
   disableCometBftStateSync,
   ExactNamespace,
   exactNamespace,
@@ -355,6 +354,7 @@ async function installValidator(
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
+    nodeIdentifier: svConfig.onboardingName,
   });
 
   return validator;
@@ -449,10 +449,6 @@ function installMigrationIdSpecificComponents(
           ? 'INFO'
           : 'DEBUG';
 
-      const mustBeManuallyInitialized =
-        disableCantonAutoInit ||
-        !isActive ||
-        decentralizedSynchronizerMigrationConfig.isRunningMigration();
       // legacy domains don't need cometbft state sync because no new nodes will join
       // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
       // also for upgrade domains we first deploy the domain and then redeploy the sv app, and as we proxy the calls for state sync through the
@@ -462,15 +458,11 @@ function installMigrationIdSpecificComponents(
         !disableCometBftStateSync &&
         isActive &&
         !decentralizedSynchronizerMigrationConfig.isRunningMigration();
-      // If we have a dump, we disable auto init.
-      const isParticipantRestoringFromDump = !!svConfig.bootstrappingDumpConfig;
       const participant = installParticipant(
         xns,
         `participant-${migrationId}`,
         participantDb,
         auth0UserNameEnvVarSource('sv'),
-        isParticipantRestoringFromDump || mustBeManuallyInitialized,
-        svConfig.onboardingName,
         version,
         svConfig.auth0Client.getCfg(),
         migrationId,
@@ -483,7 +475,6 @@ function installMigrationIdSpecificComponents(
         sequencerDb,
         mediatorDb,
         canSyncFromCometBft ? cometbft : { ...cometbft, syncSource: undefined },
-        mustBeManuallyInitialized,
         isActive,
         svConfig.onboardingName,
         logLevel,
@@ -587,6 +578,7 @@ function installSvApp(
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,
+    nodeIdentifier: config.onboardingName,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

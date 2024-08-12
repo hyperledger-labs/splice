@@ -542,25 +542,11 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Replace ``YOUR_NODE_NAME`` with the name you chose when creating the SV identity.
 - For the initial onboarding of your node, set ``disableAutoInit`` to ``false``.
 
-If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <sv-upgrades>`, you will need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_END
-
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
-
-If you are deploying new instances of your global domain components as part of a :ref:`synchronizer migration <sv-upgrades>`, you will need to set ``disableAutoInit`` to ``true`` in your ``global-domain-values.yaml``:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/global-domain-values.yaml
-    :language: yaml
-    :start-after: DOMAIN_BOOTSTRAP_START
-    :end-before: DOMAIN_BOOTSTRAP_END
 
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
 
@@ -994,10 +980,6 @@ Repeat the steps described in :ref:`helm-validator-install` for installing the v
 
 While doing so, please note the following:
 
-.. TODO(#12353) the disableAutoInit step should become obsolete
-
-* Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` so that ``disableAutoInit`` is set to ``true``.
-  This will ensure that the Canton participant does not generate new :ref:`identities <validator-upgrades-state>` for itself and instead remains ready to be initialized with the identities from the backup.
 * Modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
 * Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
   Use the separate JSON file prepared previously.

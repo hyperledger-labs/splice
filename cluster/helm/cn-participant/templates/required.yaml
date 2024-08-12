@@ -13,4 +13,3 @@
 {{ $_ := required ".Values.participantAdminUserNameFrom is required." .Values.participantAdminUserNameFrom }}
 {{ $_ := required ".Values.auth.jwksUrl is required." .Values.auth.jwksUrl }}
 {{ $_ := required ".Values.auth.targetAudience is required." .Values.auth.targetAudience }}
-{{ $_ := required ".Values.nodeIdentifier is required." .Values.nodeIdentifier }}

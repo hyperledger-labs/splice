@@ -75,16 +75,6 @@ spec:
             - name: SEQUENCER_DRIVER_COMETBFT_PORT
               value: "{{ .Values.sequencer.driver.port }}"
         {{- end}}
-        {{- if .Values.disableAutoInit }}
-            - name: CANTON_SEQUENCER_AUTO_INIT
-              value: "false"
-        {{- end }}
-            - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
-              value: |
-                canton.sequencers.sequencer.init.identity.node-identifier {
-                  type = explicit
-                  name = "{{ .Values.nodeIdentifier }}"
-                }
             {{- with .Values.sequencer.tokenExpirationTime }}
             - name: SEQUENCER_TOKEN_EXPIRATION_TIME
               value: "{{ . }}"

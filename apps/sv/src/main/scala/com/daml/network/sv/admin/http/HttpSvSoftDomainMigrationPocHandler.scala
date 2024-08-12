@@ -146,7 +146,7 @@ class HttpSvSoftDomainMigrationPocHandler(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.SignSynchronizerBootstrappingStateResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    withSpan(s"$workflowId.signSynchronizerBootstrappingState") { _ => _ =>
+    withSpan(s"$workflowId.$signSynchronizerBootstrappingState") { _ => _ =>
       for {
         scanUrls <- getScanUrls()
         synchronizerIdentities <- scanUrls.traverse { url =>

@@ -33,3 +33,7 @@ persistence:
   # newParticipantIdentifier: put-some-new-string-never-used-before
 # migrateValidatorParty: true
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
+
+# Replace YOUR_VALIDATOR_NAME with the name you provided for your validator identity.
+# This value will be used for the node identifier of your participant.
+nodeIdentifier: YOUR_VALIDATOR_NAME

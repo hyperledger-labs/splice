@@ -53,6 +53,7 @@ import com.daml.network.validator.config.{
   AppInstance,
   MigrateValidatorPartyConfig,
   ValidatorAppBackendConfig,
+  ValidatorCantonIdentifierConfig,
   ValidatorOnboardingConfig,
 }
 import com.daml.network.validator.domain.DomainConnector
@@ -126,13 +127,22 @@ class ValidatorApp(
     _ <- withParticipantAdminConnection { participantAdminConnection =>
       readRestoreDump match {
         case Some(migrationDump) =>
+          logger.info(
+            "We're restoring from a migration dump, ensuring participant is initialized"
+          )
           val nodeInitializer =
             new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
-          nodeInitializer.initializeAndWait(
+          nodeInitializer.initializeFromDumpAndWait(
             migrationDump.participant
           )
         case None =>
+          logger.info(
+            "Ensuring participant is initialized"
+          )
+          val cantonIdentifierConfig =
+            config.cantonIdentifierConfig.getOrElse(ValidatorCantonIdentifierConfig.default(config))
           ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+            cantonIdentifierConfig.participant,
             participantAdminConnection,
             config.participantBootstrappingDump,
             loggerFactory,

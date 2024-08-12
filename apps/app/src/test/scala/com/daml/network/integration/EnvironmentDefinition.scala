@@ -1,15 +1,17 @@
 package com.daml.network.integration
 
 import better.files.{File, Resource}
-import com.daml.network.config.{SpliceConfig, ConfigTransforms}
+import com.daml.network.config.{ConfigTransforms, SpliceConfig}
 import com.daml.network.console.{ParticipantClientReference, ValidatorAppBackendReference}
 import com.daml.network.environment.{
+  EnvironmentImpl,
   SpliceConsoleEnvironment,
   SpliceEnvironmentFactory,
-  EnvironmentImpl,
 }
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import com.daml.network.sv.config.SvCantonIdentifierConfig
 import com.daml.network.util.CommonAppInstanceReferences
+import com.daml.network.validator.config.ValidatorCantonIdentifierConfig
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
@@ -225,6 +227,51 @@ case class EnvironmentDefinition(
       )(config)
     )
   }
+
+  private def svNameFromValidatorName(name: String): Option[String] = {
+    // Assumption: SV validators are named "sv<name>Validator"
+    // Note that some tests create additional SVs, so <name> is not necessarily [1-4]
+    "(sv.*)Validator".r.findFirstMatchIn(name) match {
+      case Some(m) => Some(m.group(1))
+      case None => None
+    }
+  }
+
+  /** Configures all SV and validator apps to use a given suffix for their canton node identifiers.
+    *
+    * The canton node identifiers of shared canton nodes are defined in simple-topology-canton.conf (or similar),
+    * and for tests, apps are configured in simple-topology.conf (or similar) to use those identifiers.
+    *
+    * This method is therefore only useful for tests that are using external canton instances
+    */
+  def withCantonNodeNameSuffix(suffix: String): EnvironmentDefinition =
+    addConfigTransforms(
+      (_, conf) =>
+        ConfigTransforms.updateAllSvAppConfigs((svName, c) =>
+          c.copy(
+            cantonIdentifierConfig = Some(
+              SvCantonIdentifierConfig(
+                participant = svName + suffix,
+                sequencer = svName + suffix,
+                mediator = svName + suffix,
+              )
+            )
+          )
+        )(conf),
+      (_, conf) =>
+        ConfigTransforms.updateAllValidatorAppConfigs((validatorName, c) =>
+          c.copy(
+            cantonIdentifierConfig = Some(
+              ValidatorCantonIdentifierConfig(
+                participant = svNameFromValidatorName(validatorName) match {
+                  case Some(svName) => svName + suffix
+                  case None => validatorName + suffix
+                }
+              )
+            )
+          )
+        )(conf),
+    )
 
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())

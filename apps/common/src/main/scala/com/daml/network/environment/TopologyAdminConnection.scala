@@ -14,6 +14,7 @@ import com.daml.network.environment.TopologyAdminConnection.{
 }
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{
   DomainTimeCommands,
   TopologyAdminCommands,
@@ -21,12 +22,19 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
+  ListNamespaceDelegationResult,
   ListOwnerToKeyMappingResult,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{Fingerprint, PublicKey, SigningPublicKey}
+import com.digitalasset.canton.crypto.{
+  EncryptionPublicKey,
+  Fingerprint,
+  PublicKey,
+  SigningPublicKey,
+}
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -76,10 +84,22 @@ abstract class TopologyAdminConnection(
 
   override val serviceName = "Canton Participant Admin API"
 
-  private val memberIdO: AtomicReference[Option[UniqueIdentifier]] = new AtomicReference(None)
+  private val memberIdO: AtomicReference[Option[GetIdResult]] = new AtomicReference(None)
 
   def getId(
   )(implicit traceContext: TraceContext): Future[UniqueIdentifier] =
+    getIdOption().map {
+      case GetIdResult(true, Some(uniqueIdentifier)) => uniqueIdentifier
+      case GetIdResult(_, _) =>
+        throw Status.UNAVAILABLE
+          .withDescription(
+            s"Node does not have an Id assigned yet."
+          )
+          .asRuntimeException()
+    }
+
+  def getIdOption(
+  )(implicit traceContext: TraceContext): Future[GetIdResult] =
     // We don't lock around this, worst case we make concurrent requests
     // that both update memberIdO which is fine as the request is idempotent.
     memberIdO.get() match {
@@ -90,10 +110,14 @@ abstract class TopologyAdminConnection(
             TopologyAdminCommands.Init.GetId()
           )
         } yield {
-          memberIdO.set(Some(memberId))
+          if (memberId.initialized) {
+            memberIdO.set(Some(memberId))
+          }
           memberId
         }
     }
+
+  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[NodeStatus.Status]]
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
@@ -1292,6 +1316,67 @@ abstract class TopologyAdminConnection(
     ).map(_.map(r => TopologyResult(r.context, DomainParametersState(domainId, r.item))))
   }
 
+  private def listNamespaceDelegation(namespace: Namespace, target: Option[SigningPublicKey])(
+      implicit traceContext: TraceContext
+  ): Future[Seq[TopologyResult[NamespaceDelegation]]] =
+    runCmd(
+      TopologyAdminCommands.Read.ListNamespaceDelegation(
+        BaseQuery(
+          filterStore = AuthorizedStore.filterName,
+          proposals = false,
+          timeQuery = TimeQuery.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterNamespace = namespace.unwrap,
+        filterTargetKey = target.map(_.fingerprint),
+      )
+    ).map { txs =>
+      txs.map { case ListNamespaceDelegationResult(context, item) =>
+        TopologyResult(context, item)
+      }
+    }
+
+  def ensureNamespaceDelegation(
+      namespace: Namespace,
+      target: SigningPublicKey,
+      isRootDelegation: Boolean,
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider.ensureThatB(
+      retryFor,
+      "ensure_namespace_delegation",
+      show"Namespace delegation for $namespace exists",
+      listNamespaceDelegation(
+        namespace,
+        Some(target),
+      ).map(_.nonEmpty),
+      proposeNamespaceDelegation(namespace, target, isRootDelegation, signedBy).map(_ => ()),
+      logger,
+    )
+
+  def proposeNamespaceDelegation(
+      namespace: Namespace,
+      target: SigningPublicKey,
+      isRootDelegation: Boolean,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransaction[TopologyChangeOp, NamespaceDelegation]] =
+    proposeMapping(
+      TopologyStoreId.AuthorizedStore,
+      NamespaceDelegation.create(
+        namespace,
+        target,
+        isRootDelegation,
+      ),
+      signedBy = signedBy,
+      serial = PositiveInt.one,
+      isProposal = false,
+    )
+
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
     runCmd(TopologyAdminCommands.Init.InitId(id.uid.toProtoPrimitive))
   }
@@ -1327,6 +1412,12 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[SigningPublicKey] = {
     runCmd(VaultAdminCommands.GenerateSigningKey(name, Some(Ed25519)))
+  }
+
+  def generateEncryptionKeyPair(name: String)(implicit
+      traceContext: TraceContext
+  ): Future[EncryptionPublicKey] = {
+    runCmd(VaultAdminCommands.GenerateEncryptionKey(name, None))
   }
 
   def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
@@ -1426,6 +1517,7 @@ abstract class TopologyAdminConnection(
         ).map(_ => ()),
       logger,
     )
+
 }
 
 object TopologyAdminConnection {

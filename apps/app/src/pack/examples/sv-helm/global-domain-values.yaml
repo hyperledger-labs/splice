@@ -16,7 +16,3 @@ mediator:
     secretName: mediator-pg-secret
     databaseName: mediator_MIGRATION_ID
 nodeIdentifier: YOUR_SV_NAME
-# DOMAIN_BOOTSTRAP_START
-# Set this to false only for initial onboarding (must be true for synchronizer migrations and disaster recovery)
-disableAutoInit: true
-# DOMAIN_BOOTSTRAP_END

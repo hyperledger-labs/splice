@@ -276,7 +276,7 @@ object ConfigTransforms {
       )
     )
 
-  private def updateAllValidatorAppConfigs(
+  def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): ConfigTransform =
     cantonConfig =>

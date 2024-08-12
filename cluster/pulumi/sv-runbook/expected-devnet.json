@@ -478,7 +478,6 @@
             }
           }
         },
-        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",
         "mediator": {
@@ -637,7 +636,6 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
-        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -647,7 +645,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_3",
           "port": 5432,
@@ -937,6 +934,7 @@
         "migration": {
           "id": "3"
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
         "participantAddress": "participant-3",
         "persistence": {
@@ -1348,6 +1346,7 @@
         "migration": {
           "id": "3"
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "participantAddress": "participant-3",
         "persistence": {
           "postgresName": "apps-pg",

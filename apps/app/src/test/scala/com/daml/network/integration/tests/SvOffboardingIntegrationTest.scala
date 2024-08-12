@@ -59,6 +59,7 @@ class SvOffboardingIntegrationTest
             .withPausedTrigger[LocalSequencerConnectionsTrigger]
         )(config)
       )
+      .withCantonNodeNameSuffix("SvOffboarding")
       .withManualStart
 
   "Off-boarding SV4 updates the topology states" in { implicit env =>

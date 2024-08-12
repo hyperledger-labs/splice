@@ -44,7 +44,7 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
   CometBftRequestSigner,
 }
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, SynchronizerNodeIdentities}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
@@ -144,7 +144,7 @@ class SvApp(
                 retryProvider,
                 loggerFactory,
               )
-              participantInitializer.initializeAndWait(
+              participantInitializer.initializeFromDumpAndWait(
                 DomainMigrationInitializer
                   .loadDomainMigrationDump(dumpFilePath)
                   .nodeIdentities
@@ -152,7 +152,14 @@ class SvApp(
               )
 
             case _ =>
+              logger.info(
+                "Ensuring participant is initialized"
+              )
+              val cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+                SvCantonIdentifierConfig.default(config)
+              )
               ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                cantonIdentifierConfig.participant,
                 participantAdminConnection,
                 config.participantBootstrappingDump,
                 loggerFactory,

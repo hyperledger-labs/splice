@@ -46,8 +46,8 @@ PERMISSION_DENIED.*Claims do not authorize to act as party 'alice__wallet__user.
 
 # TODO(#7924): remove once txs in-flight during party migrations do not produce any more warnings
 # Made as specific as possible to avoid ignoring other SYNC_SERVICE_ALARMS
-SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv.*Participant::.*Discarding.*with all ancestors
-SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv.*Participant::.*Continue processing
+SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv[1-4]::.*Discarding.*with all ancestors
+SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv[1-4]::.*Continue processing
 LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts

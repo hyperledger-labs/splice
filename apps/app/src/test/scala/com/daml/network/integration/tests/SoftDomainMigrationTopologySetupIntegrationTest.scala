@@ -1,5 +1,7 @@
 package com.daml.network.integration.tests
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.daml.network.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
@@ -19,8 +21,17 @@ import com.daml.network.codegen.java.splice.dsorules.{DsoRulesConfig, DsoRules_S
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.{ConfigTransforms, SynchronizerConfig}
+import com.daml.network.console.SvAppBackendReference
+import com.daml.network.environment.{
+  MediatorAdminConnection,
+  RetryProvider,
+  SequencerAdminConnection,
+}
 import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.IntegrationTest
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import com.daml.network.scan.config.ScanSynchronizerConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.automation.AcceptedAppPaymentRequestsTrigger
@@ -36,9 +47,11 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
@@ -46,6 +59,7 @@ import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -137,11 +151,18 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     val (alice, bob) = onboardAliceAndBob()
     env.scans.local should have size 4
     val prefix = "global-domain-new"
-    eventually() {
-      val dsoInfo = sv1Backend.getDsoInfo()
-      dsoInfo.svNodeStates.values.flatMap(
-        _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
-      ) should have size 4
+    clue("DSO info has 4 synchronizer nodes") {
+      eventually() {
+        val dsoInfo = sv1Backend.getDsoInfo()
+        dsoInfo.svNodeStates.values.flatMap(
+          _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
+        ) should have size 4
+      }
+    }
+    clue("All synchronizer nodes are initialized") {
+      env.svs.local.foreach { sv =>
+        waitForSynchronizerInitialized(sv)
+      }
     }
     // Enough time that the voting flow can go through
     val scheduledTime = env.environment.clock.now.plus(java.time.Duration.ofSeconds(30)).toInstant
@@ -517,5 +538,46 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       }
     }
 
+  }
+
+  def waitForSynchronizerInitialized(
+      sv: SvAppBackendReference
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    import env.environment.scheduler
+    import env.executionContext
+    val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
+      NoOpMetricsFactory,
+      "testing",
+    )
+    val retryProvider = new RetryProvider(
+      loggerFactory,
+      ProcessingTimeout(),
+      new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
+      NoOpMetricsFactory,
+    )
+    val loggerFactoryWithKey = loggerFactory.append("synchronizer", sv.name)
+    val sequencerAdminConnection = new SequencerAdminConnection(
+      ClientConfig(port = sv.config.localSynchronizerNode.value.sequencer.adminApi.port),
+      env.environment.config.monitoring.logging.api,
+      loggerFactoryWithKey,
+      grpcClientMetrics,
+      retryProvider,
+    )
+    val mediatorAdminConnection = new MediatorAdminConnection(
+      ClientConfig(port = sv.config.localSynchronizerNode.value.mediator.adminApi.port),
+      env.environment.config.monitoring.logging.api,
+      loggerFactoryWithKey,
+      grpcClientMetrics,
+      retryProvider,
+    )
+
+    eventually() {
+      sequencerAdminConnection.isNodeInitialized().futureValue shouldBe true
+      mediatorAdminConnection.isNodeInitialized().futureValue shouldBe true
+    }
+
+    sequencerAdminConnection.close()
+    mediatorAdminConnection.close()
+    retryProvider.close()
   }
 }

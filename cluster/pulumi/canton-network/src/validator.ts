@@ -66,6 +66,7 @@ type BasicValidatorConfig = {
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
   sweep?: SweepConfig;
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
+  nodeIdentifier: string;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -240,6 +241,7 @@ export async function installValidatorApp(
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,
+      nodeIdentifier: config.nodeIdentifier,
       ...spliceInstanceNames,
     },
     defaultVersion,

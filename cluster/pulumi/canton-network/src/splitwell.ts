@@ -57,7 +57,6 @@ export async function installSplitwell(
     xns,
     sharedPostgres,
     participantBootstrapDump,
-    'splitwell',
     auth0Client.getCfg(),
     undefined,
     dependsOn.concat([loopback])
@@ -144,6 +143,7 @@ export async function installSplitwell(
     },
     validatorWalletUser,
     validatorPartyHint: 'digitalasset-splitwell-1',
+    nodeIdentifier: 'splitwell',
   });
 
   return validator;

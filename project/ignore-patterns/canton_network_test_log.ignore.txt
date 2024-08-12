@@ -90,4 +90,7 @@ unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetr
 # TODO (#13145): investigate what task is it still running and see if we can somehow fix it
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
+# TODO (#13985): we don't close cache metrics created by DbScanStoreMetrics
+Instrument daml.cache.* has recorded multiple values for the same attributes
+
 # Make sure to have a trailing newline

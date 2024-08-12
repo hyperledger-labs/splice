@@ -52,16 +52,6 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_DB
           value: {{ .Values.persistence.databaseName }}
         {{- end }}
-        {{- if .Values.disableAutoInit }}
-        - name: CANTON_PARTICIPANT_AUTO_INIT
-          value: "false"
-        {{- end }}
-        - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
-          value: |
-            canton.participants.participant.init.identity.node-identifier {
-              type = explicit
-              name = "{{ .Values.nodeIdentifier }}"
-            }
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "cn-util-lib.log-level" .Values | indent 8}}
         ports:

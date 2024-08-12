@@ -324,7 +324,6 @@
         "metrics": {
           "enable": true
         },
-        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -518,6 +517,7 @@
         "migration": {
           "id": "2"
         },
+        "nodeIdentifier": "validator-runbook",
         "participantAddress": "participant",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
