@@ -126,9 +126,6 @@ object DarLockChecker {
   private def isTestDar(packageName: String): Boolean =
     packageName.endsWith("-test")
 
-  private def isCurrentDar(packageName: String): Boolean =
-    packageName.endsWith("-test")
-
   // Parse the contents of the dar lock file into
   // a map of (package name, package version) -> package id
   private def parseDarsLock(fileContent: String): Map[(String, String), String] = {
