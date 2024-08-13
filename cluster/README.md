@@ -354,11 +354,6 @@ The dashboard is available in grafana, for exampel for CILR: [Pulumi Operator Da
 To get the preview of the stacks you can run the CCI job on the deployment branch/PR branch with the following arguments:
 
 `run-job` = `preview-changes`
-`cluster` = `<your-cluster>` (eg. `cilr`)
-
-To get the preview of the operator (deployment) stack you can run the CCI job on your PR branch with the following arguments:
-
-`run-job` = `preview-operator-changes`
 
 ## Pulumi and Helm
 

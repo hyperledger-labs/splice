@@ -93,28 +93,13 @@ function git-backport() {
     push_pr main "$originalbranch" "$pr_title" "$fixed_issues" ""
     primary_pr="$(gh pr list --head "$originalbranch" --base main --json url | jq -r '.[].url')"
 
-    function clusters_based_on_branch() {
-        local releasebranch="$1"
-        local prod_clusters="devnet testnet mainnet"
-        local affected_clusters=""
-        for cluster in $prod_clusters
-        do
-          if git show "main:cluster/deployment/${cluster}/.envrc.vars" | grep -q "CN_DEPLOYMENT_FLUX_REF=.*${releasebranch}[^-_./a-zA-Z0-9]"
-          then
-            affected_clusters="$affected_clusters $cluster"
-          fi
-        done
-        echo "$affected_clusters"
-    }
-
     function trigger_preview_job() {
         local branch="$1"
-        local cluster="$2"
 
         endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline"
         pipeline_url=$(curl -fsSL "$endpoint" -X POST \
             -H "Content-Type: application/json" -H "circle-token: $CIRCLECI_TOKEN" \
-            -d '{"branch": "'"$branch"'", "parameters": {"run-job": "preview-changes", "cluster": "'"$cluster"'"}}' | \
+            -d '{"branch": "'"$branch"'", "parameters": {"run-job": "preview-changes"}}' | \
             jq -r '"https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/\(.number)"')
         echo "$pipeline_url"
     }
@@ -141,19 +126,10 @@ function git-backport() {
         push_pr "$basebranch" "$workingbranch" "[backport] $pr_title ($basebranch)" "" "$primary_pr"
         backport_pr="$(gh pr list --head "$workingbranch" --base "$basebranch" --json url | jq -r '.[].url')"
 
-        affected_clusters=$(clusters_based_on_branch "$basebranch")
-        if [ -n "$affected_clusters" ]
-        then
-            _info "Clusters dependent on branch: $affected_clusters"
-            for cluster in $affected_clusters
-            do
-                _info "Triggering preview job for $cluster"
-                pipeline_url=$(trigger_preview_job "$workingbranch" "$cluster")
-                _info "Adding PR comment with preview job link"
-                gh pr comment "$backport_pr" -b "$cluster preview: $pipeline_url"
-            done
-
-        fi
+        _info "Triggering preview-changes job"
+        pipeline_url=$(trigger_preview_job "$workingbranch")
+        _info "Adding PR comment with preview job link"
+        gh pr comment "$backport_pr" -b "pulumi preview: $pipeline_url"
 
     done
 

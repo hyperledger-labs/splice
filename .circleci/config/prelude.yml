@@ -53,7 +53,6 @@ parameters:
         apply-infra,
         update-deployment,
         preview-changes,
-        preview-operator-changes,
         deploy-hard-migration,
         backup-status-check,
       ]

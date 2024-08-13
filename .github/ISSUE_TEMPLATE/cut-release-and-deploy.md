@@ -41,14 +41,14 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off from main.
     - Run `git diff (git merge-base origin/release-line-0.x.z origin/main) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
     - Run `git log (git merge-base origin/release-line-0.x.z origin/main)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
-- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: preview-changes` and `cluster: devnet`.
+- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: preview-changes`.
   - Review the output together with someone else to see that there are no unexpected changes.
   - Pay particular attention to deleted or newly created resources.
   - Keep a URL to the preview job. It'll be required for the PR in the next step
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
-  - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes` and `cluster: devnet`
+  - [ ] Before merging, trigger a CircleCI pipeline on the PR branch with `run-job: preview-changes`
     - Review the changes to the `deployment` stack.
     - Update the PR with a URL to the preview job on the release line
     - Update the PR with a URL to the preview job on the PR's branch

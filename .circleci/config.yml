@@ -58,7 +58,6 @@ parameters:
         apply-infra,
         update-deployment,
         preview-changes,
-        preview-operator-changes,
         deploy-hard-migration,
         backup-status-check,
       ]
@@ -1389,7 +1388,7 @@ commands:
         default: ""
     steps:
       - run_bash_command_in_nix:
-          cmd_name: Run preview << parameters.project >> on cluster << parameters.cluster >>
+          cmd_name: Running << parameters.project >> preview on cluster << parameters.cluster >>
           cluster: << parameters.cluster >>
           additional_nix_args: >
             --keep GITHUB_TOKEN
@@ -1411,7 +1410,8 @@ commands:
             --keep K6_VALIDATOR_ADMIN_PASSWORD
           gce_authenticate: true
           cmd: |
-            if [ -z "<< parameters.when_env >>" ] || (env-bool "<< parameters.when_env >>"); then
+            if ([ -z "<< parameters.when_env >>" ] || env-bool "<< parameters.when_env >>"); then
+              echo "Executing << parameters.project >> preview on << parameters.cluster >>"
               cncluster activate
               export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
               # overwrite the use of internal DNS in the config file directly
@@ -1420,6 +1420,19 @@ commands:
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
+
+  set_pr_target_branch:
+    steps:
+      - run:
+          name: Setting TARGET_BRANCH env var
+          command: |
+            PR_NUMBER=$(echo $CIRCLE_PULL_REQUEST | sed 's|.*/pull/\([0-9]*\)|\1|')
+            TARGET_BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
+            echo "PR target branch: $TARGET_BRANCH"
+            echo export "TARGET_BRANCH=\"$TARGET_BRANCH\"" >> "$BASH_ENV"
+      - run:
+          name: Print TARGET_BRANCH for debugging
+          command: echo "TARGET_BRANCH set to $TARGET_BRANCH"
 
   clone_and_update_oss:
       steps:
@@ -3222,6 +3235,17 @@ jobs:
           command: |
             .circleci/release-hold.sh "hold_set_scratchnet"
 
+  trigger_pulumi_previews:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout_with_retry
+      - set_pr_target_branch
+      - run:
+          name: Trigger previews
+          command: |
+            .circleci/trigger-previews.sh "set_previews"
+
   # Persists the choice of scratchnet cluster to a CCI workspace
   set_scratchnet:
     parameters:
@@ -3771,6 +3795,8 @@ jobs:
   preview_pulumi_changes:
     parameters:
       <<: *cluster-parameter
+      deployment_only:
+        type: boolean
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -3780,6 +3806,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix
+      - set_pr_target_branch
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
           cluster: << parameters.cluster >>
@@ -3790,48 +3817,34 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "canton-network"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "infra"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "sv-runbook"
-          when_env: "CN_DEPLOY_SV_RUNBOOK"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "multi-validator"
-          when_env: "CN_DEPLOY_MULTI_VALIDATOR"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "validator-runbook"
-          when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
-  preview_pulumi_operator_changes:
-    parameters:
-      <<: *cluster-parameter
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Install pulumi dependencies
-          cluster: << parameters.cluster >>
-          cmd: |
-            make -j cluster/pulumi/build
-          cmd_retry_count: 2
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "deployment"
+      - when:
+          condition:
+            not: << parameters.deployment_only >>
+          steps:
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "canton-network"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "infra"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "sv-runbook"
+                when_env: "CN_DEPLOY_SV_RUNBOOK"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "multi-validator"
+                when_env: "CN_DEPLOY_MULTI_VALIDATOR"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "validator-runbook"
+                when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
+      - when:
+          condition: << parameters.deployment_only >>
+          steps:
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "deployment"
 
 
   reset_cluster:
@@ -6384,22 +6397,85 @@ workflows:
     when:
       equal: [ preview-changes, << pipeline.parameters.run-job >> ]
     jobs:
+      - trigger_pulumi_previews
+      - set_previews:
+          <<: *main-branch-never
+          name: set_previews_devnet
+          type: approval
+      - set_previews:
+          <<: *main-branch-never
+          name: set_previews_testnet
+          type: approval
+      - set_previews:
+          <<: *main-branch-never
+          name: set_previews_mainnet
+          type: approval
+      - set_previews:
+          <<: *main-branch-never
+          name: set_previews_deployment
+          type: approval
       - preview_pulumi_changes:
+          name: Preview pulumi changes for DevNet
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: << pipeline.parameters.cluster >>
-  preview_pulumi_operator_changes:
-    when:
-      equal: [ preview-operator-changes, << pipeline.parameters.run-job >> ]
-    jobs:
-      - preview_pulumi_operator_changes:
+          cluster: "devnet"
+          deployment_only: false
+          requires:
+            - set_previews_devnet
+      - preview_pulumi_changes:
+          name: Preview pulumi changes for TestNet
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: << pipeline.parameters.cluster >>
+          cluster: "testnet"
+          deployment_only: false
+          requires:
+            - set_previews_testnet
+      - preview_pulumi_changes:
+          name: Preview pulumi changes for MainNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "mainnet"
+          deployment_only: false
+          requires:
+            - set_previews_mainnet
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for DevNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "devnet"
+          deployment_only: true
+          requires:
+            - set_previews_deployment
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for TestNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "testnet"
+          deployment_only: true
+          requires:
+            - set_previews_deployment
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for MainNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "mainnet"
+          deployment_only: true
+          requires:
+            - set_previews_deployment
+
+
 
   backup_testnet:
     when:

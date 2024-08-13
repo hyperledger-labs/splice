@@ -2,6 +2,8 @@ jobs:
   preview_pulumi_changes:
     parameters:
       <<: *cluster-parameter
+      deployment_only:
+        type: boolean
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -11,6 +13,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix
+      - set_pr_target_branch
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
           cluster: << parameters.cluster >>
@@ -21,45 +24,31 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "canton-network"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "infra"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "sv-runbook"
-          when_env: "CN_DEPLOY_SV_RUNBOOK"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "multi-validator"
-          when_env: "CN_DEPLOY_MULTI_VALIDATOR"
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "validator-runbook"
-          when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
-  preview_pulumi_operator_changes:
-    parameters:
-      <<: *cluster-parameter
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Install pulumi dependencies
-          cluster: << parameters.cluster >>
-          cmd: |
-            make -j cluster/pulumi/build
-          cmd_retry_count: 2
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - preview_pulumi:
-          cluster: << parameters.cluster >>
-          project: "deployment"
+      - when:
+          condition:
+            not: << parameters.deployment_only >>
+          steps:
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "canton-network"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "infra"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "sv-runbook"
+                when_env: "CN_DEPLOY_SV_RUNBOOK"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "multi-validator"
+                when_env: "CN_DEPLOY_MULTI_VALIDATOR"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "validator-runbook"
+                when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
+      - when:
+          condition: << parameters.deployment_only >>
+          steps:
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "deployment"

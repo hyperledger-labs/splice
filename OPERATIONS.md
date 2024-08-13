@@ -5,7 +5,7 @@ This document describes guidelines for operating on production clusters (MainNet
 ## Patching an [Operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#operator-deployments) controlled deployment
 
 1. Open a PR with the changes
-2. Run the preview job for the clusters tracking the branch, by running on the branch that you created, a CCI job with the following arguments: `run-job=preview-operator-changes`, `cluster=<target_cluster>`
+2. Run the preview job for the clusters tracking the branch, by running on the branch that you created, a CCI job with the following arguments: `run-job=preview-changes`
 3. Post the link to the preview job in the PR you have opened, and (optionally) add the preview job output as a comment on the PR
 4. Get approval for the PR
 5. Post on the slack channel for the clusters that you are merging a patch
