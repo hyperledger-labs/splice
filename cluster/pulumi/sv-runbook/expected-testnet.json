@@ -910,6 +910,16 @@
             "name": "Orb-1-LP",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJjVrU8AbQM12OyHwsoI1uHNQrtOYO5IFbB7w46F+ivPWSIo+7nqh5nKYFkFoMNPEYGUwrO57N12rj8Dyb0ldDg==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "MPC-Holding-Inc",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOxCYWSBB4hDz7O1XxJ3xswKXxJcQqsgyzBTbWjkwa+ILYXy8T2vtVMoZ+tC/Ykdp3MyFwcMIP1kzcDKCSp0qow==",
+            "rewardWeightBps": 10000
+          },
+          {
+            "name": "Infstones-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAQhh41RwumQYb+uL9R1bM0olmAQMbOrY7uSGMRM+ygfhhfjrdNdJNkFakGYxqS9R/WlrCCJH+zCBjvtb2BY7MA==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
