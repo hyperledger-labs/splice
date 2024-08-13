@@ -52,9 +52,9 @@ enableWallet: true
 # tolerations:
 
 spliceInstanceNames:
-  networkName: "Splice"
-  networkFaviconUrl: "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png"
-  amuletName: "Amulet"
-  amuletNameAcronym: "AMT"
-  nameServiceName: "Amulet Name Service"
-  nameServiceNameAcronym: "ANS"
+  networkName: # Please provide a value as provided in the docs
+  networkFaviconUrl: # Please provide a value as provided in the docs
+  amuletName: # Please provide a value as provided in the docs
+  amuletNameAcronym: # Please provide a value as provided in the docs
+  nameServiceName: # Please provide a value as provided in the docs
+  nameServiceNameAcronym: # Please provide a value as provided in the docs

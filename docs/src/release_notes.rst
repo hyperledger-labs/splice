@@ -66,6 +66,8 @@ Upcoming
     (otherwise, the app will fail to start).
     For new validators, it must be of format `<organization>-<function>-<enumerator>`, where `organization` and `function`
     are alphanumeric, and `enumerator` is a number starting from 1.
+  * `spliceInstanceNames` values are now mandatory for all Helm charts that deploy a frontend (``cn-scan``, ``cn-validator``, ``cn-sv-node``, and ``cn-splitwell-web-ui``).
+    The correct values for them are published in the docs for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>`.
 
 * Documentation
 
