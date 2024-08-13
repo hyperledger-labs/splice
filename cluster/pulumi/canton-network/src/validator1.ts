@@ -70,6 +70,7 @@ export async function installValidator1(
     xns,
     defaultPostgres,
     participantBootstrapDump,
+    'validator1',
     auth0Client.getCfg(),
     undefined,
     dependsOn.concat([loopback])

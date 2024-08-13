@@ -1618,6 +1618,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1627,6 +1628,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2304,6 +2306,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2565,6 +2568,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2575,6 +2579,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -3405,6 +3410,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3666,6 +3672,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3676,6 +3683,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "Digital-Asset-Eng-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -4472,6 +4480,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4733,6 +4742,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4743,6 +4753,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "Digital-Asset-Eng-3",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -5539,6 +5550,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5800,6 +5812,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5810,6 +5823,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "Digital-Asset-Eng-4",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -6813,6 +6827,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -6822,6 +6837,7 @@
             "id": 3
           }
         },
+        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
