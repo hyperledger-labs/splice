@@ -78,11 +78,11 @@ class ValidatorReonboardingIntegrationTest
               // to produce a collision between the participant admin party
               // and our validator operator party to check
               // that we revoke the domain trust cert.
-              ledgerApiUser = "aliceValidatorLocalForValidatorReonboardingIT",
-              validatorPartyHint = Some("aliceValidatorLocalForValidatorReonboardingIT"),
+              ledgerApiUser = "alice-validatorLocalForValidatorReonboardingIT-1",
+              validatorPartyHint = Some("alice-validatorLocalForValidatorReonboardingIT-1"),
               cantonIdentifierConfig = Some(
                 ValidatorCantonIdentifierConfig(
-                  participant = "aliceValidatorLocalForValidatorReonboardingIT"
+                  participant = "alice-validatorLocalForValidatorReonboardingIT-1"
                 )
               ),
               participantClient = ParticipantClientConfig(
@@ -175,7 +175,7 @@ class ValidatorReonboardingIntegrationTest
       .withManualStart
 
   "re-onboard validator" in { implicit env =>
-    aliceValidatorBackend.config.ledgerApiUser shouldBe "aliceValidatorLocalForValidatorReonboardingIT"
+    aliceValidatorBackend.config.ledgerApiUser shouldBe "alice-validatorLocalForValidatorReonboardingIT-1"
     initDsoWithSv1Only()
     // We need a standalone instance so we can revoke the domain trust certificate
     // without breaking the long-running nodes.
