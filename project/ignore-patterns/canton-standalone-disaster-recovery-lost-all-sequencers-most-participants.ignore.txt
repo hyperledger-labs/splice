@@ -4,4 +4,6 @@ The provided balance may not be up to date if a balance update is being processe
 # TODO (#11294): suspicious warning, but doesn't fail tests
 Using approximate topology snapshot.*.*StandaloneSequencer
 
+Failed to acknowledge clean timestamp.*closed stream
+
 # Make sure to have a trailing newline
