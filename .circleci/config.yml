@@ -1633,19 +1633,24 @@ jobs:
           gce_authenticate: true
           no_output_timeout: "10m"
           cmd: |
+            set -eou pipefail
+
             cncluster activate
             latest_creationTimestamp=$(kubectl get volumesnapshot -n << parameters.namespace_name >> -o json | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.creationTimestamp')
             msg="The latest backup for namespace << parameters.namespace_name >>"
+
             if [ -n "$latest_creationTimestamp" ] && date -d "$latest_creationTimestamp" >/dev/null 2>&1; then
               latest_creation_epoch=$(date -d "$latest_creationTimestamp" +%s)
-              last_epoch=$(date -d "$alert_threshold" +%s)
+              last_epoch=$(date -d "<< parameters.alert_threshold >>" +%s)
+
               if [ "$latest_creation_epoch" -lt "$last_epoch" ]; then
-                msg+=" is older than one day with creationTimestamp: ($latest_creationTimestamp)."
+                msg+=" is older than << parameters.alert_threshold >> with creationTimestamp: $latest_creationTimestamp."
+                echo $msg
                 exit 1
               else
-                msg+=" is not older than one day with creationTimestamp: ($latest_creationTimestamp)."
+                msg+=" is not older than << parameters.alert_threshold >> with creationTimestamp: $latest_creationTimestamp."
+                echo $msg
               fi
-              echo $msg
             else
               echo "No volumesnapshot found yet."
             fi
@@ -1653,7 +1658,7 @@ jobs:
           channel: << parameters.channel_notify >>
           event: fail
           custom: |
-            { "text": "The latest backup for cluster: << parameters.cluster >> and namespace: << parameters.namespace_name >> is older than one day." }
+            { "text": "The latest backup for cluster: << parameters.cluster >> and namespace: << parameters.namespace_name >> is older than << parameters.alert_threshold >>." }
 
   deploy_sv_runbook:
     machine:
