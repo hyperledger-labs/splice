@@ -729,6 +729,7 @@ final class DbMultiDomainAcsStore[TXE](
         val newAcsSize = summaryState.acsSizeDiff
         val summary = summaryState.toIngestionSummary(
           updateId = None,
+          synchronizerId = None,
           offset = offset,
           recordTime = None,
           newAcsSize = newAcsSize,
@@ -766,6 +767,7 @@ final class DbMultiDomainAcsStore[TXE](
             val summary =
               summaryState.toIngestionSummary(
                 updateId = None,
+                synchronizerId = Some(domain),
                 offset = reassignment.offset.getOffset,
                 recordTime = Some(reassignment.recordTime),
                 newAcsSize = state.get().acsSize,
@@ -786,6 +788,7 @@ final class DbMultiDomainAcsStore[TXE](
             val summary =
               summaryState.toIngestionSummary(
                 updateId = Some(tree.getUpdateId),
+                synchronizerId = Some(domain),
                 offset = tree.getOffset,
                 recordTime = Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)),
                 newAcsSize = state.get().acsSize,
@@ -1446,11 +1449,13 @@ object DbMultiDomainAcsStore {
 
     def toIngestionSummary(
         updateId: Option[String],
+        synchronizerId: Option[DomainId],
         offset: String,
         recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
     ): IngestionSummary = IngestionSummary(
       updateId = updateId,
+      synchronizerId = synchronizerId,
       offset = Some(offset),
       recordTime = recordTime,
       newAcsSize = newAcsSize,
