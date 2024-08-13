@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   auth0UserNameEnvVarSource,
@@ -14,7 +13,7 @@ import {
   Auth0Config,
   LogLevel,
   DomainMigrationIndex,
-  defaultVersion,
+  autoInitValues,
 } from 'cn-pulumi-common';
 import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 
@@ -74,18 +73,6 @@ export function installParticipant(
 ): Release {
   const pgName = sanitizedForPostgres(name);
 
-  // TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
-  const withoutAutoInit =
-    defaultVersion.type == 'local' ||
-    defaultVersion.version.startsWith('0.2.0') ||
-    semver.gt(defaultVersion.version, '0.2.0');
-  const autoInitValues = withoutAutoInit
-    ? {}
-    : {
-        disableAutoInit: true,
-        nodeIdentifier,
-      };
-
   const participant = installCNHelmChart(
     xns,
     name,
@@ -113,7 +100,7 @@ export function installParticipant(
         jwksUrl: `https://${auth0Cfg.auth0Domain}/.well-known/jwks.json`,
         targetAudience: auth0Cfg.appToApiAudience['participant'],
       },
-      ...autoInitValues,
+      ...autoInitValues(nodeIdentifier),
     },
     version,
     {

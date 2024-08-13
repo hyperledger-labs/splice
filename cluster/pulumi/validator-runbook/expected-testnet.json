@@ -324,6 +324,7 @@
         "metrics": {
           "enable": true
         },
+        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",

@@ -1,8 +1,8 @@
 import * as pulumi from '@pulumi/pulumi';
-import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
 import {
+  autoInitValues,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
@@ -75,18 +75,6 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
 
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
-    // TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
-    const withoutAutoInit =
-      defaultVersion.type == 'local' ||
-      defaultVersion.version.startsWith('0.2.0') ||
-      semver.gt(defaultVersion.version, '0.2.0');
-    const autoInitValues = withoutAutoInit
-      ? {}
-      : {
-          disableAutoInit: true,
-          nodeIdentifier,
-        };
-
     installCNHelmChart(
       xns,
       this.name,
@@ -123,7 +111,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             active: active,
           },
         },
-        ...autoInitValues,
+        ...autoInitValues(nodeIdentifier),
         additionalJvmOptions: jmxOptions(),
         enablePostgresMetrics: true,
       },

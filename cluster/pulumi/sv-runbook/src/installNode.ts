@@ -40,6 +40,7 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
+  autoInitValues,
 } from 'cn-pulumi-common';
 import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -244,6 +245,7 @@ async function installSvAndValidator(
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
           }
         ),
+        ...autoInitValues(onboardingName),
         metrics: {
           enable: true,
           migration: {

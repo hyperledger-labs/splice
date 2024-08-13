@@ -660,6 +660,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
+        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -669,6 +670,7 @@
             "id": 0
           }
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_0",
           "host": "participant-pg.sv.svc.cluster.local",

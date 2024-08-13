@@ -1,10 +1,12 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
+import * as semver from 'semver';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config } from './config';
+import { defaultVersion } from './helm';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
@@ -222,3 +224,17 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+// TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
+const withoutAutoInit =
+  defaultVersion.type == 'local' ||
+  defaultVersion.version.startsWith('0.2.0') ||
+  semver.gt(defaultVersion.version, '0.2.0');
+export const autoInitValues = (nodeIdentifier: string): ChartValues => {
+  return withoutAutoInit
+    ? {}
+    : {
+        disableAutoInit: true,
+        nodeIdentifier,
+      };
+};
