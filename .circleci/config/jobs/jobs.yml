@@ -799,6 +799,17 @@ jobs:
           command: |
             .circleci/release-hold.sh "hold_set_scratchnet"
 
+  trigger_pulumi_previews:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout_with_retry
+      - set_pr_target_branch
+      - run:
+          name: Trigger previews
+          command: |
+            .circleci/trigger-previews.sh "set_previews"
+
   # Persists the choice of scratchnet cluster to a CCI workspace
   set_scratchnet:
     parameters:

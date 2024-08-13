@@ -1222,7 +1222,7 @@ commands:
         default: ""
     steps:
       - run_bash_command_in_nix:
-          cmd_name: Run preview << parameters.project >> on cluster << parameters.cluster >>
+          cmd_name: Running << parameters.project >> preview on cluster << parameters.cluster >>
           cluster: << parameters.cluster >>
           additional_nix_args: >
             --keep GITHUB_TOKEN
@@ -1244,7 +1244,8 @@ commands:
             --keep K6_VALIDATOR_ADMIN_PASSWORD
           gce_authenticate: true
           cmd: |
-            if [ -z "<< parameters.when_env >>" ] || (env-bool "<< parameters.when_env >>"); then
+            if ([ -z "<< parameters.when_env >>" ] || env-bool "<< parameters.when_env >>"); then
+              echo "Executing << parameters.project >> preview on << parameters.cluster >>"
               cncluster activate
               export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
               # overwrite the use of internal DNS in the config file directly
@@ -1253,6 +1254,19 @@ commands:
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
+
+  set_pr_target_branch:
+    steps:
+      - run:
+          name: Setting TARGET_BRANCH env var
+          command: |
+            PR_NUMBER=$(echo $CIRCLE_PULL_REQUEST | sed 's|.*/pull/\([0-9]*\)|\1|')
+            TARGET_BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
+            echo "PR target branch: $TARGET_BRANCH"
+            echo export "TARGET_BRANCH=\"$TARGET_BRANCH\"" >> "$BASH_ENV"
+      - run:
+          name: Print TARGET_BRANCH for debugging
+          command: echo "TARGET_BRANCH set to $TARGET_BRANCH"
 
   clone_and_update_splice:
       steps:
