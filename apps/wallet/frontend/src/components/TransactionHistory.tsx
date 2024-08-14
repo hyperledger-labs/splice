@@ -31,6 +31,7 @@ import { Party } from '@daml/types';
 import { usePrimaryParty, useTransactions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { Transaction, TransactionSubtype } from '../models/models';
+import { config } from '../utils/config';
 import BftAnsEntry from './BftAnsEntry';
 
 const TransactionHistory: React.FC = () => {
@@ -257,7 +258,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'Amulet_Expire':
       // AmuletExpired
-      text = 'Canton Coin Expired';
+      text = `${config.spliceInstanceNames.amuletName} Expired`;
       break;
     case 'SvRewardCoupon_ArchiveAsBeneficiary':
       // SvRewardCollected
@@ -269,7 +270,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'LockedAmulet_Unlock':
       // LockedAmuletUnlocked
-      text = 'Locked Canton Coin Unlocked';
+      text = `Locked ${config.spliceInstanceNames.amuletName} Unlocked`;
       break;
     case 'SubscriptionInitialPayment_Reject':
       // SubscriptionInitialPaymentRejected
@@ -277,11 +278,11 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'LockedAmulet_OwnerExpireLock':
       // LockedAmuletOwnerExpired
-      text = 'Locked Canton Coin Owner Expired';
+      text = `Locked ${config.spliceInstanceNames.amuletName} Owner Expired`;
       break;
     case 'LockedAmulet_ExpireAmulet':
       // LockedAmuletExpired
-      text = 'Locked Canton Coin Expired';
+      text = `Locked ${config.spliceInstanceNames.amuletName} Expired`;
       break;
     case 'AcceptedAppPayment_Reject':
       // AppPaymentRejected
@@ -305,11 +306,11 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'AnsRules_CollectInitialEntryPayment':
       // AnsEntryInitialPaymentCollected
-      text = 'CNS Entry Initial Payment Collected';
+      text = `${config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} Entry Initial Payment Collected`;
       break;
     case 'AnsRules_CollectEntryRenewalPayment':
       // AnsEntryRenewalPaymentCollected
-      text = 'CNS Entry Renewal Payment Collected';
+      text = `${config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} Entry Renewal Payment Collected`;
       break;
     default:
       console.warn('Unknown Transaction Subtype', subtype);
