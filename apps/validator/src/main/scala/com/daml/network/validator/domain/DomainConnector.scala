@@ -154,7 +154,7 @@ class DomainConnector(
           if (connections.isEmpty)
             throw Status.NOT_FOUND
               .withDescription(
-                s"sequencer connections is empty"
+                s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
               )
               .asRuntimeException()
         },
