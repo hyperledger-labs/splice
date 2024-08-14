@@ -140,10 +140,11 @@ class ManualStartIntegrationTest
           participantAdminConnection("alice", aliceValidatorBackend.config),
         )
 
-        clue("All Canton nodes have no identity") {
+        clue("All Canton nodes are running but have no identity") {
           def assertHasNoIdentity(connection: TopologyAdminConnection) = {
-            // Eventually, because for the query to the server will fail while the server is still starting up
-            eventually() {
+            // Eventually, because the query to the server will fail while the server is still starting up
+            // Long timeout because Canton is slow to start up
+            eventually(timeUntilSuccess = 60.seconds) {
               val id = connection.getIdOption().futureValue
               id.initialized shouldBe false
               id.uniqueIdentifier shouldBe None
