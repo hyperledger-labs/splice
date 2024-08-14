@@ -1,19 +1,23 @@
 #! /usr/bin/env bash
 
+set -euo pipefail
+
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
-if [ -z "$1" ]; then
+if [ -z "${1:-}" ]; then
     _error "Usage: $0 <image-tag>"
 else
     imageTag=$1
 fi
 
-if [ "$2" = "--force" ]; then
-    force=yes
-fi
-
 [[ -z "${MAKE}" || ! -f 'target/docker.id' ]] && _error 'must be run from within from make'
+
+force=""
+if [[ "$imageTag" == *-dirty ]]; then
+    # We allow force overwriting images only for dirty tags.
+    force=1
+fi
 
 imageId="$(<target/docker.id)"
 
@@ -37,8 +41,7 @@ fi
 
 if docker-check "${imageTag}" --optional; then
   if [ -z "${force}" ]; then
-    _warning "tag already exists in repo:\n${imageTag}\n images cannot be overwritten when CI is set"
-    exit 0
+    _error "tag already exists in repo:\n${imageTag}\n images cannot be overwritten unless they are flagged as dirty"
   else
     _warning "Forcing push, tag already exists in repo:\n${imageTag}"
   fi
