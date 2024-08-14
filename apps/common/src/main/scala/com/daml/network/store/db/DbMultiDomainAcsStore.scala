@@ -89,6 +89,9 @@ final class DbMultiDomainAcsStore[TXE](
   import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
 
+  override lazy val storeName = storeDescriptor.name
+  override lazy val storeParty = storeDescriptor.party.toString
+
   override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
 
   private val state = new AtomicReference[State](State.empty())
