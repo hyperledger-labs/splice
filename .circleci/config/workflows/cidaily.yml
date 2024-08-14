@@ -194,7 +194,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-          skip_if_exists: true
       - deploy_sv_runbook:
           filters:
             branches:
@@ -254,7 +253,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-          skip_if_exists: true
       - deploy_validator_runbook:
           filters:
             branches:
