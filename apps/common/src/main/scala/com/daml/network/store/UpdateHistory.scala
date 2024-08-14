@@ -704,7 +704,6 @@ class UpdateHistory(
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
-    // TODO(#13976): this probably does not hit the indices
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
     (select
@@ -751,7 +750,6 @@ class UpdateHistory(
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
-    // TODO(#13976): this probably does not hit the indices
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
     (select
