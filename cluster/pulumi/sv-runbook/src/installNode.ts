@@ -245,7 +245,7 @@ async function installSvAndValidator(
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
           }
         ),
-        ...autoInitValues(onboardingName),
+        ...autoInitValues(version, onboardingName),
         metrics: {
           enable: true,
           migration: {

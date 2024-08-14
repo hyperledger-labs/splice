@@ -5,8 +5,8 @@ import * as semver from 'semver';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
+import { CnChartVersion } from './artifacts';
 import { config } from './config';
-import { defaultVersion } from './helm';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
@@ -225,16 +225,23 @@ export function conditionalString(condition: boolean, value: string): string {
 
 export const daContactPoint = 'sv-support@digitalasset.com';
 
+const withoutAutoInit = (version: CnChartVersion) =>
+  version.type == 'local' ||
+  version.version.startsWith('0.2.0') ||
+  semver.gt(version.version, '0.2.0');
+
 // TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
-const withoutAutoInit =
-  defaultVersion.type == 'local' ||
-  defaultVersion.version.startsWith('0.2.0') ||
-  semver.gt(defaultVersion.version, '0.2.0');
-export const autoInitValues = (nodeIdentifier: string): ChartValues => {
-  return withoutAutoInit
-    ? {}
-    : {
-        disableAutoInit: true,
-        nodeIdentifier,
-      };
+export const autoInitValues = (version: CnChartVersion, nodeIdentifier: string): ChartValues => {
+  const versionStr =
+    version.type === 'local' ? 'local charts' : `remote charts version ${version.version}`;
+  if (withoutAutoInit(version)) {
+    console.error(`Node ${nodeIdentifier} is using ${versionStr}`);
+    return {};
+  } else {
+    console.error(`Node ${nodeIdentifier} is using ${versionStr}, setting auto init values`);
+    return {
+      disableAutoInit: true,
+      nodeIdentifier,
+    };
+  }
 };

@@ -296,7 +296,7 @@
           "targetAudience": "https://ledger_api.example.com"
         },
         "db": {},
-        "disableAutoInit": false,
+        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {

@@ -176,13 +176,10 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
     ),
-    ...autoInitValues(config.nodeIdentifier),
+    ...autoInitValues(defaultVersion, config.nodeIdentifier),
     metrics: {
       enable: true,
     },
-    disableAutoInit:
-      !!participantBootstrapDumpSecret ||
-      decentralizedSynchronizerMigrationConfig.isRunningMigration(),
   };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
