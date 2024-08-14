@@ -3,3 +3,7 @@
 
 Request failed for sequencer. Is the server running?
 SEQUENCER_SUBSCRIPTION_LOST
+
+Failed to acknowledge clean timestamp.*closed stream
+
+# Make sure to have a trailing newline
