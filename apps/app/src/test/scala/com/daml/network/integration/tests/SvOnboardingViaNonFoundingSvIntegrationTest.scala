@@ -23,7 +23,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
     with SvTestUtil
     with StandaloneCanton {
 
-  override def dbsSuffix: String = "non_founding_svs"
+  override def dbsSuffix: String = "non_sv1_svs"
 
   // Runs against a temporary Canton instance.
   override lazy val resetRequiredTopologyState = false
@@ -94,8 +94,8 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
       })
       .withManualStart
 
-  "A new SV can: 1) onboard via a non-founding SV while founding SV is offboarded from the DSO and " +
-    "2) bootstrap using a sequencer that is not founding SV's sequencer" in { implicit env =>
+  "A new SV can: 1) onboard via a non-sv1 while sv1 is offboarded from the DSO and " +
+    "2) bootstrap using a sequencer that is not sv1's sequencer" in { implicit env =>
       withCantonSvNodes(
         (
           Some(sv1Backend),
@@ -103,7 +103,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           Some(sv3Backend),
           None,
         ),
-        logSuffix = "sv123-non-founding-svs",
+        logSuffix = "sv123-non-sv1-svs",
         sv4 = false,
       )() {
         actAndCheck(

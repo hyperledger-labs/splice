@@ -16,7 +16,7 @@ import scala.collection.concurrent.TrieMap
 /** Creates a new CometBft deployment for all the configured nodes
   * The node config must be set for a container to be created
   * The containers for a given environment share a docker network
-  * The CometBFT container belonging to SV1  is always started as it's the founder member in the genesis.json file
+  * The CometBFT container belonging to SV1  is always started as it's the sv1 in the genesis.json file
   */
 class CometBftNetworkPlugin(
     identifier: String,

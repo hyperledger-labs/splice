@@ -2273,6 +2273,12 @@
         "stateSync": {
           "enable": false
         },
+        "sv1": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2386,6 +2392,12 @@
         ],
         "stateSync": {
           "enable": false
+        },
+        "sv1": {
+          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -3651,6 +3663,12 @@
         "stateSync": {
           "enable": false
         },
+        "sv1": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3761,6 +3779,12 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+        },
+        "sv1": {
+          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -4992,6 +5016,12 @@
         "stateSync": {
           "enable": false
         },
+        "sv1": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -5102,6 +5132,12 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+        },
+        "sv1": {
+          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {
@@ -6333,6 +6369,12 @@
         "stateSync": {
           "enable": false
         },
+        "sv1": {
+          "externalAddress": "global-domain-1-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -6443,6 +6485,12 @@
         "stateSync": {
           "enable": true,
           "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+        },
+        "sv1": {
+          "externalAddress": "global-domain-2-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "tolerations": [
           {

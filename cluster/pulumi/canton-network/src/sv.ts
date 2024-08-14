@@ -85,7 +85,7 @@ export type SvOnboarding =
   | { type: 'domain-migration' }
   | {
       type: 'found-dso';
-      foundingSvRewardWeightBps: number;
+      sv1SvRewardWeightBps: number;
       roundZeroDuration?: string;
     }
   | {
@@ -102,10 +102,10 @@ export type SequencerPruningConfig = {
 };
 
 export interface SvConfig extends StaticSvConfig {
-  isFounder: boolean;
+  isFirstSv: boolean;
   auth0Client: Auth0Client;
   nodeConfigs: {
-    founder: StaticCometBftConfigWithNodeName;
+    sv1: StaticCometBftConfigWithNodeName;
     peers: StaticCometBftConfigWithNodeName[];
   };
   onboarding: SvOnboarding;
@@ -253,7 +253,7 @@ export async function installSvNode(
 
   const scan = installScan(
     xns,
-    config.isFounder,
+    config.isFirstSv,
     decentralizedSynchronizerUpgradeConfig,
     config.nodeName,
     activeMigrationComponents.decentralizedSynchronizer,
@@ -369,7 +369,7 @@ function installMigrationIdSpecificComponents(
     onboardingName: string;
     nodeConfigs: {
       self: StaticCometBftConfigWithNodeName;
-      founder: StaticCometBftConfigWithNodeName;
+      sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     };
     syncSource?: Release;
@@ -492,9 +492,7 @@ function installSvApp(
     onboardingType: onboardingType(config.onboarding),
     onboardingName: config.onboardingName,
     onboardingFoundingSvRewardWeightBps:
-      config.onboarding.type == 'found-dso'
-        ? config.onboarding.foundingSvRewardWeightBps
-        : undefined,
+      config.onboarding.type == 'found-dso' ? config.onboarding.sv1SvRewardWeightBps : undefined,
     onboardingRoundZeroDuration:
       config.onboarding.type == 'found-dso' ? config.onboarding.roundZeroDuration : undefined,
     initialSynchronizerFeesConfig:
@@ -504,7 +502,7 @@ function installSvApp(
       enabled: true,
       connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
     },
-    decentralizedSynchronizerUrl: decentralizedSynchronizer.founderInternalSequencerAddress,
+    decentralizedSynchronizerUrl: decentralizedSynchronizer.sv1InternalSequencerAddress,
     domain:
       // defaults for ports and address are fine,
       // we need to include a dummy value though
@@ -576,7 +574,7 @@ function installSvApp(
 
 function installScan(
   xns: ExactNamespace,
-  isFounder: boolean,
+  isFirstSv: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   nodename: string,
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
@@ -592,7 +590,7 @@ function installScan(
     metrics: {
       enable: true,
     },
-    isFounder: isFounder,
+    [supportsRenamedFounder ? 'isFirstSv' : 'isFounder']: isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
@@ -608,3 +606,9 @@ function installScan(
   });
   return scan;
 }
+
+// TODO (#13845) remove when ciperiodic version >= 0.1.18
+const supportsRenamedFounder =
+  defaultVersion.type == 'local' ||
+  defaultVersion.version.startsWith('0.1.18') ||
+  semver.gt(defaultVersion.version, '0.1.18');

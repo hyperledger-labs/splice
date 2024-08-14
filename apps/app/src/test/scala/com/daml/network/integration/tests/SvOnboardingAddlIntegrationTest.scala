@@ -261,7 +261,7 @@ class SvOnboardingAddlIntegrationTest
                   sv2Party.toProtoPrimitive,
                   getSvName(2),
                   "PAR::sv2::1220f3e2",
-                  SvUtil.DefaultFoundingNodeWeight,
+                  SvUtil.DefaultSV1Weight,
                   "no reason",
                 )
               )

@@ -15,7 +15,7 @@ stateSync:
   trustPeriod: "168h0m0s"
 
 peers:
-  # Permanent peers to add alongside the founder
+  # Permanent peers to add alongside the sv1
   # The CometBFT node ID of the peer node
   #- nodeId:
   # External address, in the format <host>:<port> that can be used to access the p2p port of the peer

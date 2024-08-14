@@ -44,7 +44,7 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig] extends 
       )
       .withManualStart
 
-  "founding SV and alice's validator" should {
+  "sv1 and alice's validator" should {
     "produce backup dumps in the background" in { implicit env =>
       initDsoWithSv1Only()
       val participantIdentitiesLogLineRegex =

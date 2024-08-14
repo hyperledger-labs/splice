@@ -1,6 +1,6 @@
 nodeName: "YOUR_SV_NAME"
 
-founder:
+sv1:
   # Replace MIGRATION_ID (part of port number!) with the current migration ID of the global synchronizer.
   externalAddress: TARGET_HOSTNAME:26MIGRATION_ID16
 

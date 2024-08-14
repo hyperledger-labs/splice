@@ -86,11 +86,11 @@ class SvTimeBasedRewardCouponIntegrationTest
         sv1Coupons should have size expectedSize
         aliceCoupons should have size expectedSize
         sv1Coupons.map(_.payload.weight) should be(
-          Seq.fill(expectedSize.toInt)(BigDecimal(SvUtil.DefaultFoundingNodeWeight))
+          Seq.fill(expectedSize.toInt)(BigDecimal(SvUtil.DefaultSV1Weight))
         )
         aliceCoupons.map(_.payload.weight) should be(
           Seq.fill(expectedSize.toInt)(
-            BigDecimal(SvUtil.DefaultFoundingNodeWeight) * BigDecimal("0.3333")
+            BigDecimal(SvUtil.DefaultSV1Weight) * BigDecimal("0.3333")
           )
         )
         // SV4 has no wallet

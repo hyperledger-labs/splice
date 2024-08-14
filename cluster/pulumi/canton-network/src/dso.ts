@@ -26,7 +26,7 @@ interface DsoArgs {
 
   auth0Client: Auth0Client;
   approvedSvIdentities: ApprovedSvIdentity[];
-  expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the founder
+  expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
   isDevNet: boolean;
   periodicBackupConfig?: BackupConfig;
   identitiesBackupLocation: BackupLocation;
@@ -41,7 +41,7 @@ interface DsoArgs {
 
 export class Dso extends pulumi.ComponentResource {
   args: DsoArgs;
-  founder: Promise<InstalledSv>;
+  sv1: Promise<InstalledSv>;
   allSvs: Promise<InstalledSv[]>;
 
   private joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
@@ -57,12 +57,12 @@ export class Dso extends pulumi.ComponentResource {
     svConf: StaticSvConfig,
     onboarding: SvOnboarding,
     nodeConfigs: {
-      founder: StaticCometBftConfigWithNodeName;
+      sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
-    isFounder = false,
+    isFirstSv = false,
     cometBftSyncSource?: k8s.helm.v3.Release
   ) {
     const defaultApprovedSvIdentities = approvedSvIdentities();
@@ -78,7 +78,7 @@ export class Dso extends pulumi.ComponentResource {
 
     return installSvNode(
       {
-        isFounder,
+        isFirstSv,
         nodeName: svConf.nodeName,
         ingressName: svConf.ingressName,
         onboardingName: svConf.onboardingName,
@@ -109,7 +109,7 @@ export class Dso extends pulumi.ComponentResource {
   }
 
   private async installDso() {
-    const [founderConf, ...restSvConfs] = svConfigs.slice(0, this.args.dsoSize);
+    const [sv1Conf, ...restSvConfs] = svConfigs.slice(0, this.args.dsoSize);
 
     const keys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
       return {
@@ -126,10 +126,10 @@ export class Dso extends pulumi.ComponentResource {
       }))
       .concat(daSupportApprovedIdentities);
 
-    const founderCometBftConf = {
-      ...founderConf.cometBft,
-      nodeName: founderConf.nodeName,
-      ingressName: founderConf.ingressName,
+    const sv1CometBftConf = {
+      ...sv1Conf.cometBft,
+      nodeName: sv1Conf.nodeName,
+      ingressName: sv1Conf.ingressName,
     };
     const peerCometBftConfs = restSvConfs.map(conf => ({
       ...conf.cometBft,
@@ -137,20 +137,20 @@ export class Dso extends pulumi.ComponentResource {
       ingressName: conf.ingressName,
     }));
 
-    const foundingSvRewardWeightBps = 140_000;
+    const sv1SvRewardWeightBps = 140_000;
 
     const runningMigration = this.args.decentralizedSynchronizerUpgradeConfig.isRunningMigration();
-    const founder = await this.installSvNode(
-      founderConf,
+    const sv1 = await this.installSvNode(
+      sv1Conf,
       runningMigration
         ? { type: 'domain-migration' }
         : {
             type: 'found-dso',
-            foundingSvRewardWeightBps,
+            sv1SvRewardWeightBps,
             roundZeroDuration: config.optionalEnv('ROUND_ZERO_DURATION'),
           },
       {
-        founder: founderCometBftConf,
+        sv1: sv1CometBftConf,
         peers: peerCometBftConfs,
       },
       additionalSvIdentities,
@@ -162,9 +162,9 @@ export class Dso extends pulumi.ComponentResource {
       restSvConfs.map(conf => {
         const onboarding: SvOnboarding = runningMigration
           ? { type: 'domain-migration' }
-          : this.joinViaSv1(founder.svApp, keys[conf.onboardingName]);
+          : this.joinViaSv1(sv1.svApp, keys[conf.onboardingName]);
         const cometBft = {
-          founder: founderCometBftConf,
+          sv1: sv1CometBftConf,
           peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
         };
 
@@ -175,12 +175,12 @@ export class Dso extends pulumi.ComponentResource {
           additionalSvIdentities,
           [],
           false,
-          founder.svApp
+          sv1.svApp
         );
       })
     );
 
-    return { founder, allSvs: [founder, ...restSvs] };
+    return { sv1, allSvs: [sv1, ...restSvs] };
   }
 
   constructor(name: string, args: DsoArgs, opts?: pulumi.ComponentResourceOptions) {
@@ -190,7 +190,7 @@ export class Dso extends pulumi.ComponentResource {
     const dso = this.installDso();
 
     // eslint-disable-next-line promise/prefer-await-to-then
-    this.founder = dso.then(r => r.founder);
+    this.sv1 = dso.then(r => r.sv1);
     // eslint-disable-next-line promise/prefer-await-to-then
     this.allSvs = dso.then(r => r.allSvs);
 

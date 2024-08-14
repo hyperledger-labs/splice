@@ -5,10 +5,10 @@
 
 {{ $_ := required ".Values.nodeName is required." .Values.nodeName }}
 
-{{ $_ := required ".Values.founder.nodeId is required." (.Values.founder).nodeId }}
-{{ $_ := required ".Values.founder.publicKey is required." (.Values.founder).publicKey }}
-{{ $_ := required ".Values.founder.externalAddress is required." (.Values.founder).externalAddress }}
-{{ $_ := required ".Values.founder.keyAddress is required." (.Values.founder).keyAddress }}
+{{ $_ := required ".Values.sv1.nodeId is required." (.Values.sv1).nodeId }}
+{{ $_ := required ".Values.sv1.publicKey is required." (.Values.sv1).publicKey }}
+{{ $_ := required ".Values.sv1.externalAddress is required." (.Values.sv1).externalAddress }}
+{{ $_ := required ".Values.sv1.keyAddress is required." (.Values.sv1).keyAddress }}
 
 {{ $_ := required ".Values.node.id is required." (.Values.node).id }}
 {{ $_ := required ".Values.node.p2pPort is required." (.Values.node).p2pPort }}

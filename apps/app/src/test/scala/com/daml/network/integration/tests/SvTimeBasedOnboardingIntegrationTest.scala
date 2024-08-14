@@ -93,7 +93,7 @@ class SvTimeBasedOnboardingIntegrationTest
                     svYParty.toProtoPrimitive,
                     "new random party",
                     "PAR::sv::1220f3e2",
-                    SvUtil.DefaultFoundingNodeWeight,
+                    SvUtil.DefaultSV1Weight,
                     "create new `SvOnboardingConfirmed` contract",
                   )
                 )

@@ -1133,7 +1133,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       new DsoRules_AddSv(
         userParty(666).toProtoPrimitive,
         "user666",
-        SvUtil.DefaultFoundingNodeWeight,
+        SvUtil.DefaultSV1Weight,
         "user666ParticipantId",
         new Round(1L),
       )
@@ -1145,7 +1145,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       new DsoRules_AddSv(
         userParty(667).toProtoPrimitive,
         "user667",
-        SvUtil.DefaultFoundingNodeWeight,
+        SvUtil.DefaultSV1Weight,
         "user667ParticipantId",
         new Round(1L),
       )
@@ -1398,7 +1398,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     val template = new SvOnboardingConfirmed(
       candidate.toProtoPrimitive,
       name,
-      SvUtil.DefaultFoundingNodeWeight,
+      SvUtil.DefaultSV1Weight,
       participantId,
       "reason",
       dsoParty.toProtoPrimitive,

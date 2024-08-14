@@ -964,6 +964,41 @@ function subcmd_leader_dso_delegate() {
     "$GSR_ARGS $(exclude_all "${unsafe_for_word_replacement[@]}")"
 }
 
+subcommand_whitelist[founding_founder_sv1]='Rename: founding, founder to sv1'
+function subcmd_founding_founder_sv1() {
+  assert_clean_working_dir
+
+  local extra_includes=(
+    'apps/app/src/test/resources/**/*.conf'
+    'apps/app/src/pack/examples/**/*.yaml'
+    'cluster/**/*.json'
+    'cluster/**/*.tpl'
+    'cluster/**/*.yaml'
+    'cluster/images/**/*.conf'
+    'cluster/pulumi/**/*.ts'
+    docs/src/sv_operator/sv_helm.rst
+    scripts/scan-txlog/scan_txlog.py
+    .envrc.vars.da
+  )
+  local extra_excludes=(
+    'expected-*.json'
+  )
+  local GSR_ARGS
+  GSR_ARGS="$(include_all "${extra_includes[@]}") $(exclude_all "${extra_excludes[@]}") $(include_all "${app_scala_files[@]}")"
+
+  run_and_commit_rename "founder in config to firstSv" \
+    "'\bisFounder\b///isFirstSv'" \
+    "'\bis-founder\b///is-first-sv'" \
+    "'\bfounder(?=SvRewardWeightBps\b)///first'" \
+    "'\bfounder(?=-sv-reward-weight-bps\b)///first'" \
+    "$GSR_ARGS"
+  run_and_commit_rename "founding node, founder to SV1" \
+    "'(?:(?:\bthe )?founding(?: SV\b)?(?: node\b)?|founding|founder(?: member\b)?)///sv1'" \
+    "'(?:Founding(?:Node| node\b)|Founder|FOUNDER)///SV1'" \
+    "'(?<=\bonboarding)FoundingSv(?=RewardWeightBps)\b///SV1'" \
+    "$GSR_ARGS"
+}
+
 ### UI cleanup - ANS
 
 subcommand_whitelist[ui_cleanup_ans]='Rename: UI cleanup to use CNS instead of ANS'

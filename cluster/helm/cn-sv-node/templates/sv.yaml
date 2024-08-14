@@ -76,7 +76,7 @@ spec:
               value: {{ .Values.onboardingName }}
             {{- end }}
             {{- if .Values.onboardingFoundingSvRewardWeightBps }}
-            - name: CN_APP_SV_FOUNDER_REWARD_WEIGHT
+            - name: CN_APP_SV_SV1_REWARD_WEIGHT
               value: {{ .Values.onboardingFoundingSvRewardWeightBps | quote }}
             {{- end }}
             {{- if .Values.onboardingRoundZeroDuration }}

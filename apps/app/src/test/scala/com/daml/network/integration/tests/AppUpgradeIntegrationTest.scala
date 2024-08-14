@@ -174,10 +174,10 @@ class AppUpgradeIntegrationTest
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
-          // Founder does not upload DAR before the vote goes through
+          // SV1 does not upload DAR before the vote goes through
           // TODO(#13413) Enable this
-          // val founderPackages = sv1Backend.participantClientWithAdminToken.packages.list()
-          // forAll(founderPackages) { pkg =>
+          // val sv1Packages = sv1Backend.participantClientWithAdminToken.packages.list()
+          // forAll(sv1Packages) { pkg =>
           //   pkg.packageId should not be DarResources.amulet.bootstrap.packageId
           // }
 
@@ -312,9 +312,9 @@ class AppUpgradeIntegrationTest
             },
           )
 
-          val founderPackagesAfterUpgrade =
+          val sv1PackagesAfterUpgrade =
             sv1Backend.participantClientWithAdminToken.packages.list()
-          forExactly(1, founderPackagesAfterUpgrade) { pkg =>
+          forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
             pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
           }
 

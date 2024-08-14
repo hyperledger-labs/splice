@@ -37,7 +37,7 @@ export function installCometBftNode(
   onboardingName: string,
   nodeConfigs: {
     self: StaticCometBftConfigWithNodeName;
-    founder: StaticCometBftConfigWithNodeName;
+    sv1: StaticCometBftConfigWithNodeName;
     peers: StaticCometBftConfigWithNodeName[];
   },
   migrationId: DomainMigrationIndex,
@@ -65,7 +65,9 @@ export function installCometBftNode(
     'cn-cometbft',
     {
       nodeName: onboardingName,
-      founder: configs.founder,
+      sv1: configs.sv1,
+      // TODO (#13845) remove when ciperiodic version >= 0.1.18
+      founder: configs.sv1,
       istioVirtualService: {
         enabled: true,
         gateway: 'cluster-ingress/cn-apps-gateway',
@@ -133,7 +135,7 @@ class CometBftNodeConfig {
   private readonly _domainMigrationId: number;
   private readonly _nodeConfigs: {
     self: StaticCometBftConfigWithNodeName;
-    founder: StaticCometBftConfigWithNodeName;
+    sv1: StaticCometBftConfigWithNodeName;
     peers: StaticCometBftConfigWithNodeName[];
   };
 
@@ -141,7 +143,7 @@ class CometBftNodeConfig {
     domainMigrationId: number,
     nodeConfigs: {
       self: StaticCometBftConfigWithNodeName;
-      founder: StaticCometBftConfigWithNodeName;
+      sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     }
   ) {
@@ -166,7 +168,7 @@ class CometBftNodeConfig {
   }
 
   get sv1NodeConfig() {
-    return this.staticToNodeConfig(this._nodeConfigs.founder);
+    return this.staticToNodeConfig(this._nodeConfigs.sv1);
   }
 
   p2pServiceAddress(nodename: string): string {
@@ -177,19 +179,19 @@ class CometBftNodeConfig {
     return `global-domain-${this._domainMigrationId}-cometbft`;
   }
 
-  get founder() {
+  get sv1() {
     return {
       nodeId: this.sv1NodeConfig.id,
       publicKey: this.sv1NodeConfig.validator.publicKey,
       keyAddress: this.sv1NodeConfig.validator.keyAddress,
-      externalAddress: this.p2pServiceAddress(this._nodeConfigs.founder.nodeName),
+      externalAddress: this.p2pServiceAddress(this._nodeConfigs.sv1.nodeName),
     };
   }
 
   get nodeConfigs(): {
     [key: string]: NodeConfig;
   } {
-    return [this._nodeConfigs.founder, this._nodeConfigs.self, ...this._nodeConfigs.peers].reduce<{
+    return [this._nodeConfigs.sv1, this._nodeConfigs.self, ...this._nodeConfigs.peers].reduce<{
       [key: string]: NodeConfig;
     }>((acc, staticConf) => {
       return { ...acc, [staticConf.nodeName]: this.staticToNodeConfig(staticConf) };

@@ -43,6 +43,8 @@ Upcoming
   * `validatorPartyHint` is now mandatory for non-SV validators. For an existing validator, it should be set to the current party hint
     (otherwise, the value will be ignored, and a warning will be printed to log).
     For new validators, it should be of format `<organization>-<function>-<enumerator>`.
+  * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
+    example has been updated to match, and this change must be made to your own copy.
 
 * Documentation
 
