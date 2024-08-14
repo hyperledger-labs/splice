@@ -3,12 +3,13 @@
 
 package com.daml.network.store
 
-import com.daml.metrics.api.{MetricInfo, MetricName}
-import com.daml.metrics.api.MetricHandle.{LabeledMetricsFactory, Timer}
-import com.daml.metrics.api.MetricQualification.Latency
+import com.daml.metrics.api.{MetricsContext, MetricInfo, MetricName}
+import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Timer}
+import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.network.environment.SpliceMetrics
 
-class StoreMetrics(metricsFactory: LabeledMetricsFactory) {
+class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext)
+    extends AutoCloseable {
 
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "store"
 
@@ -22,4 +23,18 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory) {
       )
     )
 
+  val acsSize: Gauge[Long] =
+    metricsFactory.gauge(
+      MetricInfo(
+        name = prefix :+ "acs-size",
+        summary = "The number of active contracts in this store",
+        Traffic,
+        "The number of active contracts in this store. Note that this is only in the given store. The participant might have contracts we do not ingest.",
+      ),
+      0L,
+    )(metricsContext)
+
+  override def close(): Unit = {
+    acsSize.close()
+  }
 }

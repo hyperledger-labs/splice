@@ -93,6 +93,7 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val storeParty = storeDescriptor.party.toString
 
   override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
+  override lazy val metrics = new StoreMetrics(metricsFactory)(mc)
 
   private val state = new AtomicReference[State](State.empty())
 
@@ -736,6 +737,7 @@ final class DbMultiDomainAcsStore[TXE](
           offset = offset,
           recordTime = None,
           newAcsSize = newAcsSize,
+          metrics,
         )
         state
           .getAndUpdate(
@@ -774,6 +776,7 @@ final class DbMultiDomainAcsStore[TXE](
                 offset = reassignment.offset.getOffset,
                 recordTime = Some(reassignment.recordTime),
                 newAcsSize = state.get().acsSize,
+                metrics,
               )
             logger.debug(show"Ingested reassignment $summary")
             handleIngestionSummary(summary)
@@ -795,6 +798,7 @@ final class DbMultiDomainAcsStore[TXE](
                 offset = tree.getOffset,
                 recordTime = Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)),
                 newAcsSize = state.get().acsSize,
+                metrics,
               )
             logger.debug(show"Ingested transaction $summary")
             handleIngestionSummary(summary)
@@ -1321,8 +1325,6 @@ final class DbMultiDomainAcsStore[TXE](
     storage.update(action, "deleteRolledBackTxLogEntries")
   }
 
-  override def close(): Unit = ()
-
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def reassignmentEventUnassignFromRow(
       row: SelectFromAcsTableWithStateResult
@@ -1337,6 +1339,9 @@ final class DbMultiDomainAcsStore[TXE](
       counter = row.stateRow.reassignmentCounter,
     )
   }
+
+  override def close(): Unit =
+    metrics.close()
 }
 
 object DbMultiDomainAcsStore {
@@ -1456,26 +1461,32 @@ object DbMultiDomainAcsStore {
         offset: String,
         recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
-    ): IngestionSummary = IngestionSummary(
-      updateId = updateId,
-      synchronizerId = synchronizerId,
-      offset = Some(offset),
-      recordTime = recordTime,
-      newAcsSize = newAcsSize,
-      ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
-      numFilteredCreatedEvents = this.numFilteredCreatedEvents,
-      ingestedArchivedEvents = this.ingestedArchivedEvents.toVector,
-      numFilteredArchivedEvents = this.numFilteredArchivedEvents,
-      updatedContractStates = this.updatedContractStates.toVector,
-      addedAssignEvents = this.addedAssignEvents.toVector,
-      numFilteredAssignEvents = this.numFilteredAssignEvents,
-      removedAssignEvents = this.removedAssignEvents.toVector,
-      addedUnassignEvents = this.addedUnassignEvents.toVector,
-      numFilteredUnassignEvents = this.numFilteredUnassignEvents,
-      removedUnassignEvents = this.removedUnassignEvents.toVector,
-      prunedContracts = Vector.empty,
-      ingestedTxLogEntries = this.ingestedTxLogEntries.toSeq,
-    )
+        metrics: StoreMetrics,
+    ): IngestionSummary = {
+      // We update the metrics in here as it's the easiest way
+      // to not miss any place that might need updating.
+      metrics.acsSize.updateValue(newAcsSize.toLong)
+      IngestionSummary(
+        updateId = updateId,
+        synchronizerId = synchronizerId,
+        offset = Some(offset),
+        recordTime = recordTime,
+        newAcsSize = newAcsSize,
+        ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
+        numFilteredCreatedEvents = this.numFilteredCreatedEvents,
+        ingestedArchivedEvents = this.ingestedArchivedEvents.toVector,
+        numFilteredArchivedEvents = this.numFilteredArchivedEvents,
+        updatedContractStates = this.updatedContractStates.toVector,
+        addedAssignEvents = this.addedAssignEvents.toVector,
+        numFilteredAssignEvents = this.numFilteredAssignEvents,
+        removedAssignEvents = this.removedAssignEvents.toVector,
+        addedUnassignEvents = this.addedUnassignEvents.toVector,
+        numFilteredUnassignEvents = this.numFilteredUnassignEvents,
+        removedUnassignEvents = this.removedUnassignEvents.toVector,
+        prunedContracts = Vector.empty,
+        ingestedTxLogEntries = this.ingestedTxLogEntries.toSeq,
+      )
+    }
   }
 
   object MutableIngestionSummary {

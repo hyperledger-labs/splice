@@ -56,12 +56,13 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   protected def storeName: String
   protected def storeParty: String
 
-  private implicit val mc: MetricsContext = MetricsContext(
+  protected implicit lazy val mc: MetricsContext = MetricsContext(
     "store_name" -> storeName,
     "store_party" -> storeParty,
   )
   protected def metricsFactory: LabeledMetricsFactory
-  val metrics = new StoreMetrics(metricsFactory)
+
+  protected def metrics: StoreMetrics
 
   import MultiDomainAcsStore.*
 

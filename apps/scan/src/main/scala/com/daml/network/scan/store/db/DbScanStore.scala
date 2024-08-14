@@ -119,6 +119,7 @@ class DbScanStore(
         NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
       ),
       SyncCloseable("db_scan_store_metrics", storeMetrics.close()),
+      SyncCloseable("db_scan_acs_store", multiDomainAcsStore.close()),
     )
   }
 
