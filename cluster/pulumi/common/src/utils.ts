@@ -231,14 +231,20 @@ const withoutAutoInit = (version: CnChartVersion) =>
   semver.gt(version.version, '0.2.0');
 
 // TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
-export const autoInitValues = (version: CnChartVersion, nodeIdentifier: string): ChartValues => {
+export const autoInitValues = (
+  chartName: string,
+  version: CnChartVersion,
+  nodeIdentifier: string
+): ChartValues => {
   const versionStr =
     version.type === 'local' ? 'local charts' : `remote charts version ${version.version}`;
   if (withoutAutoInit(version)) {
-    console.error(`Node ${nodeIdentifier} is using ${versionStr}`);
+    console.error(`Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}`);
     return {};
   } else {
-    console.error(`Node ${nodeIdentifier} is using ${versionStr}, setting auto init values`);
+    console.error(
+      `Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}, setting auto init values`
+    );
     return {
       disableAutoInit: true,
       nodeIdentifier,

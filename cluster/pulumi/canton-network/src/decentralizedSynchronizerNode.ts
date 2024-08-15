@@ -111,7 +111,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
             active: active,
           },
         },
-        ...autoInitValues(defaultVersion, nodeIdentifier),
+        ...autoInitValues('cn-global-domain', version, nodeIdentifier),
         additionalJvmOptions: jmxOptions(),
         enablePostgresMetrics: true,
       },

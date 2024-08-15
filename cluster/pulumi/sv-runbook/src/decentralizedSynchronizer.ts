@@ -12,6 +12,7 @@ import {
   sequencerResources,
   sequencerTokenExpirationTime,
   config,
+  autoInitValues,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -56,7 +57,6 @@ export function installDecentralizedSynchronizerNode(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
           {
             MIGRATION_ID: migrationId.toString(),
-            YOUR_SV_NAME: svName,
           }
         ),
         metrics: {
@@ -94,6 +94,7 @@ export function installDecentralizedSynchronizerNode(
           },
           enablePostgresMetrics: true,
           logLevel: logLevel,
+          ...autoInitValues('cn-global-domain', version, svName),
         },
         version,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])

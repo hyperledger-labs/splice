@@ -176,7 +176,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
     ),
-    ...autoInitValues(defaultVersion, config.nodeIdentifier),
     metrics: {
       enable: true,
     },
@@ -194,6 +193,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
+    ...autoInitValues('cn-participant', defaultVersion, config.nodeIdentifier),
   };
 
   const participant = installCNRunbookHelmChart(

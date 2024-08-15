@@ -478,6 +478,7 @@
             }
           }
         },
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",
         "mediator": {

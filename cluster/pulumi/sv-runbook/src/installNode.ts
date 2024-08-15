@@ -245,7 +245,6 @@ async function installSvAndValidator(
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
           }
         ),
-        ...autoInitValues(version, onboardingName),
         metrics: {
           enable: true,
           migration: {
@@ -262,6 +261,7 @@ async function installSvAndValidator(
           ...participantValues.auth,
           targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
         },
+        ...autoInitValues('cn-participant', version, onboardingName),
       };
 
       return installCNRunbookHelmChart(

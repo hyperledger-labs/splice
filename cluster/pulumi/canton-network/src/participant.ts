@@ -100,7 +100,7 @@ export function installParticipant(
         jwksUrl: `https://${auth0Cfg.auth0Domain}/.well-known/jwks.json`,
         targetAudience: auth0Cfg.appToApiAudience['participant'],
       },
-      ...autoInitValues(version, nodeIdentifier),
+      ...autoInitValues('cn-participant', version, nodeIdentifier),
     },
     version,
     {

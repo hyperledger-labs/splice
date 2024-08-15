@@ -500,6 +500,7 @@
             }
           }
         },
+        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "logLevel": "DEBUG",
         "mediator": {

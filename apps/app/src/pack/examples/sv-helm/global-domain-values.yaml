@@ -15,4 +15,3 @@ mediator:
     port: 5432
     secretName: mediator-pg-secret
     databaseName: mediator_MIGRATION_ID
-nodeIdentifier: YOUR_SV_NAME
