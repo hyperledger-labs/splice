@@ -87,7 +87,7 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
-import scala.concurrent.{blocking, ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -547,6 +547,7 @@ class SvApp(
               extraSynchronizerNodes,
               participantAdminConnection,
               config.domainMigrationId,
+              config.legacyMigrationId,
               clock,
               retryProvider,
               loggerFactory,

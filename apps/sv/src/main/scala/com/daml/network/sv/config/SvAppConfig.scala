@@ -207,6 +207,7 @@ case class SvAppBackendConfig(
     supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
+    legacyMigrationId: Option[Long] = None,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
