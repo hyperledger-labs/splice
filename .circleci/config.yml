@@ -2691,9 +2691,6 @@ jobs:
           command: |
             set -eou pipefail
             .circleci/copy-openapi.sh
-      - store_artifacts:
-          path: /tmp/artifacts
-          destination: release-artifacts
       - run_bash_command_in_nix:
          cmd_name: Publish release bundles
          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
