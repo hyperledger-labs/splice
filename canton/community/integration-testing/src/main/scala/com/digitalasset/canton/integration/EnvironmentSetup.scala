@@ -8,12 +8,15 @@ import com.digitalasset.canton.CloseableTest
 import com.digitalasset.canton.config.DefaultPorts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
 import java.util.concurrent.TimeUnit
-import scala.util.control.NonFatal
+import scala.util.Try
+import scala.util.control.{NoStackTrace, NonFatal}
 
 /** Provides an ability to create a canton environment when needed for test.
   * Include [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens.
@@ -77,64 +80,96 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
       configTransform: E#Config => E#Config = identity,
       runPlugins: EnvironmentSetupPlugin[E, TCE] => Boolean = _ => true,
       testName: Option[String],
-  ): TCE = {
+  ): TCE = TraceContext.withNewTraceContext { tc =>
+    logger.debug(
+      s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
+    )(tc)
+    import org.scalactic.source
+    def step[T](name: String)(expr: => T)(implicit pos: source.Position): T = {
+      logger.debug(s"Starting creating environment: $name")(tc)
+      Try(expr) match {
+        case scala.util.Success(value) =>
+          logger.debug(s"Finished creating environment: $name")(tc)
+          value
+        case scala.util.Failure(exception) =>
+          val loc = s"(${pos.fileName}:${pos.lineNumber})"
+          logger.error(s"Failed creating environment: $name $loc", exception)(tc)
+          throw EnvironmentSetupException(
+            s"Creating environment failed at step $name $loc",
+            exception,
+          )
+      }
+    }
     val metrics = testInfrastructureEnvironmentMetrics(testName)
     val testConfig = initialConfig
     // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
-    val pluginConfig = Timed.value(
-      metrics.environmentCreatePluginsBefore,
-      plugins.foldLeft(testConfig)((config, plugin) =>
-        if (runPlugins(plugin))
-          plugin.beforeEnvironmentCreated(config)
-        else
-          config
-      ),
-    )
-
-    // Once all the plugins and config transformation is done apply the defaults
-    val finalConfig = configTransform(pluginConfig).withDefaults(new DefaultPorts())
-
-    val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
-    val environmentFixture = Timed.value(
-      metrics.environmentCreateFixture,
-      envDef.environmentFactory.create(
-        finalConfig,
-        loggerFactory,
-        envDef.testingConfig.copy(
-          metricsFactoryType =
-            /* If metrics reporters were configured for the test then it's an externally observed test
-             * therefore actual metrics have to be reported.
-             * The in memory metrics are used when no reporters are configured and the metrics are
-             * observed directly in the test scenarios.
-             *
-             * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
-             * which is accessible using env.environment.metricsRegistry
-             *
-             * */
-            if (finalConfig.monitoring.metrics.reporters.isEmpty)
-              MetricsFactoryType.InMemory(scopedMetricsFactory)
-            else MetricsFactoryType.External,
-          initializeGlobalOpenTelemetry = false,
-          sequencerTransportSeed = Some(1L),
-        ),
-      ),
-    )
-
-    try {
-      val testEnvironment: TCE =
-        envDef.createTestConsole(environmentFixture, loggerFactory)
-
+    val pluginConfig = step("Running plugins before") {
       Timed.value(
-        metrics.environmentCreatePluginsAfter,
-        plugins.foreach(plugin =>
-          if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+        metrics.environmentCreatePluginsBefore,
+        plugins.foldLeft(testConfig)((config, plugin) =>
+          if (runPlugins(plugin))
+            plugin.beforeEnvironmentCreated(config)
+          else
+            config
         ),
       )
+    }
+
+    // Once all the plugins and config transformation is done apply the defaults
+    val finalConfig = step("Applying config transforms") {
+      configTransform(pluginConfig).withDefaults(new DefaultPorts())
+    }
+
+    val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
+    val environmentFixture = step("Creating fixture") {
+      Timed.value(
+        metrics.environmentCreateFixture,
+        envDef.environmentFactory.create(
+          finalConfig,
+          loggerFactory,
+          envDef.testingConfig.copy(
+            metricsFactoryType =
+              /* If metrics reporters were configured for the test then it's an externally observed test
+               * therefore actual metrics have to be reported.
+               * The in memory metrics are used when no reporters are configured and the metrics are
+               * observed directly in the test scenarios.
+               *
+               * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
+               * which is accessible using env.environment.metricsRegistry
+               *
+               * */
+              if (finalConfig.monitoring.metrics.reporters.isEmpty)
+                MetricsFactoryType.InMemory(scopedMetricsFactory)
+              else MetricsFactoryType.External,
+            initializeGlobalOpenTelemetry = false,
+            sequencerTransportSeed = Some(1L),
+          ),
+        ),
+      )
+    }
+
+    try {
+      val testEnvironment: TCE = step("Creating test console") {
+        envDef.createTestConsole(environmentFixture, loggerFactory)
+      }
+
+      step("Running plugins after") {
+        Timed.value(
+          metrics.environmentCreatePluginsAfter,
+          plugins.foreach(plugin =>
+            if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+          ),
+        )
+      }
 
       if (!finalConfig.parameters.manualStart)
-        handleStartupLogs(testEnvironment.startAll())
+        step("Starting all nodes") {
+          handleStartupLogs(testEnvironment.startAll())
+        }
 
-      envDef.setups.foreach(setup => setup(testEnvironment))
+      step("Running setup") {
+        envDef.setups.foreach(setup => setup(testEnvironment))
+      }
 
       testEnvironment
     } catch {
@@ -188,6 +223,12 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     */
   protected def numPermits: PositiveInt = PositiveInt.one
 
+}
+
+object EnvironmentSetup {
+  final case class EnvironmentSetupException(message: String, cause: Throwable)
+      extends RuntimeException(message, cause)
+      with NoStackTrace // Stack trace is just a lot of scalatest and EnvironmentSetup
 }
 
 /** Starts an environment in a beforeAll test and uses it for all tests.
