@@ -1632,33 +1632,26 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: |
-            set -eou pipefail
-
-            cncluster activate
-            latest_creationTimestamp=$(kubectl get volumesnapshot -n << parameters.namespace_name >> -o json | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.creationTimestamp')
-            msg="The latest backup for namespace << parameters.namespace_name >>"
-
-            if [ -n "$latest_creationTimestamp" ] && date -d "$latest_creationTimestamp" >/dev/null 2>&1; then
-              latest_creation_epoch=$(date -d "$latest_creationTimestamp" +%s)
-              last_epoch=$(date -d "<< parameters.alert_threshold >>" +%s)
-
-              if [ "$latest_creation_epoch" -lt "$last_epoch" ]; then
-                msg+=" is older than << parameters.alert_threshold >> with creationTimestamp: $latest_creationTimestamp."
-                echo $msg
-                exit 1
-              else
-                msg+=" is not older than << parameters.alert_threshold >> with creationTimestamp: $latest_creationTimestamp."
-                echo $msg
-              fi
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>"
+      - run:
+          name: Add snapshot_array to env
+          command: |
+            echo "source tmp-snapshots.sh" >> "$BASH_ENV"
+      - run:
+          name: Notify if backups are old
+          command: |
+            if [ ${#snapshot_array[@]} -eq 0 ]; then
+              echo "Do not notify."
+              exit 0
             else
-              echo "No volumesnapshot found yet."
+              echo "Notify."
+              exit 1
             fi
       - slack/notify:
           channel: << parameters.channel_notify >>
           event: fail
           custom: |
-            { "text": "The latest backup for cluster: << parameters.cluster >> and namespace: << parameters.namespace_name >> is older than << parameters.alert_threshold >>." }
+            { "text": ":fire: Found backups in << parameters.cluster >> that are older than << parameters.alert_threshold >>:\n${snapshot_array[@]}" }
 
   deploy_sv_runbook:
     machine:
