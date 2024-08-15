@@ -52,7 +52,6 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        preview-changes,
         deploy-hard-migration,
         backup-status-check,
       ]

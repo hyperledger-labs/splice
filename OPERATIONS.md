@@ -5,12 +5,11 @@ This document describes guidelines for operating on production clusters (MainNet
 ## Patching an [Operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#operator-deployments) controlled deployment
 
 1. Open a PR with the changes
-2. Run the preview job for the clusters tracking the branch, by running on the branch that you created, a CCI job with the following arguments: `run-job=preview-changes`
-3. Post the link to the preview job in the PR you have opened, and (optionally) add the preview job output as a comment on the PR
-4. Get approval for the PR
-5. Post on the slack channel for the clusters that you are merging a patch
-6. Merge the PR
-7. Monitor the cluster health (as outlined further down in this document) and slack channels for notifications until the operator has finished applying your changes
+2. Review the output of the `preview-pulumi-changes` CircleCi workflow
+3. Get approval for the PR
+4. Post on the slack channel for the clusters that you are merging a patch
+5. Merge the PR
+6. Monitor the cluster health (as outlined further down in this document) and slack channels for notifications until the operator has finished applying your changes
 
 ## Emergency fixes on production clusters
 
