@@ -12,14 +12,15 @@ import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import com.daml.network.config.{
   ConfigTransforms,
-  ParticipantClientConfig,
   NetworkAppClientConfig,
+  ParticipantClientConfig,
   SynchronizerConfig,
 }
-import com.daml.network.config.ConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
+  SvAppBackendReference,
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
@@ -47,9 +48,9 @@ import com.daml.network.sv.automation.singlesv.SvNamespaceMembershipTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
-  SpliceUtil,
   DomainMigrationUtil,
   ProcessTestUtil,
+  SpliceUtil,
   SplitwellTestUtil,
   StandaloneCanton,
   SvTestUtil,
@@ -134,6 +135,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       )
                     ),
                     domainMigrationId = 1L,
+                    legacyMigrationId = Some(0L),
                   )
             ) + (
               InstanceName.tryCreate(s"sv1LocalOnboarded") ->
@@ -142,6 +144,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .copy(
                     onboarding = None,
                     domainMigrationId = 1L,
+                    legacyMigrationId = None,
                   )
             ),
           scanApps = config.scanApps + (
@@ -594,7 +597,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             )
           val testDsoParty = dsoParty(env)
           val dsoPartyDecentralizedNamespace = testDsoParty.uid.namespace
-
           val domainDynamicParams =
             sv1Backend.participantClientWithAdminToken.topology.domain_parameters
               .list(
@@ -839,19 +841,35 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               )
             }
 
-            clue(s"validator should connect to sequencers in upgraded domain") {
+            clue(s"scan should expose sequencers in both pre-upgrade or upgraded domain") {
               eventually() {
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
                   case Seq(DomainSequencers(domainId, sequencers)) =>
                     domainId shouldBe decentralizedSynchronizerId
                     sequencers.foreach { sequencer =>
-                      if (sequencer.migrationId != 1)
+                      if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
-                          s"Expected sequencer migrationId to be 1, but got ${sequencer.migrationId}"
+                          s"Expected sequencer migrationId to be either 0 or 1, but got ${sequencer.migrationId}"
                         )
-                      sequencers should have size 4
                     }
+                    sequencers.map { sequencer =>
+                      (sequencer.migrationId, sequencer.url)
+                    }.toSet shouldBe Set(
+                      (0L, getPublicSequencerUrl(sv1Backend)),
+                      (1L, getPublicSequencerUrl(sv1LocalBackend)),
+                      (0L, getPublicSequencerUrl(sv2Backend)),
+                      (1L, getPublicSequencerUrl(sv2LocalBackend)),
+                      (0L, getPublicSequencerUrl(sv3Backend)),
+                      (1L, getPublicSequencerUrl(sv3LocalBackend)),
+                      (0L, getPublicSequencerUrl(sv4Backend)),
+                      (1L, getPublicSequencerUrl(sv4LocalBackend)),
+                    )
                 }
+              }
+            }
+
+            clue(s"validator should connect to sequencers in upgraded domain") {
+              eventually() {
                 val sequencerUrlSet = getSequencerUrlSet(
                   aliceValidatorLocal.participantClientWithAdminToken,
                   decentralizedSynchronizerAlias,
@@ -985,6 +1003,26 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               withClueAndLog("sv1 restarts without any onboarding type") {
                 sv1LocalBackend.stop()
                 svb("sv1LocalOnboarded").startSync()
+
+                clue(s"scan should expose sequencers in upgraded domain only for sv1") {
+                  eventually() {
+                    inside(sv1ScanLocalBackend.listDsoSequencers()) {
+                      case Seq(DomainSequencers(domainId, sequencers)) =>
+                        domainId shouldBe decentralizedSynchronizerId
+                        sequencers.map { sequencer =>
+                          (sequencer.migrationId, sequencer.url)
+                        }.toSet shouldBe Set(
+                          (1L, getPublicSequencerUrl(sv1LocalBackend)),
+                          (0L, getPublicSequencerUrl(sv2Backend)),
+                          (1L, getPublicSequencerUrl(sv2LocalBackend)),
+                          (0L, getPublicSequencerUrl(sv3Backend)),
+                          (1L, getPublicSequencerUrl(sv3LocalBackend)),
+                          (0L, getPublicSequencerUrl(sv4Backend)),
+                          (1L, getPublicSequencerUrl(sv4LocalBackend)),
+                        )
+                    }
+                  }
+                }
               }
             }
           }
@@ -1170,6 +1208,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       key
     }
   }
+
+  private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
+    sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
 }
 
 object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {

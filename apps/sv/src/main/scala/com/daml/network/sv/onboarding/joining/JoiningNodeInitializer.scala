@@ -288,6 +288,7 @@ class JoiningNodeInitializer(
     val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
       dsoAutomationService.connection,
+      config.legacyMigrationId,
       clock,
       retryProvider,
       logger,

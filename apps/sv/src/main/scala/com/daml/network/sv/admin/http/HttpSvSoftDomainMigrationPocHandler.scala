@@ -58,6 +58,7 @@ class HttpSvSoftDomainMigrationPocHandler(
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     migrationId: Long,
+    legacyMigrationId: Option[Long],
     clock: Clock,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -435,6 +436,7 @@ class HttpSvSoftDomainMigrationPocHandler(
     val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
       dsoStoreWithIngestion.connection,
+      legacyMigrationId,
       clock,
       retryProvider,
       logger,

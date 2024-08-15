@@ -79,7 +79,7 @@ export const amuletRules = {
             packageConfig: {
               amuletNameService: '0.1.4',
               walletPayments: '0.1.4',
-              dsoGovernance: '0.1.6',
+              dsoGovernance: '0.1.7',
               validatorLifecycle: '0.1.1',
               amulet: '0.1.4',
               wallet: '0.1.4',
