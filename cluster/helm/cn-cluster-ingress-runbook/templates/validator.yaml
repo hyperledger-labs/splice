@@ -59,6 +59,6 @@ spec:
         - destination:
             port:
               number: 80
-            host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: ans-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}

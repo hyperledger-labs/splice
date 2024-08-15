@@ -20,7 +20,7 @@ ADD target/cn-node-0.1.0-SNAPSHOT.tar.gz .
 
 COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/LICENSE /app/
 
-RUN ln -s cn-node-0.1.0-SNAPSHOT/bin/cn-node cn-image-bin
+RUN ln -s cn-node-0.1.0-SNAPSHOT/bin/cn-node splice-image-bin
 
 # point entrypoint to the cn-node executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

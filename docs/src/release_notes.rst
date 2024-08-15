@@ -1244,7 +1244,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * The Canton Name Service Directory UI is now being deployed as part of the SV node in our runbook.
     See instructions for deploying the ``cn-validator`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
     and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-    Section :ref:`Using the Canton Coin Directory UI <helm-cns-web-ui>` explains the UI.
+    Section Using the Canton Coin Directory UI explains the UI.
     By searching for a name in the UI, an SV operator can register the name on Canton name service if it is not yet
     registered.
 

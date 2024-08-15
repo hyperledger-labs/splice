@@ -1,7 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{{- $cnsWebUiLabel := "cns-web-ui" }}
+{{- $cnsWebUiLabel := "ans-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,8 +24,8 @@ spec:
         migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
-      - name: cns-web-ui
-        image: "{{ .Values.imageRepo }}/cns-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).cns_web_ui) }}"
+      - name: ans-web-ui
+        image: "{{ .Values.imageRepo }}/ans-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).cns_web_ui) }}"
         imagePullPolicy: Always
         env:
         - name: CN_APP_UI_AUTH_CLIENT_ID

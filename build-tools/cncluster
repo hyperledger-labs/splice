@@ -1956,25 +1956,25 @@ function subcmd_debug_shell() {
 apiVersion: v1
 kind: Pod
 metadata:
-  name: cn-debug
+  name: splice-debug
   labels:
-    app: cn-debug
+    app: splice-debug
 spec:
   containers:
-  - name: cn-debug
-    image: us-central1-docker.pkg.dev/da-cn-shared/cn-images/cn-debug:${VERSION_NUMBER}
+  - name: splice-debug
+    image: us-central1-docker.pkg.dev/da-cn-shared/cn-images/splice-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
   restartPolicy: Never
 EOF
 
   ( _info "Waiting for debug pod to become ready" && \
-    kubectl wait --for=condition=Ready pod cn-debug --timeout=30s && \
+    kubectl wait --for=condition=Ready pod splice-debug --timeout=30s && \
     _info "Opening terminal on debug pod" && \
-    kubectl exec -it cn-debug -- /bin/bash ) || true
+    kubectl exec -it splice-debug -- /bin/bash ) || true
 
   _info "Deleting debug pod"
-  kubectl delete pod cn-debug
+  kubectl delete pod splice-debug
 }
 
 ###

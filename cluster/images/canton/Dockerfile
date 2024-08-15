@@ -19,7 +19,7 @@ ADD target/canton.tar .
 
 COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 
-RUN ln -s bin/canton cn-image-bin
+RUN ln -s bin/canton splice-image-bin
 
 # point entrypoint to the amulet executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
