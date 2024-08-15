@@ -7,7 +7,7 @@ set -eou pipefail
 
 source /app/tools.sh
 
-EXE=$(readlink -f cn-image-bin)
+EXE=$(readlink -f splice-image-bin)
 
 declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off )
 

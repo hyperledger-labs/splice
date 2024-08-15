@@ -406,7 +406,7 @@ namespace. A typical query might look as follows:
 
     $ kubectl get pods -n validator
     NAMESPACE         NAME                                  READY   STATUS             RESTARTS        AGE
-    validator         cns-web-ui-5bf489db78-bdn2j           1/1     Running            0               24m
+    validator         ans-web-ui-5bf489db78-bdn2j           1/1     Running            0               24m
     validator         participant-8988dfb54-m9655           1/1     Running            0               26m
     validator         postgres-0                            1/1     Running            0               37m
     validator         validator-app-f8c74d5dd-zf9j4         1/1     Running            0               24m
@@ -431,13 +431,13 @@ Services               Port         Routes
 ---------------------- ------------ ---------------------------------------------------------------------------
 ``wallet-web-ui``                   ``https://wallet.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
-``cns-web-ui``                      ``https://cns.validator.<YOUR_HOSTNAME>``
+``ans-web-ui``                      ``https://cns.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://cns.validator.<YOUR_HOSTNAME>/api/validator``
 ====================== ============ ===========================================================================
 
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
 * ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
-* ``https://cns.validator.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``validator`` namespace
+* ``https://cns.validator.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``validator`` namespace
 * ``https://cns.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
@@ -569,7 +569,7 @@ the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b736
 
 An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
 
-.. _helm-validator-cns-web-ui:
+.. _helm-validator-ans-web-ui:
 
 Logging into the CNS UI
 -----------------------------

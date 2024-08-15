@@ -1177,6 +1177,36 @@ function subcmd_no_bad_things_repo_wide() {
     done
 }
 
+subcommand_whitelist[rename_docker_images]='Rename docker images'
+function subcmd_rename_docker_images() {
+  assert_clean_working_dir
+
+  rename "cn-debug to splice-debug" \
+    "'cn-debug///splice-debug'" \
+    "" \
+    ""
+
+  rename "cn-app image to splice-app" \
+    "'\bcn-app($| |:)///splice-app\\1'" \
+    "" \
+    ""
+
+  rename "cns-web-ui image to ans-web-ui" \
+    "'\bcns-web-ui\b///ans-web-ui'" \
+    "" \
+    ""
+
+  rename "cn-base-image-dep to splice-base-image-dep" \
+    "'cn-base-image-dep///splice-base-image-dep'" \
+    "" \
+    ""
+
+  rename "cn-image to splice-image" \
+    "'\bcn-image\b///splice-image'" \
+    "" \
+    ""
+}
+
 ################################
 ### Main
 ################################

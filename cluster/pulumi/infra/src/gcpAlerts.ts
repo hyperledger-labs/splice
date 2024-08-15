@@ -47,7 +47,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -jsonPayload.message=~"Task runner canton-env-ec is .* overloaded.*"
 -- on startup
 -textPayload=~"Picked up JAVA_TOOL_OPTIONS:.*"
--resource.labels.container_name="cns-web-ui"
+-resource.labels.container_name="ans-web-ui"
 -resource.labels.container_name="wallet-web-ui"
 -resource.labels.container_name="scan-web-ui"
 -resource.labels.container_name="sv-web-ui"

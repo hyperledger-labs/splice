@@ -10,8 +10,8 @@ images := \
 	canton-cometbft-sequencer \
 	cometbft \
 	\
-	cn-app \
-	cn-debug \
+	splice-app \
+	splice-debug \
 	sv-app \
 	sv-web-ui \
 	scan-app \
@@ -20,7 +20,7 @@ images := \
 	validator-app \
 	splitwell-app \
 	\
-	cns-web-ui \
+	ans-web-ui \
 	splitwell-web-ui \
 	\
 	docs \
@@ -31,7 +31,7 @@ images := \
 	pulumi-kubernetes-operator \
 
 canton-image := cluster/images/canton
-cn-image := cluster/images/cn-app
+splice-image := cluster/images/splice-app
 
 ifdef CI
     # never use the cache in CI on the master branch

@@ -661,7 +661,7 @@ namespace. A typical query might look as follows:
     $ kubectl get pods -n sv
     NAME                                         READY   STATUS    RESTARTS      AGE
     apps-pg-0                                    2/2     Running   0             14m
-    cns-web-ui-5cf76bfc98-bh6tw                  2/2     Running   0             10m
+    ans-web-ui-5cf76bfc98-bh6tw                  2/2     Running   0             10m
     global-domain-0-cometbft-c584c9468-9r2v5     2/2     Running   2 (14m ago)   14m
     global-domain-0-mediator-7bfb5f6b6d-ts5zp    2/2     Running   0             13m
     global-domain-0-sequencer-6c85d98bb6-887c7   2/2     Running   0             13m
@@ -700,7 +700,7 @@ Each SV is required to configure their cluster ingress to allow traffic from the
 * ``https://scan.sv.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
 * ``global-domain-<MIGRATION_ID>-cometbft.sv.<YOUR_HOSTNAME>:26<MIGRATION_ID>56`` should be routed to port 26656 of service ``global-domain-<MIGRATION_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
-* ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
+* ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
 * ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
 
@@ -860,7 +860,7 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
-.. _helm-cns-web-ui:
+.. _helm-ans-web-ui:
 
 Logging into the CNS UI
 -----------------------------
