@@ -1133,7 +1133,7 @@
           {
             "name": "Infstones-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtlsophsbkyQCfrEvO9glQeVZUY8S4/kZ3D/vhuvDdu9uNAy3mGr3p1hw/lcmoHgcCY0HAtBcYTMNGCdEogXMGQ==",
-            "rewardWeightBps": 10000
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
