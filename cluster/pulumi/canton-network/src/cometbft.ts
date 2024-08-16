@@ -59,6 +59,7 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
+  const enableTimeoutCommitSv1 = config.envFlag('COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1', false);
   const release = installCNHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -73,7 +74,7 @@ export function installCometBftNode(
         gateway: 'cluster-ingress/cn-apps-gateway',
         port: nodeConfig.istioPort,
       },
-      node: nodeConfig,
+      node: { ...nodeConfig, enableTimeoutCommit: nodename === 'sv-1' && enableTimeoutCommitSv1 },
       logLevel,
       peers: Object.keys(configs.nodeConfigs)
         .filter(key => key !== nodename && key !== 'sv-1')

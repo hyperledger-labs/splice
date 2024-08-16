@@ -2365,6 +2365,9 @@ function subcmd_hard_domain_migration_prepare() {
   # so the actual migrate step does not have to redeploy them and is therefore faster.
   export DISABLE_COMETBFT_STATE_SYNC="true"
 
+  # Throttle SV1's CometBFT block processing during the migration (see #13868)
+  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
+
   # pulumi will show a preview and ask us to confirm each deployment step
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
@@ -2416,6 +2419,8 @@ function subcmd_hard_domain_migration_migrate() {
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
+  # Throttle SV1's CometBFT block processing during the migration (see #13868)
+  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
 
   # pulumi will show a preview and ask us to confirm each deployment step
 
@@ -2602,6 +2607,9 @@ function subcmd_disaster_recovery_test() {
   _info "Deploying new domain"
   export DISABLE_COMETBFT_STATE_SYNC="true"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
+  # Throttle SV1's CometBFT block processing during the migration (see #13868)
+  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
+
   _cluster_apply
 
   _info "Switching to new domain"

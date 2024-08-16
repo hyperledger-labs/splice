@@ -1459,6 +1459,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * `export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=` the migration ID we're migrating to
    * `export DISABLE_CANTON_AUTO_INIT="true"` for a slightly faster migrate step; will be removed with [#12353](https://github.com/DACH-NY/canton-network-node/issues/12353)
    * `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
+   * `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1511,6 +1512,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
    Communicate the result of your check to the rest of the DSO to conclude the migration.
 1. Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
+1. Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
 1. [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
    so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
    is set to reflect the expected migration ID after completing the migration.

@@ -2169,6 +2169,7 @@
           }
         },
         "node": {
+          "enableTimeoutCommit": false,
           "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-3-cometbft",
@@ -3276,6 +3277,7 @@
           }
         },
         "node": {
+          "enableTimeoutCommit": false,
           "externalAddress": "dev.global.canton.network.digitalasset.com:26326",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
           "identifier": "global-domain-3-cometbft",
@@ -4346,6 +4348,7 @@
           }
         },
         "node": {
+          "enableTimeoutCommit": false,
           "externalAddress": "dev.global.canton.network.digitalasset.com:26336",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
           "identifier": "global-domain-3-cometbft",
@@ -5416,6 +5419,7 @@
           }
         },
         "node": {
+          "enableTimeoutCommit": false,
           "externalAddress": "dev.global.canton.network.digitalasset.com:26346",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
           "identifier": "global-domain-3-cometbft",

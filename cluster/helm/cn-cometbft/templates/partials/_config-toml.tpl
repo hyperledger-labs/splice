@@ -412,7 +412,7 @@ timeout_precommit_delta = "500ms"
 # How long we wait after committing a block, before starting on the new
 # height (this gives us a chance to receive some more precommits, even
 # though we already have +2/3).
-timeout_commit = "100ms" # skipped anyway, see below
+timeout_commit = "100ms" # skipped if skip_timeout_commit is true, see below
 
 # How many blocks to look back to check existence of the node's consensus votes before joining consensus
 # When non-zero, the node will panic upon restart
@@ -420,8 +420,12 @@ timeout_commit = "100ms" # skipped anyway, see below
 # So, validators should stop the state machine, wait for some blocks, and then restart the state machine to avoid panic.
 double_sign_check_height = 0
 
+{{- if .Values.node.enableTimeoutCommit | default false }}
+skip_timeout_commit = false
+{{- else }}
 # Make progress as soon as we have all the precommits (as if TimeoutCommit = 0)
 skip_timeout_commit = true
+{{- end }}
 
 # EmptyBlocks mode and possible interval between empty blocks
 create_empty_blocks = true
