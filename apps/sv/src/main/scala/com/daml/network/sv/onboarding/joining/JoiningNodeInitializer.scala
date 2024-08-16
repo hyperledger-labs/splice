@@ -44,6 +44,7 @@ import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.config.DomainTimeTrackerConfig
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -342,6 +343,8 @@ class JoiningNodeInitializer(
           _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
             decentralizedSynchronizer
           )
+          _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
+          _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
         } yield ()
       }
       _ <- synchronizerNodeReconciler
@@ -433,6 +436,42 @@ class JoiningNodeInitializer(
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
         }
+      },
+      logger,
+    )
+  }
+
+  private def waitForSvToObtainUnlimitedTraffic(
+      localSynchronizerNode: LocalSynchronizerNode,
+      synchronizerId: DomainId,
+  ) = {
+    val description = "SV nodes have been granted unlimited traffic"
+    retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
+      "unlimited_traffic",
+      description,
+      for {
+        mediatorId <- localSynchronizerNode.mediatorAdminConnection.getMediatorId
+        participantTrafficState <- participantAdminConnection.getParticipantTrafficState(
+          synchronizerId
+        )
+        mediatorTrafficState <- localSynchronizerNode.sequencerAdminConnection
+          .getSequencerTrafficControlState(mediatorId)
+      } yield {
+        val unlimitedTraffic = NonNegativeLong.maxValue
+        if (participantTrafficState.extraTrafficPurchased != unlimitedTraffic)
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              show"SV participant $participantId does not have unlimited traffic on synchronizer $synchronizerId"
+            )
+            .asRuntimeException()
+        if (mediatorTrafficState.extraTrafficLimit != unlimitedTraffic)
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              show"SV mediator $participantId does not have unlimited traffic on synchronizer $synchronizerId"
+            )
+            .asRuntimeException()
+        ()
       },
       logger,
     )

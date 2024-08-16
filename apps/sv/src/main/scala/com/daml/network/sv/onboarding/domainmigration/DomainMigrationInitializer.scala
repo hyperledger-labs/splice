@@ -191,12 +191,6 @@ class DomainMigrationInitializer(
           upgradesConfig,
           loggerFactory,
         )
-      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
-        decentralizedSynchronizerId,
-        dsoAutomationService,
-        svAutomation,
-        None,
-      )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
         svStore.key.svParty,
@@ -204,6 +198,12 @@ class DomainMigrationInitializer(
         dsoAutomationService,
       )
       _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
+      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
+        decentralizedSynchronizerId,
+        dsoAutomationService,
+        svAutomation,
+        None,
+      )
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,
