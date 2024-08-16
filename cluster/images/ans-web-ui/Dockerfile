@@ -9,7 +9,7 @@ RUN apt-get update && \
   apt-get install -y tini
 
 COPY default.conf /etc/nginx/conf.d
-COPY --from=0 app/cn-node-0.1.0-SNAPSHOT/web-uis/ans /usr/share/nginx/html/
+COPY --from=0 app/splice-node/web-uis/ans /usr/share/nginx/html/
 
 COPY config.js /tmpl/config.js.tmpl
 

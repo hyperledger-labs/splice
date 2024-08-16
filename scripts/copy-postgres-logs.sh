@@ -8,7 +8,7 @@ set -eou pipefail
 TMP_FILE="/tmp/postgresql.csv"
 LOG_DIR="${REPO_ROOT}/log"
 
-docker cp postgres-for-cn-node:var/lib/postgresql/data/log/postgresql.csv "${TMP_FILE}"
+docker cp postgres-for-splice-node:var/lib/postgresql/data/log/postgresql.csv "${TMP_FILE}"
 
 # Convert CSV to JSON format
 python -c '

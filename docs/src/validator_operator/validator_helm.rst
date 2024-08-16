@@ -42,7 +42,7 @@ Requirements
 
 .. parsed-literal::
 
-  tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+  tar xzvf |version|\_splice-node.tar.gz
 
 6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <validator-upgrades>`.
    If it has, please record the current migration ID of the synchronizer.
@@ -339,7 +339,7 @@ version of the Helm charts necessary to connect to this environment:
 
 |chart_version_set|
 
-Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
+Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` as follows:
 
 - If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
@@ -348,11 +348,11 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
-Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml`` as follows:
+Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
-To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
+To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator.
@@ -363,7 +363,7 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` as follows:
+Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
@@ -395,8 +395,8 @@ reaches a stable state prior to moving on to the next step.
 
     helm repo update
     helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} --wait
-    helm install participant canton-network-helm/cn-participant -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml --wait
-    helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml --wait
+    helm install participant canton-network-helm/cn-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
+    helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in the new
@@ -539,7 +539,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:

@@ -105,7 +105,7 @@ substituting the migration ID (``MIGRATION_ID``) with the target migration ID af
 While doing so, please note the following:
 
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
-* Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` so that ``migration.migrating`` is set to ``true``.
+* Please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` so that ``migration.migrating`` is set to ``true``.
   This will ensure that the validator app will consume the migration dump and initialize the participant based on the contents of this dump.
 * You do not need to redeploy the ``postgres`` release.
   The updated Canton participant will use a new database on the PostgreSQL instance,

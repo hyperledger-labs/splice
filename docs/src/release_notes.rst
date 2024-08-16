@@ -75,6 +75,8 @@ Upcoming
     are alphanumeric, and `enumerator` is a number starting from 1.
   * `spliceInstanceNames` values are now mandatory for all Helm charts that deploy a frontend (``cn-scan``, ``cn-validator``, ``cn-sv-node``, and ``cn-splitwell-web-ui``).
     The correct values for them are published in the docs for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>`.
+  * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
+    Its content has been renamed accordingly as well.
 
 * Documentation
 

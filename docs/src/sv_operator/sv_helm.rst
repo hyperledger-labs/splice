@@ -39,7 +39,7 @@ Requirements
 
 .. parsed-literal::
 
-  tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+  tar xzvf |version|\_splice-node.tar.gz
 
 6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
    If it has, please record the current migration ID of the synchronizer.
@@ -430,7 +430,7 @@ There are 3 main configuration parameters that control state sync in CometBft:
 - `trust_hash` - Hash corresponding to the trusted height
 
 A CometBft node installed using our helm charts (see :ref:`helm-sv-install`) with the default values set in
-``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` automatically uses state sync for bootstrapping
+``splice-node/examples/sv-helm/cometbft-values.yaml`` automatically uses state sync for bootstrapping
 if:
 
 - it has not been explicitly disabled by setting `stateSync.enable` to `false`
@@ -483,10 +483,10 @@ If you wish to run the Postgres instances as pods in your cluster, you can use t
 
 .. code-block:: bash
 
-    helm install sequencer-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
-    helm install mediator-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
-    helm install participant-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
-    helm install apps-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-apps.yaml --wait
+    helm install sequencer-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install apps-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-apps.yaml --wait
 
 Cloud-Hosted Postgres
 +++++++++++++++++++++
@@ -519,7 +519,7 @@ version of the Helm charts necessary to connect to this environment:
 |chart_version_set|
 
 An SV node includes a CometBft node so you also need to configure
-that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` as follows:
+that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
@@ -532,7 +532,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 
 .. _helm-configure-global-domain:
 
-Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
+Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
@@ -542,19 +542,19 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Replace ``YOUR_NODE_NAME`` with the name you chose when creating the SV identity.
 - For the initial onboarding of your node, set ``disableAutoInit`` to ``false``.
 
-Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
+Please modify the file ``splice-node/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
-Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
+Please modify the file ``splice-node/examples/sv-helm/scan-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 An SV node includes a validator app so you also need to configure
-that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
+that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
@@ -567,7 +567,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 - If your validator is not supposed to hold any CC, you should disable the wallet by setting `enableWallet` to `false`.
   Note that if the wallet is disabled, you shouldn't install the wallet or CNS UIs, as they won't work.
 
-Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml`` as follows:
+Additionally, please modify the file ``splice-node/examples/sv-helm/sv-validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
@@ -586,7 +586,7 @@ identity.
         --from-literal=public=YOUR_PUBLIC_KEY \
         --from-literal=private=YOUR_PRIVATE_KEY
 
-For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
+For configuring your sv app, please modify the file ``splice-node/examples/sv-helm/sv-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
@@ -638,9 +638,9 @@ Install the Canton and CometBFT components:
 .. code-block:: bash
 
     helm repo update
-    helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
-    helm install global-domain-${MIGRATION_ID} canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant-${MIGRATION_ID} canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID} canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
+    helm install participant-${MIGRATION_ID} canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
 
 Note that we use the migration ID when naming Canton components.
 This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
@@ -649,9 +649,9 @@ Install the SV node apps (replace ``helm install`` in these commands with ``helm
 
 .. code-block:: bash
 
-    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
 
 
@@ -823,7 +823,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-cluster-ingress-values.yaml
+    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml
 
 
 
@@ -983,7 +983,7 @@ Repeat the steps described in :ref:`helm-validator-install` for installing the v
 
 While doing so, please note the following:
 
-* Modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
+* Modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
 * Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
   Use the separate JSON file prepared previously.
 

@@ -492,7 +492,7 @@ object AppUpgradeIntegrationTest {
           "--log-encoder",
           "json",
           "--log-file-name",
-          s"log/cn-node-$logSuffix-$name.clog",
+          s"log/splice-node-$logSuffix-$name.clog",
           "-c",
           config.toString,
         ),
@@ -518,7 +518,7 @@ object AppUpgradeIntegrationTest {
 
     def getBundledSplice(version: String) = {
       val dir = getDir(bundleDir(version))
-      val bundledSplice = dir.resolve("bin/cn-node")
+      val bundledSplice = dir.resolve("bin/splice-node")
       if (!bundledSplice.toFile.exists()) {
         throw new RuntimeException(
           s"Bundled Splice artifacts for version ${version} not found, did you run build-tools/prep-app-upgrade-test ?"
@@ -549,7 +549,7 @@ object AppUpgradeIntegrationTest {
       Paths
         .get("apps/app/src/test/resources/bundles")
         .resolve(version)
-        .resolve("cn-node-0.1.0-SNAPSHOT")
+        .resolve("splice-node")
     )
   }
 
@@ -573,7 +573,7 @@ object AppUpgradeIntegrationTest {
 
   def generateConfig(sourceConfig: Path, version: String, testId: String): Path = {
     val bundle = bundleDir(version)
-    val classpath = bundle.resolve("lib/cn-node-0.1.0-SNAPSHOT.jar")
+    val classpath = bundle.resolve("lib/splice-node.jar")
     val transformConfig = bundle.resolve("testResources/transform-config.sc")
     val generatedPath = generatedConfigDir(version).resolve(sourceConfig.getFileName)
     val generated = File(generatedPath)

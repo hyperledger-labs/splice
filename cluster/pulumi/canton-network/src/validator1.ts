@@ -85,7 +85,7 @@ export async function installValidator1(
     participant,
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     // We vet both versions to easily test upgrades.
-    appDars: ['cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar'],
+    appDars: ['splice-node/dars/splitwell-current.dar'],
     validatorPartyHint: `digitalasset-${name}-1`,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     onboardingSecret,

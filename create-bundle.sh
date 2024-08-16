@@ -11,7 +11,7 @@ set -eou pipefail
 
 # The app "binary" is just a shell script that calls the main JAR
 function adjust_shellscript_binary() {
-  REPLACE_VERSION=$(echo "$JAR" | sed -E 's/.*cn-node-([^-]+)-.*/\1/')
+  REPLACE_VERSION=$(echo "$JAR" | sed -E 's/.*splice-node-([^-]+)-.*/\1/')
   REPLACE_REVISION=$(git rev-parse HEAD)
   REPLACE_JVM_OPTS="-XX:+CrashOnOutOfMemoryError"
   REPLACE_JAR="lib\/$JAR"
@@ -19,7 +19,7 @@ function adjust_shellscript_binary() {
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
   # shellcheck disable=SC2043
-  for file in "bin/cn-node" # TODO(#161): Canton supports windows. Do we want that too? "bin/cn-node.bat"
+  for file in "bin/splice-node" # TODO(#161): Canton supports windows. Do we want that too? "bin/splice-node.bat"
   do
       cat "$RELEASE_DIR"/$file |
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
@@ -38,9 +38,9 @@ function adjust_shellscript_binary() {
 set -euo pipefail
 
 JARFILE=$1
-# e.g. cn-node-0.1.0-SNAPSHOT.jar
+# e.g. splice-node.jar
 JAR=$(basename "$JARFILE")
-# e.g. cn-node-0.1.0-SNAPSHOT
+# e.g. splice-node
 RELEASE="${JAR%.jar}"
 
 RELEASES_DIR=$(dirname "$JARFILE")/../release
@@ -136,10 +136,6 @@ rm -f "${RELEASE}.zip"
 tar -zcf "${RELEASE}.tar.gz" "$RELEASE" &
 zip -rq "${RELEASE}.zip" "$RELEASE"/* &
 wait
-
-# finally, add a stable link to the directory
-rm -f cn-node
-ln -s "$RELEASE" cn-node
 
 echo "Successfully created release bundle for release $RELEASE"
 echo "Folders with binaries: $RELEASE_DIR/bin"

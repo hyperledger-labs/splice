@@ -7,4 +7,4 @@ FROM --platform=linux/amd64 splice-app:${base_version}
 FROM nginx:stable
 ARG version
 
-COPY --from=0 app/cn-node-0.1.0-SNAPSHOT/docs/html /usr/share/nginx/html/
+COPY --from=0 app/splice-node/docs/html /usr/share/nginx/html/

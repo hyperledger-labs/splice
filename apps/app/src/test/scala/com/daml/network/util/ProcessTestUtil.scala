@@ -87,14 +87,14 @@ trait ProcessTestUtil { this: BaseTest =>
     Using.resource(
       startProcess(
         Seq(
-          "cn-node",
+          "splice-node",
           "daemon",
           "--log-level-canton=DEBUG",
           "--log-level-stdout=OFF",
           "--log-encoder",
           "json",
           "--log-file-name",
-          s"log/cn-node-${logSuffix}.clog",
+          s"log/splice-node-${logSuffix}.clog",
         ) ++ configs.flatMap(config => Seq("-c", config.toString)),
         Seq(),
       )

@@ -13,11 +13,11 @@ This section provides an overview of which information can be collected to debug
 Where to find logs
 ------------------
 
-**When launched locally**, cn-node will create a ``log/`` directory located at the root of the repository and log into ``canton_network.log``.
+**When launched locally**, splice-node will create a ``log/`` directory located at the root of the repository and log into ``canton_network.log``.
 Canton logs into ``canton.log``.
 
 .. note::
-    The default log level, initially set to Debug, can be changed using the ``--log-level-canton`` flag, for example: ``cn-node --config "${OUTPUT_CONFIG}" --log-level-canton=DEBUG ...``
+    The default log level, initially set to Debug, can be changed using the ``--log-level-canton`` flag, for example: ``splice-node --config "${OUTPUT_CONFIG}" --log-level-canton=DEBUG ...``
 
 **When the node is launched in a kubernetes cluster**, we recommend to setup a log collector so that you can capture logs of at least the last day. For now, the default log level is set to Debug.
 

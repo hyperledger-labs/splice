@@ -13,7 +13,7 @@ base_version=$(cat LATEST_RELEASE)
 
 ALL_BUNDLES_DIR="${REPO_ROOT}/apps/app/src/test/resources/bundles"
 mkdir -p "${ALL_BUNDLES_DIR}"
-tarball="${base_version}_cn-node-0.1.0-SNAPSHOT.tar.gz"
+tarball="${base_version}_splice-node.tar.gz"
 
 if [ -f "${ALL_BUNDLES_DIR}/${tarball}" ]; then
   _info "Release ${base_version} exists locally already"
@@ -43,8 +43,8 @@ _info "Copying dar files into the respective daml directories"
 
 # Make sure the base Splitwell uses the base dars, and not "current" from the local repo
 mkdir -p "daml/splitwell/src/main/resources/dar/"
-cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar" "daml/splitwell/src/main/resources/dar/splitwell-base.dar"
+cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/src/main/resources/dar/splitwell-base.dar"
 mkdir -p "daml/splitwell/.daml/dist/"
-cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar" "daml/splitwell/.daml/dist/splitwell-base.dar"
-sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/examples/splitwell/splitwell-validator.conf
-sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/testResources/include/validators/splitwell-validator.conf
+cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/.daml/dist/splitwell-base.dar"
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/examples/splitwell/splitwell-validator.conf
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/testResources/include/validators/splitwell-validator.conf

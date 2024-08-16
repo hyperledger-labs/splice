@@ -99,7 +99,7 @@ com/digitalasset/canton/.*.proto.* warning: Import .* is unused.
 
 npm-install.sh.*returned non-zero exit code: .*, retrying
 
-# Ignore noise from bundled cn-node execution
+# Ignore noise from bundled splice-node execution
 .*Appender named.*not referenced.*
 
 # Make sure to have a trailing newline
