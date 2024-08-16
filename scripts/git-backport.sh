@@ -93,17 +93,6 @@ function git-backport() {
     push_pr main "$originalbranch" "$pr_title" "$fixed_issues" ""
     primary_pr="$(gh pr list --head "$originalbranch" --base main --json url | jq -r '.[].url')"
 
-    function trigger_preview_job() {
-        local branch="$1"
-
-        endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline"
-        pipeline_url=$(curl -fsSL "$endpoint" -X POST \
-            -H "Content-Type: application/json" -H "circle-token: $CIRCLECI_TOKEN" \
-            -d '{"branch": "'"$branch"'", "parameters": {"run-job": "preview-changes"}}' | \
-            jq -r '"https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/\(.number)"')
-        echo "$pipeline_url"
-    }
-
     for basebranch in "$@"
     do
         _info "Checking out $basebranch"
@@ -124,12 +113,6 @@ function git-backport() {
 
         _info "Committing and pushing on $workingbranch"
         push_pr "$basebranch" "$workingbranch" "[backport] $pr_title ($basebranch)" "" "$primary_pr"
-        backport_pr="$(gh pr list --head "$workingbranch" --base "$basebranch" --json url | jq -r '.[].url')"
-
-        _info "Triggering preview-changes job"
-        pipeline_url=$(trigger_preview_job "$workingbranch")
-        _info "Adding PR comment with preview job link"
-        gh pr comment "$backport_pr" -b "pulumi preview: $pipeline_url"
 
     done
 

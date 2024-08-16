@@ -52,7 +52,6 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        preview-changes
       ]
     default: build
   # Whether the cluster should be reset before deploying.

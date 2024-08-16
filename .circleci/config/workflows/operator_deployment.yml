@@ -10,7 +10,7 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
   preview_pulumi_changes:
     when:
-      equal: [ preview-changes, << pipeline.parameters.run-job >> ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - trigger_pulumi_previews
       - set_previews:
