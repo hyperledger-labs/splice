@@ -2909,6 +2909,11 @@
             "name": "Infstones-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtlsophsbkyQCfrEvO9glQeVZUY8S4/kZ3D/vhuvDdu9uNAy3mGr3p1hw/lcmoHgcCY0HAtBcYTMNGCdEogXMGQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Tradeweb-Markets",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -4014,6 +4019,11 @@
             "name": "Infstones-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtlsophsbkyQCfrEvO9glQeVZUY8S4/kZ3D/vhuvDdu9uNAy3mGr3p1hw/lcmoHgcCY0HAtBcYTMNGCdEogXMGQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Tradeweb-Markets",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -5085,6 +5095,11 @@
             "name": "Infstones-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtlsophsbkyQCfrEvO9glQeVZUY8S4/kZ3D/vhuvDdu9uNAy3mGr3p1hw/lcmoHgcCY0HAtBcYTMNGCdEogXMGQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Tradeweb-Markets",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -6156,6 +6171,11 @@
             "name": "Infstones-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtlsophsbkyQCfrEvO9glQeVZUY8S4/kZ3D/vhuvDdu9uNAy3mGr3p1hw/lcmoHgcCY0HAtBcYTMNGCdEogXMGQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Tradeweb-Markets",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
