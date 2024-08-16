@@ -45,6 +45,8 @@ Upcoming
     For new validators, it should be of format `<organization>-<function>-<enumerator>`.
   * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
     example has been updated to match, and this change must be made to your own copy.
+  * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
+    Its content has been renamed accordingly as well.
 
 * Documentation
 

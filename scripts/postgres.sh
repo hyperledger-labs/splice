@@ -8,7 +8,7 @@ set -eou pipefail
 DOCKER_POSTGRES_IMAGE_NAME="postgres:14"
 
 # Postgres settings
-DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-cn-node"
+DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-splice-node"
 LOCAL_POSTGRES_DATA_DIRECTORY="$REPO_ROOT/temp/postgres"
 LOCAL_POSTGRES_LOG_FILE="$LOGS_PATH/postgres.log"
 

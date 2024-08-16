@@ -139,7 +139,7 @@ rst_prolog = f"""
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
 
-.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_cn-node-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
+.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
 
 .. |canton_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-{canton_version}.tar.gz">Download Canton enterprise</a>`

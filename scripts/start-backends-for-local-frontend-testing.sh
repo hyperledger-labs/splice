@@ -50,7 +50,7 @@ if [ $skip_bundle -eq 0 ]; then
 fi
 
 echo "Generating config file ${OUTPUT_CONFIG} with self-signed tokens"
-scala -classpath "$BUNDLE/lib/cn-node-0.1.0-SNAPSHOT.jar" ./scripts/transform-config.sc "useSelfSignedTokensForLedgerApiAuth" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
+scala -classpath "$BUNDLE/lib/splice-node.jar" ./scripts/transform-config.sc "useSelfSignedTokensForLedgerApiAuth" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
 
 echo "Starting Canton Network apps for local frontend testing"
-cn-node --config "${OUTPUT_CONFIG}" --bootstrap ./apps/splitwell/frontend/$bootstrapScript --log-level-canton=DEBUG --log-encoder json --log-file-name log/cn-node_local_frontend_testing.clog
+splice-node --config "${OUTPUT_CONFIG}" --bootstrap ./apps/splitwell/frontend/$bootstrapScript --log-level-canton=DEBUG --log-encoder json --log-file-name log/splice-node_local_frontend_testing.clog

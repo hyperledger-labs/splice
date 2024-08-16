@@ -1055,7 +1055,7 @@ our own apps. Here we use the topology from our tests:
 2. Start the Amulet apps and run the bootstrap script to
    initialize. This starts the necessary Canton Coin apps (in a single
    process) to run the front ends.
-   The logs from these apps are output to `log/cn-node_local_frontend_testing.clog`.
+   The logs from these apps are output to `log/splice-node_local_frontend_testing.clog`.
 
 ```
 ./scripts/start-backends-for-local-frontend-testing.sh

@@ -16,11 +16,11 @@ RUN mkdir /app
 WORKDIR /app
 
 # move tarball to a static name
-ADD target/cn-node-0.1.0-SNAPSHOT.tar.gz .
+ADD target/splice-node.tar.gz .
 
 COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/LICENSE /app/
 
-RUN ln -s cn-node-0.1.0-SNAPSHOT/bin/cn-node splice-image-bin
+RUN ln -s splice-node/bin/splice-node splice-image-bin
 
-# point entrypoint to the cn-node executable
+# point entrypoint to the splice-node executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

@@ -5,8 +5,8 @@
 
 set -eou pipefail
 
-DOCKER_COMETBFT_CONTAINER_NAME="cometbft-for-cn-node"
-DOCKER_COMEBFT_NETWORK_NAME="cometbft-for-cn-node"
+DOCKER_COMETBFT_CONTAINER_NAME="cometbft-for-splice-node"
+DOCKER_COMEBFT_NETWORK_NAME="cometbft-for-splice-node"
 
 function create_docker_network() {
   docker network create $DOCKER_COMEBFT_NETWORK_NAME

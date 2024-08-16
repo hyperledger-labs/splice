@@ -1150,7 +1150,7 @@ lazy val bundleTask = {
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
-        ((`apps-ans-frontend` / bundle).value, "cns"),
+        ((`apps-ans-frontend` / bundle).value, "ans"),
         ((`apps-sv-frontend` / bundle).value, "sv"),
         ((`apps-scan-frontend` / bundle).value, "scan"),
         ((`apps-splitwell-frontend` / bundle).value, "splitwell"),
@@ -1343,7 +1343,7 @@ lazy val `apps-app` =
       // when building the fat jar, we need to properly merge our artefacts
       assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
       assembly / mainClass := Some("com.daml.network.SpliceApp"),
-      assembly / assemblyJarName := s"cn-node-${version.value}.jar",
+      assembly / assemblyJarName := "splice-node.jar",
       // include historic dars in the jar
       Compile / unmanagedResourceDirectories += { file(file(".").absolutePath) / "daml/dars" },
     )

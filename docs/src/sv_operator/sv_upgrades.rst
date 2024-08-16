@@ -98,7 +98,7 @@ While doing so, please note the following:
 * Note that repeating the process with the incremented migration ID will result in the deployment of new pods with new Canton components and a new CometBFT node.
   Among other things, these deployments differ in k8s-internal host names, which are formed based on the migration ID.
 * We recommend disabling CometBFT :ref:`state sync <helm-cometbft-state-sync>` while going through a synchronizer migration, to reduce dependencies on the readiness of other SVs.
-  To do so, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` so that ``stateSync.enable`` is set to ``false``.
+  To do so, please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml`` so that ``stateSync.enable`` is set to ``false``.
 * Please ensure that your ingress rules are extended accordingly to accommodate the new pods.
   Revisit :ref:`helm-sv-ingress` with the updated migration ID in mind.
 * Note that the exposed CometBFT port and CometBFT ``externalAddress`` are changed due to a limitation in CometBFT.
@@ -126,7 +126,7 @@ substituting the migration ID (``MIGRATION_ID``) with the target migration ID af
 While doing so, please note the following:
 
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
-* Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` so that ``migration.migrating`` is set to ``true``.
+* Please modify the file ``splice-node/examples/sv-helm/sv-values.yaml`` so that ``migration.migrating`` is set to ``true``.
   This will ensure that the SV app will consume the migration dump and initialize new components based on the contents of this dump.
 * Use ``helm upgrade`` in place of ``helm install`` for the ``sv``, ``scan`` and ``validator`` charts
   and do not uninstall any Helm charts installed as part of the original deployment run (with the smaller migration ID).

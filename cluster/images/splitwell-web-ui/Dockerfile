@@ -8,7 +8,7 @@ FROM nginx:stable
 RUN apt-get update && \
   apt-get install -y tini
 
-COPY --from=0 app/cn-node-0.1.0-SNAPSHOT/web-uis/splitwell /usr/share/nginx/html/
+COPY --from=0 app/splice-node/web-uis/splitwell /usr/share/nginx/html/
 
 COPY config.js /tmpl/config.js.tmpl
 

@@ -9,7 +9,7 @@ SHELL=/usr/bin/env bash
 
 current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 
-app-bundle := ${REPO_ROOT}/apps/app/target/release/cn-node-0.1.0-SNAPSHOT.tar.gz
+app-bundle := ${REPO_ROOT}/apps/app/target/release/splice-node.tar.gz
 
 load-tester := ${REPO_ROOT}/load-tester/dist
 

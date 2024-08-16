@@ -117,7 +117,7 @@ export async function installSplitwell(
       '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
       // We vet both versions to easily test upgrades.
-      '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar"]',
+      '  dars = ["splice-node/dars/splitwell-current.dar"]',
       '}',
     ].join('\n'),
     onboardingSecret,

@@ -1186,6 +1186,22 @@ function subcmd_rename_docker_images() {
     ""
 }
 
+subcommand_whitelist[rename_cn_node]="Rename: cn-node to splice-node"
+function subcmd_rename_cn_node() {
+  assert_clean_working_dir
+
+  rename "cn-node-0.1.0-SNAPSHOT to splice-node" \
+    "'cn-node-0.1.0-SNAPSHOT///splice-node'" \
+    "" \
+    ""
+
+  rename "cn-node to splice-node" \
+    "'\bcn-node///splice-node'" \
+    "" \
+    ""
+
+}
+
 ################################
 ### Main
 ################################
