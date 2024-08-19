@@ -1,0 +1,58 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.TransferPreapproval where
+
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Util
+
+template TransferPreapproval
+  with
+    receiver : Party
+    provider : Party
+    dso : Party
+  where
+    signatory receiver, provider
+    -- We put the DSO party on these contracts so we can disclose them through scan.
+    -- Note: This needs to switch to a model where you purchase these entries
+    -- similar to an ANS entry to avoid spam (or even make this pre-approval part of an ANS entry).
+    -- We skip over this in the PoC.
+    observer dso
+
+    nonconsuming choice TransferPreapproval_Send : TransferPreapproval_SendResult
+      with
+        context : PaymentTransferContext
+        inputs : [TransferInput]
+        amount : Decimal
+        sender : Party
+      controller sender
+      do _ <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch sender)
+         transferResult <- exercisePaymentTransfer context Transfer with
+           sender
+           provider
+           inputs
+           outputs =
+             [ TransferOutput with
+                 receiver
+                 receiverFeeRatio = 0.0
+                 amount = amount
+                 lock = None
+             ]
+         pure (TransferPreapproval_SendResult transferResult)
+
+    choice TransferPreapproval_ArchiveAsStakeholder : TransferPreapproval_ArchiveAsStakeholderResult
+      with
+        p : Party
+      controller p
+      do let stakeholders = signatory this ++ observer this
+         require ("Controller " <> show p <> " is in stakeholders " <> show stakeholders) (p `elem` stakeholders)
+         pure TransferPreapproval_ArchiveAsStakeholderResult
+
+data TransferPreapproval_SendResult = TransferPreapproval_SendResult
+  with
+    result : TransferResult
+  deriving (Show, Eq)
+
+data TransferPreapproval_ArchiveAsStakeholderResult = TransferPreapproval_ArchiveAsStakeholderResult {}
+  deriving (Show, Eq)

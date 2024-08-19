@@ -1,0 +1,37 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.ExternalParty where
+
+import Splice.Amulet
+import Splice.TransferPreapproval
+
+-- TODO(#14156) Add expiry
+template ExternalPartySetupProposal
+  with
+    validator : Party
+    user : Party
+    dso : Party
+  where
+    signatory validator
+    observer user
+
+    choice ExternalPartySetupProposal_Accept : ExternalPartySetupProposal_AcceptResult
+      controller user
+      do validatorRightCid <- create ValidatorRight with
+           dso
+           validator
+           user
+         transferPreapprovalCid <- create TransferPreapproval with
+           receiver = user
+           provider = validator
+           dso
+         pure ExternalPartySetupProposal_AcceptResult with
+           validatorRightCid
+           transferPreapprovalCid
+
+data ExternalPartySetupProposal_AcceptResult = ExternalPartySetupProposal_AcceptResult
+  with
+    validatorRightCid : ContractId ValidatorRight
+    transferPreapprovalCid : ContractId TransferPreapproval
+  deriving (Show, Eq)
