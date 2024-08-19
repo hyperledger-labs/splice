@@ -12,6 +12,7 @@ import {
   installCNHelmChart,
   ValidatorTopupConfig,
   spliceInstanceNames,
+  config,
 } from 'cn-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
@@ -86,7 +87,10 @@ export async function installValidator1(
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     // We vet both versions to easily test upgrades.
     appDars: ['splice-node/dars/splitwell-current.dar'],
-    validatorPartyHint: `digitalasset-${name}-1`,
+    // TODO(#14199) Remove this with the next reset
+    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
+      ? `${name}_validator_service_user`
+      : `digitalasset-${name}-1`,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     onboardingSecret,
     persistenceConfig: {
