@@ -38,6 +38,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submis
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
+import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -90,6 +91,9 @@ class TransactionConfirmationRequestFactory(
 
     for {
       _ <- assertSubmittersNodeAuthorization(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
+      _ <- assertNonLocalPartyAuthorization(submitterInfo, cryptoSnapshot).mapK(
         FutureUnlessShutdown.outcomeK
       )
 
@@ -175,6 +179,44 @@ class TransactionConfirmationRequestFactory(
         protocolVersion,
       )
     }
+
+  private def validatePartySignatures(
+      submitterInfo: SubmitterInfo,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, ParticipantAuthorizationError, Set[LfPartyId]] =
+    submitterInfo.partySignatures match {
+      case None => EitherT.rightT[Future, ParticipantAuthorizationError](Set.empty)
+      case Some(partySignatures) =>
+        for {
+          hash <- EitherT.pure[Future, ParticipantAuthorizationError](
+            Hash
+              .digest(
+                HashPurpose.SignedLedgerApiCommand,
+                ByteString.copyFromUtf8(submitterInfo.commandId),
+                HashAlgorithm.Sha256,
+              )
+          )
+          parties <- partySignatures
+            .verifySignatures(hash, cryptoSnapshot)
+            .leftMap(ParticipantAuthorizationError)
+        } yield parties
+    }
+
+  private def assertNonLocalPartyAuthorization(
+      submitterInfo: SubmitterInfo,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+  )(implicit traceContext: TraceContext): EitherT[Future, ParticipantAuthorizationError, Unit] =
+    // TODO(i20746): This is the absolute minimum level of validation
+    // We only check that provided signatures (if any) are valid
+    // As we thread authorization checks through for external signing, we'll need to make sure that all "actAs" parties
+    // are either hosted on this participant, or have provided a valid external signature.
+    // _For now_, we still require all submitting parties to be hosted on this participant anyway (via assertSubmittersNodeAuthorization below),
+    // so the external signatures are checked here ONLY, and are not used validated in phase 3.
+    // We'll also need to check that parties with external signatures are hosted with confirmation rights somewhere, although
+    // this may belong in the logic in AdmissibleDomains instead.
+    validatePartySignatures(submitterInfo, cryptoSnapshot).void
 
   private def assertSubmittersNodeAuthorization(
       submitters: List[LfPartyId],

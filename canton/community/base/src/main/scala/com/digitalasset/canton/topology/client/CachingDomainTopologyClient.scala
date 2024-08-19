@@ -335,6 +335,12 @@ private class ForwardingTopologySnapshotClient(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[SigningPublicKey]] =
     parent.signingKeysUS(owner)
+
+  override def signingKeys(party: PartyId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyKeyInfo]] =
+    parent.signingKeys(party)
+
 }
 
 class CachingTopologySnapshot(
@@ -438,6 +444,13 @@ class CachingTopologySnapshot(
       .buildTracedAsyncFuture[Set[LfPartyId], PartyTopologySnapshotClient.AuthorityOfResponse](
         cache = cachingConfigs.partyCache.buildScaffeine(),
         loader = traceContext => party => parent.authorityOf(party)(traceContext),
+      )(logger)
+
+  private val signingKeysCache =
+    TracedScaffeine
+      .buildTracedAsyncFutureUS[PartyId, Option[PartyKeyTopologySnapshotClient.PartyKeyInfo]](
+        cache = cachingConfigs.partyCache.buildScaffeine(),
+        loader = traceContext => party => parent.signingKeys(party)(traceContext),
       )(logger)
 
   override def allKeys(owner: Member)(implicit traceContext: TraceContext): Future[KeyCollection] =
@@ -576,4 +589,10 @@ class CachingTopologySnapshot(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[SigningPublicKey]] =
     FutureUnlessShutdown.outcomeF(signingKeys(owner))
+
+  override def signingKeys(party: PartyId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyKeyInfo]] =
+    signingKeysCache.getUS(party)
+
 }

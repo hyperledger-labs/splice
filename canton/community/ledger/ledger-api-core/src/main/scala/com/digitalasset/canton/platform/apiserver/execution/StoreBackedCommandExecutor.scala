@@ -130,6 +130,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
         commands.commandId.unwrap,
         commands.deduplicationPeriod,
         commands.submissionId.map(_.unwrap),
+        partySignatures = None,
       ),
       optDomainId = commands.domainId,
       transactionMeta = state.TransactionMeta(

@@ -4,9 +4,11 @@
 package com.digitalasset.canton.platform.apiserver.services
 
 import com.daml.error.ContextualizedErrorLogger
-import com.daml.ledger.api.v2.command_submission_service.SubmitRequest as SubmiteRequestP
+import com.daml.ledger.api.v2.command_submission_service.SubmitRequest as SubmitRequestP
 import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc.InteractiveSubmissionService as InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.interactive_submission_service.{
+  ExecuteSubmissionRequest,
+  ExecuteSubmissionResponse,
   PrepareSubmissionRequest as PrepareRequestP,
   PrepareSubmissionResponse as PrepareResponseP,
 }
@@ -25,7 +27,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.OptionUtil
 import io.grpc.ServerServiceDefinition
 
@@ -94,13 +96,23 @@ class ApiInteractiveSubmissionService(
     )
   }
 
-  private def generateSubmissionIdIfEmpty(request: PrepareRequestP): SubmiteRequestP =
+  private def generateSubmissionIdIfEmpty(request: PrepareRequestP): SubmitRequestP =
     if (request.commands.exists(_.submissionId.isEmpty))
-      SubmiteRequestP(
+      SubmitRequestP(
         request.update(_.commands.submissionId := submissionIdGenerator.generate()).commands
       )
     else
-      SubmiteRequestP(request.commands)
+      SubmitRequestP(request.commands)
+
+  override def executeSubmission(
+      request: ExecuteSubmissionRequest
+  ): Future[ExecuteSubmissionResponse] = {
+    val traceContext =
+      TraceContext.fromDamlTelemetryContext(telemetry.contextFromGrpcThreadLocalContext())
+    implicit val loggingContextWithTrace: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory)(traceContext)
+    interactiveSubmissionService.execute(request)
+  }
 
   override def close(): Unit = {}
 

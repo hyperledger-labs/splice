@@ -3,7 +3,11 @@
 
 package com.digitalasset.canton.ledger.api.services
 
-import com.daml.ledger.api.v2.interactive_submission_service.PrepareSubmissionResponse
+import com.daml.ledger.api.v2.interactive_submission_service.{
+  ExecuteSubmissionRequest,
+  ExecuteSubmissionResponse,
+  PrepareSubmissionResponse,
+}
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.PrepareRequest
 import com.digitalasset.canton.logging.LoggingContextWithTrace
@@ -18,4 +22,8 @@ trait InteractiveSubmissionService {
   def prepare(request: PrepareRequest)(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PrepareSubmissionResponse]
+
+  def execute(
+      request: ExecuteSubmissionRequest
+  )(implicit loggingContext: LoggingContextWithTrace): Future[ExecuteSubmissionResponse]
 }

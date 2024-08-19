@@ -16,7 +16,10 @@ import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
-import com.daml.ledger.api.v2.interactive_submission_service.PrepareSubmissionResponse as PrepareResponseProto
+import com.daml.ledger.api.v2.interactive_submission_service.{
+  ExecuteSubmissionResponse as ExecuteResponseProto,
+  PrepareSubmissionResponse as PrepareResponseProto,
+}
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
@@ -69,6 +72,7 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
   RemoteParticipantReference,
 }
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.auth.{AuthServiceJWTCodec, StandardJWTPayload}
 import com.digitalasset.canton.ledger.api.domain
@@ -88,6 +92,7 @@ import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.{LfPackageId, LfPartyId, config}
 import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
@@ -443,6 +448,25 @@ trait BaseLedgerApiAdministration extends NoTracing {
               domainId,
               applicationId,
               userPackageSelectionPreference,
+            )
+          )
+        }
+
+      @Help.Summary(
+        "Execute a prepared submission"
+      )
+      @Help.Description(
+        "Execute a prepared submission"
+      )
+      def execute(
+          interpretedTransaction: ByteString,
+          transactionSignatures: Map[PartyId, Seq[Signature]],
+      ): ExecuteResponseProto =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService.ExecuteCommand(
+              interpretedTransaction,
+              transactionSignatures,
             )
           )
         }

@@ -413,6 +413,9 @@ object ApiServices {
           Option.when(interactiveSubmissionServiceConfig.enabled) {
             val interactiveSubmissionService =
               InteractiveSubmissionServiceImpl.createApiService(
+                writeService,
+                timeProvider,
+                timeProviderType,
                 seedService,
                 commandExecutor,
                 metrics,

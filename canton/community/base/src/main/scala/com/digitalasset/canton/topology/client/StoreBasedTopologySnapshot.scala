@@ -766,4 +766,35 @@ class StoreBasedTopologySnapshot(
   override def signingKeysUS(owner: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[SigningPublicKey]] = FutureUnlessShutdown.outcomeF(signingKeys(owner))
+
+  /** returns all signing keys */
+  override def signingKeys(party: PartyId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyKeyInfo]] =
+    FutureUnlessShutdown.outcomeF(
+      findTransactions(
+        asOfInclusive = false,
+        types = Seq(TopologyMapping.Code.PartyToKeyMapping),
+        filterUid = Some(Seq(party.uid)),
+        filterNamespace = None,
+      ).map { transactions =>
+        val keys = transactions
+          .collectOfMapping[PartyToKeyMapping]
+        keys.result.toList match {
+          case head :: Nil =>
+            val mapping = head.transaction.transaction.mapping
+            Some(
+              PartyKeyTopologySnapshotClient.PartyKeyInfo(
+                threshold = mapping.threshold,
+                signingKeys = mapping.signingKeys,
+              )
+            )
+          case Nil => None
+          case _ =>
+            logger.error(s"Too many PartyToKeyMappings for $party: $keys Returning none")
+            None
+        }
+      }
+    )
+
 }

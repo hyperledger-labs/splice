@@ -737,7 +737,7 @@ final case class PartyToKeyMapping private (
       )
     )
 
-  def code: TopologyMapping.Code = Code.OwnerToKeyMapping
+  def code: TopologyMapping.Code = Code.PartyToKeyMapping
 
   override def namespace: Namespace = party.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(party.uid)

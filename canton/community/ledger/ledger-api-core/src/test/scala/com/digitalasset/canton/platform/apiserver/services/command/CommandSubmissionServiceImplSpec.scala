@@ -269,6 +269,7 @@ class CommandSubmissionServiceImplSpec
       commandId = Ref.CommandId.assertFromString("foobar"),
       deduplicationPeriod = DeduplicationDuration(Duration.ofMinutes(1)),
       submissionId = None,
+      partySignatures = None,
     )
     val transactionMeta = TransactionMeta(
       ledgerEffectiveTime = Timestamp.Epoch,

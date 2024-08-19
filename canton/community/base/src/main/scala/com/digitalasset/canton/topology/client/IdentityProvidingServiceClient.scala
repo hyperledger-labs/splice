@@ -8,6 +8,7 @@ import cats.data.EitherT
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
@@ -25,6 +26,7 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.PartyKeyTopologySnapshotClient.PartyKeyInfo
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
   AuthorityOfResponse,
   PartyInfo,
@@ -340,6 +342,32 @@ object PartyTopologySnapshotClient {
   }
 }
 
+/** The subset of the topology client, providing the party related key information */
+trait PartyKeyTopologySnapshotClient {
+
+  this: BaseTopologySnapshotClient =>
+
+  // TODO(#19613) should this be a Seq(Party) instead of a single party???
+  /** returns all signing keys */
+  def signingKeys(party: PartyId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PartyKeyInfo]]
+
+}
+
+object PartyKeyTopologySnapshotClient {
+
+  /** party key information
+    *
+    * @param threshold how many signatures we want to have for the given party
+    * @param signingKeys the valid signing keys for the given party
+    */
+  final case class PartyKeyInfo(
+      threshold: PositiveInt,
+      signingKeys: NonEmpty[Seq[SigningPublicKey]],
+  )
+}
+
 /** The subset of the topology client, providing signing and encryption key information */
 trait KeyTopologySnapshotClient {
 
@@ -556,7 +584,8 @@ trait TopologySnapshot
     with MediatorDomainStateClient
     with SequencerDomainStateClient
     with DomainGovernanceSnapshotClient
-    with MembersTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
+    with MembersTopologySnapshotClient
+    with PartyKeyTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
 
 // architecture-handbook-entry-end: IdentityProvidingServiceClient
 
