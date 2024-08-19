@@ -933,6 +933,27 @@ class SpliceLedgerConnection(
     }
   }
 
+  def prepareSubmission(
+      domainId: Option[DomainId],
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      commands: Seq[Command],
+      disclosedContracts: DisclosedContracts,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+    client.prepareSubmission(
+      domainId = domainId.map(_.toProtoPrimitive),
+      applicationId = applicationId,
+      // Command dedup with external submissions isn't required for our use atm.
+      commandId = UUID.randomUUID().toString(),
+      actAs = actAs.map(_.toProtoPrimitive),
+      readAs = readAs.map(_.toProtoPrimitive),
+      commands = commands,
+      disclosedContracts = disclosedContracts,
+    )
+  }
+
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
   private[this] def awaitCompletion(

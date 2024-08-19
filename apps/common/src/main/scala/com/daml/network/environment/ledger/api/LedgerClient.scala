@@ -16,6 +16,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
+import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
@@ -127,6 +128,9 @@ private[environment] class LedgerClient(
   private val identityProviderConfigServiceStub
       : identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
     identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
+  private val interactiveSubmissionServiceStub
+      : InteractiveSubmissionServiceGrpc.InteractiveSubmissionServiceStub =
+    InteractiveSubmissionServiceGrpc.stub(channel)
 
   private def toSource[T](f: Future[Source[T, NotUsed]]) =
     Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
@@ -233,6 +237,39 @@ private[environment] class LedgerClient(
       res <-
         waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res
+  }
+
+  def prepareSubmission(
+      domainId: Option[String],
+      applicationId: String,
+      commandId: String,
+      actAs: Seq[String],
+      readAs: Seq[String],
+      commands: Seq[Command],
+      disclosedContracts: DisclosedContracts,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+    val cmds = lapi.commands.Commands(
+      domainId = domainId.getOrElse(""),
+      applicationId = applicationId,
+      commandId = commandId,
+      actAs = actAs,
+      readAs = readAs,
+      commands = commands.map(c => lapi.commands.Command.fromJavaProto(c.toProtoCommand)),
+      disclosedContracts = disclosedContracts.toLedgerApiDisclosedContracts.map(
+        lapi.commands.DisclosedContract.fromJavaProto(_)
+      ),
+    )
+    for {
+      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
+      result <- stub.prepareSubmission(
+        lapi.interactive_submission_service.PrepareSubmissionRequest(
+          Some(cmds)
+        )
+      )
+    } yield result
   }
 
   def listPackages()(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[String]] = {

@@ -497,6 +497,19 @@ abstract class TopologyAdminConnection(
       isProposal,
     )
 
+  /** Prepare a transaction for external signing.
+    */
+  def generateTransactions(
+      proposals: Seq[TopologyAdminCommands.Write.GenerateTransactions.Proposal]
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] =
+    runCmd(
+      TopologyAdminCommands.Write.GenerateTransactions(
+        proposals
+      )
+    )
+
   /** Version of [[ensureTopologyMapping]] that also handles proposals:
     * - a new topology transaction is created as a proposal
     * - checks the proposals as well to see if the check holds
