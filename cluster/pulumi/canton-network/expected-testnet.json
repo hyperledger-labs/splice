@@ -1329,7 +1329,6 @@
           "targetThroughput": 4500
         },
         "useSequencerConnectionsFromScan": true,
-        "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
       "version": "0.1.16"

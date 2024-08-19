@@ -12,6 +12,7 @@ import {
   installAuth0Secret,
   installCNHelmChart,
   ValidatorTopupConfig,
+  config,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -143,7 +144,10 @@ export async function installSplitwell(
       auth0AppName: 'splitwell_validator',
     },
     validatorWalletUser,
-    validatorPartyHint: 'digitalasset-splitwell-1',
+    // TODO(#14199) Remove this with the next reset
+    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
+      ? undefined
+      : 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });
 
