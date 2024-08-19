@@ -99,7 +99,7 @@ class AcsSnapshotTriggerTest
 
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.Epoch.plusSeconds(1L)))),
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
@@ -115,7 +115,7 @@ class AcsSnapshotTriggerTest
         // data after ACS
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.Epoch.plusSeconds(1L)))),
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -150,7 +150,7 @@ class AcsSnapshotTriggerTest
         // data after ACS
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.Epoch.plusSeconds(1L)))),
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(

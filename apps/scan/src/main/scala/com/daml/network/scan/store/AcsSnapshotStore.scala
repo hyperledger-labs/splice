@@ -58,7 +58,7 @@ class AcsSnapshotStore(
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
-    val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.Epoch)
+    val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
     val previousSnapshotDataFiler = lastSnapshot match {
       case Some(AcsSnapshot(_, _, firstRowId, lastRowId)) =>
         sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
@@ -77,7 +77,7 @@ class AcsSnapshotStore(
                     from update_history_transactions txs
                     where txs.history_id = $historyId
                       and txs.migration_id = $migrationId
-                      and txs.record_time >= $from -- this will be >= unix_epoch for the first snapshot, which includes ACS imports
+                      and txs.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
                       and txs.record_time < $until
                     ),
                 new_creates as (select contract_id
@@ -89,29 +89,32 @@ class AcsSnapshotStore(
                                       join update_history_exercises archives on archives.update_row_id = txs.row_id
                                  and consuming),
                 contracts_to_insert as (select contract_id
-                                        from previous_snapshot_data
-                                        union
-                                        select contract_id
-                                        from new_creates
-                                        except
-                                        select contract_id
-                                        from archives)
-                insert
-                    into acs_snapshot_data (create_id, template_id, stakeholder)
-                        select
-                           creates.row_id,
-                           concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
-                           stakeholder
-                        from contracts_to_insert contracts
-                           join update_history_creates creates
-                                on contracts.contract_id = creates.contract_id
-                           join update_history_transactions txs on txs.row_id = creates.update_row_id
-                           cross join unnest(array_cat(signatories, observers)) as stakeholders(stakeholder)
-                        where txs.history_id = $historyId
-                          and txs.migration_id = $migrationId
-                        -- consistent ordering across SVs
-                        order by creates.created_at, creates.contract_id
-                        returning row_id
+                                from previous_snapshot_data
+                                union
+                                select contract_id
+                                from new_creates
+                                except
+                                select contract_id
+                                from archives),
+                -- these two materialized CTEs force the join order in a way that doesn't completely blow up the number of rows
+                creates_to_insert as materialized (select creates.*
+                                                   from contracts_to_insert contracts
+                                                            join update_history_creates creates
+                                                                 on contracts.contract_id = creates.contract_id),
+                txs_to_insert as materialized (select *, creates.row_id as create_row_id, txs.history_id as tx_history_id
+                                               from creates_to_insert creates
+                                                        join update_history_transactions txs on txs.row_id = creates.update_row_id)
+                insert into acs_snapshot_data (create_id, template_id, stakeholder)
+                select create_row_id,
+                       concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
+                       stakeholder
+                from txs_to_insert
+                         cross join unnest(array_cat(signatories, observers)) as stakeholders(stakeholder)
+                where tx_history_id = $historyId
+                  and migration_id = $migrationId
+                -- consistent ordering across SVs
+                order by created_at, contract_id
+                returning row_id
         )
         insert
         into acs_snapshot (snapshot_record_time, migration_id, first_row_id, last_row_id)

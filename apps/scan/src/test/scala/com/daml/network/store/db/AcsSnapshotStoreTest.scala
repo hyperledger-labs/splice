@@ -471,13 +471,14 @@ class AcsSnapshotStoreTest
     )
   }
 
+  // TODO (#14215): this has proven to be insufficient at making sure an ACS snapshot is included in the snapshots.
   private def ingestAcs[TCid <: ContractId[T], T](
       updateHistory: UpdateHistory,
       acs: Seq[Contract[TCid, T]],
   ): Future[Unit] = {
     MonadUtil
       .sequentialTraverse(acs) { contract =>
-        ingestCreate(updateHistory, contract, recordTime = CantonTimestamp.Epoch)
+        ingestCreate(updateHistory, contract, recordTime = CantonTimestamp.MinValue)
       }
       .map(_ => ())
   }

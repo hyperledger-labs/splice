@@ -113,8 +113,8 @@ class AcsSnapshotTrigger(
         Some(
           (
             store.migrationId,
-            // exclude ACS imports, which have record_time=epoch
-            CantonTimestamp.Epoch.plusSeconds(1L),
+            // exclude ACS imports, which have record_time=MinValue
+            CantonTimestamp.MinValue.plusSeconds(1L),
           )
         ),
         PageLimit.tryCreate(1),
