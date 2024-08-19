@@ -9,7 +9,12 @@ import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import com.daml.network.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
+import com.daml.network.environment.{
+  PackageIdResolver,
+  RetryFor,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import com.daml.network.sv.SynchronizerNode
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
@@ -93,11 +98,16 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.Onboarding =>
           false
       }
-      updatedSequencerConfigUpdate = updateLegacySequencerConfig(
-        existingLegacySequencerConfig,
-        existingSequencerConfig,
-        legacyMigrationId,
-      )
+
+      amuletRules <- dsoStore.getAssignedAmuletRules()
+      updatedSequencerConfigUpdate =
+        if (PackageIdResolver.supportsLegacySequencerConfig(clock.now, amuletRules.payload))
+          updateLegacySequencerConfig(
+            existingLegacySequencerConfig,
+            existingSequencerConfig,
+            legacyMigrationId,
+          )
+        else Left(())
       _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,
