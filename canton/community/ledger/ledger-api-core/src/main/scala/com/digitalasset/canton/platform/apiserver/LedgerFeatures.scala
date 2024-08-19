@@ -9,4 +9,5 @@ final case class LedgerFeatures(
     staticTime: Boolean = false,
     commandInspectionService: ExperimentalCommandInspectionService =
       ExperimentalCommandInspectionService(supported = true),
+    interactiveSubmissionService: Boolean = false,
 )

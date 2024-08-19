@@ -368,6 +368,7 @@ class StartableStoppableLedgerApiServer(
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = config.syncService.dynamicDomainParameterGetter,
+        interactiveSubmissionServiceConfig = config.serverConfig.interactiveSubmissionService,
       )
       _ <- startHttpApiIfEnabled
       _ <- {
@@ -447,6 +448,7 @@ class StartableStoppableLedgerApiServer(
     staticTime = config.testingTimeService.isDefined,
     commandInspectionService =
       ExperimentalCommandInspectionService.of(supported = config.enableCommandInspection),
+    interactiveSubmissionService = config.serverConfig.interactiveSubmissionService.enabled,
   )
 
   private def startHttpApiIfEnabled: ResourceOwner[Unit] =

@@ -93,4 +93,5 @@ object HashPurpose {
   val CantonScript = HashPurpose(44, "CantonScriptHash")
   val BftAvailabilityAck = HashPurpose(45, "BftAvailabilityAck")
   val BftBatchId = HashPurpose(46, "BftBatchId")
+  val PreparedSubmission = HashPurpose(47, "PreparedSubmission")
 }

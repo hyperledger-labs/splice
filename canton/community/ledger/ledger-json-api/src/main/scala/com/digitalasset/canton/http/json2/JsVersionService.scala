@@ -13,7 +13,6 @@ import sttp.tapir.generic.auto.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
-
 class JsVersionService(versionClient: VersionClient)(implicit
     val executionContext: ExecutionContext
 ) extends Endpoints {
@@ -29,16 +28,21 @@ class JsVersionService(versionClient: VersionClient)(implicit
   )
   private def getVersion(
       caller: CallerContext
-  ): TracedInput[Unit] => Future[Either[JsCantonError, version_service.GetLedgerApiVersionResponse]] =
+  ): TracedInput[Unit] => Future[
+    Either[JsCantonError, version_service.GetLedgerApiVersionResponse]
+  ] =
     tracedInput =>
       versionClient
         .serviceStub(caller.token())(tracedInput.traceContext)
-        .getLedgerApiVersion(version_service.GetLedgerApiVersionRequest()).toRight
+        .getLedgerApiVersion(version_service.GetLedgerApiVersionRequest())
+        .toRight
 }
 
 object JsVersionServiceCodecs {
   implicit val est: Codec[experimental_features.ExperimentalStaticTime] = deriveCodec
   implicit val ecis: Codec[experimental_features.ExperimentalCommandInspectionService] = deriveCodec
+  implicit val eiss: Codec[experimental_features.ExperimentalInteractiveSubmissionService] =
+    deriveCodec
   implicit val ef: Codec[experimental_features.ExperimentalFeatures] = deriveCodec
   implicit val umf: Codec[version_service.UserManagementFeature] = deriveCodec
   implicit val pmf: Codec[version_service.PartyManagementFeature] = deriveCodec

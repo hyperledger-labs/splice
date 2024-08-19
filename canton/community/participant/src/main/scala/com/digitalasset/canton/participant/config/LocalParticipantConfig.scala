@@ -23,6 +23,7 @@ import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
   IndexServiceConfig as LedgerIndexServiceConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -175,6 +176,7 @@ final case class RemoteParticipantConfig(
   * @param rateLimit                 limit the ledger api server request rates based on system metrics
   * @param enableExplicitDisclosure  enable usage of explicitly disclosed contracts in command submission and transaction validation.
   * @param enableCommandInspection   enable command inspection service over the ledger api
+  * @param interactiveSubmissionServiceConfig config for interactive submission service over the ledger api
   */
 final case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
@@ -199,6 +201,8 @@ final case class LedgerApiServerConfig(
     adminToken: Option[String] = None,
     identityProviderManagement: IdentityProviderManagementConfig =
       LedgerApiServerConfig.DefaultIdentityProviderManagementConfig,
+    interactiveSubmissionService: InteractiveSubmissionServiceConfig =
+      InteractiveSubmissionServiceConfig.Default,
 ) extends CommunityServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 

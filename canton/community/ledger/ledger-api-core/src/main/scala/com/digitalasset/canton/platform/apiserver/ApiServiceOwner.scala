@@ -38,6 +38,7 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTr
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -101,6 +102,7 @@ object ApiServiceOwner {
       loggerFactory: NamedLoggerFactory,
       authenticateContract: AuthenticateContract,
       dynParamGetter: DynamicDomainParameterGetter,
+      interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
   )(implicit
       actorSystem: ActorSystem,
       materializer: Materializer,
@@ -172,6 +174,7 @@ object ApiServiceOwner {
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = dynParamGetter,
+        interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
       )(materializer, executionSequencerFactory, tracer)
         .map(_.withServices(otherServices))
       apiService <- new LedgerApiService(

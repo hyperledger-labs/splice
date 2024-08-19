@@ -6,6 +6,7 @@ package com.digitalasset.canton.console.commands
 import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
@@ -259,6 +260,16 @@ class TopologyAdministrationGroup(
         adminCommand(
           TopologyAdminCommands.Write
             .AddTransactions(transactions, store, ForceFlags(forceChanges*))
+        )
+      }
+
+    def generate(
+        proposals: Seq[GenerateTransactions.Proposal]
+    ): Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+      consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommands.Write
+            .GenerateTransactions(proposals)
         )
       }
 
@@ -1200,6 +1211,63 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = true,
         force: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping] =
+      synchronisation.runAdminCommand(synchronize)(
+        TopologyAdminCommands.Write.Propose(
+          mapping = proposedMapping,
+          signedBy = signedBy.toList,
+          store = store,
+          change = ops,
+          serial = Some(serial),
+          mustFullyAuthorize = mustFullyAuthorize,
+          forceChanges = force,
+        )
+      )
+  }
+
+  @Help.Summary("Manage party to key mappings")
+  @Help.Group("Party to key mappings")
+  object party_to_key_mappings extends Helpful {
+
+    @Help.Summary("List party to key mapping transactions")
+    def list(
+        filterStore: String = "",
+        proposals: Boolean = false,
+        timeQuery: TimeQuery = TimeQuery.HeadState,
+        operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+        filterParty: String = "",
+        filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
+    ): Seq[ListPartyToKeyMappingResult] =
+      consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommands.Read.ListPartyToKeyMapping(
+            BaseQuery(
+              filterStore,
+              proposals,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
+            filterParty,
+          )
+        )
+      }
+
+    @Help.Summary("Propose a party to key mapping")
+    def propose(
+        proposedMapping: PartyToKeyMapping,
+        serial: RequireTypes.PositiveNumeric[Int],
+        ops: TopologyChangeOp = TopologyChangeOp.Replace,
+        signedBy: Option[Fingerprint] = None,
+        store: String = AuthorizedStore.filterName,
+        synchronize: Option[config.NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
+        // configurable in case of a key under a decentralized namespace
+        mustFullyAuthorize: Boolean = true,
+        force: ForceFlags = ForceFlags.none,
+    ): SignedTopologyTransaction[TopologyChangeOp, PartyToKeyMapping] =
       synchronisation.runAdminCommand(synchronize)(
         TopologyAdminCommands.Write.Propose(
           mapping = proposedMapping,
