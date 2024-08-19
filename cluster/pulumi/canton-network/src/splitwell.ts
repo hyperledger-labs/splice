@@ -146,7 +146,7 @@ export async function installSplitwell(
     validatorWalletUser,
     // TODO(#14199) Remove this with the next reset
     validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
-      ? undefined
+      ? config.requireEnv('CN_SPLITWELL_VALIDATOR_LEGACY_PARTY_HINT')
       : 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });
