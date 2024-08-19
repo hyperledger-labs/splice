@@ -31,6 +31,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
@@ -152,6 +153,7 @@ object PublishScanConfigTrigger {
         synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
         synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
         Some(scanConfig).toJava,
+        Optional.empty(),
       )
   }
 }

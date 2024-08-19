@@ -33,6 +33,7 @@ trait SynchronizerNodeConfigClient {
       synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
       synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
       synchronizerNodeConfig.flatMap(_.scan.toScala).toJava,
+      synchronizerNodeConfig.flatMap(_.legacySequencerConfig.toScala).toJava,
     )
 
   protected def getNewCometBftNodeConfig(
