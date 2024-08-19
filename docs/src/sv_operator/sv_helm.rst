@@ -621,7 +621,10 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
   If it is not running during the time that the reward coupon can be collected, the corresponding reward is marked as unclaimed, and stored in an DSO-wide unclaimed reward pool.
   The `extraBeneficiaries` can be changed with just a restart of the SV app.
 
-If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``sv-values.yaml``:
+If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, in your ``sv-values.yaml``:
+
+- set ``migrating`` to ``true``
+- set ``legacyId`` to the value of migration ID before incremented (``MIGRATION_ID`` - 1)
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
     :language: yaml

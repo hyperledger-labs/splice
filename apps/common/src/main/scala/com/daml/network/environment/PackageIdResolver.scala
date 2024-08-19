@@ -251,4 +251,14 @@ object PackageIdResolver {
       PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
     dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_5.metadata.version
   }
+
+  def supportsLegacySequencerConfig(
+      now: CantonTimestamp,
+      amuletRules: AmuletRules,
+  ): Boolean = {
+    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
+    val dsoGovernanceVersion =
+      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
+    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_7.metadata.version
+  }
 }

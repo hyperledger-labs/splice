@@ -463,6 +463,7 @@ class SV1Initializer(
     private val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
       dsoStoreWithIngestion.connection,
+      config.legacyMigrationId,
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,

@@ -132,6 +132,13 @@ spec:
                 canton.sv-apps.sv {
                   domain-migration-id = {{ .Values.migration.id }}
                 }
+            {{ if hasKey .Values.migration "legacyId" }}
+            - name: ADDITIONAL_CONFIG_LEGACY_MIGRATION_ID
+              value: |
+                canton.sv-apps.sv {
+                  legacy-migration-id = {{ .Values.migration.legacyId }}
+                }
+            {{ end }}
             - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
               value: |
                 canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"

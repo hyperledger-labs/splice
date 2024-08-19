@@ -498,11 +498,20 @@ object SpliceConfig {
             case _: SvOnboardingConfig.DomainMigration => true
           }
         }
-        Either.cond(
-          sv1NodeHasSynchronizerConfig,
-          conf,
-          ConfigValidationFailed("SV1 must always specify a domain config"),
-        )
+        for {
+          _ <- Either.cond(
+            sv1NodeHasSynchronizerConfig,
+            (),
+            ConfigValidationFailed("SV1 must always specify a domain config"),
+          )
+          _ <- Either.cond(
+            conf.legacyMigrationId.forall(_ == conf.domainMigrationId - 1L),
+            (),
+            ConfigValidationFailed(
+              "legacyMigrationId must equal to domainMigrationId - 1 unless legacyMigrationId is empty"
+            ),
+          )
+        } yield conf
       }
 
     implicit val spliceAppParametersReader: ConfigReader[SharedSpliceAppParameters] =

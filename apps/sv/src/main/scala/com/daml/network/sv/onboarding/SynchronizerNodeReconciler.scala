@@ -4,11 +4,17 @@
 package com.daml.network.sv.onboarding
 
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
+  LegacySequencerConfig,
   MediatorConfig,
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import com.daml.network.environment.{SpliceLedgerConnection, RetryFor, RetryProvider}
+import com.daml.network.environment.{
+  PackageIdResolver,
+  RetryFor,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
@@ -22,7 +28,6 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
-import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
@@ -30,6 +35,7 @@ import scala.jdk.OptionConverters.{RichOption, RichOptional}
 class SynchronizerNodeReconciler(
     dsoStore: SvDsoStore,
     connection: SpliceLedgerConnection,
+    legacyMigrationId: Option[Long],
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
@@ -82,11 +88,24 @@ class SynchronizerNodeReconciler(
         LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
       )
       existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
+      existingLegacySequencerConfig = synchronizerNodeConfig.flatMap(
+        _.legacySequencerConfig.toScala
+      )
       shouldMarkSequencerAsOnboarded = state match {
         case SynchronizerNodeState.Onboarded => sequencerConfig.exists(_.availableAfter.isEmpty)
         case SynchronizerNodeState.Onboarding =>
           false
       }
+
+      amuletRules <- dsoStore.getAssignedAmuletRules()
+      updatedSequencerConfigUpdate =
+        if (PackageIdResolver.supportsLegacySequencerConfig(clock.now, amuletRules.payload))
+          updateLegacySequencerConfig(
+            existingLegacySequencerConfig,
+            existingSequencerConfig,
+            legacyMigrationId,
+          )
+        else Left(())
       _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,
@@ -95,7 +114,8 @@ class SynchronizerNodeReconciler(
         if (
           existingSequencerConfig != localSequencerConfig ||
           existingMediatorConfig != localMediatorConfig ||
-          shouldMarkSequencerAsOnboarded
+          shouldMarkSequencerAsOnboarded ||
+          updatedSequencerConfigUpdate.isRight
         ) {
           val nodeConfig = new SynchronizerNodeConfig(
             synchronizerNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
@@ -128,7 +148,7 @@ class SynchronizerNodeReconciler(
               )
               .toJava,
             existingScanConfig,
-            Optional.empty(),
+            updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
           )
           setConfig(domainId, rulesAndState, nodeConfig)
         } else {
@@ -161,6 +181,42 @@ class SynchronizerNodeReconciler(
       }
     )
       sys.error("Sequencer URL must be different when domain is upgraded.")
+  }
+  private def updateLegacySequencerConfig(
+      existingLegacySequencerConfig: Option[LegacySequencerConfig],
+      existingSequencerConfig: Option[LocalSequencerConfig],
+      legacyMigrationId: Option[Long],
+  )(implicit
+      tc: TraceContext
+  ): Either[Unit, Option[LegacySequencerConfig]] = legacyMigrationId match {
+    case Some(expectedLegacyMigrationId) =>
+      existingSequencerConfig match {
+        case Some(existingConfig) if expectedLegacyMigrationId == existingConfig.migrationId =>
+          val legacySequencerConfig =
+            new LegacySequencerConfig(
+              expectedLegacyMigrationId,
+              existingConfig.sequencerId,
+              existingConfig.url,
+            )
+          if (!existingLegacySequencerConfig.contains(legacySequencerConfig))
+            logger.info(
+              s"overwriting existing legacy sequencer config $existingLegacySequencerConfig with $legacySequencerConfig for migration id $expectedLegacyMigrationId"
+            )
+          Right(Some(legacySequencerConfig))
+        case _ =>
+          if (existingLegacySequencerConfig.exists(_.migrationId != expectedLegacyMigrationId))
+            logger.warn(
+              s"existing legacy sequencer config with migration id is not the same as expected $expectedLegacyMigrationId"
+            )
+          Left(())
+      }
+    case None if existingLegacySequencerConfig.isDefined =>
+      logger.info(
+        s"removing existing legacy sequencer config as there is no expected legacy migration id"
+      )
+      Right(None)
+    case _ =>
+      Left(())
   }
 }
 

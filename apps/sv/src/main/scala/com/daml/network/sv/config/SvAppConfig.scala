@@ -202,6 +202,7 @@ case class SvAppBackendConfig(
     contactPoint: String,
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
+    legacyMigrationId: Option[Long] = None,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

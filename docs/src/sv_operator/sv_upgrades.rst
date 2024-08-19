@@ -128,6 +128,7 @@ While doing so, please note the following:
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
 * Please modify the file ``splice-node/examples/sv-helm/sv-values.yaml`` so that ``migration.migrating`` is set to ``true``.
   This will ensure that the SV app will consume the migration dump and initialize new components based on the contents of this dump.
+  Also set ``migration.legacyId`` to the value of migration ID before incremented. (``MIGRATION_ID`` - 1).
 * Use ``helm upgrade`` in place of ``helm install`` for the ``sv``, ``scan`` and ``validator`` charts
   and do not uninstall any Helm charts installed as part of the original deployment run (with the smaller migration ID).
 * Please make sure that all Helm chart deployments you upgrade as part of this step are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
@@ -229,6 +230,7 @@ Specifically, coordinated tests involve:
   (for example, by scanning participant logs for ``Commitment correct`` messages),
   and the ability to submit transactions to the new synchronizer (for example, by creating a dummy validator onboarding secret).
 - Agreeing on a timeline for decommissioning the Canton and CometBFT nodes connected to the original (pre-migration) synchronizer.
+- Before we decommission the Canton and CometBFT nodes connected to the original (pre-migration) synchronizer, we should remove ``migration.legacyId`` we have set previously in the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml``.
 
 .. TODO(#10782): Consider improving the "verify healthy" instructions for partners with specific metrics to check.
 

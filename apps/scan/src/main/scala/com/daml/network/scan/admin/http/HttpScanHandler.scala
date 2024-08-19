@@ -553,15 +553,27 @@ class HttpScanHandler(
         .listFromSvNodeStates { nodeState =>
           for {
             (domainId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
-            sequencer <- domainConfig.sequencer.toScala
-            availableAfter <- sequencer.availableAfter.toScala
-          } yield domainId -> definitions.DsoSequencer(
-            sequencer.migrationId,
-            sequencer.sequencerId,
-            sequencer.url,
-            nodeState.svName,
-            OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
-          )
+            sequencers = for {
+              sequencer <- domainConfig.sequencer.toScala
+              availableAfter <- sequencer.availableAfter.toScala
+            } yield domainId -> definitions.DsoSequencer(
+              sequencer.migrationId,
+              sequencer.sequencerId,
+              sequencer.url,
+              nodeState.svName,
+              OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+            )
+            legacySequencers = for {
+              legacyConfig <- domainConfig.legacySequencerConfig.toScala.toList
+            } yield domainId -> definitions.DsoSequencer(
+              legacyConfig.migrationId,
+              legacyConfig.sequencerId,
+              legacyConfig.url,
+              nodeState.svName,
+              OffsetDateTime.now,
+            )
+            sequencerConfig <- (legacySequencers ++ sequencers).distinct
+          } yield sequencerConfig
         }
         .map(list =>
           list.map { case (domainId, sequencers) =>

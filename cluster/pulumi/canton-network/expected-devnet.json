@@ -2051,6 +2051,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingSecretFrom": {
@@ -3356,6 +3357,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingFoundingSvRewardWeightBps": 140000,
@@ -4723,6 +4725,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-2",
@@ -6081,6 +6084,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-3",
@@ -7439,6 +7443,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingName": "Digital-Asset-Eng-4",
@@ -8413,6 +8418,7 @@
         },
         "migration": {
           "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "onboardingSecretFrom": {

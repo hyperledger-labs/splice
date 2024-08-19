@@ -19,6 +19,11 @@ Upcoming
     uencer failing to initialize after the
     migration. We recommend upgrading before the next hard domain migration.
 
+  * Enable SV to retain pre-migration sequencer URLs in ``SvNodeState``. This is done through a new `migration.legacyId` configuration in the SV values.
+    If set, the SV will keep exposing its sequencer URL for that migration id.
+    Once you undeploy the old sequencer node, remove this option as well to stop Scan from advertising your old sequencer.
+    This allows validators that have been lagging behind to catchup easier.
+
 * Dashboards
 
   * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
@@ -28,6 +33,8 @@ Upcoming
 
   * Added the ``getUpdateById`` API in ``scan-internal.yaml``.
     The ``getUpdateById`` API can be used to retrieve an update by its update ID.
+
+  * Modified ``listDsoSequencers`` Scan API to also expose pre migration sequencer urls, allowing pre-migration validators to catch up.
 
 * UI
 
