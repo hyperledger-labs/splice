@@ -183,7 +183,7 @@ make sure that whatever you configure there matches the contents of the `sub` fi
 
 *All* JWTs issued for use with your SV node:
 
-- must be signed using the RS256 signing algorithm
+- must be signed using the RS256 signing algorithm.
 
 In the future, your OIDC provider might additionally be required to issue JWTs with a ``scope`` explicitly set to ``daml_ledger_api``
 (when requested to do so as part of the OAuth 2.0 authorization code flow).

@@ -363,6 +363,24 @@ To configure the validator app, please modify the file ``splice-node/examples/sv
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
+If you want to configure to only connect to a single trusted scan at ``TRUSTED_SCAN_URL`` but not obtaining additional Scan URLs for BFT Scan reads,
+you can uncomment the following and set ``nonSvValidatorTrustSingleScan`` to ``true``.
+This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: TRUSTED_SINGLE_SCAN_START
+    :end-before: TRUSTED_SINGLE_SCAN_END
+
+If you want to configure to connect to the decentralized synchronizer via only a single trusted sequencer,
+you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
+This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: TRUSTED_SINGLE_SEQUENCER_START
+    :end-before: TRUSTED_SINGLE_SEQUENCER_END
+
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
