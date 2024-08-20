@@ -240,7 +240,7 @@ class AcsSnapshotStoreTest
             0L,
             timestamp1,
             None,
-            PageLimit.tryCreate(2),
+            PageLimit.tryCreate(10),
             Seq(providerParty(1)),
             Seq.empty,
           )
@@ -248,8 +248,16 @@ class AcsSnapshotStoreTest
             0L,
             timestamp1,
             None,
-            PageLimit.tryCreate(2),
+            PageLimit.tryCreate(10),
             Seq(providerParty(2)),
+            Seq.empty,
+          )
+          resultBothParties <- store.queryAcsSnapshot(
+            0L,
+            timestamp1,
+            None,
+            PageLimit.tryCreate(10),
+            Seq(providerParty(1), providerParty(2)),
             Seq.empty,
           )
         } yield {
@@ -258,6 +266,9 @@ class AcsSnapshotStoreTest
           )
           resultParty2.createdEventsInPage.map(_.getContractId) should be(
             Seq(p2, bothParties).map(_.contractId.contractId)
+          )
+          resultBothParties.createdEventsInPage.map(_.getContractId) should be(
+            Seq(p1, p2, bothParties).map(_.contractId.contractId)
           )
         }
       }
@@ -286,7 +297,7 @@ class AcsSnapshotStoreTest
             0L,
             timestamp1,
             None,
-            PageLimit.tryCreate(2),
+            PageLimit.tryCreate(10),
             Seq.empty,
             Seq(PackageQualifiedName(t1.identifier)),
           )
@@ -294,7 +305,7 @@ class AcsSnapshotStoreTest
             0L,
             timestamp1,
             None,
-            PageLimit.tryCreate(2),
+            PageLimit.tryCreate(10),
             Seq.empty,
             Seq(PackageQualifiedName(t2.identifier)),
           )
@@ -339,7 +350,7 @@ class AcsSnapshotStoreTest
             0L,
             timestamp1,
             None,
-            PageLimit.tryCreate(2),
+            PageLimit.tryCreate(10),
             Seq(providerParty(1)),
             Seq(PackageQualifiedName(ok.identifier)),
           )

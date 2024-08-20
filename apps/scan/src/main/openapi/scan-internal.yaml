@@ -538,6 +538,33 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/holdings/state:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "getHoldingsStateAt"
+      description: |
+        Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsStateRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/ans-entries:
     get:
       tags: [scan]
@@ -1552,6 +1579,41 @@ components:
             type: string
           description: |
             Filters the ACS by contracts with these template_ids, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
+    HoldingsStateRequest: # same as AcsRequest, but without `templates`
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - page_size
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the ACS.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        after:
+          type: integer
+          format: int64
+          description: |
+            Pagination token for the next page of results.
+        page_size:
+          description: |
+            The maximum number of created events returned for this request.
+          type: integer
+          format: int32
+        party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters by contracts in which these party_ids are stakeholders.
+
     AcsResponse:
       type: object
       required:

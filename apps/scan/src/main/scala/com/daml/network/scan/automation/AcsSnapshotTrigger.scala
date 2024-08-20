@@ -42,7 +42,7 @@ class AcsSnapshotTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      val now = context.pollingClock.now
+      val now = context.clock.now
       for {
         lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
         possibleTask <- lastSnapshot match {
@@ -61,7 +61,7 @@ class AcsSnapshotTrigger(
             Future.successful(None)
           case Some(task) if task.snapshotRecordTime > now =>
             logger.info(
-              s"Still not time to take a snapshot. Next snapshot time: ${task.snapshotRecordTime}."
+              s"Still not time to take a snapshot. Now: ${now}. Next snapshot time: ${task.snapshotRecordTime}."
             )
             Future.successful(None)
           case Some(task) =>

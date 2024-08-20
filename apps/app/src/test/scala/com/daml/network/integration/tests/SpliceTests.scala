@@ -455,8 +455,8 @@ object SpliceTests extends LazyLogging {
     /** Changes `name` so it is unlikely to conflict with names used somewhere else.
       * Does nothing for isolated test environments, overloaded for shared environment.
       */
-    @nowarn("cat=unused-params")
-    def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) = name
+    def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) =
+      s"${name}.unverified.$ansAcronym"
 
     private def readMandatoryEnvVar(name: String): String = {
       sys.env.get(name) match {

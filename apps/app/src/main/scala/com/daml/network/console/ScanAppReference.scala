@@ -24,7 +24,13 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.util.{AmuletConfigSchedule, SpliceUtil, Contract, ContractWithState}
+import com.daml.network.util.{
+  AmuletConfigSchedule,
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  SpliceUtil,
+}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -309,6 +315,56 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetAcsSnapshot(party)
+      )
+    }
+
+  def getDateOfMostRecentSnapshotBefore(before: CantonTimestamp, migrationId: Long) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetDateOfMostRecentSnapshotBefore(
+          before.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+        )
+      )
+    }
+
+  def getAcsSnapshotAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+      templates: Option[Vector[PackageQualifiedName]] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetAcsSnapshotAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          after,
+          pageSize,
+          partyIds,
+          templates,
+        )
+      )
+    }
+
+  def getHoldingsStateAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsStateAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          after,
+          pageSize,
+          partyIds,
+        )
       )
     }
 

@@ -184,6 +184,13 @@ class AcsSnapshotStore(
       events <- storage
         .query(
           (sql"""
+               with snapshot as (
+                  select create_id, max(row_id) as row_id
+                  from acs_snapshot_data
+                  where row_id between $begin and $end
+               """ ++ partyIdsFilter ++ templatesFilter ++ sql"""
+                  group by create_id
+               )
                select
                  snapshot.row_id,
                  update_row_id,
@@ -198,13 +205,10 @@ class AcsSnapshotStore(
                  signatories,
                  observers,
                  contract_key
-              from acs_snapshot_data snapshot
+              from snapshot
               join update_history_creates creates on creates.row_id = snapshot.create_id
-              where snapshot.row_id between $begin and $end
-            """
-            ++ partyIdsFilter
-            ++ templatesFilter
-            ++ sql" order by snapshot.row_id limit ${limit.limit}").toActionBuilder
+              order by snapshot.row_id limit ${limit.limit}
+            """).toActionBuilder
             .as[(Long, SelectFromCreateEvents)],
           "queryAcsSnapshot.getCreatedEvents",
         )

@@ -21,9 +21,16 @@ import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
+import com.daml.network.http.v0.scan.{GetDateOfMostRecentSnapshotBeforeResponse, ScanClient}
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -742,6 +749,111 @@ object HttpScanAppClient {
         Right(ByteString.copyFrom(Base64.getDecoder.decode(response.acsSnapshot)))
     }
   }
+
+  case class GetDateOfMostRecentSnapshotBefore(
+      before: java.time.OffsetDateTime,
+      migrationId: Long,
+  ) extends InternalBaseCommand[
+        http.GetDateOfMostRecentSnapshotBeforeResponse,
+        Option[java.time.OffsetDateTime],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], GetDateOfMostRecentSnapshotBeforeResponse] =
+      client.getDateOfMostRecentSnapshotBefore(before, migrationId, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[GetDateOfMostRecentSnapshotBeforeResponse, Either[
+      String,
+      Option[java.time.OffsetDateTime],
+    ]] = {
+      case http.GetDateOfMostRecentSnapshotBeforeResponse.OK(value) =>
+        Right(Some(value.recordTime))
+      case http.GetDateOfMostRecentSnapshotBeforeResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetAcsSnapshotAt(
+      at: java.time.OffsetDateTime,
+      migrationId: Long,
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+      templates: Option[Vector[PackageQualifiedName]] = None,
+  ) extends InternalBaseCommand[
+        http.GetAcsSnapshotAtResponse,
+        Option[definitions.AcsResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAcsSnapshotAtResponse] =
+      client.getAcsSnapshotAt(
+        definitions.AcsRequest(
+          migrationId,
+          at,
+          after,
+          pageSize,
+          partyIds.map(_.map(_.toProtoPrimitive)),
+          templates.map(_.map(_.toString)),
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetAcsSnapshotAtResponse, Either[
+      String,
+      Option[definitions.AcsResponse],
+    ]] = {
+      case http.GetAcsSnapshotAtResponse.OK(value) =>
+        Right(Some(value))
+      case http.GetAcsSnapshotAtResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetHoldingsStateAt(
+      at: java.time.OffsetDateTime,
+      migrationId: Long,
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+  ) extends InternalBaseCommand[
+        http.GetHoldingsStateAtResponse,
+        Option[definitions.AcsResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetHoldingsStateAtResponse] =
+      client.getHoldingsStateAt(
+        definitions.HoldingsStateRequest(
+          migrationId,
+          at,
+          after,
+          pageSize,
+          partyIds.map(_.map(_.toProtoPrimitive)),
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetHoldingsStateAtResponse, Either[
+      String,
+      Option[definitions.AcsResponse],
+    ]] = {
+      case http.GetHoldingsStateAtResponse.OK(value) =>
+        Right(Some(value))
+      case http.GetHoldingsStateAtResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
   object GetAggregatedRounds
       extends InternalBaseCommand[http.GetAggregatedRoundsResponse, Option[
         ScanAggregator.RoundRange

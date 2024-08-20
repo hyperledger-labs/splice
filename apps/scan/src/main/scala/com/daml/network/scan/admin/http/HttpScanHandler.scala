@@ -8,7 +8,7 @@ import cats.data.OptionT
 import cats.syntax.either.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amulet
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
@@ -20,7 +20,11 @@ import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.config.Thresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
-import com.daml.network.http.v0.definitions.{AcsRequest, MaybeCachedContractWithState}
+import com.daml.network.http.v0.definitions.{
+  AcsRequest,
+  HoldingsStateRequest,
+  MaybeCachedContractWithState,
+}
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, SortOrder, TxLogEntry}
 import com.daml.network.util.{
@@ -288,7 +292,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.listFeaturedAppRights") { _ => _ =>
       for {
         apps <- store.multiDomainAcsStore.listContracts(
-          FeaturedAppRight.COMPANION
+          amulet.FeaturedAppRight.COMPANION
         )
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.contract.toHttp))
@@ -951,39 +955,71 @@ class HttpScanHandler(
 
   override def getAcsSnapshotAt(respond: ScanResource.GetAcsSnapshotAtResponse.type)(
       body: AcsRequest
-  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = body match {
-    case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
-      implicit val tc: TraceContext = extracted
-      snapshotStore
-        .queryAcsSnapshot(
-          migrationId,
-          CantonTimestamp.assertFromInstant(recordTime.toInstant),
-          after,
-          PageLimit.tryCreate(pageSize),
-          partyIds
-            .getOrElse(Seq.empty)
-            .map(PartyId.tryFromProtoPrimitive),
-          templates
-            .getOrElse(Seq.empty)
-            .map(_.split(":") match {
-              case Array(packageName, moduleName, entityName) =>
-                PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
-              case _ =>
-                throw HttpErrorHandler.badRequest(
-                  s"Malformed template_id, expected 'package_id:module_name:entity_name'"
-                )
-            }),
-        )
-        .map { result =>
-          ScanResource.GetAcsSnapshotAtResponseOK(
+  )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getAcsSnapshotAt") { _ => _ =>
+      querySnapshot(body).map(ScanResource.GetAcsSnapshotAtResponseOK)
+    }
+  }
+
+  private def querySnapshot(
+      request: AcsRequest
+  )(implicit tc: TraceContext): Future[definitions.AcsResponse] = {
+    request match {
+      case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
+        snapshotStore
+          .queryAcsSnapshot(
+            migrationId,
+            CantonTimestamp.assertFromInstant(recordTime.toInstant),
+            after,
+            PageLimit.tryCreate(pageSize),
+            partyIds
+              .getOrElse(Seq.empty)
+              .map(PartyId.tryFromProtoPrimitive),
+            templates
+              .getOrElse(Seq.empty)
+              .map(_.split(":") match {
+                case Array(packageName, moduleName, entityName) =>
+                  PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+                case _ =>
+                  throw HttpErrorHandler.badRequest(
+                    s"Malformed template_id, expected 'package_name:module_name:entity_name'"
+                  )
+              }),
+          )
+          .map { result =>
             definitions.AcsResponse(
               recordTime,
               migrationId,
               result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
               result.afterToken,
             )
-          )
-        }
+          }
+    }
+  }
+
+  override def getHoldingsStateAt(respond: ScanResource.GetHoldingsStateAtResponse.type)(
+      body: HoldingsStateRequest
+  )(extracted: TraceContext): Future[ScanResource.GetHoldingsStateAtResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getAmuletStateAt") { _ => _ =>
+      body match {
+        case HoldingsStateRequest(migrationId, recordTime, after, pageSize, partyIds) =>
+          querySnapshot(
+            AcsRequest(
+              migrationId,
+              recordTime,
+              after,
+              pageSize,
+              partyIds,
+              templates = Some(
+                Vector(amulet.Amulet.TEMPLATE_ID, amulet.LockedAmulet.TEMPLATE_ID)
+                  .map(PackageQualifiedName(_).toString)
+              ),
+            )
+          ).map(ScanResource.GetHoldingsStateAtResponseOK)
+      }
+    }
   }
 
   override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(

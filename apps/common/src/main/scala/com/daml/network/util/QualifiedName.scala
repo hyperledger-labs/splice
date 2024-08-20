@@ -13,7 +13,9 @@ final case class QualifiedName(moduleName: String, entityName: String) {
   override def toString = s"$moduleName:$entityName"
 }
 
-final case class PackageQualifiedName(packageName: String, qualifiedName: QualifiedName)
+final case class PackageQualifiedName(packageName: String, qualifiedName: QualifiedName) {
+  override def toString = s"$packageName:${qualifiedName.toString}"
+}
 
 object PackageQualifiedName {
   def apply(identifier: Identifier): PackageQualifiedName = {

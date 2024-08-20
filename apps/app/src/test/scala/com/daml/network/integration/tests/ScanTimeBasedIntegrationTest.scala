@@ -2,6 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import com.daml.network.codegen.java.splice.amulet.Amulet
+import com.daml.network.codegen.java.splice.ans.AnsEntry
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.integration.EnvironmentDefinition
@@ -14,8 +17,10 @@ import com.daml.network.scan.automation.ScanAggregationTrigger
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.*
 import com.daml.network.util.SpliceUtil.defaultAnsConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
@@ -414,5 +419,70 @@ class ScanTimeBasedIntegrationTest
   "return AnsRules contract and config" in { implicit env =>
     val ansRules = sv1ScanBackend.getAnsRules()
     ansRules.payload.config shouldBe defaultAnsConfig()
+  }
+
+  "snapshotting" in { implicit env =>
+    val (aliceUserParty, _) = onboardAliceAndBob()
+    val migrationId = sv1ScanBackend.config.domainMigrationId
+
+    val snapshotBefore = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+      getLedgerTime,
+      migrationId,
+    )
+
+    createAnsEntry(
+      aliceAnsExternalClient,
+      perTestCaseName("snapshot"),
+      aliceWalletClient,
+      tapAmount = 5000,
+    )
+
+    advanceTime(
+      java.time.Duration
+        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .plusSeconds(1L)
+    )
+    val snapshotAfter = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+      getLedgerTime,
+      migrationId,
+    )
+    eventually() {
+      snapshotBefore should not(be(snapshotAfter))
+    }
+
+    val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
+      CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
+      migrationId,
+      templates = Some(
+        Vector(PackageQualifiedName(Amulet.TEMPLATE_ID), PackageQualifiedName(AnsEntry.TEMPLATE_ID))
+      ),
+      partyIds = Some(Vector(aliceUserParty)),
+    )
+
+    inside(snapshotAfterData) { case Some(data) =>
+      val (entries, coins) =
+        data.createdEvents.partition(
+          _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID).toString)
+        )
+      val entry = AnsEntry
+        .jsonDecoder()
+        .decode(new JsonLfReader(entries.loneElement.createArguments.noSpaces))
+      entry.name shouldBe perTestCaseName("snapshot")
+      forAll(coins) { createdEvent =>
+        Amulet
+          .jsonDecoder()
+          .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+          .owner should be(aliceUserParty.toProtoPrimitive)
+      }
+
+      val holdingsState = sv1ScanBackend.getHoldingsStateAt(
+        CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
+        migrationId,
+        partyIds = Some(Vector(aliceUserParty)),
+      )
+      inside(holdingsState) { case Some(holdings) =>
+        holdings.createdEvents should be(coins)
+      }
+    }
   }
 }
