@@ -29,6 +29,7 @@ import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -271,6 +272,35 @@ private[environment] class LedgerClient(
       )
     } yield result
   }
+
+  def executeSubmission(
+      preparedTransaction: ByteString,
+      partySignatures: Map[PartyId, LedgerClient.Signature],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[lapi.interactive_submission_service.ExecuteSubmissionResponse] =
+    for {
+      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
+      result <- stub.executeSubmission(
+        lapi.interactive_submission_service.ExecuteSubmissionRequest(
+          preparedTransaction,
+          Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
+            case (party, signature) =>
+              lapi.interactive_submission_service.SinglePartySignatures(
+                party.toProtoPrimitive,
+                Seq(
+                  lapi.interactive_submission_service.Signature(
+                    lapi.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                    signature.signature,
+                    signature.signedBy.toProtoPrimitive,
+                  )
+                ),
+              )
+          })),
+        )
+      )
+    } yield result
 
   def listPackages()(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[String]] = {
     val request = ListPackagesRequest()
@@ -787,6 +817,11 @@ object LedgerClient {
     }
   }
 
+  final case class Signature(
+      signature: ByteString,
+      signedBy: Fingerprint,
+  )
+
   final case class CompletionStreamResponse(laterOffset: String, completion: Completion)
 
   object CompletionStreamResponse {
@@ -816,8 +851,8 @@ object LedgerClient {
   ) {
     def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
       this.applicationId == applicationId &&
-        this.commandId == commandId &&
-        this.submissionId == submissionId
+        commandId == this.commandId &&
+        submissionId == this.submissionId
   }
 
   object Completion {
