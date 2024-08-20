@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1215,
+  "id": 1747,
   "links": [],
   "panels": [
     {
@@ -492,6 +492,101 @@
       ],
       "title": "Extra Traffic Available By Participant",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (member) (delta(daml_sequencer_traffic_control_extra_traffic_purchased{namespace=\"$namespace\",job=\"$job\",member=~\"$member.*\"}[24h]))",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Traffic Purchased over the last 24h",
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -530,8 +625,8 @@
       {
         "current": {
           "selected": false,
-          "text": "global-domain-0-sequencer",
-          "value": "global-domain-0-sequencer"
+          "text": "global-domain-3-sequencer",
+          "value": "global-domain-3-sequencer"
         },
         "datasource": {
           "type": "prometheus",
@@ -570,7 +665,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,sender)",
         "hide": 0,
         "includeAll": true,
         "label": "Member",
@@ -579,7 +674,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,sender)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
