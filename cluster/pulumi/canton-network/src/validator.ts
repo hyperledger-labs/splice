@@ -24,6 +24,7 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -57,10 +58,10 @@ type BasicValidatorConfig = {
   extraDependsOn?: pulumi.Resource[];
   scanAddress: Output<string> | string;
   persistenceConfig: PersistenceConfig;
-  appDars?: string[];
+  appDars?: ((version: CnChartVersion) => string)[];
   validatorPartyHint?: string;
   extraDomains?: ExtraDomain[];
-  additionalConfig?: string;
+  additionalConfig?: (version: CnChartVersion) => string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantAddress: Output<string> | string;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
@@ -189,6 +190,8 @@ export async function installValidatorApp(
     },
   };
 
+  const chartVersion = defaultVersion;
+
   return installCNHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
@@ -197,7 +200,7 @@ export async function installValidatorApp(
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
-      appDars: config.appDars || [],
+      appDars: config.appDars ? config.appDars.map(f => f(chartVersion)) : [],
       decentralizedSynchronizerUrl: config.svValidator
         ? config.decentralizedSynchronizerUrl
         : undefined,
@@ -219,7 +222,7 @@ export async function installValidatorApp(
       persistence: config.persistenceConfig,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesDumpPeriodicBackup: config.backupConfig?.config,
-      additionalConfig: config.additionalConfig,
+      additionalConfig: config.additionalConfig ? config.additionalConfig(chartVersion) : undefined,
       participantIdentitiesDumpImport:
         !config.svValidator && config.participantBootstrapDump
           ? { secretName: participantBootstrapDumpSecretName }
@@ -244,7 +247,7 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       ...spliceInstanceNames,
     },
-    defaultVersion,
+    chartVersion,
     { dependsOn }
   );
 }

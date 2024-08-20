@@ -13,6 +13,7 @@ import {
   ValidatorTopupConfig,
   spliceInstanceNames,
   config,
+  splitwellDarPath,
 } from 'cn-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
@@ -85,8 +86,7 @@ export async function installValidator1(
     xns,
     participant,
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
-    // We vet both versions to easily test upgrades.
-    appDars: ['splice-node/dars/splitwell-current.dar'],
+    appDars: [splitwellDarPath],
     // TODO(#14199) Remove this with the next reset
     validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
       ? `${name}_validator_service_user`
