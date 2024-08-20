@@ -938,14 +938,21 @@ commands:
             - save_daml_artifacts
       - run:
           name: Convert time stamps in browser logs
-          when: always
+          when: on_fail
           command: |
             if [[ -d log && -f scripts/convts.py ]]; then
               find log -type f -name "browser*.log" -print0 | xargs -r0 python3 scripts/convts.py
             fi
+      - run:
+          name: Remove logfiles if the build was successful
+          when: on_success
+          command: |
+            if [[ -d log ]]; then
+              rm -f log/*
+            fi
       - run: # Pack logfiles to speedup downloads.
           name: Pack Logfiles
-          when: always
+          when: on_fail
           command: |
             if [[ -d log ]]; then
               # pigz fails if there is no file to compress, which can be the case if Canton just rolled its logs
