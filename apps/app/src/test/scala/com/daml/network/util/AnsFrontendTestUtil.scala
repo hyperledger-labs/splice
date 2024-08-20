@@ -16,10 +16,12 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
   private def allocateAnsEntry(
       ansUiLogin: () => Unit,
       entryName: String,
+      ansAcronym: String,
   )(implicit
       webDriver: WebDriverType
   ) = {
-    val entryNameWithoutSuffix = entryName.stripSuffix(AnsUtil.entryNameSuffix)
+    val ansUtil = new AnsUtil(ansAcronym)
+    val entryNameWithoutSuffix = entryName.stripSuffix(ansUtil.entryNameSuffix)
     ansUiLogin()
 
     // 100 seconds waiting here because we need to wait on the JSON API being ready which is sloooow.
@@ -41,13 +43,14 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
       expectedAmount: String,
       expectedUnit: String,
       expectedInterval: String,
+      ansAcronym: String,
   )(implicit
       webDriver: WebDriverType
   ): Assertion = {
 
     clue(s"Reserving ans name: ${expectedName}") {
       val timeBeforeAllocate = LocalDateTime.now()
-      allocateAnsEntry(ansUiLogin, expectedName)
+      allocateAnsEntry(ansUiLogin, expectedName, ansAcronym)
 
       // user is redirected to their wallet...
       eventually() {

@@ -308,6 +308,7 @@ class SvApp(
           storage,
           loggerFactory,
           retryProvider,
+          config.spliceInstanceNames,
         )
       // Ensure DSO party, DsoRules, AmuletRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
@@ -357,6 +358,7 @@ class SvApp(
                 domainParamsAutomationService.domainUnpausedSync,
                 storage,
                 retryProvider,
+                config.spliceInstanceNames,
                 loggerFactory,
               )
               initializer.bootstrapDso()
@@ -399,6 +401,7 @@ class SvApp(
               storage,
               loggerFactory,
               retryProvider,
+              config.spliceInstanceNames,
               newJoiningNodeInitializer,
             ).migrateDomain()
           }

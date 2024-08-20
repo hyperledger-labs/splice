@@ -8,7 +8,7 @@ import org.apache.pekko.stream.Materializer
 import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
-import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
+import com.daml.network.config.{NetworkAppClientConfig, SpliceInstanceNamesConfig, UpgradesConfig}
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.http.HttpClient
@@ -81,6 +81,7 @@ class JoiningNodeInitializer(
     override protected val storage: Storage,
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,

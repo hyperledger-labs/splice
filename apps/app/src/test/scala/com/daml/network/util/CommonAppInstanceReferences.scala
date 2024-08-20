@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.network.config.SpliceInstanceNamesConfig
 import com.daml.network.console.{
   AppManagerAppClientReference,
   ScanAppBackendReference,
@@ -305,4 +306,24 @@ trait CommonAppInstanceReferences {
     env.scans.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"scan app client [$name] not configured"))
+
+  def spliceInstanceNames(implicit env: SpliceTestConsoleEnvironment): SpliceInstanceNamesConfig = {
+    // Find any SV reference that contains splice instance names
+    env.svs.local.headOption
+      .map(_.config.spliceInstanceNames)
+      .getOrElse(
+        // TODO(#13480): figure out how to not rely on this default for runbook preflight tests
+        SpliceInstanceNamesConfig(
+          networkName = "Canton Network",
+          networkFaviconUrl = "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
+          amuletName = "Canton Coin",
+          amuletNameAcronym = "CC",
+          nameServiceName = "Canton Name Service",
+          nameServiceNameAcronym = "CNS",
+        )
+      )
+  }
+
+  def ansAcronym(implicit env: SpliceTestConsoleEnvironment): String =
+    spliceInstanceNames.nameServiceNameAcronym.toLowerCase()
 }

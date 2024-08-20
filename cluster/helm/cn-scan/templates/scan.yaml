@@ -70,6 +70,18 @@ spec:
           value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
+        - name: CN_APP_UI_NETWORK_NAME
+          value: {{ .Values.spliceInstanceNames.networkName | quote }}
+        - name: CN_APP_UI_NETWORK_FAVICON_URL
+          value: {{ .Values.spliceInstanceNames.networkFaviconUrl | quote }}
+        - name: CN_APP_UI_AMULET_NAME
+          value: {{ .Values.spliceInstanceNames.amuletName | quote }}
+        - name: CN_APP_UI_AMULET_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
+        - name: CN_APP_UI_NAME_SERVICE_NAME
+          value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
+        - name: CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "cn-util-lib.log-level" .Values | indent 8}}
         imagePullPolicy: Always

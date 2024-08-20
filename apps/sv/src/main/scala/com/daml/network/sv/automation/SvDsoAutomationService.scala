@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.config.UpgradesConfig
+import com.daml.network.config.SpliceInstanceNamesConfig
 import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
@@ -64,6 +65,7 @@ class SvDsoAutomationService(
     localSynchronizerNode: Option[LocalSynchronizerNode],
     extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     upgradesConfig: UpgradesConfig,
+    spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -329,7 +331,12 @@ class SvDsoAutomationService(
     }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
-      new AnsSubscriptionInitialPaymentTrigger(triggerContext, dsoStore, connection)
+      new AnsSubscriptionInitialPaymentTrigger(
+        triggerContext,
+        dsoStore,
+        spliceInstanceNamesConfig,
+        connection,
+      )
     )
     registerTrigger(
       new SvPackageVettingTrigger(

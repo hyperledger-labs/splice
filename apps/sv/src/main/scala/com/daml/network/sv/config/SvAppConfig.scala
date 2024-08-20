@@ -10,6 +10,7 @@ import com.daml.network.config.{
   SpliceDbConfig,
   SpliceBackendConfig,
   SpliceParametersConfig,
+  SpliceInstanceNamesConfig,
   ParticipantClientConfig,
   GcpBucketConfig,
   ParticipantBootstrapDumpConfig,
@@ -200,6 +201,7 @@ case class SvAppBackendConfig(
     // We don't make this optional to encourage users to think about it at least. They
     // can always set it to an empty string.
     contactPoint: String,
+    spliceInstanceNames: SpliceInstanceNamesConfig,
     // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),

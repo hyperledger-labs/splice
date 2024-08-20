@@ -22,7 +22,7 @@ class AnsFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100.0)
 
-      val entryName = "mycool_entry.unverified.cns"
+      val entryName = s"mycool_entry.unverified.$ansAcronym"
       val entryNameWithoutSufffix = "mycool_entry"
 
       aliceWalletClient.listSubscriptionRequests() shouldBe empty
@@ -37,6 +37,7 @@ class AnsFrontendIntegrationTest
           "1.0000000000",
           "USD",
           "90 days",
+          ansAcronym,
         )
 
         clue("requesting an existing name to check the already taken message") {
@@ -56,7 +57,8 @@ class AnsFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100.0)
 
-      val entryNameJustReachesLimit = "a" * (60 - ".unverified.cns".length) + ".unverified.cns"
+      val suffix = s".unverified.$ansAcronym"
+      val entryNameJustReachesLimit = "a" * (60 - suffix.length) + suffix
 
       aliceWalletClient.listSubscriptionRequests() shouldBe empty
 
@@ -70,6 +72,7 @@ class AnsFrontendIntegrationTest
           "1.0000000000",
           "USD",
           "90 days",
+          ansAcronym,
         )
       }
     }
@@ -108,7 +111,7 @@ class AnsFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100.0)
 
-      val entryNameJustOverLimit = "a" * (61 - ".unverified.cns".length)
+      val entryNameJustOverLimit = "a" * (61 - s".unverified.$ansAcronym".length)
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session

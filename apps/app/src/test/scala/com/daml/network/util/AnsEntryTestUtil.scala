@@ -17,8 +17,8 @@ trait AnsEntryTestUtil extends TestCommon with AnsTestUtil {
       show"Request CNS entry ${userName.singleQuoted} for $userParty",
       ansExternalApp.createAnsEntry(
         userName,
-        "https://ans-dir-url.com",
-        "Sample CNS Entry Description",
+        testEntryUrl,
+        testEntryDescription,
       ),
     )(
       "There is exactly one subscription request",

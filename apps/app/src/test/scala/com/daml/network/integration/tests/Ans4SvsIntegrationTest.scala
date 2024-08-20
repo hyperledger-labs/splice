@@ -16,10 +16,6 @@ import org.scalatest.Assertion
 
 class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
 
-  private val testEntryName = "mycoolentry.unverified.cns"
-  private val testEntryUrl = "https://ans-dir-url.com"
-  private val testEntryDescription = "Sample CNS Entry Description"
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition

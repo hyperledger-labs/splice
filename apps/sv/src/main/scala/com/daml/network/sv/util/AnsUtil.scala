@@ -7,10 +7,10 @@ import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.util.{Failure, Success, Try}
 
-object AnsUtil {
-
-  val entryNameSuffix = ".unverified.cns"
-  val entryNameRegex = s"[a-z0-9_-]{1,${60 - entryNameSuffix.length()}}\\.unverified\\.cns"
+class AnsUtil(ansAcronym: String) {
+  val entryNameSuffix = s".unverified.$ansAcronym"
+  val entryNameRegex =
+    s"[a-z0-9_-]{1,${60 - entryNameSuffix.length()}}\\.unverified\\.${scala.util.matching.Regex quote ansAcronym}"
   val entryUrlLength = 255
   val validEntryUrlSchemes = Seq("http", "https")
   val entryDescriptionLength = 140

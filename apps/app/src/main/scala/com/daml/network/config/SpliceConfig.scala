@@ -461,6 +461,8 @@ object SpliceConfig {
       deriveReader[SvDecentralizedSynchronizerConfig]
     implicit val svSynchronizerConfigReader: ConfigReader[SvSynchronizerConfig] =
       deriveReader[SvSynchronizerConfig]
+    implicit val spliceInstanceNamesConfigReader: ConfigReader[SpliceInstanceNamesConfig] =
+      deriveReader[SpliceInstanceNamesConfig]
     implicit val backupDumpConfigHint: FieldCoproductHint[PeriodicBackupDumpConfig] =
       new FieldCoproductHint[PeriodicBackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryReader: ConfigReader[BackupDumpConfig.Directory] =
@@ -748,6 +750,8 @@ object SpliceConfig {
       deriveWriter[SvScanConfig]
     implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =
       deriveWriter[SvSynchronizerNodeConfig]
+    implicit val spliceInstanceNamesConfigWriter: ConfigWriter[SpliceInstanceNamesConfig] =
+      deriveWriter[SpliceInstanceNamesConfig]
     implicit val svDecentralizedSynchronizerConfigWriter
         : ConfigWriter[SvDecentralizedSynchronizerConfig] =
       deriveWriter[SvDecentralizedSynchronizerConfig]

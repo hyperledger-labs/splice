@@ -79,3 +79,11 @@ extraBeneficiaries:
 # This can be a slack username or an email address.
 # If you do not wish to share this, set it to an empty string.
 contactPoint: "YOUR_CONTACT_POINT"
+
+spliceInstanceNames:
+  networkName: # Please provide a value as provided in the docs
+  networkFaviconUrl: # Please provide a value as provided in the docs
+  amuletName: # Please provide a value as provided in the docs
+  amuletNameAcronym: # Please provide a value as provided in the docs
+  nameServiceName: # Please provide a value as provided in the docs
+  nameServiceNameAcronym: # Please provide a value as provided in the docs

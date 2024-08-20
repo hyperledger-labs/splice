@@ -203,7 +203,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(
-                  s"${expectedAns(dsoParty, "dso.cns")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.cns")}"
+                  s"${expectedAns(dsoParty, s"dso.$ansAcronym")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
                 ),
                 expectedAmountAmulet = -trafficCostCc,
               )

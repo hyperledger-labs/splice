@@ -437,7 +437,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     )
   }
   protected def expectedDsoAns(implicit env: SpliceTestConsoleEnvironment): String = {
-    expectedAns(dsoParty, DsoAnsResolver.dsoAnsName)
+    expectedAns(dsoParty, DsoAnsResolver.dsoAnsName(ansAcronym))
   }
 
   protected def createAnsEntry(
@@ -445,8 +445,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       entryName: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
-      entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = testEntryUrl,
+      entryDescription: String = testEntryDescription,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): Unit = {
@@ -477,8 +477,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   protected def requestAnsEntry(
       ansExternalApp: AnsExternalAppReference,
       entryName: String,
-      entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = testEntryUrl,
+      entryDescription: String = testEntryDescription,
   ) = {
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
@@ -761,13 +761,11 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       userId: String,
       userParty: PartyId,
   )(implicit env: SpliceTestConsoleEnvironment) = {
-    val entryUrl = "https://ans-dir-url.com"
-    val entryDescription = "Sample CNS Entry Description"
     val ansRules = sv1ScanBackend.getAnsRules()
     val update = ansRules.contractId.exerciseAnsRules_RequestEntry(
       entryName,
-      entryUrl,
-      entryDescription,
+      testEntryUrl,
+      testEntryDescription,
       userParty.toProtoPrimitive,
     )
     val disclosure = DisclosedContracts.forTesting(ansRules)
@@ -1007,8 +1005,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   protected def requestEntry(
       refs: DynamicUserRefs,
       entryName: String,
-      entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = testEntryUrl,
+      entryDescription: String = testEntryDescription,
   )(implicit env: SpliceTestConsoleEnvironment) = {
     val ansRules = sv1ScanBackend.getAnsRules()
 
@@ -1033,8 +1031,8 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   protected def requestAndPayForEntry(
       refs: DynamicUserRefs,
       entryName: String,
-      entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = testEntryUrl,
+      entryDescription: String = testEntryDescription,
   )(implicit env: SpliceTestConsoleEnvironment) = {
     // for paying the ans entry initial payment.
     refs.wallet.tap(5.0)

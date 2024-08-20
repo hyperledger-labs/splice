@@ -288,7 +288,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     val aliceParty = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     aliceWalletClient.tap(10)
 
-    val name = "alice.unverified.cns"
+    val name = s"alice.unverified.$ansAcronym"
     val url = "https://alice-url.com"
     val description = "A test CNS entry for alice"
 

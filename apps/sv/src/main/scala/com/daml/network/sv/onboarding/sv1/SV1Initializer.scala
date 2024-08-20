@@ -12,7 +12,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.splice
-import com.daml.network.config.UpgradesConfig
+import com.daml.network.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import com.daml.network.environment.*
 import com.daml.network.http.HttpClient
 import com.daml.network.migration.DomainMigrationInfo
@@ -96,6 +96,7 @@ class SV1Initializer(
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
     override protected val storage: Storage,
     override protected val retryProvider: RetryProvider,
+    override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,

@@ -39,10 +39,6 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
   import WalletTestUtil.*
 
-  private val testEntryName = "mycoolentry.unverified.cns"
-  private val testEntryUrl = "https://ans-dir-url.com"
-  private val testEntryDescription = "Sample CNS Entry Description"
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition
@@ -117,8 +113,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
             .listEntries("", 25)
             .filter(entry =>
               !entry.name.endsWith(
-                DsoAnsResolver.svAnsNameSuffix
-              ) && entry.name != DsoAnsResolver.dsoAnsName
+                DsoAnsResolver.svAnsNameSuffix(ansAcronym)
+              ) && entry.name != DsoAnsResolver.dsoAnsName(ansAcronym)
             )
           userEntries shouldBe empty
         }
@@ -174,7 +170,11 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       clue("invalid entries(bad names) are rejected") {
         val invalidNames =
-          Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.ans")
+          Seq(
+            s"alice.company.unverified.$ansAcronym",
+            s"alice$$company.unverified.$ansAcronym",
+            s"alice.$ansAcronym",
+          )
         invalidNames.foreach { name =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
@@ -197,11 +197,15 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       clue("invalid entries(bad urls) are rejected") {
         val invalidUrls =
-          Seq("s3://alice.arn.ans", "http://asdklfjh%skldjfgh", s"https://${"alice-" * 50}.ans.com")
+          Seq(
+            s"s3://alice.arn.$ansAcronym",
+            "http://asdklfjh%skldjfgh",
+            s"https://${"alice-" * 50}.$ansAcronym.com",
+          )
         invalidUrls.foreach { url =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
-              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryUrl = url)
+              requestAndPayForEntry(aliceRefs, s"alice.unverified.$ansAcronym", entryUrl = url)
             },
             lines => {
               forAll(lines) { line =>
@@ -223,7 +227,11 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         invalidDescriptions.foreach { desc =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
-              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryDescription = desc)
+              requestAndPayForEntry(
+                aliceRefs,
+                s"alice.unverified.$ansAcronym",
+                entryDescription = desc,
+              )
             },
             lines => {
               forAll(lines) { line =>
@@ -425,13 +433,15 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       val expectedDsoEntry = definitions.AnsEntry(
         None,
         dsoParty.toProtoPrimitive,
-        DsoAnsResolver.dsoAnsName,
+        DsoAnsResolver.dsoAnsName(ansAcronym),
         "",
         "",
         None,
       )
 
-      sv1ScanBackend.lookupEntryByName(DsoAnsResolver.dsoAnsName) shouldBe expectedDsoEntry
+      sv1ScanBackend.lookupEntryByName(
+        DsoAnsResolver.dsoAnsName(ansAcronym)
+      ) shouldBe expectedDsoEntry
       sv1ScanBackend.lookupEntryByParty(dsoParty).value shouldBe expectedDsoEntry
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
@@ -439,9 +449,9 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
     "na SV's CNS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
-        val expectedSvEntry = svEntry(svInfo.name, svParty)
+        val expectedSvEntry = svEntry(svInfo.name, svParty, ansAcronym)
         sv1ScanBackend.lookupEntryByName(
-          s"${svInfo.name.toLowerCase}${DsoAnsResolver.svAnsNameSuffix}"
+          s"${svInfo.name.toLowerCase}${DsoAnsResolver.svAnsNameSuffix(ansAcronym)}"
         ) shouldBe expectedSvEntry
         sv1ScanBackend
           .lookupEntryByParty(PartyId.tryFromProtoPrimitive(svParty))
@@ -451,11 +461,11 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
     }
   }
 
-  private def svEntry(svName: String, svParty: String) =
+  private def svEntry(svName: String, svParty: String, ansAcronym: String) =
     definitions.AnsEntry(
       None,
       svParty,
-      s"${svName.toLowerCase}${DsoAnsResolver.svAnsNameSuffix}",
+      s"${svName.toLowerCase}${DsoAnsResolver.svAnsNameSuffix(ansAcronym)}",
       "",
       "",
       None,

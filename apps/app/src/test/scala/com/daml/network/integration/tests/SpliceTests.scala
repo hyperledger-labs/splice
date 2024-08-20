@@ -226,7 +226,8 @@ object SpliceTests extends LazyLogging {
         env: SpliceTestConsoleEnvironment
     ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
 
-    override def perTestCaseName(name: String) = s"${name}_tc$testCaseId.unverified.cns"
+    override def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) =
+      s"${name}_tc$testCaseId.unverified.$ansAcronym"
     def perTestCaseNameWithoutUnverified(name: String) = s"${name}_tc$testCaseId"
 
     private def extendLedgerApiUserWithCaseId(
@@ -302,6 +303,11 @@ object SpliceTests extends LazyLogging {
       with CommonAppInstanceReferences
       with LedgerApiExtensions
       with AppendedClues {
+
+    protected def testEntryName(implicit env: SpliceTestConsoleEnvironment): String =
+      s"mycoolentry.unverified.$ansAcronym"
+    protected val testEntryUrl = "https://ans-dir-url.com"
+    protected val testEntryDescription = "Sample CNS Entry Description"
 
     protected def initDso()(implicit env: SpliceTestConsoleEnvironment): Unit = {
       env.fullDsoApps.local.foreach(_.start())
@@ -449,7 +455,8 @@ object SpliceTests extends LazyLogging {
     /** Changes `name` so it is unlikely to conflict with names used somewhere else.
       * Does nothing for isolated test environments, overloaded for shared environment.
       */
-    def perTestCaseName(name: String) = name
+    @nowarn("cat=unused-params")
+    def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) = name
 
     private def readMandatoryEnvVar(name: String): String = {
       sys.env.get(name) match {

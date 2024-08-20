@@ -303,7 +303,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
   }
 
-  "test the CNS ui of a validator" in { _ =>
+  "test the CNS ui of a validator" in { implicit env =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     withFrontEnd("alice-validator") { implicit webDriver =>
@@ -314,7 +314,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
         // Generate new random ANS names to avoid conflicts between multiple preflight check runs
         val entryId = (new scala.util.Random).nextInt().toHexString
-        val ansName = s"alice_${entryId}.unverified.cns"
+        val ansName = s"alice_${entryId}.unverified.$ansAcronym"
 
         tapAmulets(100)
         reserveAnsNameFor(
@@ -331,6 +331,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           "1.0000000000",
           "USD",
           "90 days",
+          ansAcronym,
         )
       } else {
         // On non-DevNet clusters, we only test logging in to the directory UI

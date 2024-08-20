@@ -5,7 +5,7 @@ package com.daml.network.sv.onboarding.domainmigration
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
-import com.daml.network.config.UpgradesConfig
+import com.daml.network.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import com.daml.network.environment.{
   BaseLedgerConnection,
   MediatorAdminConnection,
@@ -74,6 +74,7 @@ class DomainMigrationInitializer(
     override protected val storage: Storage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     newJoiningNodeInitializer: (
         Option[SvOnboardingConfig.JoinWithKey],
         Option[CometBftNode],
@@ -189,6 +190,7 @@ class DomainMigrationInitializer(
           Some(localSynchronizerNode),
           extraSynchronizerNodes,
           upgradesConfig,
+          spliceInstanceNamesConfig,
           loggerFactory,
         )
       _ <- ensureCometBftGovernanceKeysAreSet(

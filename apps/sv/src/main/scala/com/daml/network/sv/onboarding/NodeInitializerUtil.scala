@@ -3,7 +3,7 @@
 
 package com.daml.network.sv.onboarding
 
-import com.daml.network.config.UpgradesConfig
+import com.daml.network.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import com.daml.network.environment.{
   SpliceLedgerClient,
   ParticipantAdminConnection,
@@ -44,6 +44,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val participantAdminConnection: ParticipantAdminConnection
   protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: SpliceLedgerClient
+  protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig
 
   protected def newSvStore(
       key: SvStore.Key,
@@ -129,6 +130,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode,
       extraSynchronizerNodes,
       upgradesConfig,
+      spliceInstanceNamesConfig,
       loggerFactory,
     )
 

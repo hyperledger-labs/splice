@@ -6,14 +6,17 @@ package com.daml.network.scan.dso
 import com.daml.network.util.Contract
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.scan.dso.DsoAnsResolver.{DsoAnsEntry, dsoAnsName, svAnsNameSuffix}
+import com.daml.network.scan.dso.DsoAnsResolver.DsoAnsEntry
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
-class DsoAnsResolver(dsoParty: PartyId) {
+class DsoAnsResolver(dsoParty: PartyId, ansAcronym: String) {
+  val dsoAnsName = s"dso.$ansAcronym"
+  val svAnsNameSuffix = s".sv.$ansAcronym"
+
   private val dsoAnsEntry: DsoAnsEntry = DsoAnsEntry(dsoParty, dsoAnsName)
-  private val svAnsNamePattern = """^[a-zA-Z0-9_-]+\.sv\.cns$""".r
+  private val svAnsNamePattern = s"^[a-zA-Z0-9_-]+\\.sv\\.$ansAcronym$$".r
 
   def lookupEntryByName(
       dsoRules: Contract[DsoRules.ContractId, DsoRules],
@@ -60,8 +63,8 @@ class DsoAnsResolver(dsoParty: PartyId) {
 }
 
 object DsoAnsResolver {
-  val dsoAnsName = "dso.cns"
-  val svAnsNameSuffix = ".sv.cns"
+  def dsoAnsName(ansAcronym: String): String = s"dso.$ansAcronym"
+  def svAnsNameSuffix(ansAcronym: String): String = s".sv.$ansAcronym"
   case class DsoAnsEntry(user: PartyId, name: String) {
     def toHttp: http.AnsEntry = http.AnsEntry(None, user.toProtoPrimitive, name, "", "", None)
   }

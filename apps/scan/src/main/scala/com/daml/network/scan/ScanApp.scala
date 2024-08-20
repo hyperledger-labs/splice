@@ -186,7 +186,10 @@ class ScanApp(
           logger,
         )
       }
-      dsoAnsResolver = new DsoAnsResolver(dsoParty)
+      dsoAnsResolver = new DsoAnsResolver(
+        dsoParty,
+        config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
+      )
       internalHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
