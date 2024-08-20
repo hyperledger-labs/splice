@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
@@ -130,6 +131,14 @@ abstract class ScanAppReference(
             ConsoleCommandResult.fromEither(optContract.toRight(s"Entry with name $name not found"))
           )
       }
+
+  @Help.Summary("Lookup a TransferPreapproval by the receiver party")
+  def lookupTransferPreapprovalByParty(
+      party: PartyId
+  ): Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
+    }
 
   @Help.Summary(
     "Get the (cached) amulet config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."

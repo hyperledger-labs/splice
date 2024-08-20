@@ -18,6 +18,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
@@ -356,6 +357,30 @@ object HttpScanAppClient {
       case http.LookupAnsEntryByNameResponse.OK(response) =>
         Right(Some(response.entry))
       case http.LookupAnsEntryByNameResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class LookupTransferPreapprovalByParty(
+      party: PartyId
+  ) extends InternalBaseCommand[http.LookupTransferPreapprovalByPartyResponse, Option[
+        Contract[TransferPreapproval.ContractId, TransferPreapproval]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupTransferPreapprovalByParty(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupTransferPreapprovalByPartyResponse.OK(response) =>
+        Contract
+          .fromHttp(TransferPreapproval.COMPANION)(response.transferPreapproval)
+          .map(Some(_))
+          .leftMap(_.toString)
+      case http.LookupTransferPreapprovalByPartyResponse.NotFound(_) =>
         Right(None)
     }
   }

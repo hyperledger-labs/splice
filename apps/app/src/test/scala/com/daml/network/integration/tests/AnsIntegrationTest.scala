@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.ans as codegen
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
 import com.daml.network.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -436,7 +437,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "na SV's CNS entry can be seen via scan api" in { implicit env =>
+    "an SV's CNS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty)
@@ -448,6 +449,32 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           .value shouldBe expectedSvEntry
         sv1ScanBackend.listEntries("", 100) should contain(expectedSvEntry)
       }
+    }
+
+    "lookupTransferPreapprovalByParty returns the TransferPreapproval contract if it exists" in {
+      implicit env =>
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+        actAndCheck(
+          "Create TransferPreapproval",
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = aliceValidatorBackend.config.ledgerApiUser,
+              actAs = Seq(aliceUserParty, aliceValidatorBackend.getValidatorPartyId()),
+              readAs = Seq.empty,
+              update = new TransferPreapproval(
+                aliceUserParty.toProtoPrimitive,
+                aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive,
+                dsoParty.toProtoPrimitive,
+              ).create,
+            ),
+        )(
+          "Scan lookup returns TransferPreapproval",
+          c => {
+            val contract = sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+            contract.contractId shouldBe c.contractId
+          },
+        )
     }
   }
 

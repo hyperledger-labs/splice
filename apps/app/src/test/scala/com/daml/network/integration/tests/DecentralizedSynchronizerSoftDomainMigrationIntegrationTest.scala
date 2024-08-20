@@ -675,6 +675,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
           filterNot Set(
             spw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             splice.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
+            splice.transferpreapproval.TransferPreapproval.COMPANION,
           )
           map (c(_)): _*
       )

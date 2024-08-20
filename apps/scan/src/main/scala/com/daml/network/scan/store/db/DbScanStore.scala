@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.environment.RetryProvider
@@ -298,6 +299,33 @@ class DbScanStore(
           "lookupEntryByName",
         )
     } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
+  }
+
+  override def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTable(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferPreapproval.COMPANION.TEMPLATE_ID
+              )}
+                and transfer_preapproval_receiver = $partyId
+            """,
+            orderLimit = sql"""
+                limit 1
+            """,
+          ).headOption,
+          "lookupTransferPreapprovalReceiver",
+        )
+    } yield contractFromRow(TransferPreapproval.COMPANION)(row)).value
   }
 
   override def listTransactions(

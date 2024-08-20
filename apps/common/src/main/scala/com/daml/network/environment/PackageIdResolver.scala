@@ -214,6 +214,7 @@ object PackageIdResolver {
     "Splice.Wallet.TransferOffer" -> Package.SpliceWallet,
     "Splice.Wallet.Payment" -> Package.SpliceWalletPayments,
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
+    "Splice.TransferPreapproval" -> Package.SpliceAmuletNameService,
   )
 
   sealed abstract class Package extends Product with Serializable {

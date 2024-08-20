@@ -870,6 +870,33 @@ class HttpScanHandler(
     }
   }
 
+  override def lookupTransferPreapprovalByParty(
+      respond: ScanResource.LookupTransferPreapprovalByPartyResponse.type
+  )(
+      party: String
+  )(extracted: TraceContext): Future[ScanResource.LookupTransferPreapprovalByPartyResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupTransferPreapprovalByParty") { _ => _ =>
+      val partyId = PartyId.tryFromProtoPrimitive(party)
+      store
+        .lookupTransferPreapprovalByParty(
+          partyId
+        )
+        .map {
+          case Some(c) =>
+            v0.ScanResource.LookupTransferPreapprovalByPartyResponse.OK(
+              definitions.LookupTransferPreapprovalByPartyResponse(
+                c.toHttp
+              )
+            )
+          case None =>
+            v0.ScanResource.LookupTransferPreapprovalByPartyResponse.NotFound(
+              definitions.ErrorResponse(s"No TransferPreapproval found for party: $party")
+            )
+        }
+    }
+  }
+
   /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
   // TODO(#9340) Move this logic inside a Canton gRPC API.
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {

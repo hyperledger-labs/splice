@@ -993,6 +993,7 @@ object SvDsoStore {
     splice.ans.AnsEntry.COMPANION,
     splice.ans.AnsEntryContext.COMPANION,
     splice.ans.AnsRules.COMPANION,
+    splice.transferpreapproval.TransferPreapproval.COMPANION,
     splice.dso.amuletprice.AmuletPriceVote.COMPANION,
     splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
@@ -1271,6 +1272,13 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(splice.transferpreapproval.TransferPreapproval.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
         )
       },
     )

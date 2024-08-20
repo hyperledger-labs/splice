@@ -134,6 +134,7 @@ class TemplateQualifiedNames:
     dso_rules = "Splice.DsoRules:DsoRules"
     dso_bootstrap = "Splice.DsoBootstrap:DsoBootstrap"
     amulet_rules = "Splice.AmuletRules:AmuletRules"
+    transfer_preapproval = "Splice.TransferPreapproval:TransferPreapproval"
 
     all_tracked = set(
         [
@@ -1814,6 +1815,8 @@ class State:
 
         match event.template_id.qualified_name:
             case TemplateQualifiedNames.dso_bootstrap:
+                pass
+            case TemplateQualifiedNames.transfer_preapproval:
                 pass
             case _:
                 self._fail(transaction, f"Unexpected root CreatedEvent: {event}")

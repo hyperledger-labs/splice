@@ -220,6 +220,15 @@ trait ScanStore
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
+  def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[Contract[
+      splice.transferpreapproval.TransferPreapproval.ContractId,
+      splice.transferpreapproval.TransferPreapproval,
+    ]]
+  ]
+
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
@@ -390,6 +399,15 @@ object ScanStore {
               contract,
               svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
             )
+        },
+        mkFilter(splice.transferpreapproval.TransferPreapproval.COMPANION)(co =>
+          co.payload.dso == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract,
+            transferPreapprovalReceiver =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
+          )
         },
       ),
     )
