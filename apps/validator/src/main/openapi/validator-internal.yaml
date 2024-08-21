@@ -499,7 +499,38 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "409":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
-
+  /v0/external-party-topology/generate:
+    post:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "createNamespaceDelegationAndPartyTxs"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateNamespaceDelegationAndPartyTxsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateNamespaceDelegationAndPartyTxsResponse"
+  /v0/external-party-topology/submit:
+    post:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "submitNamespaceDelegationAndPartyTxs"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SubmitNamespaceDelegationAndPartyTxsRequest"
+      responses:
+        "200":
+          description: ok
 
 components:
   schemas:
@@ -522,6 +553,49 @@ components:
         - party_id
       properties:
         party_id:
+          type: string
+
+    CreateNamespaceDelegationAndPartyTxsRequest:
+      type: object
+      required:
+        - party_hint
+        - public_key
+      properties:
+        party_hint:
+          type: string
+        public_key:
+          type: string
+    CreateNamespaceDelegationAndPartyTxsResponse:
+      type: object
+      required:
+        - topology_txs
+      properties:
+        topology_txs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TopologyTx"
+    TopologyTx:
+      type: object
+      required:
+        - topology_tx
+        - hash
+      properties:
+        topology_tx:
+          type: string
+        hash:
+          type: string
+
+    SubmitNamespaceDelegationAndPartyTxsRequest:
+      type: object
+      required:
+        - topology_txs
+        - signed_tx_hash
+      properties:
+        topology_txs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TopologyTx"
+        signed_tx_hash:
           type: string
 
     RegistrationRequest:

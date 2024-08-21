@@ -5,6 +5,11 @@ package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.http.v0.definitions.{
+  CreateNamespaceDelegationAndPartyTxsRequest,
+  SubmitNamespaceDelegationAndPartyTxsRequest,
+}
+import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
@@ -198,4 +203,16 @@ class HttpValidatorAdminHandler(
       logger,
     )
   }
+
+  override def createNamespaceDelegationAndPartyTxs(
+      respond: ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse.type
+  )(body: CreateNamespaceDelegationAndPartyTxsRequest)(
+      extracted: TracedUser
+  ): Future[ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse] = ???
+
+  override def submitNamespaceDelegationAndPartyTxs(
+      respond: ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse.type
+  )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
+      extracted: TracedUser
+  ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = ???
 }
