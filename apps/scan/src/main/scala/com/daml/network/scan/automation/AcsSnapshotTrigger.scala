@@ -90,6 +90,11 @@ class AcsSnapshotTrigger(
       store
         .insertNewSnapshot(lastSnapshot, snapshotRecordTime)
         .map { insertCount =>
+          if (insertCount == 0) {
+            logger.error(
+              s"No entries were inserted for snapshot $snapshotRecordTime. This is very likely a bug."
+            )
+          }
           TaskSuccess(
             s"Successfully inserted $insertCount entries for snapshot $snapshotRecordTime."
           )

@@ -59,6 +59,25 @@ class AcsSnapshotStoreTest
         } yield result should be(None)
       }
 
+      "only return the last snapshot of the active history id" in {
+        for {
+          originalUpdateHistory <- mkUpdateHistory(participantId = "original")
+          originalStore = mkStore(originalUpdateHistory)
+          activeUpdateHistory <- mkUpdateHistory(participantId = "active")
+          activeStore = mkStore(activeUpdateHistory)
+          _ <- ingestCreate(
+            originalUpdateHistory,
+            amuletRules(),
+            timestamp1.minusSeconds(1L),
+          )
+          _ <- originalStore.insertNewSnapshot(None, timestamp1)
+          result <- activeStore.lookupSnapshotBefore(
+            migrationId = activeStore.migrationId,
+            CantonTimestamp.MaxValue,
+          )
+        } yield result should be(None)
+      }
+
       "return the latest snapshot before the given timestamp" in {
         for {
           updateHistory <- mkUpdateHistory()
@@ -409,12 +428,15 @@ class AcsSnapshotStoreTest
 
   }
 
-  private def mkUpdateHistory(migrationId: Long = 0L): Future[UpdateHistory] = {
+  private def mkUpdateHistory(
+      migrationId: Long = 0L,
+      participantId: String = "whatever",
+  ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
       new DomainMigrationInfo(migrationId, None),
       "update_history_acs_snapshot_test",
-      mkParticipantId("whatever"),
+      mkParticipantId(participantId),
       dsoParty,
       loggerFactory,
       true,

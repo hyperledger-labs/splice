@@ -229,6 +229,7 @@ class AcsSnapshotTriggerTest
     )
     val store: AcsSnapshotStore = mock[AcsSnapshotStore]
     val migrationId: Long = 0L
+    val historyId: Long = 1L
     when(store.migrationId).thenReturn(migrationId)
     val updateHistory: UpdateHistory = mock[UpdateHistory]
     when(updateHistory.isReady).thenReturn(true)
@@ -246,7 +247,7 @@ class AcsSnapshotTriggerTest
     }
 
     def previousSnapshot(time: CantonTimestamp): AcsSnapshot = {
-      val lastSnapshot = AcsSnapshot(time, migrationId, 0, 100)
+      val lastSnapshot = AcsSnapshot(time, migrationId, historyId, 0, 100)
       when(
         store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]

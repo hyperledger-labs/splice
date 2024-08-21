@@ -42,9 +42,11 @@ class AcsSnapshotStore(
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
     storage
       .querySingle(
-        sql"""select snapshot_record_time, migration_id, first_row_id, last_row_id
+        sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id
             from acs_snapshot
-            where snapshot_record_time <= $before and migration_id = $migrationId
+            where snapshot_record_time <= $before
+              and migration_id = $migrationId
+              and history_id = $historyId
             order by snapshot_record_time desc
             limit 1""".as[AcsSnapshot].headOption,
         "lookupSnapshotBefore",
@@ -60,7 +62,7 @@ class AcsSnapshotStore(
   ): Future[Int] = {
     val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
     val previousSnapshotDataFiler = lastSnapshot match {
-      case Some(AcsSnapshot(_, _, firstRowId, lastRowId)) =>
+      case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId)) =>
         sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
       case None =>
         sql"where false"
@@ -117,8 +119,8 @@ class AcsSnapshotStore(
                 returning row_id
         )
         insert
-        into acs_snapshot (snapshot_record_time, migration_id, first_row_id, last_row_id)
-        select $until, $migrationId, min(row_id), max(row_id)
+        into acs_snapshot (snapshot_record_time, migration_id, history_id, first_row_id, last_row_id)
+        select $until, $migrationId, $historyId, min(row_id), max(row_id)
         from inserted_rows
         having min(row_id) is not null;
              """).toActionBuilder.asUpdate,
@@ -137,9 +139,11 @@ class AcsSnapshotStore(
     for {
       snapshot <- storage
         .querySingle(
-          sql"""select snapshot_record_time, migration_id, first_row_id, last_row_id
+          sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id
             from acs_snapshot
-            where snapshot_record_time = $snapshot and migration_id = $migrationId
+            where snapshot_record_time = $snapshot
+              and migration_id = $migrationId
+              and history_id = $historyId
             limit 1""".as[AcsSnapshot].headOption,
           "queryAcsSnapshot.getSnapshot",
         )
@@ -227,6 +231,7 @@ object AcsSnapshotStore {
   case class AcsSnapshot(
       snapshotRecordTime: CantonTimestamp,
       migrationId: Long,
+      historyId: Long,
       firstRowId: Long,
       lastRowId: Long,
   ) extends PrettyPrinting {
@@ -234,6 +239,7 @@ object AcsSnapshotStore {
     override def pretty: Pretty[this.type] = prettyOfClass(
       param("snapshotRecordTime", _.snapshotRecordTime),
       param("migrationId", _.migrationId),
+      param("historyId", _.historyId),
       param("firstRowId", _.firstRowId),
       param("lastRowId", _.lastRowId),
     )
@@ -244,6 +250,7 @@ object AcsSnapshotStore {
       AcsSnapshot(
         snapshotRecordTime = r.<<[CantonTimestamp],
         migrationId = r.<<[Long],
+        historyId = r.<<[Long],
         firstRowId = r.<<[Long],
         lastRowId = r.<<[Long],
       )
