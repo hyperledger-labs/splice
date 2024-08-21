@@ -45,7 +45,7 @@ class SvOffboardPreflightIntegrationTest
   private val svUsername = s"admin@sv-dev.com"
   private val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
-  "The SV can log in to their wallet and tap" in { _ =>
+  "The SV can log in to their wallet and tap" in { implicit env =>
     withFrontEnd("sv") { implicit webDriver =>
       actAndCheck(
         s"Logging in to wallet at ${walletUrl}", {

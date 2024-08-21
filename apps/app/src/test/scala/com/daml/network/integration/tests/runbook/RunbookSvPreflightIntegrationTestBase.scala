@@ -85,7 +85,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The SV can log in to their wallet" in { _ =>
+  "The SV can log in to their wallet" in { implicit env =>
     withFrontEnd("sv") { implicit webDriver =>
       actAndCheck(
         s"Logging in to wallet at ${walletUrl}", {

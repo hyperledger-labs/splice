@@ -6,10 +6,13 @@ import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
+import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
-  protected def tapAmulets(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
+  protected def tapAmulets(
+      tapQuantity: BigDecimal
+  )(implicit webDriver: WebDriverType, env: SpliceTestConsoleEnvironment): Unit = {
 
     def tap(): Unit = {
       click on "tap-amount-field"
@@ -61,11 +64,12 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   }
 
   protected def matchBalance(balanceCC: String, balanceUSD: String)(implicit
-      webDriverType: WebDriverType
+      webDriverType: WebDriverType,
+      env: SpliceTestConsoleEnvironment,
   ): Assertion = {
     find(id("wallet-balance-cc"))
       .valueOrFail("Couldn't find balance")
-      .text should matchText(s"$balanceCC CC")
+      .text should matchText(s"$balanceCC ${spliceInstanceNames.amuletNameAcronym}")
 
     find(id("wallet-balance-usd"))
       .valueOrFail("Couldn't find balance")
@@ -86,7 +90,11 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     }
   }
 
-  protected def readTransactionFromRow(transactionRow: Element): FrontendTransaction = {
+  protected def readTransactionFromRow(
+      transactionRow: Element
+  )(implicit env: SpliceTestConsoleEnvironment): FrontendTransaction = {
+
+    val acronym = spliceInstanceNames.amuletNameAcronym
 
     FrontendTransaction(
       action = transactionRow.childElement(className("tx-action")).text,
@@ -102,7 +110,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .childElement(className("tx-row-cell-balance-change"))
           .childElement(className("tx-amount-cc"))
           .text,
-        unit = "CC",
+        unit = acronym,
       ),
       usdAmount = parseAmountText(
         transactionRow
@@ -117,24 +125,24 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .childElement(className("tx-row-cell-rewards"))
           .findChildElement(className("tx-reward-app-cc"))
           .map(_.text)
-          .getOrElse("0 CC"),
-        unit = "CC",
+          .getOrElse(s"0 $acronym"),
+        unit = acronym,
       ),
       validatorRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
           .findChildElement(className("tx-reward-validator-cc"))
           .map(_.text)
-          .getOrElse("0 CC"),
-        unit = "CC",
+          .getOrElse(s"0 $acronym"),
+        unit = acronym,
       ),
       svRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
           .findChildElement(className("tx-reward-sv-cc"))
           .map(_.text)
-          .getOrElse("0 CC"),
-        unit = "CC",
+          .getOrElse(s"0 $acronym"),
+        unit = acronym,
       ),
     )
   }
@@ -145,7 +153,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedSubtype: String,
       expectedPartyDescription: Option[String],
       expectedAmountAmulet: BigDecimal,
-  ): Assertion = {
+  )(implicit env: SpliceTestConsoleEnvironment): Assertion = {
     val expectedUSD = expectedAmountAmulet * amuletPrice
     matchTransactionAmountRange(transactionRow)(
       amuletPrice,
@@ -164,7 +172,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedPartyDescription: Option[String],
       expectedAmountAmulet: (BigDecimal, BigDecimal),
       expectedAmountUSD: (BigDecimal, BigDecimal),
-  ): Assertion = {
+  )(implicit env: SpliceTestConsoleEnvironment): Assertion = {
     val transaction = readTransactionFromRow(transactionRow)
 
     transaction.action should matchText(expectedAction)
@@ -179,7 +187,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedAmountUSD._1,
       expectedAmountUSD._2,
     )
-    transaction.rate should matchText(s"${BigDecimal(1) / amuletPrice} CC/USD")
+    transaction.rate should matchText(
+      s"${BigDecimal(1) / amuletPrice} ${spliceInstanceNames.amuletNameAcronym}/USD"
+    )
   }
 
   protected def createTransferOffer(
@@ -211,7 +221,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     click on "create-offer-submit-button"
   }
 
-  private def readTapFromRow(transactionRow: Element): Option[Tap] = {
+  private def readTapFromRow(
+      transactionRow: Element
+  )(implicit env: SpliceTestConsoleEnvironment): Option[Tap] = {
     val date = readDateFromRow(transactionRow)
     val amountO =
       if (
@@ -228,7 +240,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
             transactionRow
               .childElement(className("tx-amount-cc"))
               .text,
-            unit = "CC",
+            unit = spliceInstanceNames.amuletNameAcronym,
           )
         )
       } else None

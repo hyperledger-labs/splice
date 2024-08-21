@@ -130,7 +130,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   checkValidatorIsConnectedToSvRunbook()
 
-  "run through runbook against cluster validator" in { _ =>
+  "run through runbook against cluster validator" in { implicit env =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     val bobUser = auth0Users.get("bob-validator").value
@@ -194,7 +194,8 @@ abstract class ValidatorPreflightIntegrationTestBase
               description should fullyMatch regex partyR
               transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
               // we can't test a specific amulet price as the amulet price on a live network can change
-              val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
+              val rateR =
+                raw"""^\s*(\d+(?:\.\d+)?)\s*${spliceInstanceNames.amuletNameAcronym}/USD\s*$$""".r
               inside(transaction.rate) { case rateR(rate) =>
                 BigDecimal(rate) should be > BigDecimal(0)
                 transaction.usdAmount should beWithin(
@@ -215,7 +216,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
-  "test splitwell group creation and payment against validator" in { _ =>
+  "test splitwell group creation and payment against validator" in { implicit env =>
     if (includeSplitwellTests) {
       val groupName = "troika"
 
@@ -288,13 +289,20 @@ abstract class ValidatorPreflightIntegrationTestBase
             forExactly(1, rows)(row =>
               matchRow(
                 Seq("sender", "description"),
-                Seq(aliceUserPartyId, "paid 100.0 CC for Team lunch"),
+                Seq(
+                  aliceUserPartyId,
+                  s"paid 100.0 ${spliceInstanceNames.amuletNameAcronym} for Team lunch",
+                ),
               )(row)
             )
             forExactly(1, rows)(row =>
               matchRow(
                 Seq("sender", "description", "receiver"),
-                Seq(bobUserPartyId, "sent 50.0 CC to", aliceUserPartyId),
+                Seq(
+                  bobUserPartyId,
+                  s"sent 50.0 ${spliceInstanceNames.amuletNameAcronym} to",
+                  aliceUserPartyId,
+                ),
               )(row)
             )
           }
