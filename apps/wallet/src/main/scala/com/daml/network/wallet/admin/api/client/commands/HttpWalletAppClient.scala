@@ -3,13 +3,14 @@
 
 package com.daml.network.wallet.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -45,7 +46,7 @@ object HttpWalletAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
+      http.WalletClient.httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.Conflict)), host)
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -928,5 +929,43 @@ object HttpWalletAppClient {
     ) = { case http.ListTransactionsResponse.OK(response) =>
       response.items.traverse(TxLogEntry.Http.fromResponseItem)
     }
+  }
+
+  case object CreateTransferPreapproval
+      extends InternalBaseCommand[
+        http.CreateTransferPreapprovalResponse,
+        CreateTransferPreapprovalResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) =
+      client.createTransferPreapproval(headers = headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.CreateTransferPreapprovalResponse.OK(response) =>
+        Codec
+          .decodeJavaContractId(TransferPreapproval.COMPANION)(
+            response.transferPreapprovalContractId
+          )
+          .map(CreateTransferPreapprovalResponse.Created(_))
+      case http.CreateTransferPreapprovalResponse.Conflict(response) =>
+        Codec
+          .decodeJavaContractId(TransferPreapproval.COMPANION)(
+            response.transferPreapprovalContractId
+          )
+          .map(CreateTransferPreapprovalResponse.AlreadyExists(_))
+    }
+  }
+
+  sealed abstract class CreateTransferPreapprovalResponse {
+    def contractId: TransferPreapproval.ContractId
+  }
+
+  object CreateTransferPreapprovalResponse {
+    final case class Created(contractId: TransferPreapproval.ContractId)
+        extends CreateTransferPreapprovalResponse
+    final case class AlreadyExists(contractId: TransferPreapproval.ContractId)
+        extends CreateTransferPreapprovalResponse
   }
 }

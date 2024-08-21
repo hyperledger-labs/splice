@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.splice.{
   validatorlicense as validatorCodegen,
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -293,6 +294,14 @@ trait UserWalletStore extends AppStore with NamedLogging {
     // here we just take the first one.
     lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
+
+  def lookupTransferPreapproval()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[QueryResult[Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(TransferPreapproval.COMPANION)
+      .map(_.map(_.map(_.contract)))
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   final def getValidatorRightsWhereUserIsValidator()(implicit
@@ -628,6 +637,13 @@ object UserWalletStore {
           UserWalletAcsStoreRowData(
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+        ),
+        mkFilter(TransferPreapproval.COMPANION)(co =>
+          co.payload.dso == dso && co.payload.receiver == endUser
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract
           )
         ),
       ),

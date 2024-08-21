@@ -440,6 +440,13 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.ListTransactions(beginAfterId, pageSize))
     }
   }
+
+  @Help.Summary("Create transfer preapproval")
+  @Help.Description("Create transfer preapproval for the requesting party")
+  def createTransferPreapproval(): HttpWalletAppClient.CreateTransferPreapprovalResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.CreateTransferPreapproval)
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

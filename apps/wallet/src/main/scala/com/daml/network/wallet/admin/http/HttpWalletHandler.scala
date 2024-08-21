@@ -9,6 +9,7 @@ import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -22,11 +23,12 @@ import com.daml.network.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{CommandPriority, RetryProvider}
+import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{SpliceUtil, Codec, ContractWithState}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
@@ -644,6 +646,62 @@ class HttpWalletHandler(
                 )
               })(user),
               logger,
+            )
+        }
+      } yield result
+    }
+  }
+
+  override def createTransferPreapproval(
+      respond: r0.CreateTransferPreapprovalResponse.type
+  )()(tuser: TracedUser): Future[r0.CreateTransferPreapprovalResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.createTransferPreapproval") { implicit traceContext => _ =>
+      for {
+        wallet <- getUserWallet(user)
+        store = wallet.store
+        transferPreapprovalO <- store.lookupTransferPreapproval()
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+
+        result <- transferPreapprovalO match {
+          case QueryResult(offset, None) =>
+            wallet.connection
+              .submit(
+                Seq(store.key.validatorParty, store.key.endUserParty),
+                Seq.empty,
+                new TransferPreapproval(
+                  store.key.endUserParty.toProtoPrimitive,
+                  store.key.validatorParty.toProtoPrimitive,
+                  store.key.dsoParty.toProtoPrimitive,
+                ).create,
+              )
+              .withDedup(
+                SpliceLedgerConnection.CommandId(
+                  "com.daml.network.wallet.createTransferPreapproval",
+                  Seq(
+                    store.key.endUserParty,
+                    store.key.validatorParty,
+                  ),
+                  "",
+                ),
+                deduplicationOffset = offset,
+              )
+              .withDomainId(domain)
+              .yieldResult()
+              .map(created =>
+                r0.CreateTransferPreapprovalResponse.OK(
+                  d0.CreateTransferPreapprovalResponse(
+                    created.contractId.contractId
+                  )
+                )
+              )
+          case QueryResult(_, Some(c)) =>
+            Future.successful(
+              r0.CreateTransferPreapprovalResponse.Conflict(
+                d0.CreateTransferPreapprovalResponse(
+                  c.contractId.contractId
+                )
+              )
             )
         }
       } yield result

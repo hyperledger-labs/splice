@@ -508,6 +508,24 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-preapproval:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "createTransferPreapproval"
+      responses:
+        "200":
+          description: Transfer preapproval was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
+        "409":
+          description: Transfer preapproval already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
 components:
   schemas:
     UserStatusResponse:
@@ -912,3 +930,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListTransactionsResponseItem"
+
+    CreateTransferPreapprovalResponse:
+      type: object
+      required:
+        - transfer_preapproval_contract_id
+      properties:
+        transfer_preapproval_contract_id:
+          type: string

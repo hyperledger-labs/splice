@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.ans as codegen
-import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
 import com.daml.network.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -25,6 +24,7 @@ import com.daml.network.sv.automation.delegatebased.{
   ExpiredAnsEntryTrigger,
   ExpiredAnsSubscriptionTrigger,
 }
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import com.daml.network.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
@@ -455,26 +455,21 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
-        actAndCheck(
+        val (_, cid) = actAndCheck(
           "Create TransferPreapproval",
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitWithResult(
-              userId = aliceValidatorBackend.config.ledgerApiUser,
-              actAs = Seq(aliceUserParty, aliceValidatorBackend.getValidatorPartyId()),
-              readAs = Seq.empty,
-              update = new TransferPreapproval(
-                aliceUserParty.toProtoPrimitive,
-                aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive,
-                dsoParty.toProtoPrimitive,
-              ).create,
-            ),
+          aliceWalletClient.createTransferPreapproval(),
         )(
           "Scan lookup returns TransferPreapproval",
-          c => {
-            val contract = sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
-            contract.contractId shouldBe c.contractId
+          inside(_) {
+            case CreateTransferPreapprovalResponse.Created(c) => {
+              val contract = sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+              contract.contractId shouldBe c
+              contract.contractId
+            }
           },
         )
+        aliceWalletClient.createTransferPreapproval() shouldBe CreateTransferPreapprovalResponse
+          .AlreadyExists(cid)
     }
   }
 
