@@ -3,21 +3,24 @@
 
 package com.daml.network.validator.admin.api.client.commands
 
+import cats.data.EitherT
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
+import com.daml.network.http.HttpClient
+import com.daml.network.http.v0.{definitions, validator_admin as http}
+import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.validator.migration.DomainMigrationDump
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.validator_admin as http
-import com.daml.network.http.v0.definitions
-import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.util.{Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
 import java.time.Instant
-import com.daml.network.validator.migration.DomainMigrationDump
+import scala.concurrent.{ExecutionContext, Future}
 
 object HttpValidatorAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -149,6 +152,73 @@ object HttpValidatorAdminAppClient {
       Either[String, definitions.GetDecentralizedSynchronizerConnectionConfigResponse],
     ] = { case http.GetDecentralizedSynchronizerConnectionConfigResponse.OK(response) =>
       Right(response)
+    }
+  }
+
+  case class CreateExternalPartySetupProposal(partyId: PartyId)
+      extends BaseCommand[
+        http.CreateExternalPartySetupProposalResponse,
+        externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.CreateExternalPartySetupProposalResponse] =
+      client.createExternalPartySetupProposal(
+        definitions.CreateExternalPartySetupProposalRequest(partyId.toProtoPrimitive),
+        headers = headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.CreateExternalPartySetupProposalResponse, Either[
+      String,
+      externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+    ]] = { case http.CreateExternalPartySetupProposalResponse.OK(response) =>
+      Codec.decodeJavaContractId(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(
+        response.contractId
+      )
+    }
+  }
+
+  case class ListExternalPartySetupProposals()
+      extends BaseCommand[
+        http.ListExternalPartySetupProposalResponse,
+        Seq[ContractWithState[
+          externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+          externalPartyCodegen.ExternalPartySetupProposal,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListExternalPartySetupProposalResponse] =
+      client.listExternalPartySetupProposal(headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListExternalPartySetupProposalResponse.OK(response) =>
+      response.contracts.traverse(contractWithState =>
+        for {
+          contract <- Contract
+            .fromHttp(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(
+              contractWithState.contract
+            )
+            .leftMap(_.toString)
+          domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+        } yield ContractWithState(
+          contract,
+          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+        )
+      )
     }
   }
 

@@ -4,8 +4,15 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
+import com.daml.network.environment.{
+  BaseLedgerConnection,
+  ParticipantAdminConnection,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import com.daml.network.http.v0.definitions.{
+  CreateExternalPartySetupProposalRequest,
   CreateNamespaceDelegationAndPartyTxsRequest,
   SubmitNamespaceDelegationAndPartyTxsRequest,
 }
@@ -14,8 +21,9 @@ import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.AppStoreWithIngestion
-import com.daml.network.validator.migration.DomainMigrationDumpGenerator
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.validator.config.ValidatorAppBackendConfig
+import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -215,4 +223,73 @@ class HttpValidatorAdminHandler(
   )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
       extracted: TracedUser
   ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = ???
+
+  override def createExternalPartySetupProposal(
+      respond: ValidatorAdminResource.CreateExternalPartySetupProposalResponse.type
+  )(body: CreateExternalPartySetupProposalRequest)(
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.CreateExternalPartySetupProposalResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
+    val validatorServiceParty = store.key.validatorParty
+    val dsoParty = store.key.dsoParty
+    for {
+      domainId <- getAmuletRulesDomain()(tracedContext)
+      result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
+        case QueryResult(offset, None) => {
+          // TODO(#14156): check for existing TransferPreapproval
+          storeWithIngestion.connection
+            .submit(
+              Seq(validatorServiceParty),
+              Seq(validatorServiceParty),
+              ExternalPartySetupProposal.create(
+                validatorServiceParty.toProtoPrimitive,
+                userParty.toProtoPrimitive,
+                dsoParty.toProtoPrimitive,
+              ),
+            )
+            .withDedup(
+              commandId = SpliceLedgerConnection.CommandId(
+                "com.daml.network.validator.createExternalPartySetupProposal",
+                Seq(validatorServiceParty),
+                BaseLedgerConnection.sanitizeUserIdToPartyString(body.userPartyId),
+              ),
+              deduplicationOffset =
+                offset, // TODO(#14156): replace with min of this and offset of TransferPreapproval
+            )
+            .withDomainId(domainId)
+            .yieldResult()
+            .map(contract =>
+              ValidatorAdminResource.CreateExternalPartySetupProposalResponse.OK(
+                definitions.CreateExternalPartySetupProposalResponse(
+                  contract.contractId.contractId
+                )
+              )
+            )
+        }
+        case QueryResult(_, Some(c)) =>
+          Future.successful(
+            ValidatorAdminResource.CreateExternalPartySetupProposalResponse.Conflict(
+              definitions.ErrorResponse(
+                s"ExternalPartySetupProposal contract already exists: ${c.contract.contractId}"
+              )
+            )
+          )
+      }
+
+    } yield result
+  }
+
+  override def listExternalPartySetupProposal(
+      respond: ValidatorAdminResource.ListExternalPartySetupProposalResponse.type
+  )()(
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.ListExternalPartySetupProposalResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    for {
+      proposals <- store.listExternalPartySetupProposals()
+    } yield definitions.ListExternalPartySetupProposalsResponse(
+      proposals.map(p => p.toHttp).toVector
+    )
+  }
 }

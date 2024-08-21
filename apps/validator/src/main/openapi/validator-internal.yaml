@@ -147,6 +147,40 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/admin/external-party-setup-proposal:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "createExternalPartySetupProposal"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateExternalPartySetupProposalRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateExternalPartySetupProposalResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+    get:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "listExternalPartySetupProposal"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListExternalPartySetupProposalsResponse"
+
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
@@ -1055,3 +1089,29 @@ components:
           type: number
         patience_seconds:
           type: number
+
+    CreateExternalPartySetupProposalRequest:
+      type: object
+      required:
+        - user_party_id
+      properties:
+        user_party_id:
+          type: string
+
+    CreateExternalPartySetupProposalResponse:
+      type: object
+      required:
+        - contractId
+      properties:
+        contractId:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+
+    ListExternalPartySetupProposalsResponse:
+      type: object
+      required:
+        - contracts
+      properties:
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"

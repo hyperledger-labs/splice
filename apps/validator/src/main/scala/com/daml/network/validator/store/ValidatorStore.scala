@@ -4,15 +4,18 @@
 package com.daml.network.validator.store
 
 import cats.syntax.traverseFilter.*
+import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
+import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
+import com.daml.network.codegen.java.splice.wallet.{
+  externalparty as externalPartyCodegen,
+  install as walletCodegen,
+  topupstate as topUpCodegen,
+}
 import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
-}
-import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.splice.wallet.{
-  install as walletCodegen,
-  topupstate as topUpCodegen,
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.definitions
@@ -86,6 +89,32 @@ trait ValidatorStore extends WalletStore with AppStore {
       )
     } yield installs.map(i => i.payload.endUserName)
   }
+
+  def listExternalPartySetupProposals()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[ExternalPartySetupProposal.ContractId, ExternalPartySetupProposal]]
+  ] = {
+    for {
+      proposals <- multiDomainAcsStore.listContracts(
+        externalPartyCodegen.ExternalPartySetupProposal.COMPANION
+      )
+    } yield proposals
+  }
+
+  def lookupExternalPartySetupProposalByUserPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[ContractWithState[ExternalPartySetupProposal.ContractId, ExternalPartySetupProposal]]
+    ]
+  ]
+
+  def lookupTransferPreapprovalByReceiverPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
+  ]
 
   def lookupLatestAppConfiguration(
       provider: PartyId
@@ -341,6 +370,14 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             trafficDomainId = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
+          )
+        },
+        mkFilter(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(co =>
+          co.payload.validator == validator && co.payload.dso == dso
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
           )
         },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>

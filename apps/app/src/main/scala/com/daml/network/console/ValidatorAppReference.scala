@@ -3,40 +3,31 @@
 
 package com.daml.network.console
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.util.ContractWithState
-import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
-import com.daml.network.validator.admin.api.client.commands.{
-  HttpAppManagerAdminAppClient,
-  HttpAppManagerAppClient,
-  HttpAppManagerPublicAppClient,
-  HttpScanProxyAppClient,
-  HttpValidatorAdminAppClient,
-  HttpValidatorAppClient,
-  HttpValidatorPublicAppClient,
-  UserInfo,
-}
+import com.daml.network.validator.admin.api.client.commands.*
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
 }
+import com.daml.network.validator.migration.DomainMigrationDump
+import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 
 import java.time.Instant
-import com.daml.network.validator.migration.DomainMigrationDump
-
 import scala.concurrent.Future
 
 /** Console commands that can be executed either through client or backend reference.
@@ -143,6 +134,29 @@ abstract class ValidatorAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.GetDecentralizedSynchronizerConnectionConfig()
+      )
+    }
+  }
+
+  @Help.Summary("Creates ExternalPartySetupProposal contract for a given party")
+  def createExternalPartySetupProposal(
+      userPartyId: PartyId
+  ): externalPartyCodegen.ExternalPartySetupProposal.ContractId = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.CreateExternalPartySetupProposal(userPartyId)
+      )
+    }
+  }
+
+  @Help.Summary("List ExternalPartySetupProposal contracts")
+  def listExternalPartySetupProposal(): Seq[ContractWithState[
+    externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+    externalPartyCodegen.ExternalPartySetupProposal,
+  ]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.ListExternalPartySetupProposals()
       )
     }
   }
