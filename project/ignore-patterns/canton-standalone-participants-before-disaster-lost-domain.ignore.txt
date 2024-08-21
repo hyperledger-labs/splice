@@ -3,3 +3,5 @@
 
 Request failed for sequencer. Is the server running?
 SEQUENCER_SUBSCRIPTION_LOST
+
+Failed to acknowledge clean timestamp.*CANCELLED
