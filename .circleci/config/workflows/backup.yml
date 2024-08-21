@@ -9,12 +9,12 @@ workflow:
           context:
             - slack-context
             - canton-network-vpn
-      - backup_status_cluster:
-          cluster: "testnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          context:
-            - slack-context
-            - canton-network-vpn
+#      - backup_status_cluster:
+#          cluster: "testnet"
+#          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+#          context:
+#            - slack-context
+#            - canton-network-vpn
       - backup_status_cluster:
           cluster: "mainnet"
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
