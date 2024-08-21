@@ -58,7 +58,9 @@ parameters:
         apply-infra,
         update-deployment,
         deploy-hard-migration,
-        backup-status-check,
+        backup-status-devnet,
+        backup-status-testnet,
+        backup-status-mainnet,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -4068,9 +4070,9 @@ jobs:
 
 workflows:
   version: 2
-  backup_status_check:
+  backup_status_devnet:
     when:
-      equal: [ backup-status-check, << pipeline.parameters.run-job >> ]
+      equal: [ backup-status-devnet, << pipeline.parameters.run-job >> ]
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
@@ -4078,12 +4080,20 @@ workflows:
           context:
             - slack-context
             - canton-network-vpn
-#      - backup_status_cluster:
-#          cluster: "testnet"
-#          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-#          context:
-#            - slack-context
-#            - canton-network-vpn
+  backup_status_testnet:
+    when:
+      equal: [ backup-status-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "testnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn
+  backup_status_mainnet:
+    when:
+      equal: [ backup-status-mainnet, << pipeline.parameters.run-job >> ]
+    jobs:
       - backup_status_cluster:
           cluster: "mainnet"
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment

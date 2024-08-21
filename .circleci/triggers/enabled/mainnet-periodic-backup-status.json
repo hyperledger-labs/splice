@@ -1,10 +1,10 @@
 {
-    "name": "Backup Status for prod clusters",
-    "description": "Periodic backup status of dev/test/mainnet",
+    "name": "Backup Status for MainNet",
+    "description": "Periodic backup status of mainnet",
     "attribution-actor": "system",
     "parameters": {
       "branch": "main",
-      "run-job": "backup-status-check"
+      "run-job": "backup-status-mainnet"
     },
     "timetable": {
       "per-hour": 1,
