@@ -15,3 +15,14 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
+
+  backup_status_testnet:
+    when:
+      equal: [ backup-status-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "testnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn

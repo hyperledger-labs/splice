@@ -4070,38 +4070,6 @@ jobs:
 
 workflows:
   version: 2
-  backup_status_devnet:
-    when:
-      equal: [ backup-status-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "devnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          context:
-            - slack-context
-            - canton-network-vpn
-  backup_status_testnet:
-    when:
-      equal: [ backup-status-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "testnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          context:
-            - slack-context
-            - canton-network-vpn
-  backup_status_mainnet:
-    when:
-      equal: [ backup-status-mainnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "mainnet"
-          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
-          alert_threshold: "4 hours ago"
-          context:
-            - slack-context
-            - canton-network-vpn
-
 
   publish_public_artifacts:
     when:
@@ -6144,6 +6112,17 @@ workflows:
             - canton-network-vpn
             - slack-context
 
+  backup_status_devnet:
+    when:
+      equal: [ backup-status-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "devnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn
+
   deploy_hard_migration:
     when:
       equal: [ deploy-hard-migration, << pipeline.parameters.run-job >> ]
@@ -6386,6 +6365,18 @@ workflows:
             - canton-network-vpn
             - slack-context
 
+  backup_status_mainnet:
+    when:
+      equal: [ backup-status-mainnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "mainnet"
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          alert_threshold: "4 hours ago"
+          context:
+            - slack-context
+            - canton-network-vpn
+
   update_deployment:
     when:
       equal: [ update-deployment, << pipeline.parameters.run-job >> ]
@@ -6495,4 +6486,15 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+
+  backup_status_testnet:
+    when:
+      equal: [ backup-status-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - backup_status_cluster:
+          cluster: "testnet"
+          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
+          context:
+            - slack-context
+            - canton-network-vpn
 
