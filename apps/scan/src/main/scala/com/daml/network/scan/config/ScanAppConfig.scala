@@ -40,6 +40,7 @@ case class ScanAppBackendConfig(
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     acsSnapshotPeriodHours: Int = 3,
+    enableForcedAcsSnapshots: Boolean = false,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),

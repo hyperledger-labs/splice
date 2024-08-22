@@ -318,6 +318,13 @@ abstract class ScanAppReference(
       )
     }
 
+  def forceAcsSnapshotNow() =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ForceAcsSnapshotNow
+      )
+    }
+
   def getDateOfMostRecentSnapshotBefore(before: CantonTimestamp, migrationId: Long) =
     consoleEnvironment.run {
       httpCommand(

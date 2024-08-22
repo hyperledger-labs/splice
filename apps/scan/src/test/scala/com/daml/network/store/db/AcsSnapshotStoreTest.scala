@@ -737,7 +737,6 @@ class AcsSnapshotStoreTest
     )
   }
 
-  // TODO (#14215): this has proven to be insufficient at making sure an ACS snapshot is included in the snapshots.
   private def ingestAcs[TCid <: ContractId[T], T](
       updateHistory: UpdateHistory,
       acs: Seq[Contract[TCid, T]],

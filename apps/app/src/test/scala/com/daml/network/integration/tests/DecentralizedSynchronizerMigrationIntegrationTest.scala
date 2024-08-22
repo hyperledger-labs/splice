@@ -3,7 +3,13 @@ package com.daml.network.integration.tests
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.network.codegen.java.splice.dsorules.{DsoRules_AddSv, SynchronizerUpgradeSchedule}
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.codegen.java.splice.dsorules.{
+  DsoRules,
+  DsoRules_AddSv,
+  SynchronizerUpgradeSchedule,
+}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import com.daml.network.codegen.java.splice.splitwell.Group
@@ -16,7 +22,11 @@ import com.daml.network.config.{
   ParticipantClientConfig,
   SynchronizerConfig,
 }
-import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAllScanAppConfigs_,
+  updateAutomationConfig,
+}
 import com.daml.network.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -49,6 +59,7 @@ import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   DomainMigrationUtil,
+  PackageQualifiedName,
   ProcessTestUtil,
   SpliceUtil,
   SplitwellTestUtil,
@@ -409,6 +420,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
+      )
+      .addConfigTransforms((_, config) =>
+        updateAllScanAppConfigs_(config => config.copy(enableForcedAcsSnapshots = true))(config)
       )
       .withManualStart
       // TODO (#10859) remove and fix test failures
@@ -946,6 +960,33 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     .votes should have size 1
                 },
             )
+
+            withClueAndLog("ACS snapshot includes the ACS import") {
+              val dsoInfo = sv1ScanLocalBackend.getDsoInfo()
+              val ansRules = sv1ScanLocalBackend.getAnsRules()
+
+              val snapshotRecordTime = sv1ScanLocalBackend.forceAcsSnapshotNow()
+              val snapshot = sv1ScanLocalBackend
+                .getAcsSnapshotAt(
+                  snapshotRecordTime,
+                  migrationId = 1L,
+                  pageSize = 1000,
+                  templates = Some(
+                    Vector(DsoRules.TEMPLATE_ID, AmuletRules.TEMPLATE_ID, AnsRules.TEMPLATE_ID).map(
+                      PackageQualifiedName(_)
+                    )
+                  ),
+                )
+                .valueOrFail(s"Snapshot was just taken but not returned.")
+
+              snapshot.createdEvents.map(_.contractId) should contain(dsoInfo.dsoRules.contractId)
+              snapshot.createdEvents.map(_.contractId) should contain(
+                dsoInfo.amuletRules.contractId
+              )
+              snapshot.createdEvents.map(_.contractId) should contain(
+                ansRules.contractId.contractId
+              )
+            }
 
             withClueAndLog("3rd party app works after domain migration") {
               val (_, paymentRequest) =

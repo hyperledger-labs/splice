@@ -198,6 +198,7 @@ class ScanApp(
         acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
+        config.enableForcedAcsSnapshots,
         clock,
         loggerFactory,
       )
