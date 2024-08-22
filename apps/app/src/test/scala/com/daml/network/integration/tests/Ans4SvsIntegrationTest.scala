@@ -28,8 +28,7 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
         sv1Backend.dsoDelegateBasedAutomation.trigger[TerminatedSubscriptionTrigger]
 
       setTriggersWithin[Assertion](
-        // TODO(#13199): Consider adding a retry to the submission below instead
-        // ...and figuring out how to make the `onboardUser` part of `onboardWalletUser` not time out
+        // Figure out how to make the `onboardUser` part of `onboardWalletUser` not time out
         // in the even of an untimely domain disconnect
         triggersToPauseAtStart = Seq(
           aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]

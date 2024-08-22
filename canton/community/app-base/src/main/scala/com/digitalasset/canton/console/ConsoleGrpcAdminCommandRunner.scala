@@ -18,10 +18,11 @@ import com.digitalasset.canton.config.{ClientConfig, ConsoleCommandTimeout, NonN
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, ClientChannelBuilder}
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, ClientChannelBuilder, GrpcError}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
@@ -39,6 +40,8 @@ class GrpcAdminCommandRunner(
     extends NamedLogging
     with AutoCloseable
     with Spanning {
+
+  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = _ => _ => false
 
   private implicit val executionContext: ExecutionContextExecutor =
     environment.executionContext
@@ -99,6 +102,7 @@ class GrpcAdminCommandRunner(
         closeableChannel.channel,
         token,
         callTimeout.duration,
+        retryPolicy(command),
       )
     } yield result
     (
@@ -162,4 +166,13 @@ class ConsoleGrpcAdminCommandRunner(consoleEnvironment: ConsoleEnvironment, apiN
       consoleEnvironment.environment,
       consoleEnvironment.commandTimeouts,
       apiName,
-    )(consoleEnvironment.tracer)
+    )(consoleEnvironment.tracer) {
+
+  private val retryPolicyV =
+    new AtomicReference[GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean](_ => _ => false)
+  override def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean =
+    retryPolicyV.get()
+
+  def setRetryPolicy(policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean): Unit =
+    retryPolicyV.set(policy)
+}

@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet.Amulet
 import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.dsorules.DsoRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
@@ -36,6 +37,10 @@ class SvOnboardingAddlIntegrationTest
           } else config
         }(config)
       )
+
+  override lazy val updateHistoryIgnoredRootCreates = Seq(
+    amuletCodegen.Amulet.TEMPLATE_ID
+  )
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize DSO with 3 SVs") {
@@ -361,8 +366,8 @@ class SvOnboardingAddlIntegrationTest
       val amuletAmount = BigDecimal(42)
 
       clue("create a amulet with actAs = DSO") {
-        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
-          () => {
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+          {
             val amuletCid = createAmulet(
               sv1ValidatorBackend.participantClientWithAdminToken,
               sv1UserId,
@@ -385,6 +390,9 @@ class SvOnboardingAddlIntegrationTest
                   "Unexpected amulet create event"
                 )
             )
+            // Error emitted by every ScanTxLogParser plus the one UserWalletTxLogParser
+            // associated with the owner of the coin.
+            lines should have size 2
           },
         )
       }
@@ -410,19 +418,21 @@ class SvOnboardingAddlIntegrationTest
         }
       }
       clue("create a amulet again with actAs = DSO") {
-        assertThrowsAndLogsCommandFailures(
-          createAmulet(
-            sv1ValidatorBackend.participantClientWithAdminToken,
-            sv1UserId,
-            sv1UserParty,
-            amount = amuletAmount,
-          ),
-          _.errorMessage should (include(
-            s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"
-          ) or include(
-            s"Not connected to a domain on which this participant can submit for all submitters"
-          )),
-        )
+        withCommandRetryPolicy(_ => _ => false) {
+          assertThrowsAndLogsCommandFailures(
+            createAmulet(
+              sv1ValidatorBackend.participantClientWithAdminToken,
+              sv1UserId,
+              sv1UserParty,
+              amount = amuletAmount,
+            ),
+            _.errorMessage should (include(
+              s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"
+            ) or include(
+              s"Not connected to a domain on which this participant can submit for all submitters"
+            )),
+          )
+        }
       }
   }
 

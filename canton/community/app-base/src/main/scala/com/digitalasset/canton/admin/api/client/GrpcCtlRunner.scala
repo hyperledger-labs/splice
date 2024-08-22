@@ -7,7 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.ledger.client.LedgerCallCredentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.LoggerUtil
 import io.grpc.ManagedChannel
@@ -33,6 +33,7 @@ class GrpcCtlRunner(
       channel: ManagedChannel,
       token: Option[String],
       timeout: Duration,
+      retryPolicy: GrpcError => Boolean,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
     val baseService: command.Svc = command
@@ -43,14 +44,20 @@ class GrpcCtlRunner(
 
     for {
       request <- EitherT.fromEither[Future](command.createRequest())
-      response <- submitRequest(command)(instanceName, service, request, timeout)
+      response <- submitRequest(command)(instanceName, service, request, timeout, retryPolicy)
       result <- EitherT.fromEither[Future](command.handleResponse(response))
     } yield result
   }
 
   private def submitRequest[Svc <: AbstractStub[Svc], Req, Res, Result](
       command: GrpcAdminCommand[Req, Res, Result]
-  )(instanceName: String, service: command.Svc, request: Req, timeout: Duration)(implicit
+  )(
+      instanceName: String,
+      service: command.Svc,
+      request: Req,
+      timeout: Duration,
+      retryPolicy: GrpcError => Boolean,
+  )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[Future, String, Res] =
@@ -63,7 +70,7 @@ class GrpcCtlRunner(
         timeout,
         logger,
         CantonGrpcUtil.silentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
-        _ => false, // no retry to optimize for low latency
+        retryPolicy,
       )
       .leftMap(_.toString)
 }

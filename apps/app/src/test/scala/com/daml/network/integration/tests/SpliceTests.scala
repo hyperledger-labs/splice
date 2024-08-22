@@ -21,9 +21,11 @@ import com.daml.network.integration.plugins.{
 import com.daml.network.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
 import com.daml.network.util.{Auth0Util, CommonAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
@@ -38,7 +40,7 @@ import org.apache.pekko.http.scaladsl.Http
 import org.scalactic.source
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{Matcher, MatchResult}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -499,6 +501,25 @@ object SpliceTests extends LazyLogging {
           }
           case ex: Throwable => throw ex // throw anything else
         }
+      }
+    }
+
+    /** Overrides the retry policy for ALL grpc commands executed in the given block */
+    def withCommandRetryPolicy[T](
+        policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean
+    )(block: => T)(implicit env: SpliceTestConsoleEnvironment): T = {
+      val prevD = env.grpcDomainCommandRunner.retryPolicy
+      val prevL = env.grpcLedgerCommandRunner.retryPolicy
+      val prevA = env.grpcAdminCommandRunner.retryPolicy
+      try {
+        env.grpcDomainCommandRunner.setRetryPolicy(policy)
+        env.grpcLedgerCommandRunner.setRetryPolicy(policy)
+        env.grpcAdminCommandRunner.setRetryPolicy(policy)
+        block
+      } finally {
+        env.grpcDomainCommandRunner.setRetryPolicy(prevD)
+        env.grpcLedgerCommandRunner.setRetryPolicy(prevL)
+        env.grpcAdminCommandRunner.setRetryPolicy(prevA)
       }
     }
 
