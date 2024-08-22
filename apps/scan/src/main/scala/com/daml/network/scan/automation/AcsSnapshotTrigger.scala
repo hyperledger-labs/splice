@@ -42,7 +42,7 @@ class AcsSnapshotTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      val now = context.pollingClock.now
+      val now = context.clock.now
       for {
         lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
         possibleTask <- lastSnapshot match {
@@ -61,7 +61,7 @@ class AcsSnapshotTrigger(
             Future.successful(None)
           case Some(task) if task.snapshotRecordTime > now =>
             logger.info(
-              s"Still not time to take a snapshot. Next snapshot time: ${task.snapshotRecordTime}."
+              s"Still not time to take a snapshot. Now: ${now}. Next snapshot time: ${task.snapshotRecordTime}."
             )
             Future.successful(None)
           case Some(task) =>
@@ -90,6 +90,11 @@ class AcsSnapshotTrigger(
       store
         .insertNewSnapshot(lastSnapshot, snapshotRecordTime)
         .map { insertCount =>
+          if (insertCount == 0) {
+            logger.error(
+              s"No entries were inserted for snapshot $snapshotRecordTime. This is very likely a bug."
+            )
+          }
           TaskSuccess(
             s"Successfully inserted $insertCount entries for snapshot $snapshotRecordTime."
           )
@@ -113,8 +118,8 @@ class AcsSnapshotTrigger(
         Some(
           (
             store.migrationId,
-            // exclude ACS imports, which have record_time=epoch
-            CantonTimestamp.Epoch.plusSeconds(1L),
+            // exclude ACS imports, which have record_time=MinValue
+            CantonTimestamp.MinValue.plusSeconds(1L),
           )
         ),
         PageLimit.tryCreate(1),

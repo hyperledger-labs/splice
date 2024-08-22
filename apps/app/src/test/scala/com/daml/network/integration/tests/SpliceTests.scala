@@ -447,7 +447,8 @@ object SpliceTests extends LazyLogging {
     /** Changes `name` so it is unlikely to conflict with names used somewhere else.
       * Does nothing for isolated test environments, overloaded for shared environment.
       */
-    def perTestCaseName(name: String) = name
+    def perTestCaseName(name: String) =
+      s"${name}.unverified.cns"
 
     private def readMandatoryEnvVar(name: String): String = {
       sys.env.get(name) match {
