@@ -181,6 +181,50 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListExternalPartySetupProposalsResponse"
 
+  /v0/admin/external-party-setup-proposal/prepare-accept:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "prepareAcceptExternalPartySetupProposal"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PrepareAcceptExternalPartySetupProposalRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PrepareAcceptExternalPartySetupProposalResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/external-party-setup-proposal/submit-accept:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "submitAcceptExternalPartySetupProposal"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SubmitAcceptExternalPartySetupProposalRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SubmitAcceptExternalPartySetupProposalResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
@@ -1101,9 +1145,9 @@ components:
     CreateExternalPartySetupProposalResponse:
       type: object
       required:
-        - contractId
+        - contract_id
       properties:
-        contractId:
+        contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
 
     ListExternalPartySetupProposalsResponse:
@@ -1115,3 +1159,47 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    PrepareAcceptExternalPartySetupProposalRequest:
+      type: object
+      required:
+        - contract_id
+        - user_party_id
+      properties:
+        contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        user_party_id:
+          type: string
+
+    PrepareAcceptExternalPartySetupProposalResponse:
+      type: object
+      required:
+        - transaction
+        - tx_hash
+      properties:
+        transaction:
+          type: string
+        tx_hash:
+          type: string
+
+    SubmitAcceptExternalPartySetupProposalRequest:
+      type: object
+      required:
+        - contract_id
+        - user_party_id
+        - signed_tx_hash
+      properties:
+        contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        user_party_id:
+          type: string
+        signed_tx_hash:
+          type: string
+
+    SubmitAcceptExternalPartySetupProposalResponse:
+      type: object
+      required:
+        - transfer_preapproval_contract_id
+      properties:
+        transfer_preapproval_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"

@@ -222,4 +222,34 @@ object HttpValidatorAdminAppClient {
     }
   }
 
+  case class PrepareAcceptExternalPartySetupProposal(
+      contractId: externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+      userPartyId: PartyId,
+  ) extends BaseCommand[
+        http.PrepareAcceptExternalPartySetupProposalResponse,
+        definitions.PrepareAcceptExternalPartySetupProposalResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.PrepareAcceptExternalPartySetupProposalResponse] =
+      client.prepareAcceptExternalPartySetupProposal(
+        definitions.PrepareAcceptExternalPartySetupProposalRequest(
+          contractId.contractId,
+          userPartyId.toProtoPrimitive,
+        ),
+        headers = headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.PrepareAcceptExternalPartySetupProposalResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
 }

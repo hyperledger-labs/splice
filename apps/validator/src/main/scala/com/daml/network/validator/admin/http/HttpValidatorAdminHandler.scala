@@ -14,6 +14,8 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.definitions.{
   CreateExternalPartySetupProposalRequest,
   CreateNamespaceDelegationAndPartyTxsRequest,
+  PrepareAcceptExternalPartySetupProposalRequest,
+  SubmitAcceptExternalPartySetupProposalRequest,
   SubmitNamespaceDelegationAndPartyTxsRequest,
 }
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
@@ -22,6 +24,7 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.util.DisclosedContracts
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
@@ -30,11 +33,13 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.grpc.StatusRuntimeException
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.Instant
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class HttpValidatorAdminHandler(
     storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
@@ -292,4 +297,71 @@ class HttpValidatorAdminHandler(
       proposals.map(p => p.toHttp).toVector
     )
   }
+
+  override def prepareAcceptExternalPartySetupProposal(
+      respond: ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.type
+  )(body: PrepareAcceptExternalPartySetupProposalRequest)(
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
+    for {
+      domainId <- getAmuletRulesDomain()(tracedContext)
+      result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
+        case QueryResult(_, Some(contractWithState)) => {
+          if (contractWithState.contract.contractId.contractId != body.contractId)
+            Future.successful(
+              ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.BadRequest(
+                definitions.ErrorResponse("Found contract does not match provided contractId.")
+              )
+            )
+          else {
+            val commands = contractWithState.toAssignedContract
+              .getOrElse(
+                throw Status.Code.FAILED_PRECONDITION.toStatus
+                  .withDescription(s"Invalid contract")
+                  .asRuntimeException()
+              )
+              .exercise(_.exerciseExternalPartySetupProposal_Accept())
+              .update
+              .commands()
+              .asScala
+              .toSeq
+            storeWithIngestion.connection
+              .prepareSubmission(
+                Some(domainId),
+                Seq(userParty),
+                Seq(userParty),
+                commands,
+                DisclosedContracts.Empty,
+              )
+              .flatMap { r =>
+                Future.successful(
+                  ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.OK(
+                    definitions.PrepareAcceptExternalPartySetupProposalResponse(
+                      Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
+                      Base64.getEncoder.encodeToString(r.preparedTransactionHash.toByteArray),
+                    )
+                  )
+                )
+              }
+          }
+        }
+        case QueryResult(_, None) => {
+          Future.successful(
+            ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.NotFound(
+              definitions.ErrorResponse("Contract not found.")
+            )
+          )
+        }
+      }
+
+    } yield result
+  }
+
+  override def submitAcceptExternalPartySetupProposal(
+      respond: ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.type
+  )(body: SubmitAcceptExternalPartySetupProposalRequest)(
+      extracted: TracedUser
+  ): Future[ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse] = ???
 }

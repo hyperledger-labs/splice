@@ -161,6 +161,18 @@ abstract class ValidatorAppReference(
     }
   }
 
+  @Help.Summary("Prepare AcceptExternalPartySetupProposal for a given party")
+  def prepareAcceptExternalPartySetupProposal(
+      contractId: externalPartyCodegen.ExternalPartySetupProposal.ContractId,
+      userPartyId: PartyId,
+  ): definitions.PrepareAcceptExternalPartySetupProposalResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.PrepareAcceptExternalPartySetupProposal(contractId, userPartyId)
+      )
+    }
+  }
+
   def registerApp(
       providerUserId: String,
       configuration: definitions.AppConfiguration,
