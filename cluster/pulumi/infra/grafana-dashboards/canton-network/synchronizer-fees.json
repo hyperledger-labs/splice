@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1747,
+  "id": 1751,
   "links": [],
   "panels": [
     {
@@ -468,7 +468,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(sender) (daml_sequencer_traffic_control_extra_traffic_consumed{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\", sender=~\"PAR::.*\"})",
+          "expr": "label_replace(sum by(sender) (daml_sequencer_traffic_control_extra_traffic_consumed{namespace=\"$namespace\", job=\"$job\", sender=~\"$member\", sender=~\"PAR::.*\"}), \"member\", \"$1\", \"sender\", \"(.*)\")",
           "fullMetaSearch": false,
           "hide": true,
           "includeNullMetadata": true,
@@ -587,9 +587,110 @@
       ],
       "title": "Traffic Purchased over the last 24h",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Rate of wasted traffic i.e. sequenced events that cost traffic but are not delivered in bytes/s summed across all participants matching the filter",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum by (namespace, job, reason) (rate(daml_sequencer_traffic_control_wasted_traffic_total{namespace=~\"$namespace\", sender=~\"$member\",sender=~\"PAR::.*\"}[$__rate_interval]))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Rate of Wasted Traffic",
+      "type": "timeseries"
     }
   ],
-  "refresh": "",
+  "refresh": "auto",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -693,6 +794,6 @@
   "timezone": "",
   "title": "Synchronizer Fees",
   "uid": "fdnphvrryfq4gf",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
