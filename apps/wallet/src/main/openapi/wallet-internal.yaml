@@ -526,6 +526,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
+  /v0/wallet/transfer-preapproval/send:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "transferPreapprovalSend"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TransferPreapprovalSendRequest"
+      responses:
+        "200":
+          description: ok
 components:
   schemas:
     UserStatusResponse:
@@ -937,4 +951,15 @@ components:
         - transfer_preapproval_contract_id
       properties:
         transfer_preapproval_contract_id:
+          type: string
+
+    TransferPreapprovalSendRequest:
+      type: object
+      required:
+        - receiver_party_id
+        - amount
+      properties:
+        receiver_party_id:
+          type: string
+        amount:
           type: string

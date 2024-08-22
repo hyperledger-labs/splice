@@ -20,6 +20,7 @@ import Splice.Wallet.Subscriptions
 import Splice.Wallet.TopUpState
 import Splice.Wallet.BuyTrafficRequest
 import Splice.Scripts.Wallet.TestSubscriptions
+import Splice.TransferPreapproval
 
 import Splice.Fees
 import Splice.Scripts.Util
@@ -525,6 +526,44 @@ testCO_MergeTransferInputs = script do
   aliceAmulets <- query @Amulet alice.primaryParty
   let [_, (mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceAmulets
   resultAmulet === mergedAmuletCid
+
+  pure ()
+
+testCO_TransferPreapprovalSend : Script ()
+testCO_TransferPreapprovalSend = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  amulet <- tap app bob 42.0
+
+  install <- submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = bob.primaryParty
+    endUserName = "bob_user"
+    dsoParty = app.dso
+    validatorParty = bobValidator.primaryParty
+
+  transferPreapprovalCid <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd TransferPreapproval with
+    receiver = alice.primaryParty
+    provider = aliceValidator.primaryParty
+    dso = app.dso
+
+
+  context <- getPaymentTransferContext app alice
+
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [bobValidator.primaryParty] [bob.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_TransferPreapprovalSend transferPreapprovalCid 40.0]
+    context
+
+  let [COO_TransferPreapprovalSend (Some resultAmulet)] = outcomes
+  bobAmulets <- query @Amulet bob.primaryParty
+  let [_, (mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) bobAmulets
+  resultAmulet === mergedAmuletCid
+
+  aliceAmulets <- query @Amulet alice.primaryParty
+  -- Setup creates 1 amulet of value 1. The amulet of value 40 is then the result of the transfer.
+  sort (map (\(_, a) -> a.amount.initialAmount) aliceAmulets) === [1.0, 40.0]
 
   pure ()
 

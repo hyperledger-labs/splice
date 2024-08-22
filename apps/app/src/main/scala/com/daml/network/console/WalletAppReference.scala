@@ -447,6 +447,15 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.CreateTransferPreapproval)
     }
+
+  @Help.Summary("Send amulet to the receiver using their TransferPreapproval")
+  @Help.Description(
+    "Send the given amulet to the receiver using their TransferPreapproval contract, fails if they do not have one"
+  )
+  def transferPreapprovalSend(receiver: PartyId, amount: BigDecimal): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount))
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

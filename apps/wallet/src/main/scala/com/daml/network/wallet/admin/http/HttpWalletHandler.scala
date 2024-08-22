@@ -29,7 +29,7 @@ import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{SpliceUtil, Codec, ContractWithState}
+import com.daml.network.util.{DisclosedContracts, SpliceUtil, Codec, ContractWithState}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
@@ -708,6 +708,40 @@ class HttpWalletHandler(
     }
   }
 
+  def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(
+      body: d0.TransferPreapprovalSendRequest
+  )(tuser: TracedUser): Future[r0.TransferPreapprovalSendResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.tap") { _ => _ =>
+      val receiver = Codec.tryDecode(Codec.Party)(body.receiverPartyId)
+      val amount = Codec.tryDecode(Codec.JavaBigDecimal)(body.amount)
+      scanConnection.lookupTransferPreapprovalByParty(receiver).flatMap {
+        case None =>
+          Future.failed(
+            Status.INVALID_ARGUMENT
+              .withDescription(s"Receiver $receiver does not have a TransferPreapproval")
+              .asRuntimeException
+          )
+        case Some(preapproval) =>
+          for {
+            wallet <- getUserWallet(user)
+            result <- exerciseWalletAmuletAction(
+              new amuletoperation.CO_TransferPreapprovalSend(
+                preapproval.contractId,
+                amount,
+              ),
+              user,
+              (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>
+                r0.TransferPreapprovalSendResponse.OK,
+              wallet.connection.disclosedContracts(
+                preapproval
+              ),
+            )
+          } yield result
+      }
+    }
+  }
+
   private def amuletToAmuletPosition(
       amulet: ContractWithState[Amulet.ContractId, Amulet],
       round: Long,
@@ -752,11 +786,12 @@ class HttpWalletHandler(
       operation: installCodegen.AmuletOperation,
       user: String,
       processResponse: ExpectedCOO => R,
+      extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[R] =
     for {
       userTreasury <- getUserTreasury(user)
       res <- userTreasury
-        .enqueueAmuletOperation(operation)
+        .enqueueAmuletOperation(operation, extraDisclosedContracts = extraDisclosedContracts)
         .map(processCOO[ExpectedCOO, R](processResponse))
     } yield res
 

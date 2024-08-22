@@ -304,12 +304,12 @@ class DbScanStore(
   override def lookupTransferPreapprovalByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]]
+    Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]
   ] = waitUntilAcsIngested {
     (for {
       row <- storage
         .querySingle(
-          selectFromAcsTable(
+          selectFromAcsTableWithState(
             ScanTables.acsTableName,
             storeId,
             domainMigrationId,
@@ -325,7 +325,7 @@ class DbScanStore(
           ).headOption,
           "lookupTransferPreapprovalReceiver",
         )
-    } yield contractFromRow(TransferPreapproval.COMPANION)(row)).value
+    } yield contractWithStateFromRow(TransferPreapproval.COMPANION)(row)).value
   }
 
   override def listTransactions(

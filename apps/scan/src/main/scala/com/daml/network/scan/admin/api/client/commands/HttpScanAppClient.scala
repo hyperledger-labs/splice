@@ -364,7 +364,7 @@ object HttpScanAppClient {
   case class LookupTransferPreapprovalByParty(
       party: PartyId
   ) extends InternalBaseCommand[http.LookupTransferPreapprovalByPartyResponse, Option[
-        Contract[TransferPreapproval.ContractId, TransferPreapproval]
+        ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]
       ]] {
 
     override def submitRequest(
@@ -376,7 +376,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = {
       case http.LookupTransferPreapprovalByPartyResponse.OK(response) =>
-        Contract
+        ContractWithState
           .fromHttp(TransferPreapproval.COMPANION)(response.transferPreapproval)
           .map(Some(_))
           .leftMap(_.toString)

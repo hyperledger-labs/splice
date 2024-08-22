@@ -6,6 +6,7 @@ package com.daml.network.scan.admin.api.client
 import cats.data.OptionT
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
@@ -197,6 +198,11 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule]
+
+  def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
 
 }
 

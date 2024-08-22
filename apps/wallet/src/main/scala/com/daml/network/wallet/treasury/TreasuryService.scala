@@ -166,12 +166,15 @@ class TreasuryService(
   def enqueueAmuletOperation[T](
       operation: installCodegen.AmuletOperation,
       priority: CommandPriority = CommandPriority.Low,
+      extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority)) match {
+    queue.offer(
+      EnqueuedAmuletOperation(operation, p, tc, priority, extraDisclosedContracts)
+    ) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -248,6 +251,8 @@ class TreasuryService(
             trafficRequestCodegen.BuyTrafficRequest.COMPANION
           )(op.trafficRequestCid)
         } yield ()
+
+      case _: amuletoperation.CO_TransferPreapprovalSend => Future.unit
 
       case op => throw new NotImplementedError(show"Unexpected amulet operation: $op")
     }
@@ -400,7 +405,7 @@ class TreasuryService(
           cmd,
           priority = batch.priority,
         )
-        .withDisclosedContracts(disclosedContracts)
+        .withDisclosedContracts(disclosedContracts.merge(batch.extraDisclosedContracts))
         // The only operation that is not self-conflicting is Tap, therefore
         // batch execution w/o command dedup is safe.
         .noDedup
@@ -834,6 +839,11 @@ object TreasuryService {
           op.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
         )
     }
+
+    lazy val extraDisclosedContracts: DisclosedContracts =
+      operationsToRun.foldLeft[DisclosedContracts](DisclosedContracts.Empty) {
+        case (acc, operation) => acc.merge(operation.extraDisclosedContracts)
+      }
   }
 
   private object AmuletOperationBatch {
@@ -847,6 +857,7 @@ object TreasuryService {
       outcomePromise: Promise[installCodegen.AmuletOperationOutcome],
       submittedFrom: TraceContext,
       priority: CommandPriority = CommandPriority.Low,
+      extraDisclosedContracts: DisclosedContracts,
   ) extends PrettyPrinting {
     override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(

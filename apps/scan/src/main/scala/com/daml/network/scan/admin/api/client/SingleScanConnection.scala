@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{SpliceLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.HttpClient
@@ -386,6 +387,15 @@ class SingleScanConnection private[client] (
       HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerBootstrappingTransactions(
         domainIdPrefix
       ),
+    )
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupTransferPreapprovalByParty(receiver),
     )
 }
 

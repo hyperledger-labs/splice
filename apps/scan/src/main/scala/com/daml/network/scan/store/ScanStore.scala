@@ -223,7 +223,7 @@ trait ScanStore
   def lookupTransferPreapprovalByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[Contract[
+    Option[ContractWithState[
       splice.transferpreapproval.TransferPreapproval.ContractId,
       splice.transferpreapproval.TransferPreapproval,
     ]]

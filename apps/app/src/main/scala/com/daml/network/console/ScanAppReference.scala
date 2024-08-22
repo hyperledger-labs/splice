@@ -135,7 +135,7 @@ abstract class ScanAppReference(
   @Help.Summary("Lookup a TransferPreapproval by the receiver party")
   def lookupTransferPreapprovalByParty(
       party: PartyId
-  ): Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]] =
+  ): Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
     }

@@ -1836,7 +1836,7 @@ components:
       required: ["transfer_preapproval"]
       properties:
         transfer_preapproval:
-          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     GetAcsSnapshotResponse:
       type: object
       required: ["acs_snapshot"]

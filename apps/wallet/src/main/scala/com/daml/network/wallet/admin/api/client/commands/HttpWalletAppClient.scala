@@ -968,4 +968,21 @@ object HttpWalletAppClient {
     final case class AlreadyExists(contractId: TransferPreapproval.ContractId)
         extends CreateTransferPreapprovalResponse
   }
+
+  final case class TransferPreapprovalSend(receiver: PartyId, amount: BigDecimal)
+      extends InternalBaseCommand[http.TransferPreapprovalSendResponse, Unit] {
+    override def submitRequest(client: Client, headers: List[HttpHeader]) =
+      client.transferPreapprovalSend(
+        definitions.TransferPreapprovalSendRequest(
+          receiverPartyId = Codec.encode(receiver),
+          amount = Codec.encode(amount),
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.TransferPreapprovalSendResponse.OK => Right(())
+
+    }
+  }
 }
