@@ -2773,6 +2773,44 @@ function subcmd_list_sv_cometbft_addresses() {
 
 ###
 
+subcommand_whitelist[list_cometbft_peers]="List sv1's cometbft peers"
+
+function subcmd_list_cometbft_peers() {
+  migration_id=${1:-}
+
+  if [ -z "${migration_id}" ]; then
+    _error "Usage: $SCRIPTNAME list_cometbft_peers <migration-id>"
+  fi
+
+  cleanup() {
+    kill $port_forward_pid
+  }
+  trap cleanup EXIT
+
+  kubectl port-forward -n "sv-1" deployment/global-domain-"$migration_id"-cometbft 26657:26657 > /dev/null &
+  port_forward_pid=$!
+
+  if ! kill -0 $port_forward_pid; then
+    _error "Failed to start port forwarding"
+    exit 1
+  fi
+
+  start=$(date +%s)
+  while ! nc -z -w 1 localhost 26657 > /dev/null 2>&1; do
+    sleep 0.1
+    now=$(date +%s)
+    if (( (now - start) > 5 )); then
+      echo "Failed to port-forward to sv-1 migration_id ${migration_id} cometbft pod"
+      cleanup
+      exit 1
+    fi
+  done
+
+  curl -sSLf "http://localhost:26657/net_info" | jq -S '.result.peers | map({sv: .node_info.moniker, peer_id: .node_info.id, listen_addr: .node_info.listen_addr, is_outbound: .is_outbound}) | sort_by(.sv)'
+}
+
+###
+
 subcommand_whitelist[unprotect_dbs]='Unprotects all DB resources corresponding'
 
 function subcmd_unprotect_dbs() {

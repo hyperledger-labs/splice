@@ -1575,30 +1575,33 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
    curl -s https://scan.sv-2.global.canton.network.digitalasset.com/api/scan/v0/scans | jq '.scans.[].scans.[].publicUrl' -r | xargs -n 1 sh -c 'echo -n "$0 ";  curl -s $0/api/scan/version | jq \'.version\''
    ```
 
-1. Partners' new sequencer and CometBFT nodes are reachable (before the actual migration has taken place). Hacky oneliner (with explanations below):
+1. Partners' new CometBFT nodes are reachable (before the actual migration has taken place).
+   Check that the list of SVs returned by `cncluster list_cometbft_peers <new_migration_id>` matches the expected list of SVs for the corresponding network.
+   Note that this command lists only the peers of our SV-1 CometBFT node so the output will not contain an entry for SV-1 itself.
 
+1. Partners' new sequencer nodes are reachable (before the actual migration has taken place). Hacky oneliner (with explanations below).
    ```
-   curl -s https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/dso | jq '.sv_node_states.[].payload.state.synchronizerNodes.[0].[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+   curl -s https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/dso | \
+     jq '.sv_node_states.[].payload.state.synchronizerNodes.[0].[1].sequencer.url | sub("sequencer-<old_migraion_id>"; "sequencer-<new_migration_id>") | sub("https://"; "")' -r | \
+     xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; echo'
    ```
 
-   This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that we're running this check from an IP range that should be whitelisted (SBI rightfully don't whitelist our VPN for their CometBFT ingress, for example), that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
+   This assumes that we're running this check from an IP range that should be whitelisted and that the partners follow our recommended migration ID-based URL scheme for sequencers.
    So use this with many grains of salt and clarify with partners for which of the checks fail that our assumptions are correct in their case.
 
-   For CometBFT, you can also check the [CometBFT Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-   If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their
-   new CometBFT nodes (add +1 to also count the node you are viewing). The related CometBFT Network Status dashboard also provide an easy way to check if
-   our node is seeing any CometBFT traffic from their nodes and if so, from which peers. You can use `cncluster list_sv_cometbft_addresses` to map the
-   peer ids in the dashboard to SV names.
-
-   Also note that pre-migration, the sequencer URLs of correctly set up sequencers can return the following (and this is fine):
+   Also note that pre-migration, the sequencer URLs of correctly set up sequencers can return one of the following errors (and this is fine):
 
    ```
    Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: 111
+   Error invoking method "grpc.health.v1.Health/Check": failed to query for service descriptor "grpc.health.v1.Health": server does not support the reflection API
+   Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": unexpected HTTP status code received from server: 502 (Bad Gateway)
+   Error invoking method "grpc.health.v1.Health/Check": rpc error: code = DeadlineExceeded desc = failed to query for service descriptor "grpc.health.v1.Health": context deadline exceeded
+   Failed to dial target host "sequencer-3.sv-1.test.global.canton.network.sync.global:443": EOF
    ```
 
-   We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer's public API should not be initialized yet.
-   Other errors on this connection might also be fine.
+   We expect to get an error here because the sequencer's public API should not be initialized yet. Other errors on this connection might also be fine.
    Results of this check that are certainly not fine include the sequencer reporting to be `SERVING` (check whether the sv app was properly configured to perform a migration) or us hitting an HTML page instead of an gRPC endpoint (possible ingress misconfiguration).
+   If in doubt, reach out to the relevant SV partner on `#supervalidator-ops` or ask for help in the internal channel.
 
 #### New domain readiness checks
 
