@@ -819,9 +819,9 @@ object HttpScanAppClient {
   case class GetHoldingsStateAt(
       at: java.time.OffsetDateTime,
       migrationId: Long,
+      partyIds: Vector[PartyId],
       after: Option[Long] = None,
       pageSize: Int = 100,
-      partyIds: Option[Vector[PartyId]] = None,
   ) extends InternalBaseCommand[
         http.GetHoldingsStateAtResponse,
         Option[definitions.AcsResponse],
@@ -836,7 +836,7 @@ object HttpScanAppClient {
           at,
           after,
           pageSize,
-          partyIds.map(_.map(_.toProtoPrimitive)),
+          partyIds.map(_.toProtoPrimitive),
         ),
         headers,
       )

@@ -23,6 +23,7 @@ import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.{
   AcsRequest,
   HoldingsStateRequest,
+  HoldingsSummaryRequest,
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
@@ -958,43 +959,39 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAcsSnapshotAt") { _ => _ =>
-      querySnapshot(body).map(ScanResource.GetAcsSnapshotAtResponseOK)
-    }
-  }
-
-  private def querySnapshot(
-      request: AcsRequest
-  )(implicit tc: TraceContext): Future[definitions.AcsResponse] = {
-    request match {
-      case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
-        snapshotStore
-          .queryAcsSnapshot(
-            migrationId,
-            CantonTimestamp.assertFromInstant(recordTime.toInstant),
-            after,
-            PageLimit.tryCreate(pageSize),
-            partyIds
-              .getOrElse(Seq.empty)
-              .map(PartyId.tryFromProtoPrimitive),
-            templates
-              .getOrElse(Seq.empty)
-              .map(_.split(":") match {
-                case Array(packageName, moduleName, entityName) =>
-                  PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
-                case _ =>
-                  throw HttpErrorHandler.badRequest(
-                    s"Malformed template_id, expected 'package_name:module_name:entity_name'"
-                  )
-              }),
-          )
-          .map { result =>
-            definitions.AcsResponse(
-              recordTime,
+      body match {
+        case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
+          snapshotStore
+            .queryAcsSnapshot(
               migrationId,
-              result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
-              result.afterToken,
+              CantonTimestamp.assertFromInstant(recordTime.toInstant),
+              after,
+              PageLimit.tryCreate(pageSize),
+              partyIds
+                .getOrElse(Seq.empty)
+                .map(PartyId.tryFromProtoPrimitive),
+              templates
+                .getOrElse(Seq.empty)
+                .map(_.split(":") match {
+                  case Array(packageName, moduleName, entityName) =>
+                    PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+                  case _ =>
+                    throw HttpErrorHandler.badRequest(
+                      s"Malformed template_id, expected 'package_name:module_name:entity_name'"
+                    )
+                }),
             )
-          }
+            .map { result =>
+              ScanResource.GetAcsSnapshotAtResponseOK(
+                definitions.AcsResponse(
+                  recordTime,
+                  migrationId,
+                  result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
+                  result.afterToken,
+                )
+              )
+            }
+      }
     }
   }
 
@@ -1004,20 +1001,80 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAmuletStateAt") { _ => _ =>
       body match {
-        case HoldingsStateRequest(migrationId, recordTime, after, pageSize, partyIds) =>
-          querySnapshot(
-            AcsRequest(
+        case HoldingsStateRequest(migrationId, recordTime, after, pageSize, ownerPartyIds) =>
+          snapshotStore
+            .getHoldingsState(
               migrationId,
-              recordTime,
+              CantonTimestamp.assertFromInstant(recordTime.toInstant),
               after,
-              pageSize,
-              partyIds,
-              templates = Some(
-                Vector(amulet.Amulet.TEMPLATE_ID, amulet.LockedAmulet.TEMPLATE_ID)
-                  .map(PackageQualifiedName(_).toString)
-              ),
+              PageLimit.tryCreate(pageSize),
+              ownerPartyIds.map(PartyId.tryFromProtoPrimitive),
             )
-          ).map(ScanResource.GetHoldingsStateAtResponseOK)
+            .map { result =>
+              ScanResource.GetHoldingsStateAtResponseOK(
+                definitions.AcsResponse(
+                  recordTime,
+                  migrationId,
+                  result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
+                  result.afterToken,
+                )
+              )
+            }
+      }
+    }
+  }
+
+  override def getHoldingsSummaryAt(respond: ScanResource.GetHoldingsSummaryAtResponse.type)(
+      body: HoldingsSummaryRequest
+  )(extracted: TraceContext): Future[ScanResource.GetHoldingsSummaryAtResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getHoldingsSummaryAt") { _ => _ =>
+      body match {
+        case HoldingsSummaryRequest(migrationId, recordTime, partyIds, asOfRound) =>
+          for {
+            round <- asOfRound match {
+              case Some(round) => Future.successful(round)
+              case None =>
+                // gives the earliest mining round, as listContracts orders by event_number ASC
+                store.multiDomainAcsStore
+                  .listContracts(OpenMiningRound.COMPANION, PageLimit.tryCreate(1))
+                  .map(
+                    _.headOption.getOrElse(
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription("No open mining rounds found.")
+                        .asRuntimeException()
+                    )
+                  )
+                  .map(_.contract.payload.round.number.toLong)
+            }
+            result <- snapshotStore
+              .getHoldingsSummary(
+                migrationId,
+                CantonTimestamp.assertFromInstant(recordTime.toInstant),
+                partyIds.map(PartyId.tryFromProtoPrimitive),
+                round,
+              )
+          } yield ScanResource.GetHoldingsSummaryAtResponse.OK(
+            definitions.HoldingsSummaryResponse(
+              result.recordTime.toInstant.atOffset(ZoneOffset.UTC),
+              result.migrationId,
+              result.asOfRound,
+              result.summaries.map { case (partyId, holdings) =>
+                definitions.HoldingsSummary(
+                  partyId = Codec.encode(partyId),
+                  totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
+                  totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
+                  totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
+                  accumulatedHoldingFeesUnlocked =
+                    Codec.encode(holdings.accumulatedHoldingFeesUnlocked),
+                  accumulatedHoldingFeesLocked =
+                    Codec.encode(holdings.accumulatedHoldingFeesLocked),
+                  accumulatedHoldingFeesTotal = Codec.encode(holdings.accumulatedHoldingFeesTotal),
+                  totalAvailableCoin = Codec.encode(holdings.totalAvailableCoin),
+                )
+              }.toVector,
+            )
+          )
       }
     }
   }

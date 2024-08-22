@@ -565,6 +565,34 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+
+  /v0/holdings/summary:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "getHoldingsSummaryAt"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsSummaryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/ans-entries:
     get:
       tags: [scan]
@@ -1579,12 +1607,13 @@ components:
             type: string
           description: |
             Filters the ACS by contracts with these template_ids, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
-    HoldingsStateRequest: # same as AcsRequest, but without `templates`
+    HoldingsStateRequest: # subset of AcsRequest
       type: object
       required:
         - migration_id
         - record_time
         - page_size
+        - owner_party_ids
       properties:
         migration_id:
           type: integer
@@ -1607,12 +1636,42 @@ components:
             The maximum number of created events returned for this request.
           type: integer
           format: int32
-        party_ids:
+        owner_party_ids:
           type: array
           items:
             type: string
           description: |
-            Filters by contracts in which these party_ids are stakeholders.
+            Filters by contracts in which these party_ids are the owners of the amulets.
+
+    HoldingsSummaryRequest:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the summary.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            The owners for which to compute the summary.
+        as_of_round:
+          type: integer
+          format: int64
+          description: |
+            Compute holding fees as of this round. Defaults to the earliest open mining round.
 
     AcsResponse:
       type: object
@@ -1637,6 +1696,57 @@ components:
           description: |
             When requesting the next page of results, pass this as `after` to the `AcsRequest`.
             Will be empty when there's no more pages.
+
+    HoldingsSummaryResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - computed_as_of_round
+        - summaries
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+        computed_as_of_round:
+          type: integer
+          format: int64
+        summaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsSummary"
+    HoldingsSummary:
+      type: object
+      required:
+        - party_id
+        - total_unlocked_coin
+        - total_locked_coin
+        - total_coin_holdings
+        - accumulated_holding_fees_unlocked
+        - accumulated_holding_fees_locked
+        - accumulated_holding_fees_total
+        - total_available_coin
+      properties:
+        party_id:
+          type: string
+        total_unlocked_coin:
+          type: string
+        total_locked_coin:
+          type: string
+        total_coin_holdings:
+          type: string
+        accumulated_holding_fees_unlocked:
+          type: string
+        accumulated_holding_fees_locked:
+          type: string
+        accumulated_holding_fees_total:
+          type: string
+        total_available_coin:
+          type: string
+
     ListActivityRequest:
       type: object
       required:

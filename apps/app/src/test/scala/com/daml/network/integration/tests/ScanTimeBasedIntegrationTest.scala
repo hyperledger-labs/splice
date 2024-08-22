@@ -478,7 +478,7 @@ class ScanTimeBasedIntegrationTest
       val holdingsState = sv1ScanBackend.getHoldingsStateAt(
         CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
         migrationId,
-        partyIds = Some(Vector(aliceUserParty)),
+        partyIds = Vector(aliceUserParty),
       )
       inside(holdingsState) { case Some(holdings) =>
         holdings.createdEvents should be(coins)

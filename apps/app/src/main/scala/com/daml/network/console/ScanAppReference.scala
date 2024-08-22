@@ -352,18 +352,18 @@ abstract class ScanAppReference(
   def getHoldingsStateAt(
       at: CantonTimestamp,
       migrationId: Long,
+      partyIds: Vector[PartyId],
       after: Option[Long] = None,
       pageSize: Int = 100,
-      partyIds: Option[Vector[PartyId]] = None,
   ) =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetHoldingsStateAt(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
+          partyIds,
           after,
           pageSize,
-          partyIds,
         )
       )
     }
