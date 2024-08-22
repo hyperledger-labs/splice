@@ -231,7 +231,7 @@ class SvDsoAutomationService(
     )
   }
 
-  def registerPostSequencerInitTriggers(): Unit = {
+  def registerTrafficReconciliationTriggers(): Unit = {
     registerTrigger(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,

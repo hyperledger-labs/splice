@@ -258,7 +258,7 @@ class SV1Initializer(
       )
       // Only start the triggers once DsoRules and AmuletRules have been bootstrapped
       _ = dsoAutomation.registerPostOnboardingTriggers()
-      _ = dsoAutomation.registerPostSequencerInitTriggers()
+      _ = dsoAutomation.registerTrafficReconciliationTriggers()
       _ = dsoAutomation.registerPostUnlimitedTrafficTriggers()
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore, domainId)
       // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.

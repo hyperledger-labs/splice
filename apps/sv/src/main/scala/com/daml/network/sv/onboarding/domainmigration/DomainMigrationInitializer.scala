@@ -193,6 +193,9 @@ class DomainMigrationInitializer(
           spliceInstanceNamesConfig,
           loggerFactory,
         )
+      // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain
+      // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)
+      _ = dsoAutomationService.registerTrafficReconciliationTriggers()
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
         svStore.key.svParty,
@@ -205,6 +208,7 @@ class DomainMigrationInitializer(
         dsoAutomationService,
         svAutomation,
         None,
+        skipTrafficReconciliationTriggers = true,
       )
     } yield (
       decentralizedSynchronizerId,

@@ -20,7 +20,11 @@ import com.daml.network.store.{
 }
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import com.daml.network.sv.automation.singlesv.SvPackageVettingTrigger
+import com.daml.network.sv.automation.singlesv.{
+  ReconcileSequencerLimitWithMemberTrafficTrigger,
+  SvPackageVettingTrigger,
+}
+import com.daml.network.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -284,6 +288,7 @@ class JoiningNodeInitializer(
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       withSvStore: Option[WithSvStore],
+      skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
@@ -340,10 +345,13 @@ class JoiningNodeInitializer(
           // Finally, fully onboard the sequencer and mediator
           _ <-
             localSynchronizerNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
-          _ = dsoAutomationService.registerPostSequencerInitTriggers()
+          // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
+          _ = if (!skipTrafficReconciliationTriggers)
+            dsoAutomationService.registerTrafficReconciliationTriggers()
           _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
             decentralizedSynchronizer
           )
+          _ = checkTrafficReconciliationTriggersStarted(dsoAutomationService)
           _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
           _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
         } yield ()
@@ -440,6 +448,14 @@ class JoiningNodeInitializer(
       },
       logger,
     )
+  }
+
+  private def checkTrafficReconciliationTriggersStarted(service: SvDsoAutomationService): Unit = {
+    val unlimitedTrafficTrigger = service.trigger[SvOnboardingUnlimitedTrafficTrigger]
+    val trafficReconciliationTrigger =
+      service.trigger[ReconcileSequencerLimitWithMemberTrafficTrigger]
+    if (!unlimitedTrafficTrigger.isHealthy || !trafficReconciliationTrigger.isHealthy)
+      throw new RuntimeException("Traffic triggers not started")
   }
 
   private def waitForSvToObtainUnlimitedTraffic(
