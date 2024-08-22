@@ -114,7 +114,7 @@ trait FeatureFlagFilter extends NamedLogging {
       noTracingLogger.error(
         s"The command is currently disabled. You need to enable it explicitly by setting `canton.features.${config} = yes` in your Canton configuration file (`.conf`)"
       )
-      throw new CommandFailure()
+      throw new InteractiveCommandFailure()
     }
 
   protected def check[T](flag: FeatureFlag)(command: => T): T =

@@ -598,14 +598,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def last_errors(): Map[String, String] =
       NodeLoggingUtil.lastErrors().getOrElse {
         logger.error(s"Log appender for last errors not found/configured")
-        throw new CommandFailure()
+        throw new InteractiveCommandFailure()
       }
 
     @Help.Summary("Returns log events for an error with the same trace-id")
     def last_error_trace(traceId: String): Seq[String] = {
       NodeLoggingUtil.lastErrorTrace(traceId).getOrElse {
         logger.error(s"No events found for last error trace-id $traceId")
-        throw new CommandFailure()
+        throw new InteractiveCommandFailure()
       }
     }
   }

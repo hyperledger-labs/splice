@@ -23,6 +23,7 @@ import com.digitalasset.canton.console.{
   LocalInstanceReference,
   NodeReferences,
   StandardConsoleOutput,
+  ThrowWithDetailsErrorHandler,
 }
 import org.apache.pekko.actor.ActorSystem
 
@@ -31,6 +32,8 @@ class SpliceConsoleEnvironment(
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
 ) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
+
+  override val errorHandler = ThrowWithDetailsErrorHandler
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
     DarResources.splitwell.all ++

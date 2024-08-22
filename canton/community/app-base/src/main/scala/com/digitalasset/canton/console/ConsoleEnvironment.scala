@@ -221,11 +221,12 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
         result
       } catch {
         case err: Throwable =>
-          CommandInternalError.ErrorWithException(err).logWithContext()
+          val internalError = CommandInternalError.ErrorWithException(err)
+          internalError.logWithContext()
           err match {
             case NonFatal(_) =>
               // No need to rethrow err, as it has been logged and output
-              errorHandler.handleInternalError()
+              errorHandler.handleInternalError(internalError)
             case _ =>
               // Rethrow err, as it is a bad practice to discard fatal errors.
               // As a result, the error may be printed several times,
@@ -243,13 +244,14 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
     resultValue match {
       case null =>
-        CommandInternalError.NullError().logWithContext(invocationContext())
-        errorHandler.handleInternalError()
+        val internalError = CommandInternalError.NullError()
+        internalError.logWithContext(invocationContext())
+        errorHandler.handleInternalError(internalError)
       case CommandSuccessful(value) =>
         value
       case err: CantonCommandError =>
         err.logWithContext(invocationContext())
-        errorHandler.handleCommandFailure()
+        errorHandler.handleCommandFailure(None, err)
       case err: GenericCommandError =>
         val errMsg = findInvocationSite() match {
           case Some((funcName, site)) =>
@@ -257,7 +259,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
           case None => err.cause
         }
         logger.error(errMsg)
-        errorHandler.handleCommandFailure(Some(errMsg))
+        errorHandler.handleCommandFailure(Some(errMsg), err)
     }
   }
 

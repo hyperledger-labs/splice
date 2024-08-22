@@ -51,7 +51,7 @@ package object commands {
   )(implicit loggingContext: ErrorLoggingContext): CantonTimestamp =
     CantonTimestamp.fromInstant(instant).valueOr { err =>
       loggingContext.logger.error(err)(loggingContext.traceContext)
-      throw new CommandFailure()
+      throw new InteractiveCommandFailure()
     }
 
   private[commands] def writeToFile(outputFile: String, bytes: ByteString): Unit = {
