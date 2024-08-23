@@ -71,6 +71,7 @@ class HttpScanHandler(
     snapshotStore: AcsSnapshotStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
+    enableForcedAcsSnapshots: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -941,6 +942,71 @@ class HttpScanHandler(
               definitions.ErrorResponse(s"No snapshots found before $before")
             )
         }
+    }
+  }
+
+  override def forceAcsSnapshotNow(
+      respond: ScanResource.ForceAcsSnapshotNowResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ForceAcsSnapshotNowResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.forceAcsSnapshotNow") { _ => _ =>
+      if (!enableForcedAcsSnapshots) {
+        Future.successful(
+          ScanResource.ForceAcsSnapshotNowResponse.BadRequest(
+            definitions.ErrorResponse("Forced ACS snapshots are disabled.")
+          )
+        )
+      } else {
+        for {
+          domainId <- store
+            .lookupAmuletRules()
+            .map(
+              _.getOrElse(
+                throw io.grpc.Status.FAILED_PRECONDITION
+                  .withDescription("No amulet rules.")
+                  .asRuntimeException()
+              ).state.fold(
+                identity,
+                throw io.grpc.Status.FAILED_PRECONDITION
+                  .withDescription("Amulet rules are in flight.")
+                  .asRuntimeException(),
+              )
+            )
+          snapshotTime <- snapshotStore.updateHistory
+            .getUpdatesBefore(
+              snapshotStore.migrationId,
+              domainId,
+              CantonTimestamp.MaxValue,
+              PageLimit.tryCreate(1),
+            )
+            .map(
+              _.headOption
+                .getOrElse(
+                  throw io.grpc.Status.FAILED_PRECONDITION
+                    .withDescription("No updates ever happened for a snapshot.")
+                    .asRuntimeException()
+                )
+                ._1
+                .update
+                .recordTime
+            )
+          lastSnapshot <- snapshotStore.lookupSnapshotBefore(
+            snapshotStore.migrationId,
+            snapshotTime,
+          )
+          // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
+          // this is, in principle, not a problem:
+          // - this will only be used in tests
+          // - wall clock tests must take manual snapshots anyway, because they can't wait
+          // - simtime tests will advanceTime(N.hours)
+          _ <- snapshotStore.insertNewSnapshot(lastSnapshot, snapshotTime)
+        } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
+          definitions.ForceAcsSnapshotResponse(
+            snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
+            snapshotStore.migrationId,
+          )
+        )
+      }
     }
   }
 

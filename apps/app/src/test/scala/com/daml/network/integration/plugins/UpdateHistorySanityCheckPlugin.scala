@@ -1,6 +1,7 @@
 package com.daml.network.integration.plugins
 
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.network.config.ConfigTransforms.updateAllScanAppConfigs_
 import com.daml.network.config.SpliceConfig
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.EnvironmentImpl
@@ -34,6 +35,12 @@ class UpdateHistorySanityCheckPlugin(
     with Matchers
     with Inspectors {
 
+  override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
+    updateAllScanAppConfigs_(config => config.copy(enableForcedAcsSnapshots = true))(
+      super.beforeEnvironmentCreated(config)
+    )
+  }
+
   override def beforeEnvironmentDestroyed(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
@@ -42,6 +49,8 @@ class UpdateHistorySanityCheckPlugin(
     // Also, it might not be initialized if the test uses `manualStart` and it wasn't ever started.
     environment.scans.local.find(scan => scan.name == scanName && scan.is_initialized).foreach {
       scan =>
+        val snapshotRecordTime = scan.forceAcsSnapshotNow()
+
         paginateHistory(scan, None)
 
         val readLines = mutable.Buffer[String]()
@@ -56,6 +65,10 @@ class UpdateHistorySanityCheckPlugin(
                 "--loglevel",
                 "DEBUG",
                 "--scan-balance-assertions",
+                "--stop-at-record-time",
+                snapshotRecordTime.toInstant.toString,
+                "--compare-acs-with-snapshot",
+                snapshotRecordTime.toInstant.toString,
               ) ++ ignoredRootCreates.flatMap { templateId =>
                 Seq("--ignore-root-create", QualifiedName(templateId).toString)
               } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>

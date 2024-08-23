@@ -538,6 +538,26 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/state/acs/force:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "forceAcsSnapshotNow"
+      description: |
+        Takes a snapshot of the ACS at the current time.
+        Disabled in production environments.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForceAcsSnapshotResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/holdings/state:
     post:
       tags: [ scan ]
@@ -1673,6 +1693,18 @@ components:
           description: |
             Compute holding fees as of this round. Defaults to the earliest open mining round.
 
+    ForceAcsSnapshotResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
     AcsResponse:
       type: object
       required:

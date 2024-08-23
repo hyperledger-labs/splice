@@ -21,7 +21,11 @@ import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
-import com.daml.network.http.v0.scan.{GetDateOfMostRecentSnapshotBeforeResponse, ScanClient}
+import com.daml.network.http.v0.scan.{
+  ForceAcsSnapshotNowResponse,
+  GetDateOfMostRecentSnapshotBeforeResponse,
+  ScanClient,
+}
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.{
@@ -31,6 +35,7 @@ import com.daml.network.util.{
   PackageQualifiedName,
   TemplateJsonDecoder,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -747,6 +752,22 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetAcsSnapshotResponse.OK(response) =>
         Right(ByteString.copyFrom(Base64.getDecoder.decode(response.acsSnapshot)))
+    }
+  }
+
+  case object ForceAcsSnapshotNow
+      extends InternalBaseCommand[http.ForceAcsSnapshotNowResponse, CantonTimestamp] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ForceAcsSnapshotNowResponse] =
+      client.forceAcsSnapshotNow(headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ForceAcsSnapshotNowResponse, Either[String, CantonTimestamp]] = {
+      case http.ForceAcsSnapshotNowResponse.OK(response) =>
+        Right(CantonTimestamp.assertFromInstant(response.recordTime.toInstant))
     }
   }
 
