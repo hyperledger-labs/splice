@@ -42,6 +42,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
+import SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
@@ -284,6 +285,42 @@ class HttpValidatorAdminHandler(
       )
   }
 
+  private def decodeSignedTopologyTx(
+      publicKey: SigningPublicKey,
+      topologyTx: definitions.SignedTopologyTx,
+  ): GenericSignedTopologyTransaction =
+    SignedTopologyTransaction(
+      transaction = TopologyTransaction
+        .fromTrustedByteString(
+          ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct topology transaction: $error")
+            .asRuntimeException()
+        ),
+      signatures = NonEmpty.mk(
+        Set,
+        Signature(
+          Raw,
+          HexString
+            .parseToByteString(topologyTx.signedHash)
+            .getOrElse(
+              throw Status.INVALID_ARGUMENT
+                .withDescription(
+                  s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
+                )
+                .asRuntimeException
+            ),
+          signedBy = publicKey.fingerprint,
+        ),
+      ),
+      isProposal = true,
+    )(
+      SignedTopologyTransaction.supportedProtoVersions
+        .protocolVersionRepresentativeFor(ProtocolVersion.dev)
+    )
+
   override def submitNamespaceDelegationAndPartyTxs(
       respond: ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse.type
   )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
@@ -295,31 +332,7 @@ class HttpValidatorAdminHandler(
       for {
         _ <- participantAdminConnection.addTopologyTransactions(
           store = TopologyStoreId.AuthorizedStore,
-          txs = body.signedTopologyTxs.map { topologyTxs =>
-            SignedTopologyTransaction[TopologyChangeOp, TopologyMapping](
-              transaction = TopologyTransaction
-                .fromTrustedByteString(
-                  ByteString.copyFrom(Base64.getDecoder.decode(topologyTxs.topologyTx))
-                )
-                .valueOr(error =>
-                  throw Status.INVALID_ARGUMENT
-                    .withDescription(s"failed to construct topology transaction: $error")
-                    .asRuntimeException()
-                ),
-              signatures = NonEmpty.mk(
-                Set,
-                Signature(
-                  Raw,
-                  ByteString.copyFrom(Base64.getDecoder.decode(topologyTxs.signedHash)),
-                  signedBy = publicKey.fingerprint,
-                ),
-              ),
-              isProposal = true,
-            )(
-              SignedTopologyTransaction.supportedProtoVersions
-                .protocolVersionRepresentativeFor(ProtocolVersion.dev)
-            )
-          },
+          txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
         )
         participantId <- participantAdminConnection.getParticipantId()
         // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
@@ -465,7 +478,7 @@ class HttpValidatorAdminHandler(
                   ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.OK(
                     definitions.PrepareAcceptExternalPartySetupProposalResponse(
                       Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
-                      Base64.getEncoder.encodeToString(r.preparedTransactionHash.toByteArray),
+                      HexString.toHexString(r.preparedTransactionHash.toByteArray),
                     )
                   )
                 )

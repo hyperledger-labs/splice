@@ -689,6 +689,9 @@ components:
           topology_tx:
             type: string
           signed_hash:
+            description: |
+              hex-encoded ed25519 signature of the hash return by the generate endpoint in the form
+              `${r}${s}`.
             type: string
 
     RegistrationRequest:
@@ -1195,6 +1198,7 @@ components:
         transaction:
           type: string
         tx_hash:
+          description: Hex-encoded hash of the transaction
           type: string
 
     SubmitAcceptExternalPartySetupProposalRequest:
@@ -1209,6 +1213,9 @@ components:
         user_party_id:
           type: string
         signed_tx_hash:
+          description: |
+            hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form
+            `${r}${s}`.
           type: string
 
     SubmitAcceptExternalPartySetupProposalResponse:

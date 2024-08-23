@@ -22,7 +22,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
 
-import java.util.{Base64, UUID}
+import java.util.UUID
 
 class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecutionContext {
 
@@ -78,12 +78,12 @@ class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecut
         val signedTopologyTxs = listOfTransactionsAndHashes.map { tx =>
           SignedTopologyTx(
             tx.topologyTx,
-            Base64.getEncoder.encodeToString(
+            HexString.toHexString(
               sign(
                 hash = Hash.fromHexString(tx.hash).value,
                 signingKey = privateKey.asInstanceOf[SigningPrivateKey],
                 crypto = crypto,
-              ).signature.toByteArray
+              ).signature
             ),
           )
         }
