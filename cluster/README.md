@@ -81,6 +81,7 @@
       - [Manual steps](#manual-steps)
       - [Checking the readiness of partners](#checking-the-readiness-of-partners)
       - [New domain readiness checks](#new-domain-readiness-checks)
+      - [Switching back to the old domain](#switching-back-to-the-old-domain)
   - [Interacting with Canton Network UIs](#interacting-with-canton-network-uis)
   - [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
     - [Canton Participant APIs](#canton-participant-apis)
@@ -1466,7 +1467,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Coordinate with all other SVs to schedule a migration via governance vote.
    For testing (or if our SVs have a governance majority) you can also run `cncluster hard_domain_migration_trigger`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed about the scheduled hard migration, the expected downtime associated with that, and the expected version and migration ID after the migration.
-1. Deactivate our periodic health checks and backups for the target cluster by merging a PR to `main`
+1. Deactivate our periodic health checks, backups and backup status checks for the target cluster by merging a PR to `main`
    (close to the scheduled synchronizer pausing date).
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
 1. Take down the `multi-validator` stack. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
@@ -1476,6 +1477,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
+   Once you have verified this, move onto the next step quickly (no need to wait for the go-ahead from the person leading the call).
 1. Backup our SVs and validators:
    ```
    cncluster backup_nodes <old_migration_id> sv-1
@@ -1485,7 +1487,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    cncluster backup_nodes <old_migration_id> validator1
    cncluster backup_nodes <old_migration_id> splitwell
    ```
-   You want to launch the commands in parallel, as it can be very slow if done sequentially.
+   Our backups are slow, specifically the SV backups can take upto 10 mins. So you want to get started early and launch the commands in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
 1. In the event of a disaster recovery, you need to agree on a timestamp (in the format “2024-04-17T19:12:02Z”) with the byzantine majority of the SVs and execute the following commands:
@@ -1511,16 +1513,17 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    (you need slightly over 2/3 of SVs to sign this).
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
    Communicate the result of your check to the rest of the DSO to conclude the migration.
-1. Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
-1. Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
-1. [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
-   so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
-   is set to reflect the expected migration ID after completing the migration.
-   If periodic SV runbook redeployments are scheduled for the target cluster, you can fix them by adding the
-   `global_domain_active_migration_id: 1` parameter to the triggered `deploy_sv_runbook` job.
-   After merging your patches to the cluster deployment branch,
-   the periodic checks and deployments should be able to complete successfully again.
-   Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
+   If enough SVs (>2/3) are not able to complete the migration successfully, we may need to roll-back to the previous domain.
+   For instructions on how to do so, refer to [Switching back to the old domain](#switching-back-to-the-old-domain).
+1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
+   * Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
+   * Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
+   * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_CANTON_AUTO_INIT` and `DISABLE_COMETBFT_STATE_SYNC` to "false".
+   * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
+     so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
+     is set to reflect the expected migration ID after completing the migration.
+   * Check that the patches worked by triggering the jobs manually once.
+1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
 1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps here so that only the following environment variables remain:
@@ -1610,6 +1613,25 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 3. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
 See [Network Health](./network-health/NETWORK_HEALTH.md) for further investigation if any of these checks fail.
+
+#### Switching back to the old domain
+
+1. Make sure a consensus to unpause the old domain has been reached among the SV operators
+2. Revert your previous PR on the target deployment branch that triggered the hard domain migration.
+3. Obtain an authentication token by logging in to the SV UI and copying the value in the Authorization header.
+   ```
+   export AUTH_TOKEN="Bearer <long-token-string>"
+   ```
+4. Unpause the old domain. To do this, run the following command:
+   ```
+   curl -L -H "Authorization: $AUTH_TOKEN" https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/domain/unpause
+   ```
+5. [Check that the old domain is once again functional](#new-domain-readiness-checks).
+   Communicate the result of your check to the rest of the DSO to conclude the migration.
+6. **Cleanup:** Tear down the new migration ID nodes so that they don't get in the way the next time we want to migrate.
+   To do so, you can revert your original PR staging the new nodes such that only the following environment variables remain:
+    * `export CHARTS_VERSION=` the original version we were migrating away from
+    * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the original migration ID we were migrating away from
 
 ## Interacting with Canton Network UIs
 
