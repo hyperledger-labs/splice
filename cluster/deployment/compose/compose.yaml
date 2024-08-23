@@ -1,0 +1,134 @@
+x-init-db:
+  &init-db
+    image: "postgres:14"
+    depends_on:
+      - postgres
+    command: |
+      bash -c '
+        until errmsg=$(psql -h postgres --username=cnadmin --dbname=cantonnet -c "create database $$CREATE_DB" 2>&1); do
+          if [[ $$errmsg == *"already exists"* ]]; then
+            echo "Database $$CREATE_DB already exists. Done."
+            break
+          fi
+          echo "trying to create postgres database $$CREATE_DB, last error: $$errmsg";
+          sleep 2;
+        done
+        echo "All set, created database $$CREATE_DB."
+      '
+
+services:
+  postgres:
+    image: "postgres:14"
+    environment:
+      - POSTGRES_USER=cnadmin
+      - POSTGRES_PASSWORD=supersafe
+      - POSTGRES_DB=cantonnet
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - type: bind
+        source: postgres-data
+        target: /var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - max_connections=8000
+  participant-init:
+    << : *init-db
+    environment:
+    - PGPASSWORD=supersafe
+    - CREATE_DB="participant-${MIGRATION_ID}"
+  participant:
+    image: "${IMAGE_REPO}canton-participant:${IMAGE_TAG}"
+    env_file:
+      - auth-participant.env
+      # - disable-auth-participant.env # comment out to enable auth
+    environment:
+      - CANTON_PARTICIPANT_POSTGRES_SERVER=postgres
+      - CANTON_PARTICIPANT_POSTGRES_SCHEMA=participant
+      - CANTON_PARTICIPANT_POSTGRES_USER=cnadmin
+      - CANTON_PARTICIPANT_POSTGRES_PASSWORD=supersafe
+      - CANTON_PARTICIPANT_POSTGRES_DB=participant-${MIGRATION_ID}
+      - CANTON_PARTICIPANT_POSTGRES_PORT=5432
+    depends_on:
+      participant-init:
+        condition: service_completed_successfully
+    restart: always
+  validator-init:
+    << : *init-db
+    environment:
+    - PGPASSWORD=supersafe
+    - CREATE_DB=validator
+  validator:
+    image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
+    env_file:
+      - auth-validator.env
+    environment:
+      - CN_APP_VALIDATOR_PARTICIPANT_ADDRESS=participant
+      - CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS=${SPONSOR_SV_ADDRESS}
+      - CN_APP_VALIDATOR_ONBOARDING_SECRET=${ONBOARDING_SECRET}
+      - CN_APP_VALIDATOR_SCAN_ADDRESS=${SCAN_ADDRESS}
+      # TODO(#14303): make this configurable:
+      - CN_APP_VALIDATOR_PARTICIPANT_IDENTIFIER=da-composeValidator-1
+      - CN_APP_VALIDATOR_PARTY_HINT=da-composeValidator-1
+      - CN_APP_CONTACT_POINT=
+      - |
+        ADDITIONAL_CONFIG_PERSISTENCE=
+            canton.validator-apps.validator_backend.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = validator
+                  currentSchema = validator
+                  serverName = postgres
+                  portNumber = 5432
+                  user = cnadmin
+                  password = supersafe
+                }
+              }
+            }
+      - ADDITIONAL_CONFIG_APP_INSTANCES=canton.validator-apps.validator_backend.app-instances={}
+      - |
+        ADDITIONAL_CONFIG_BFT_SCAN=
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = [ "${SCAN_ADDRESS}" ]
+      - |
+        ADDITIONAL_CONFIG_MIGRATION_ID=
+            canton.validator-apps.validator_backend {
+              domain-migration-id = ${MIGRATION_ID}
+            }
+    depends_on:
+      validator-init:
+        condition: service_completed_successfully
+    restart: always
+
+  wallet-web-ui:
+    image: "${IMAGE_REPO}wallet-web-ui:${IMAGE_TAG}"
+    env_file:
+      - auth-wallet.env
+    environment:
+      - CN_APP_UI_HTTP_URL=true
+      - CN_APP_UI_CLUSTER=${TARGET_CLUSTER}.global.canton.network.digitalasset.com
+
+  ans-web-ui:
+    image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
+    env_file:
+      - auth-ans.env
+    environment:
+      - CN_APP_WALLET_REDIRECT=http://wallet.localhost
+      - CN_APP_UI_HTTP_URL=true
+      - CN_APP_UI_CLUSTER=${TARGET_CLUSTER}.global.canton.network.digitalasset.com
+
+  nginx:
+    image: nginx:1.27.0
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 80:80
+      - 3000:3000
+      - 3001:3001
+    depends_on:
+      - ans-web-ui
+      - wallet-web-ui
+      - validator
+    restart: always

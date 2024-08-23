@@ -3976,22 +3976,30 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://cns.validator.test-stack.network.canton.global",
-        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3001",
+        "http://ans.localhost"
       ],
       "allowedOrigins": [
         "https://cns.validator.test-stack.network.canton.global",
-        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3001",
+        "http://ans.localhost"
       ],
       "appType": "spa",
       "callbacks": [
         "https://cns.validator.test-stack.network.canton.global",
-        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3001",
+        "http://ans.localhost"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the validator runbook",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://cns.validator.test-stack.network.canton.global",
-        "https://cns.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://cns.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3001",
+        "http://ans.localhost"
       ]
     },
     "name": "validatorCnsUi",
@@ -4015,22 +4023,30 @@
     "inputs": {
       "allowedLogoutUrls": [
         "https://wallet.validator.test-stack.network.canton.global",
-        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3000",
+        "http://wallet.localhost"
       ],
       "allowedOrigins": [
         "https://wallet.validator.test-stack.network.canton.global",
-        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3000",
+        "http://wallet.localhost"
       ],
       "appType": "spa",
       "callbacks": [
         "https://wallet.validator.test-stack.network.canton.global",
-        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3000",
+        "http://wallet.localhost"
       ],
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the validator runbook",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [
         "https://wallet.validator.test-stack.network.canton.global",
-        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com"
+        "https://wallet.validator.test-stack.global.canton.network.digitalasset.com",
+        "http://localhost:3000",
+        "http://wallet.localhost"
       ]
     },
     "name": "validatorWalletUi",

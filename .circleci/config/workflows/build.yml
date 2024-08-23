@@ -175,6 +175,18 @@ workflow:
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
           with_shared_gcp: true
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test with docker images"
+          test_names_file: "test-full-class-names-docker-based.log"
+          start_canton_options: "-w -m"
+          with_docker_images: true
+          resource_class: "xlarge"
+          parallelism: 1
       - ui_test:
           <<: *notify-fail
           context:

@@ -9,11 +9,11 @@ window.splice_config = {
   },
   services: {
     validator: {
-      url: "https://" + window.location.hostname + "/api/validator",
+      url: "https://" + window.location.host + "/api/validator",
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: window.location.origin.replace(/\b.?ns\b/g, "wallet"),
+      uiUrl: "${CN_APP_WALLET_REDIRECT}" || window.location.origin.replace(/\b.?ns\b/g, "wallet"),
     },
   },
   spliceInstanceNames: {

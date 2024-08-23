@@ -1,0 +1,13 @@
+services:
+  participant:
+    env_file:
+      - disable-auth-participant.env
+  validator:
+    env_file:
+      - disable-auth-validator.env
+  wallet-web-ui:
+    env_file:
+      - disable-auth-ui.env
+  ans-web-ui:
+    env_file:
+      - disable-auth-ui.env

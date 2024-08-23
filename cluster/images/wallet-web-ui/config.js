@@ -9,7 +9,7 @@ window.splice_config = {
   },
   services: {
     validator: {
-      url: "https://" + window.location.hostname + "/api/validator",
+      url: "https://" + window.location.host + "/api/validator",
     },
   },
   clusterUrl: `https://${cluster}`,

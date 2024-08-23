@@ -2604,6 +2604,9 @@ jobs:
       with_shared_gcp:
         type: boolean
         default: false
+      with_docker_images:
+        type: boolean
+        default: false
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -2664,6 +2667,17 @@ jobs:
               additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
               cmd: |
                 echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+      - when:
+          condition:
+            equal: [ true, "<< parameters.with_docker_images >>" ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Build app
+                cmd: make build -j
+                cmd_retry_count: 5 # Retry in case of dependency download errors
+                additional_nix_args: "--keep ARTIFACTORY_USER \
+                  --keep ARTIFACTORY_PASSWORD"
+            - docker_build
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
@@ -4246,6 +4260,18 @@ workflows:
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
           with_shared_gcp: true
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test with docker images"
+          test_names_file: "test-full-class-names-docker-based.log"
+          start_canton_options: "-w -m"
+          with_docker_images: true
+          resource_class: "xlarge"
+          parallelism: 1
       - ui_test:
           <<: *notify-fail
           context:

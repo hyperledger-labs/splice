@@ -11,7 +11,8 @@ function newUiApp(
   ingressName: string,
   clusterBasename: string,
   clusterDnsNames: string[],
-  auth0DomainProvider: auth0.Provider
+  auth0DomainProvider: auth0.Provider,
+  extraUrls: string[] = []
 ): auth0.Client {
   const urls = urlPrefixes
     .map(prefix => {
@@ -19,7 +20,8 @@ function newUiApp(
         return `https://${prefix}.${ingressName}.${dnsName}`;
       });
     })
-    .flat();
+    .flat()
+    .concat(extraUrls);
 
   const ret = new auth0.Client(
     resourceName,
@@ -288,7 +290,8 @@ function validatorRunbookAuth0(clusterBasename: string, dnsNames: string[]) {
     'validator',
     clusterBasename,
     dnsNames,
-    provider
+    provider,
+    ['http://localhost:3000', 'http://wallet.localhost']
   );
   const ansUiApp = newUiApp(
     'validatorCnsUi',
@@ -298,7 +301,8 @@ function validatorRunbookAuth0(clusterBasename: string, dnsNames: string[]) {
     'validator',
     clusterBasename,
     dnsNames,
-    provider
+    provider,
+    ['http://localhost:3001', 'http://ans.localhost']
   );
 
   return pulumi.all([walletUiApp.id, ansUiApp.id]).apply(([walletUiAppId, ansUiAppId]) => {

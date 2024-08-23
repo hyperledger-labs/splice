@@ -1,0 +1,15 @@
+x-ui-config:
+  &ui-config
+    environment:
+      - CN_APP_UI_NETWORK_NAME=Canton Network
+      - CN_APP_UI_NETWORK_FAVICON_URL=https://www.canton.network/hubfs/cn-favicon-05%201-1.png
+      - CN_APP_UI_AMULET_NAME=Canton Coin
+      - CN_APP_UI_AMULET_NAME_ACRONYM=CC
+      - CN_APP_UI_NAME_SERVICE_NAME=Canton Name Service
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=CNS
+
+services:
+  wallet-web-ui:
+      <<: *ui-config
+  ans-web-ui:
+      <<: *ui-config

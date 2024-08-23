@@ -8,17 +8,25 @@ import scala.util.Using
 
 trait FrontendLoginUtil { self: FrontendTestCommon =>
 
-  protected def login(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
-    go to s"http://localhost:$port"
+  protected def login(port: Int, ledgerApiUser: String, hostname: String = "localhost")(implicit
+      webDriver: WebDriver
+  ) = {
+    go to s"http://$hostname:$port"
     waitForQuery(id("user-id-field"))
-    loginOnCurrentPage(port, ledgerApiUser)
+    loginOnCurrentPage(port, ledgerApiUser, hostname)
   }
 
-  protected def loginOnCurrentPage(port: Int, ledgerApiUser: String)(implicit
+  protected def loginOnCurrentPage(
+      port: Int,
+      ledgerApiUser: String,
+      hostname: String = "localhost",
+  )(implicit
       webDriver: WebDriver
   ) = {
     eventually() {
-      currentUrl should startWith(s"http://localhost:$port")
+      val url = if (port == 80) { s"http://$hostname" }
+      else { s"http://$hostname:$port" }
+      currentUrl should startWith(url)
     }
     // We reuse frontends across tests so we might need to log out first.
     find(id("logout-button")).foreach(click on _)

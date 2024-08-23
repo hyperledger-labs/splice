@@ -1411,6 +1411,8 @@ printTests := {
   def isResourceIntensiveTest(name: String): Boolean =
     name.contains("SvReonboardingIntegration") ||
       name.contains("DecentralizedSynchronizerMigrationIntegrationTest")
+  def isDockerBasedTest(name: String): Boolean =
+    name contains "DockerComposeValidatorFrontendIntegrationTest"
 
   val allTestNames =
     definedTests
@@ -1505,6 +1507,11 @@ printTests := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
+    ),
+    (
+      "tests using docker images",
+      "test-full-class-names-docker-based.log",
+      (t: String) => isDockerBasedTest(t),
     ),
     (
       "tests with wall clock time",
