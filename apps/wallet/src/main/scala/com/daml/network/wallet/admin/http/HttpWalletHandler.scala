@@ -42,6 +42,7 @@ import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.{
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.{
+  UnknownContractDomains,
   UnknownInformees,
   UnknownSubmitters,
 }
@@ -796,6 +797,7 @@ object HttpWalletHandler {
       case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
       case ErrorInfoDetail(NotConnectedToDomain.id, _) => true
       case ErrorInfoDetail(UnknownContractDomain.id, _) => true
+      case ErrorInfoDetail(UnknownContractDomains.id, _) => true
       case ErrorInfoDetail(UnknownSubmitters.id, _) => true
       case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
       case ErrorInfoDetail(UnknownInformees.id, _) => true
