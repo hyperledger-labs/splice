@@ -4,28 +4,15 @@
 package com.daml.network.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  DamlRecord,
-  ExercisedEvent,
-  Identifier,
-  TransactionTree,
-  TreeEvent,
-  Value,
-}
-import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import com.daml.network.environment.ledger.api.{
-  LedgerClient,
-  ReassignmentUpdate,
-  TransactionTreeUpdate,
-}
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.definitions.{UpdateHistoryItem, UpdateHistoryTransaction}
+import com.daml.ledger.javaapi.data as javaApi
+import com.daml.network.environment.ledger.api as ledgerApi
+import com.daml.network.http.v0.definitions as httpApi
 import com.daml.network.store.TreeUpdateWithMigrationId
 import com.daml.network.util.Contract
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.ByteString
 import io.circe.Json
 
@@ -33,16 +20,22 @@ import java.time.{Instant, ZoneOffset}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
+/** Transcodes between different representations of ledger updates:
+  *
+  * lapi: com.daml.network.environment.ledger.api.*
+  * java: com.daml.ledger.javaapi.data.*
+  * http: com.daml.network.http.v0.httpApi.*
+  */
 sealed trait ScanHttpEncodings {
 
-  def ledgerTreeUpdateToHttp(
+  def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId
-  )(implicit elc: ErrorLoggingContext): UpdateHistoryItem = {
+  )(implicit elc: ErrorLoggingContext): httpApi.UpdateHistoryItem = {
 
     updateWithMigrationId.update.update match {
-      case TransactionTreeUpdate(tree) =>
-        definitions.UpdateHistoryItem.fromUpdateHistoryTransaction(
-          definitions
+      case ledgerApi.TransactionTreeUpdate(tree) =>
+        httpApi.UpdateHistoryItem.fromUpdateHistoryTransaction(
+          httpApi
             .UpdateHistoryTransaction(
               tree.getUpdateId,
               updateWithMigrationId.migrationId,
@@ -53,36 +46,50 @@ sealed trait ScanHttpEncodings {
               tree.getOffset,
               tree.getRootEventIds.asScala.toVector,
               tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
-                eventId -> treeEventToHttp(treeEvent)
+                eventId -> javaToHttpEvent(treeEvent)
               }.toMap,
             )
         )
-      case ReassignmentUpdate(update) =>
+      case ledgerApi.ReassignmentUpdate(update) =>
         update.event match {
-          case Assign(submitter, source, target, unassignId, createdEvent, counter) =>
-            definitions.UpdateHistoryItem.fromUpdateHistoryReassignment(
-              definitions.UpdateHistoryReassignment(
+          case ledgerApi.ReassignmentEvent.Assign(
+                submitter,
+                source,
+                target,
+                unassignId,
+                createdEvent,
+                counter,
+              ) =>
+            httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
+              httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 update.offset.getOffset,
                 update.recordTime.toString,
-                definitions.UpdateHistoryAssignment(
+                httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
                   target.toProtoPrimitive,
                   updateWithMigrationId.migrationId,
                   unassignId,
-                  createdEventToHttp(createdEvent),
+                  javaToHttpCreatedEvent(createdEvent),
                   counter,
                 ),
               )
             )
-          case Unassign(submitter, source, target, unassignId, contractId, counter) =>
-            definitions.UpdateHistoryItem.fromUpdateHistoryReassignment(
-              definitions.UpdateHistoryReassignment(
+          case ledgerApi.ReassignmentEvent.Unassign(
+                submitter,
+                source,
+                target,
+                unassignId,
+                contractId,
+                counter,
+              ) =>
+            httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
+              httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 update.offset.getOffset,
                 update.recordTime.toString,
-                definitions.UpdateHistoryUnassignment(
+                httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
                   updateWithMigrationId.migrationId,
@@ -97,17 +104,17 @@ sealed trait ScanHttpEncodings {
     }
   }
 
-  private def treeEventToHttp(treeEvent: TreeEvent)(implicit
+  private def javaToHttpEvent(treeEvent: javaApi.TreeEvent)(implicit
       elc: ErrorLoggingContext
-  ) = {
+  ): httpApi.TreeEvent = {
     treeEvent match {
-      case event: CreatedEvent =>
-        definitions.TreeEvent.fromCreatedEvent(
-          createdEventToHttp(event)
+      case event: javaApi.CreatedEvent =>
+        httpApi.TreeEvent.fromCreatedEvent(
+          javaToHttpCreatedEvent(event)
         )
-      case event: ExercisedEvent =>
-        definitions.TreeEvent.fromExercisedEvent(
-          definitions
+      case event: javaApi.ExercisedEvent =>
+        httpApi.TreeEvent.fromExercisedEvent(
+          httpApi
             .ExercisedEvent(
               "exercised_event",
               event.getEventId,
@@ -128,18 +135,47 @@ sealed trait ScanHttpEncodings {
     }
   }
 
-  def httpToTxTreeUpdate(http: UpdateHistoryTransaction): TreeUpdateWithMigrationId =
+  def javaToHttpCreatedEvent(event: javaApi.CreatedEvent)(implicit
+      elc: ErrorLoggingContext
+  ): httpApi.CreatedEvent = {
+    event.getContractKey.toScala.foreach { _ =>
+      throw new IllegalStateException(
+        "Contract keys are unexpected in UpdateHistory http encoded events"
+      )
+    }
+    httpApi
+      .CreatedEvent(
+        "created_event",
+        event.getEventId,
+        event.getContractId,
+        templateIdString(event.getTemplateId),
+        event.getPackageName,
+        encodeContractPayload(event),
+        event.getCreatedAt.atOffset(ZoneOffset.UTC),
+        event.getSignatories.asScala.toVector,
+        event.getObservers.asScala.toVector,
+      )
+  }
+
+  def httpToLapiUpdate(http: httpApi.UpdateHistoryItem): TreeUpdateWithMigrationId = http match {
+    case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(httpTransaction) =>
+      httpToLapiTransaction(httpTransaction)
+    case httpApi.UpdateHistoryItem.members.UpdateHistoryReassignment(httpReassignment) =>
+      httpToLapiReassignment(httpReassignment)
+  }
+
+  def httpToLapiTransaction(http: httpApi.UpdateHistoryTransaction): TreeUpdateWithMigrationId =
     TreeUpdateWithMigrationId(
-      LedgerClient.GetTreeUpdatesResponse(
-        update = TransactionTreeUpdate(
-          new TransactionTree(
+      ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+        update = ledgerApi.TransactionTreeUpdate(
+          new javaApi.TransactionTree(
             http.updateId,
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
             http.offset,
             http.eventsById.map { case (eventId, treeEventHttp) =>
-              eventId -> httpToTreeEvent(treeEventHttp)
+              eventId -> httpToJavaEvent(treeEventHttp)
             }.asJava,
             http.rootEventIds.asJava,
             http.synchronizerId,
@@ -152,14 +188,63 @@ sealed trait ScanHttpEncodings {
       http.migrationId,
     )
 
-  def httpToTreeEvent(http: definitions.TreeEvent): TreeEvent = http match {
-    case definitions.TreeEvent.members.CreatedEvent(createdHttp) => httpToCreatedEvent(createdHttp)
-    case definitions.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToExercisedEvent(exercisedHttp)
+  def httpToLapiReassignment(http: httpApi.UpdateHistoryReassignment): TreeUpdateWithMigrationId =
+    http.event match {
+      case httpApi.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(assignment) =>
+        TreeUpdateWithMigrationId(
+          ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+            update = ledgerApi.ReassignmentUpdate(
+              transfer = ledgerApi.Reassignment(
+                updateId = http.updateId,
+                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
+                recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
+                event = ledgerApi.ReassignmentEvent.Assign(
+                  submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
+                  source = DomainId.tryFromString(assignment.sourceSynchronizer),
+                  target = DomainId.tryFromString(assignment.targetSynchronizer),
+                  unassignId = assignment.unassignId,
+                  createdEvent = httpToJavaCreatedEvent(assignment.createdEvent),
+                  counter = assignment.reassignmentCounter,
+                ),
+              )
+            ),
+            domainId = DomainId.tryFromString(assignment.targetSynchronizer),
+          ),
+          assignment.migrationId,
+        )
+      case httpApi.UpdateHistoryReassignment.Event.members
+            .UpdateHistoryUnassignment(unassignment) =>
+        TreeUpdateWithMigrationId(
+          ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+            update = ledgerApi.ReassignmentUpdate(
+              transfer = ledgerApi.Reassignment(
+                updateId = http.updateId,
+                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
+                recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
+                event = ledgerApi.ReassignmentEvent.Unassign(
+                  submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),
+                  source = DomainId.tryFromString(unassignment.sourceSynchronizer),
+                  target = DomainId.tryFromString(unassignment.targetSynchronizer),
+                  unassignId = unassignment.unassignId,
+                  counter = unassignment.reassignmentCounter,
+                  contractId = new javaApi.codegen.ContractId(unassignment.contractId),
+                ),
+              )
+            ),
+            domainId = DomainId.tryFromString(unassignment.sourceSynchronizer),
+          ),
+          unassignment.migrationId,
+        )
+    }
+
+  def httpToJavaEvent(http: httpApi.TreeEvent): javaApi.TreeEvent = http match {
+    case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
+    case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
+      httpToJavaExercisedEvent(exercisedHttp)
   }
 
-  def httpToCreatedEvent(http: definitions.CreatedEvent): CreatedEvent =
-    new CreatedEvent(
+  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent =
+    new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       http.eventId,
       parseTemplateId(http.templateId),
@@ -175,8 +260,8 @@ sealed trait ScanHttpEncodings {
       http.createdAt.toInstant,
     )
 
-  def httpToExercisedEvent(http: definitions.ExercisedEvent): ExercisedEvent =
-    new ExercisedEvent(
+  def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent =
+    new javaApi.ExercisedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       http.eventId,
       parseTemplateId(http.templateId),
@@ -191,29 +276,7 @@ sealed trait ScanHttpEncodings {
       decodeExerciseResult(http.exerciseResult),
     )
 
-  def createdEventToHttp(event: CreatedEvent)(implicit
-      elc: ErrorLoggingContext
-  ) = {
-    event.getContractKey.toScala.foreach { _ =>
-      throw new IllegalStateException(
-        "Contract keys are unexpected in UpdateHistory http encoded events"
-      )
-    }
-    definitions
-      .CreatedEvent(
-        "created_event",
-        event.getEventId,
-        event.getContractId,
-        templateIdString(event.getTemplateId),
-        event.getPackageName,
-        encodeContractPayload(event),
-        event.getCreatedAt.atOffset(ZoneOffset.UTC),
-        event.getSignatories.asScala.toVector,
-        event.getObservers.asScala.toVector,
-      )
-  }
-
-  private def templateIdString(templateId: Identifier) =
+  private def templateIdString(templateId: javaApi.Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
 
   private def parseTemplateId(templateId: String) = {
@@ -224,7 +287,7 @@ sealed trait ScanHttpEncodings {
         throw new IllegalStateException(s"Cannot parse template Id $templateId")
       )
     val (packageId, moduleName, entityName) = (split.group(1), split.group(2), split.group(3))
-    new Identifier(packageId, moduleName, entityName)
+    new javaApi.Identifier(packageId, moduleName, entityName)
   }
 
   private def failedToWriteToJson(err: String): Nothing =
@@ -236,17 +299,23 @@ sealed trait ScanHttpEncodings {
       .parse(validJsonString)
       .fold(err => failedToWriteToJson(err.message), identity)
 
-  def encodeContractPayload(event: CreatedEvent)(implicit elc: ErrorLoggingContext): io.circe.Json
+  def encodeContractPayload(event: javaApi.CreatedEvent)(implicit
+      elc: ErrorLoggingContext
+  ): io.circe.Json
 
-  def decodeContractPayload(json: io.circe.Json): DamlRecord
+  def decodeContractPayload(json: io.circe.Json): javaApi.DamlRecord
 
-  def encodeChoiceArgument(event: ExercisedEvent)(implicit elc: ErrorLoggingContext): io.circe.Json
+  def encodeChoiceArgument(event: javaApi.ExercisedEvent)(implicit
+      elc: ErrorLoggingContext
+  ): io.circe.Json
 
-  def decodeChoiceArgument(json: io.circe.Json): Value
+  def decodeChoiceArgument(json: io.circe.Json): javaApi.Value
 
-  def encodeExerciseResult(event: ExercisedEvent)(implicit elc: ErrorLoggingContext): io.circe.Json
+  def encodeExerciseResult(event: javaApi.ExercisedEvent)(implicit
+      elc: ErrorLoggingContext
+  ): io.circe.Json
 
-  def decodeExerciseResult(json: io.circe.Json): Value
+  def decodeExerciseResult(json: io.circe.Json): javaApi.Value
 
   protected def encodeValueFallback(
       error: String,
@@ -270,7 +339,9 @@ sealed trait ScanHttpEncodings {
 // A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
 case object LossyScanHttpEncodings extends ScanHttpEncodings {
   import com.daml.network.util.ValueJsonCodecCodegen
-  override def encodeContractPayload(event: CreatedEvent)(implicit elc: ErrorLoggingContext): Json =
+  override def encodeContractPayload(
+      event: javaApi.CreatedEvent
+  )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializableContractPayload(event)
       .fold(
@@ -282,7 +353,7 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
       )
 
   override def encodeChoiceArgument(
-      event: ExercisedEvent
+      event: javaApi.ExercisedEvent
   )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializeChoiceArgument(event)
@@ -295,7 +366,7 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
       )
 
   override def encodeExerciseResult(
-      event: ExercisedEvent
+      event: javaApi.ExercisedEvent
   )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializeChoiceResult(event)
@@ -307,27 +378,29 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
         tryParseJson,
       )
 
-  override def decodeContractPayload(json: Json): DamlRecord =
+  override def decodeContractPayload(json: Json): javaApi.DamlRecord =
     throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
 
-  override def decodeChoiceArgument(json: Json): Value =
+  override def decodeChoiceArgument(json: Json): javaApi.Value =
     throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
 
-  override def decodeExerciseResult(json: Json): Value =
+  override def decodeExerciseResult(json: Json): javaApi.Value =
     throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
 }
 
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.
 case object LosslessScanHttpEncodings extends ScanHttpEncodings {
   import com.daml.network.util.ValueJsonCodecProtobuf
-  override def encodeContractPayload(event: CreatedEvent)(implicit elc: ErrorLoggingContext): Json =
+  override def encodeContractPayload(
+      event: javaApi.CreatedEvent
+  )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
       ValueJsonCodecProtobuf
         .serializeValue(event.getArguments)
     )
 
   override def encodeChoiceArgument(
-      event: ExercisedEvent
+      event: javaApi.ExercisedEvent
   )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
       ValueJsonCodecProtobuf
@@ -335,19 +408,19 @@ case object LosslessScanHttpEncodings extends ScanHttpEncodings {
     )
 
   override def encodeExerciseResult(
-      event: ExercisedEvent
+      event: javaApi.ExercisedEvent
   )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
       ValueJsonCodecProtobuf
         .serializeValue(event.getExerciseResult)
     )
 
-  override def decodeContractPayload(json: Json): DamlRecord =
+  override def decodeContractPayload(json: Json): javaApi.DamlRecord =
     ValueJsonCodecProtobuf.deserializeValue(json.toString()).asRecord().get()
 
-  override def decodeChoiceArgument(json: Json): Value =
+  override def decodeChoiceArgument(json: Json): javaApi.Value =
     ValueJsonCodecProtobuf.deserializeValue(json.toString())
 
-  override def decodeExerciseResult(json: Json): Value =
+  override def decodeExerciseResult(json: Json): javaApi.Value =
     ValueJsonCodecProtobuf.deserializeValue(json.toString())
 }

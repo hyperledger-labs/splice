@@ -264,7 +264,7 @@ class UpdateHistoryIntegrationTest
       )
       .map {
         case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(http) =>
-          LosslessScanHttpEncodings.httpToTxTreeUpdate(http)
+          LosslessScanHttpEncodings.httpToLapiTransaction(http)
         case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(_) =>
           // TODO(#14067): Support decoding reasssignments, and test this also in the soft migration test where we actually have them
           fail("Unexpected reassignment")

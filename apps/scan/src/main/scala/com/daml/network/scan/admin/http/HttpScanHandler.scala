@@ -682,7 +682,7 @@ class HttpScanHandler(
               if (lossless) LosslessScanHttpEncodings else LossyScanHttpEncodings
             definitions.UpdateHistoryResponse(
               txs
-                .map(encodings.ledgerTreeUpdateToHttp(_))
+                .map(encodings.lapiToHttpUpdate(_))
                 .toVector
             )
           }
@@ -1018,7 +1018,7 @@ class HttpScanHandler(
                 definitions.AcsResponse(
                   recordTime,
                   migrationId,
-                  result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
+                  result.createdEventsInPage.map(LossyScanHttpEncodings.javaToHttpCreatedEvent(_)),
                   result.afterToken,
                 )
               )
@@ -1047,7 +1047,7 @@ class HttpScanHandler(
                 definitions.AcsResponse(
                   recordTime,
                   migrationId,
-                  result.createdEventsInPage.map(LossyScanHttpEncodings.createdEventToHttp(_)),
+                  result.createdEventsInPage.map(LossyScanHttpEncodings.javaToHttpCreatedEvent(_)),
                   result.afterToken,
                 )
               )
@@ -1146,7 +1146,7 @@ class HttpScanHandler(
           )
         )(txWithMigration =>
           v0.ScanResource.GetUpdateByIdResponse.OK(
-            LossyScanHttpEncodings.ledgerTreeUpdateToHttp(txWithMigration)
+            LossyScanHttpEncodings.lapiToHttpUpdate(txWithMigration)
           )
         )
       }
