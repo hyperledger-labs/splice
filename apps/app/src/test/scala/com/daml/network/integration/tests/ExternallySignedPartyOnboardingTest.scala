@@ -19,6 +19,7 @@ import com.digitalasset.canton.crypto.SymmetricKeyScheme.Aes128Gcm
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
 
 import java.util.{Base64, UUID}
@@ -50,8 +51,6 @@ class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecut
           aliceValidatorBackend.participantClient.keys.secret
             .generate_signing_key(UUID.randomUUID().toString, Some(SigningKeyScheme.Ed25519))
 
-        val fingerprint = signingPublicKey.fingerprint.toProtoPrimitive
-
         val signingKeyPairByteString = aliceValidatorBackend.participantClient.keys.secret
           .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
 
@@ -62,7 +61,7 @@ class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecut
         val listOfTransactionsAndHashes = aliceValidatorBackend
           .createNamespaceDelegationAndPartyTxs(
             partyHint,
-            Base64.getEncoder.encodeToString(signingPublicKey.key.toByteArray),
+            HexString.toHexString(signingPublicKey.key),
           )
           .topologyTxs
 
@@ -92,7 +91,7 @@ class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecut
         aliceValidatorBackend.submitNameDelegationAndPartyTxs(
           partyHint,
           signedTopologyTxs,
-          fingerprint,
+          HexString.toHexString(signingPublicKey.key),
         )
 
         eventually() {

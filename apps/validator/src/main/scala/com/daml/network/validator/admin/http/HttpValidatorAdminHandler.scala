@@ -43,6 +43,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
@@ -236,20 +237,11 @@ class HttpValidatorAdminHandler(
   ): Future[ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.createNamespaceDelegationAndPartyTxs") { _ => _ =>
+      val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
       ValidatorUtil
         .createTopologyMappings(
           partyHint = body.partyHint,
-          publicKey = SigningPublicKey
-            .create(
-              format = CryptoKeyFormat.Raw,
-              key = ByteString.copyFrom(Base64.getDecoder.decode(body.publicKey)),
-              scheme = SigningKeyScheme.Ed25519,
-            )
-            .valueOr(error =>
-              throw Status.INVALID_ARGUMENT
-                .withDescription(s"failed to construct signing public key: $error")
-                .asRuntimeException()
-            ),
+          publicKey = publicKey,
           participantAdminConnection = participantAdminConnection,
         )
         .map { topologyTxs =>
@@ -269,6 +261,29 @@ class HttpValidatorAdminHandler(
     }
   }
 
+  private def signingPublicKeyFromHexEd25119(publicKey: String): SigningPublicKey = {
+    val publicKeyBytes = HexString
+      .parseToByteString(publicKey)
+      .getOrElse(
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Could not decode public key $publicKey as a hex string")
+          .asRuntimeException()
+      )
+    SigningPublicKey
+      .fromProtoV30(
+        v30.SigningPublicKey(
+          v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
+          publicKeyBytes,
+          v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
+        )
+      )
+      .valueOr(err =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Failed to decode public key: $err")
+          .asRuntimeException()
+      )
+  }
+
   override def submitNamespaceDelegationAndPartyTxs(
       respond: ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse.type
   )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
@@ -276,6 +291,7 @@ class HttpValidatorAdminHandler(
   ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.submitNamespaceDelegationAndPartyTxs") { _ => _ =>
+      val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
       for {
         _ <- participantAdminConnection.addTopologyTransactions(
           store = TopologyStoreId.AuthorizedStore,
@@ -295,7 +311,7 @@ class HttpValidatorAdminHandler(
                 Signature(
                   Raw,
                   ByteString.copyFrom(Base64.getDecoder.decode(topologyTxs.signedHash)),
-                  signedBy = Fingerprint.tryCreate(body.publicKeyFingerprint),
+                  signedBy = publicKey.fingerprint,
                 ),
               ),
               isProposal = true,
@@ -313,7 +329,7 @@ class HttpValidatorAdminHandler(
             .create(
               partyId = PartyId.tryCreate(
                 body.partyHint,
-                fingerprint = Fingerprint.tryCreate(body.publicKeyFingerprint),
+                fingerprint = publicKey.fingerprint,
               ),
               domainId = None,
               threshold = PositiveInt.one,

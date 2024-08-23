@@ -642,6 +642,7 @@ components:
         party_hint:
           type: string
         public_key:
+          description: hex-encoded ed25519 public key
           type: string
     CreateNamespaceDelegationAndPartyTxsResponse:
       type: object
@@ -668,11 +669,12 @@ components:
       required:
         - party_hint
         - signed_topology_txs
-        - public_key_fingerprint
+        - public_key
       properties:
         party_hint:
           type: string
-        public_key_fingerprint:
+        public_key:
+          description: hex-encoded ed25519 public key
           type: string
         signed_topology_txs:
           type: array
