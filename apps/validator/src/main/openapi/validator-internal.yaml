@@ -666,15 +666,28 @@ components:
     SubmitNamespaceDelegationAndPartyTxsRequest:
       type: object
       required:
-        - topology_txs
-        - signed_tx_hash
+        - party_hint
+        - signed_topology_txs
+        - public_key_fingerprint
       properties:
-        topology_txs:
+        party_hint:
+          type: string
+        public_key_fingerprint:
+          type: string
+        signed_topology_txs:
           type: array
           items:
-            "$ref": "#/components/schemas/TopologyTx"
-        signed_tx_hash:
-          type: string
+            "$ref": "#/components/schemas/SignedTopologyTx"
+    SignedTopologyTx:
+        type: object
+        required:
+          - topology_tx
+          - signed_hash
+        properties:
+          topology_tx:
+            type: string
+          signed_hash:
+            type: string
 
     RegistrationRequest:
       type: object

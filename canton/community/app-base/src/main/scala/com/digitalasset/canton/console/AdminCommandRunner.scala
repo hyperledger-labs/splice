@@ -93,7 +93,7 @@ trait BaseInspection[+I <: CantonNode] {
     )
   }
 
-  protected[canton] def crypto: Crypto = {
+  def crypto: Crypto = {
     runningNode
       .flatMap(_.crypto)
       .getOrElse(throw new IllegalArgumentException(s"instance $name is not running."))

@@ -9,6 +9,11 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
 import com.daml.network.http.HttpClient
+import com.daml.network.http.v0.definitions.{
+  CreateNamespaceDelegationAndPartyTxsResponse,
+  SignedTopologyTx,
+}
+import com.daml.network.http.v0.validator_admin.SubmitNamespaceDelegationAndPartyTxsResponse
 import com.daml.network.http.v0.{definitions, validator_admin as http}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.store.MultiDomainAcsStore.ContractState
@@ -36,6 +41,60 @@ object HttpValidatorAdminAppClient {
         HttpClientBuilder().buildClient(),
         host,
       )
+  }
+
+  case class CreateNamespaceDelegationAndPartyTxs(partyHint: String, publicKey: String)
+      extends BaseCommand[
+        http.CreateNamespaceDelegationAndPartyTxsResponse,
+        CreateNamespaceDelegationAndPartyTxsResponse,
+      ] {
+
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.CreateNamespaceDelegationAndPartyTxsResponse] =
+      client.createNamespaceDelegationAndPartyTxs(
+        definitions.CreateNamespaceDelegationAndPartyTxsRequest(partyHint, publicKey),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.CreateNamespaceDelegationAndPartyTxsResponse, Either[
+      String,
+      CreateNamespaceDelegationAndPartyTxsResponse,
+    ]] = { case http.CreateNamespaceDelegationAndPartyTxsResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  case class SubmitNamespaceDelegationAndPartyTxs(
+      partyHint: String,
+      topologyTx: Vector[SignedTopologyTx],
+      publicKeyFingerprint: String,
+  ) extends BaseCommand[http.SubmitNamespaceDelegationAndPartyTxsResponse, Unit] {
+
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.SubmitNamespaceDelegationAndPartyTxsResponse] =
+      client.submitNamespaceDelegationAndPartyTxs(
+        definitions
+          .SubmitNamespaceDelegationAndPartyTxsRequest(partyHint, publicKeyFingerprint, topologyTx),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[SubmitNamespaceDelegationAndPartyTxsResponse, Either[String, Unit]] = {
+      case http.SubmitNamespaceDelegationAndPartyTxsResponse.OK => Right(())
+    }
   }
 
   case class OnboardUser(name: String, existingPartyId: Option[PartyId])

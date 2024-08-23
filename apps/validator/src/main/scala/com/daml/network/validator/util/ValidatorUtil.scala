@@ -3,22 +3,22 @@
 
 package com.daml.network.validator.util
 
+import cats.syntax.either.*
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
-import com.daml.network.environment.{
-  BaseLedgerConnection,
-  CommandPriority,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerConnection,
-}
+import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
 import com.daml.network.util.SpliceUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions.Proposal
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -152,6 +152,72 @@ private[validator] object ValidatorUtil {
         priority = priority,
       )
     } yield userPartyId
+  }
+
+  def createTopologyMappings(
+      partyHint: String,
+      publicKey: SigningPublicKey,
+      participantAdminConnection: ParticipantAdminConnection,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] = {
+    val partyId = PartyId.tryCreate(partyHint, fingerprint = publicKey.fingerprint)
+
+    for {
+      participantId <- participantAdminConnection.getParticipantId()
+      namespaceDelegationMapping = NamespaceDelegation
+        .create(
+          namespace = partyId.uid.namespace,
+          target = publicKey,
+          isRootDelegation = true,
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct namespace delegation: $error")
+            .asRuntimeException()
+        )
+
+      // TODO(#14156): change to Confirmation
+      partyToParticipantMapping = PartyToParticipant
+        .create(
+          partyId = partyId,
+          domainId = None,
+          threshold = PositiveInt.one,
+          participants = Seq(
+            HostingParticipant(participantId, ParticipantPermission.Submission)
+          ),
+          groupAddressing = false,
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct party to participant mapping: $error")
+            .asRuntimeException()
+        )
+      partyToKeyMapping = PartyToKeyMapping
+        .create(
+          partyId,
+          None,
+          PositiveInt.one,
+          NonEmpty.mk(Seq, publicKey),
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct party to key mapping: $error")
+            .asRuntimeException()
+        )
+      transactions <- participantAdminConnection.generateTransactions(
+        Seq(namespaceDelegationMapping, partyToParticipantMapping, partyToKeyMapping)
+          .map(mapping =>
+            Proposal(
+              mapping = mapping,
+              store = TopologyStoreId.AuthorizedStore.filterName,
+              serial = Some(PositiveInt.one),
+            )
+          )
+      )
+    } yield transactions
+
   }
 
   def offboard(

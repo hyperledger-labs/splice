@@ -9,6 +9,10 @@ import com.daml.network.codegen.java.splice.wallet.externalparty as externalPart
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.definitions.{
+  CreateNamespaceDelegationAndPartyTxsResponse,
+  SignedTopologyTx,
+}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.util.ContractWithState
 import com.daml.network.validator.admin.api.client.commands.*
@@ -54,6 +58,39 @@ abstract class ValidatorAppReference(
   @Help.Description("Return the party id of the validator operator")
   def getValidatorPartyId(): PartyId =
     getValidatorUserInfo().primaryParty
+
+  @Help.Summary("Create a namespace delegation and party transaction")
+  @Help.Description(
+    """Create a namespace delegation and party transaction
+      |Return the topology transaction and transaction authorization hash (this should be signed by CCSP).""".stripMargin
+  )
+  def createNamespaceDelegationAndPartyTxs(
+      partyHint: String,
+      publicKey: String,
+  ): CreateNamespaceDelegationAndPartyTxsResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.CreateNamespaceDelegationAndPartyTxs(partyHint, publicKey)
+      )
+    }
+  }
+
+  @Help.Summary("Submit a namespace delegation and party transaction")
+  def submitNameDelegationAndPartyTxs(
+      partyHint: String,
+      topologyTxs: Vector[SignedTopologyTx],
+      publicKeyFingerprint: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.SubmitNamespaceDelegationAndPartyTxs(
+          partyHint,
+          topologyTxs,
+          publicKeyFingerprint,
+        )
+      )
+    }
+  }
 
   @Help.Summary("Onboard a new user")
   @Help.Description("""Onboard individual canton-amulet user with a fresh or existing party-id.

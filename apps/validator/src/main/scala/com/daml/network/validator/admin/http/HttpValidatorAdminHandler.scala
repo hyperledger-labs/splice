@@ -3,6 +3,7 @@
 
 package com.daml.network.validator.admin.http
 
+import cats.syntax.either.*
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
 import com.daml.network.environment.{
@@ -14,9 +15,11 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.definitions.{
   CreateExternalPartySetupProposalRequest,
   CreateNamespaceDelegationAndPartyTxsRequest,
+  CreateNamespaceDelegationAndPartyTxsResponse,
   PrepareAcceptExternalPartySetupProposalRequest,
   SubmitAcceptExternalPartySetupProposalRequest,
   SubmitNamespaceDelegationAndPartyTxsRequest,
+  TopologyTx,
 }
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
@@ -29,10 +32,19 @@ import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.SignatureFormat.Raw
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.version.ProtocolVersion
+import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
@@ -220,14 +232,111 @@ class HttpValidatorAdminHandler(
   override def createNamespaceDelegationAndPartyTxs(
       respond: ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse.type
   )(body: CreateNamespaceDelegationAndPartyTxsRequest)(
-      extracted: TracedUser
-  ): Future[ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse] = ???
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.createNamespaceDelegationAndPartyTxs") { _ => _ =>
+      ValidatorUtil
+        .createTopologyMappings(
+          partyHint = body.partyHint,
+          publicKey = SigningPublicKey
+            .create(
+              format = CryptoKeyFormat.Raw,
+              key = ByteString.copyFrom(Base64.getDecoder.decode(body.publicKey)),
+              scheme = SigningKeyScheme.Ed25519,
+            )
+            .valueOr(error =>
+              throw Status.INVALID_ARGUMENT
+                .withDescription(s"failed to construct signing public key: $error")
+                .asRuntimeException()
+            ),
+          participantAdminConnection = participantAdminConnection,
+        )
+        .map { topologyTxs =>
+          ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse.OK(
+            CreateNamespaceDelegationAndPartyTxsResponse(
+              topologyTxs
+                .map(tx =>
+                  TopologyTx(
+                    topologyTx = Base64.getEncoder.encodeToString(tx.toByteArray),
+                    hash = tx.hash.hash.toHexString,
+                  )
+                )
+                .toVector
+            )
+          )
+        }
+    }
+  }
 
   override def submitNamespaceDelegationAndPartyTxs(
       respond: ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse.type
   )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
-      extracted: TracedUser
-  ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = ???
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.submitNamespaceDelegationAndPartyTxs") { _ => _ =>
+      for {
+        _ <- participantAdminConnection.addTopologyTransactions(
+          store = TopologyStoreId.AuthorizedStore,
+          txs = body.signedTopologyTxs.map { topologyTxs =>
+            SignedTopologyTransaction[TopologyChangeOp, TopologyMapping](
+              transaction = TopologyTransaction
+                .fromTrustedByteString(
+                  ByteString.copyFrom(Base64.getDecoder.decode(topologyTxs.topologyTx))
+                )
+                .valueOr(error =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(s"failed to construct topology transaction: $error")
+                    .asRuntimeException()
+                ),
+              signatures = NonEmpty.mk(
+                Set,
+                Signature(
+                  Raw,
+                  ByteString.copyFrom(Base64.getDecoder.decode(topologyTxs.signedHash)),
+                  signedBy = Fingerprint.tryCreate(body.publicKeyFingerprint),
+                ),
+              ),
+              isProposal = true,
+            )(
+              SignedTopologyTransaction.supportedProtoVersions
+                .protocolVersionRepresentativeFor(ProtocolVersion.dev)
+            )
+          },
+        )
+        participantId <- participantAdminConnection.getParticipantId()
+        // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
+        _ <- participantAdminConnection.proposeMapping(
+          AuthorizedStore,
+          PartyToParticipant
+            .create(
+              partyId = PartyId.tryCreate(
+                body.partyHint,
+                fingerprint = Fingerprint.tryCreate(body.publicKeyFingerprint),
+              ),
+              domainId = None,
+              threshold = PositiveInt.one,
+              participants = Seq(
+                HostingParticipant(participantId, ParticipantPermission.Submission)
+              ),
+              groupAddressing = false,
+            )
+            .valueOr(error =>
+              throw Status.INVALID_ARGUMENT
+                .withDescription(s"failed to construct party to participant mapping: $error")
+                .asRuntimeException()
+            ),
+          signedBy = participantId.fingerprint,
+          serial = PositiveInt.one,
+          isProposal = true,
+          change = TopologyChangeOp.Replace,
+        )
+        // TODO(#14325) Check that the transactions got accepted to the topology store
+      } yield ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponseOK
+
+    }
+  }
 
   override def createExternalPartySetupProposal(
       respond: ValidatorAdminResource.CreateExternalPartySetupProposalResponse.type
