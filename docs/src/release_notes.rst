@@ -11,12 +11,15 @@ Release Notes
 Upcoming
 --------
 
+
+0.1.18
+--------
+
 * SV apps
 
   * Fix a rare race condition where the SV app uses the wrong
     timestamp to export the topology state on a hard domain migration
-    resulting in the seq
-    uencer failing to initialize after the
+    resulting in the sequencer failing to initialize after the
     migration. We recommend upgrading before the next hard domain migration.
 
   * Enable SV to retain pre-migration sequencer URLs in ``SvNodeState``. This is done through a new `migration.legacyId` configuration in the SV values.
@@ -33,6 +36,9 @@ Upcoming
 
   * Added the ``getUpdateById`` API in ``scan-internal.yaml``.
     The ``getUpdateById`` API can be used to retrieve an update by its update ID.
+
+  * Added the ``getAcsSnapshotAt``, ``getHoldingsStateAt`` and ``getHoldingsSummaryAt`` APIs in ``scan-internal.yaml``.
+    A snapshot of the active contract set (ACS) is now computed and stored periodically to serve these endpoints.
 
   * Modified ``listDsoSequencers`` Scan API to also expose pre migration sequencer urls, allowing pre-migration validators to catch up.
 
