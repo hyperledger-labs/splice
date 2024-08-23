@@ -24,7 +24,7 @@ class DockerComposeValidatorFrontendIntegrationTest
   // TODO(#14303): auth0 variant (see AnsAuth0FrontendIntegrationTest)
   // TODO(#14303): test the administrator user
 
-  "run through runbook with self-hosted validator" in { _ =>
+  "run through runbook with self-hosted validator" in { implicit env =>
     Using.resource(
       startProcess(
         Seq("scripts/compose-validator-for-integration-test.sh"),
@@ -55,6 +55,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           "1.0000000000",
           "USD",
           "90 days",
+          ansAcronym,
         )
       }
     })(_ =>
