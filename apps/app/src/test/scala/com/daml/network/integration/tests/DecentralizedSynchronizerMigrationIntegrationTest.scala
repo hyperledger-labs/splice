@@ -22,11 +22,7 @@ import com.daml.network.config.{
   ParticipantClientConfig,
   SynchronizerConfig,
 }
-import com.daml.network.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAllScanAppConfigs_,
-  updateAutomationConfig,
-}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -420,9 +416,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
-      )
-      .addConfigTransforms((_, config) =>
-        updateAllScanAppConfigs_(config => config.copy(enableForcedAcsSnapshots = true))(config)
       )
       .withManualStart
       // TODO (#10859) remove and fix test failures

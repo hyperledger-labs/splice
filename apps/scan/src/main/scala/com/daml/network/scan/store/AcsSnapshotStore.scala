@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AcsSnapshotStore(
     storage: DbStorage,
-    updateHistory: UpdateHistory,
+    val updateHistory: UpdateHistory,
     val migrationId: Long,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, closeContext: CloseContext)

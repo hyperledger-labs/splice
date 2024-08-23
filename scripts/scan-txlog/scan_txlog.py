@@ -151,6 +151,22 @@ class TemplateQualifiedNames:
         ]
     )
 
+    all_tracked_with_package_name = set(
+        [
+            "splice-amulet:" + amulet,
+            "splice-amulet:" + locked_amulet,
+            "splice-amulet:" + app_reward_coupon,
+            "splice-amulet:" + validator_reward_coupon,
+            "splice-amulet:" + sv_reward_coupon,
+            "splice-amulet:" + validator_faucet_coupon,
+            "splice-amulet:" + open_mining_round,
+            "splice-amulet:" + summarizing_mining_round,
+            "splice-amulet:" + issuing_mining_round,
+            "splice-amulet-name-service:" + ans_entry_context,
+            "splice-wallet-payments:" + subscription_idle_state,
+        ]
+    )
+
 
 @dataclass
 class HandleTransactionResult:
@@ -271,6 +287,24 @@ class ScanClient:
             *[self.balance(party, round_number) for party in parties]
         )
         return dict(balances)
+
+    async def get_acs_snapshot_page_at(self, migration_id, record_time, templates, after):
+        payload = {
+            "migration_id": migration_id,
+            "record_time": record_time.isoformat(),
+            "page_size": 1000,
+            "templates": list(templates)
+        }
+        if after:
+            payload["after"] = after
+
+        response = await self.session.post(
+            f"{self.url}/api/scan/v0/state/acs",
+            json=payload,
+        )
+        response.raise_for_status()
+        json = await response.json()
+        return json
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -3237,6 +3271,14 @@ def _parse_cli_args():
         "--report-output",
         help="The name of a file to which a CSV report stream should be written. (Specific report structure a work in progress)",
     )
+    parser.add_argument(
+        "--stop-at-record-time",
+        help="The script will stop once the it reaches the given record time. Expected in ISO format.",
+    )
+    parser.add_argument(
+        "--compare-acs-with-snapshot",
+        help="Compares the ACS at the end of the script with the ACS snapshot of the given record_time"
+    )
     return parser.parse_args()
 
 
@@ -3359,14 +3401,16 @@ async def main():
 
         async with aiohttp.ClientSession() as session:
             scan_client = ScanClient(session, args.scan_url, args.page_size)
+            stop_at_record_time=datetime.fromisoformat(args.stop_at_record_time) if args.stop_at_record_time else None
+            last_migration_id = None
             while True:
-                batch = await scan_client.updates(app_state.pagination_key)
+                json_batch = await scan_client.updates(app_state.pagination_key)
+                batch = [TransactionTree.parse(tx) for tx in json_batch if (stop_at_record_time is None) or (datetime.fromisoformat(tx["record_time"]) < stop_at_record_time)]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
                 )
 
-                for transaction_json in batch:
-                    transaction = TransactionTree.parse(transaction_json)
+                for transaction in batch:
                     await _process_transaction(
                         args, app_state, scan_client, transaction
                     )
@@ -3375,12 +3419,36 @@ async def main():
                 if len(batch) >= 1:
                     last = batch[-1]
                     app_state.pagination_key = PaginationKey(
-                        last["migration_id"], last["record_time"]
+                        last.migration_id, last.record_time.isoformat()
                     )
                     app_state.save_to_cache(args)
+                    last_migration_id=last.migration_id
                 if len(batch) < scan_client.page_size:
                     LOG.debug(f"Reached end of stream at {app_state.pagination_key}")
                     break
+            if args.compare_acs_with_snapshot is not None and last_migration_id is not None:
+                snapshot_time=datetime.fromisoformat(args.compare_acs_with_snapshot)
+                after=None
+                expected_contracts=app_state.state.active_contracts
+                found_in_snapshot={}
+                while True:
+                    snapshot_page=await scan_client.get_acs_snapshot_page_at(last_migration_id, snapshot_time, TemplateQualifiedNames.all_tracked_with_package_name, after)
+                    for event in snapshot_page["created_events"]:
+                        cid = event["contract_id"]
+                        found_in_snapshot[cid] = event
+
+                    if snapshot_page["next_page_token"] is None:
+                        break
+                    else:
+                        after=snapshot_page["next_page_token"]
+                missing_in_snapshot=set(expected_contracts.keys()).difference(set(found_in_snapshot.keys()))
+                missing_in_script=set(found_in_snapshot.keys()).difference(set(expected_contracts.keys()))
+                if len(missing_in_snapshot)>0:
+                    missing = [expected_contracts[cid] for cid in missing_in_snapshot]
+                    LOG.error(f"Contracts missing in snapshot: {missing}")
+                if len(missing_in_script)>0:
+                    missing = [found_in_snapshot[cid] for cid in missing_in_script]
+                    LOG.error(f"Contracts missing in script ACS: {missing}")
         duration = time.time() - begin_t
         LOG.info(
             f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)"
