@@ -11,6 +11,25 @@ Release Notes
 Upcoming
 --------
 
+* Daml
+
+  * Add a choice that allows merging duplicated validator licenses. On DevNet it is easy to get duplicates as secrets can be automatically generated
+  * by querying the `/api/sv/v0/devnet/onboard/validator/prepare` endpoint. This is not an issue on Test/MainNet where secrets are explicitly provisioned by SV operators and are one-time use.
+  * It is up to the SV operators to ensure that they only hand out one secret to each validator
+
+  * The Daml changes in this release require a governance vote to upgrade the package configs to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.5
+    amuletNameService  0.1.5
+    dsoGovernance      0.1.8
+    validatorLifecycle 0.1.1
+    wallet             0.1.5
+    walletPayments     0.1.5
+    ================== =======
+
 * SV and validator apps
 
   * Remove support for deprecated ``bootstrapTXs`` field on node identity dumps. Node identity dumps taken on a 0.1.2 snapshot or earlier version are no longer supported.

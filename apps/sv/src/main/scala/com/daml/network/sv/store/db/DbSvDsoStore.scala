@@ -860,6 +860,26 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
+  override def listValidatorLicensePerValidator(validator: String, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
+    for {
+      result <- storage
+        .query(
+          selectFromAcsTable(
+            DsoTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where =
+              sql"""template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}
+              AND validator = ${lengthLimited(validator)}
+            """,
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
+          "listValidatorLicensePerValidator",
+        )
+    } yield result.map(contractFromRow(ValidatorLicense.COMPANION)(_))
+
   override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
       tc: TraceContext
   ): Future[Long] = waitUntilAcsIngested {

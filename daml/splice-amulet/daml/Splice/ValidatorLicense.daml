@@ -182,3 +182,6 @@ template ValidatorFaucetCoupon with
 
 instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
   contractGroupId ValidatorFaucetCoupon{..} = ForOwner with dso; owner = validator
+
+instance HasCheckedFetch ValidatorLicense ForDso where
+  contractGroupId ValidatorLicense{..} = ForDso with dso

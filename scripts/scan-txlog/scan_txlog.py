@@ -3060,6 +3060,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_PruneAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
+            case "DsoRules_MergeValidatorLicense":
+                return HandleTransactionResult.empty()
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 

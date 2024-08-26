@@ -10,8 +10,8 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
 import com.daml.network.codegen.java.splice.amuletrules.{
-  AppTransferContext,
   AmuletRules_MiningRound_Archive,
+  AppTransferContext,
 }
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense as vl
@@ -25,13 +25,14 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
+  DsoRules_CloseVoteRequestResult,
   DsoRules_ConfirmSvOnboarding,
   VoteRequest,
-  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.codegen.java.splice.svonboarding as so
 import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
 import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
@@ -699,6 +700,10 @@ trait SvDsoStore
     multiDomainAcsStore
       .listContracts(vl.ValidatorLicense.COMPANION, limit)
       .map(_ map (_.contract))
+
+  def listValidatorLicensePerValidator(validator: String, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]
 
   def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
       tc: TraceContext

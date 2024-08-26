@@ -252,6 +252,16 @@ object PackageIdResolver {
     dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_5.metadata.version
   }
 
+  def supportsMergeDuplicatedValidatorLicense(
+      now: CantonTimestamp,
+      amuletRules: AmuletRules,
+  ): Boolean = {
+    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
+    val dsoGovernanceVersion =
+      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
+    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_8.metadata.version
+  }
+
   def supportsLegacySequencerConfig(
       now: CantonTimestamp,
       amuletRules: AmuletRules,
