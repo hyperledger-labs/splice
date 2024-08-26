@@ -1399,7 +1399,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1487,7 +1487,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -1570,7 +1570,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -1650,7 +1650,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "splitwell-participant-3",
     "provider": "",
@@ -1778,7 +1778,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -2017,7 +2017,7 @@
         "validatorPartyHint": "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW_0040clients",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",
@@ -2214,7 +2214,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-cometbft-global-domain-3",
     "provider": "",
@@ -2346,7 +2346,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-global-domain-3",
     "provider": "",
@@ -2409,7 +2409,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -2462,7 +2462,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2602,7 +2602,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-participant-3",
     "provider": "",
@@ -2709,7 +2709,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFounder": true,
+        "isFirstSv": true,
         "metrics": {
           "enable": true
         },
@@ -2742,7 +2742,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -3026,7 +3026,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -3130,7 +3130,7 @@
           }
         }
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -3324,7 +3324,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-cometbft-global-domain-3",
     "provider": "",
@@ -3456,7 +3456,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-global-domain-3",
     "provider": "",
@@ -3519,7 +3519,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -3572,7 +3572,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3712,7 +3712,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-participant-3",
     "provider": "",
@@ -3819,7 +3819,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFounder": false,
+        "isFirstSv": false,
         "metrics": {
           "enable": true
         },
@@ -3852,7 +3852,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -4109,7 +4109,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -4206,7 +4206,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -4400,7 +4400,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-cometbft-global-domain-3",
     "provider": "",
@@ -4532,7 +4532,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-global-domain-3",
     "provider": "",
@@ -4595,7 +4595,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -4648,7 +4648,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -4788,7 +4788,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-participant-3",
     "provider": "",
@@ -4895,7 +4895,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFounder": false,
+        "isFirstSv": false,
         "metrics": {
           "enable": true
         },
@@ -4928,7 +4928,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -5185,7 +5185,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -5282,7 +5282,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -5476,7 +5476,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-cometbft-global-domain-3",
     "provider": "",
@@ -5608,7 +5608,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-global-domain-3",
     "provider": "",
@@ -5671,7 +5671,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -5724,7 +5724,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -5864,7 +5864,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-participant-3",
     "provider": "",
@@ -5971,7 +5971,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "isFounder": false,
+        "isFirstSv": false,
         "metrics": {
           "enable": true
         },
@@ -6004,7 +6004,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -6261,7 +6261,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -6358,7 +6358,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",
@@ -6730,7 +6730,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -6803,7 +6803,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -6883,7 +6883,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "validator1-participant-3",
     "provider": "",
@@ -7003,7 +7003,7 @@
           }
         ]
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -7169,7 +7169,7 @@
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.1.17"
+      "version": "0.1.18"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
