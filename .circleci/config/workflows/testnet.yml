@@ -10,7 +10,7 @@ workflow:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
-          migration_id: 2
+          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
