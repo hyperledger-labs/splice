@@ -69,6 +69,8 @@ function configureIstiod(
           istioNamespace: ingressNs.metadata.name,
           logAsJson: true,
           proxy: {
+            // disable traffic proxying for the postgres port.
+            excludeOutboundPorts: '5432',
             resources: {
               limits: {
                 memory: '4096Mi',
