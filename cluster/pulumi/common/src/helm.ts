@@ -124,8 +124,6 @@ function cnChartValues(
         fixedTokens: fixedTokens(),
         dnsName: CLUSTER_HOSTNAME,
       },
-      // TODO(#12200) do we still need both cluster.hostname and clusterUrl ?
-      clusterUrl: CLUSTER_HOSTNAME,
     },
     overrideValues,
     (a, b) => (_.isArray(b) ? b : undefined)

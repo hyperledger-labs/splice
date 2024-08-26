@@ -27,7 +27,6 @@ window.splice_config = {
       url: 'https://scan.sv-2.TARGET_HOSTNAME/api/scan',
     },
   },
-  clusterUrl: `https://TARGET_HOSTNAME`,
   spliceInstanceNames: {
     networkName: 'Canton Network',
     networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',

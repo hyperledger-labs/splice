@@ -21,10 +21,9 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -t <target_cluster> -o <onboarding_secret> [-c <scan_address>]"
+  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> [-c <scan_address>]"
   echo "  -a: Use this flag to enable authentication"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
-  echo "  -t <target_cluster>: The target cluster to onboard to (dev/test/main)"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
 
   echo ""
@@ -41,8 +40,6 @@ auth=0
 trust_single=0
 SPONSOR_SV_ADDRESS=""
 SCAN_ADDRESS=""
-#TODO(#14336): remove or rename TARGET_CLUSTER
-TARGET_CLUSTER=""
 ONBOARDING_SECRET=""
 SEQUENCER_ADDRESS=""
 while getopts 'has:c:t:o:nbq:' arg; do
@@ -63,9 +60,6 @@ while getopts 'has:c:t:o:nbq:' arg; do
     q)
       SEQUENCER_ADDRESS="${OPTARG}"
       ;;
-    t)
-      TARGET_CLUSTER="${OPTARG}"
-      ;;
     o)
       ONBOARDING_SECRET="${OPTARG}"
       ;;
@@ -81,12 +75,6 @@ done
 
 if [ -z "${SPONSOR_SV_ADDRESS}" ]; then
   _error_msg "Please provide the sponsor SV address"
-  usage
-  exit 1
-fi
-
-if [ -z "${TARGET_CLUSTER}" ]; then
-  _error_msg "Please provide the target cluster"
   usage
   exit 1
 fi
@@ -115,7 +103,6 @@ if [ $trust_single -eq 1 ] && [ -z "${SEQUENCER_ADDRESS}" ]; then
 fi
 
 export ONBOARDING_SECRET
-export TARGET_CLUSTER
 export SPONSOR_SV_ADDRESS
 export SCAN_ADDRESS
 export SEQUENCER_ADDRESS

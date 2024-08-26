@@ -725,7 +725,6 @@
             }
           }
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true
@@ -819,7 +818,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {
           "volumeSize": "48Gi"
         },
@@ -1086,7 +1084,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {
           "volumeSize": "48Gi"
         },
@@ -1165,7 +1162,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
@@ -1242,7 +1238,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
@@ -1315,7 +1310,6 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,

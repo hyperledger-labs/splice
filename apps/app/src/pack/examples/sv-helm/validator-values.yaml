@@ -17,7 +17,6 @@ scanAddress: "TRUSTED_SCAN_URL"
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
 validatorWalletUser: "OPERATOR_WALLET_USER_ID"
-clusterUrl: "TARGET_HOSTNAME"
 auth:
   # If you want to configure a custom audience for Validator app backend, uncomment this line and replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   # The default value of audience is ``https://canton.network.global``.

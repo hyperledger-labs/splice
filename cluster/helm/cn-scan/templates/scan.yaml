@@ -187,8 +187,6 @@ spec:
       - env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
-        - name: CN_APP_UI_CLUSTER
-          value: {{ .Values.clusterUrl | quote }}
         - name: CN_APP_UI_NETWORK_NAME
           value: {{ .Values.spliceInstanceNames.networkName | quote }}
         - name: CN_APP_UI_NETWORK_FAVICON_URL

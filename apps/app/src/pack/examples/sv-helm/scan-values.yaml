@@ -1,5 +1,3 @@
-clusterUrl: "TARGET_HOSTNAME"
-
 # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
 migration:
   id: "MIGRATION_ID"

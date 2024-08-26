@@ -24,7 +24,6 @@ const config = {
       url: 'http://localhost:5003/api/validator',
     },
   },
-  clusterUrl: `https://TARGET_HOSTNAME`,
   spliceInstanceNames: {
     networkName: 'Canton Network',
     networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',

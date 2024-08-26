@@ -3,7 +3,6 @@
 
 {{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
 
-{{ $_ := required ".Values.clusterUrl is required." .Values.clusterUrl }}
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.scanAddress is required." .Values.scanAddress }}

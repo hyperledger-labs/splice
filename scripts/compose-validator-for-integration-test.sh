@@ -21,7 +21,6 @@ export IMAGE_TAG
   -s "http://${docker_gateway}:5114" \
   -c "http://${docker_gateway}:5012" \
   -q "http://${docker_gateway}:5108" \
-  -t dev \
   -o "$secret" \
   -b >> "${REPO_ROOT}/log/compose.log" 2>&1
 

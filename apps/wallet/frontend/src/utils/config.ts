@@ -17,7 +17,6 @@ type WalletConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   services: WalletServicesConfig;
-  clusterUrl: string;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
 };
 
@@ -28,7 +27,6 @@ const reader = new ConfigReader(
     services: z.object({
       validator: serviceSchema,
     }),
-    clusterUrl: z.string().url(),
     spliceInstanceNames: spliceInstanceNamesSchema,
   })
 );

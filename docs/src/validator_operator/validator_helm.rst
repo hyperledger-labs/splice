@@ -356,7 +356,6 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator.
   (This Scan instances will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.

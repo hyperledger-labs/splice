@@ -122,6 +122,7 @@ export async function installValidator1(
       'cn-splitwell-web-ui',
       {
         ...spliceInstanceNames,
+        clusterUrl: CLUSTER_HOSTNAME,
       },
       defaultVersion,
       {

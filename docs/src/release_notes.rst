@@ -96,6 +96,7 @@ Upcoming
     The correct values for them are published in the docs for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>`.
   * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
     Its content has been renamed accordingly as well.
+  * The configuration variable `clusterUrl` was removed from all Helm charts except `splitwell-web-ui`.
 
 * Documentation
 

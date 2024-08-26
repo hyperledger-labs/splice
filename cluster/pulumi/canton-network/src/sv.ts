@@ -604,7 +604,6 @@ function installScan(
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
-    clusterUrl: CLUSTER_HOSTNAME,
     ...spliceInstanceNames,
     metrics: {
       enable: true,

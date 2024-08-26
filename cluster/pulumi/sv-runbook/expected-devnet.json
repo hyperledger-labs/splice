@@ -700,7 +700,6 @@
             }
           }
         },
-        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true
@@ -1343,7 +1342,6 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
-        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,

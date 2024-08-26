@@ -1,5 +1,4 @@
 const host = window.location.hostname;
-const cluster = "${CN_APP_UI_CLUSTER}";
 window.splice_config = {
   auth: {
     algorithm: "rs-256",
@@ -12,7 +11,6 @@ window.splice_config = {
       url: "https://" + window.location.host + "/api/validator",
     },
   },
-  clusterUrl: `https://${cluster}`,
   spliceInstanceNames: {
     networkName: "${CN_APP_UI_NETWORK_NAME}",
     networkFaviconUrl: "${CN_APP_UI_NETWORK_FAVICON_URL}",

@@ -692,7 +692,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -779,7 +778,6 @@
           "name": "cn-testnet",
           "svNamespace": "splitwell"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -863,7 +861,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -920,7 +917,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1055,7 +1051,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1264,7 +1259,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -1451,7 +1445,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
           "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
@@ -1608,7 +1601,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1693,7 +1685,6 @@
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "decentralizedSynchronizer": {
@@ -1754,7 +1745,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -1870,7 +1860,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2007,7 +1996,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2202,7 +2190,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -2352,7 +2339,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
@@ -2606,7 +2592,6 @@
           "name": "cn-testnet",
           "svNamespace": "validator1"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "decentralizedSynchronizer": {
@@ -2686,7 +2671,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -2743,7 +2727,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3006,7 +2989,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,

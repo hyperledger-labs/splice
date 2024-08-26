@@ -106,12 +106,6 @@ local services(node, clusterProtocol, clusterAddress, port) =
   else
     error 'Unknown node name ' + node;
 
-local clusterUrl(app) =
-  if (app == 'wallet') then
-    { clusterUrl: 'https://TARGET_HOSTNAME' }
-  else
-    {};
-
 function(
   authAlgorithm='rs-256',
   enableTestAuth,
@@ -121,4 +115,4 @@ function(
   clusterAddress,
   spliceInstanceNames,
   port,
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames + clusterUrl(app)
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames

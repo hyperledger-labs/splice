@@ -550,13 +550,11 @@ Please modify the file ``splice-node/examples/sv-helm/global-domain-values.yaml`
 
 Please modify the file ``splice-node/examples/sv-helm/scan-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |cn_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace ``TRUSTED_SCAN_URL`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.

@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 
-import { Box, Link, Typography } from '@mui/material';
-
-import { config } from '../utils/config';
+import { Box, Typography } from '@mui/material';
 
 export const Faqs: React.FC = () => {
   return (
@@ -19,13 +17,7 @@ export const Faqs: React.FC = () => {
       >
         <Typography variant="h4">FAQs</Typography>
         <Box marginTop={2}>
-          <Typography variant="body1">
-            More complete FAQs are coming soon. In the meantime, please visit the official{' '}
-            <Link href={config.clusterUrl} target="_blank">
-              {config.spliceInstanceNames.networkName} documentation
-            </Link>{' '}
-            for more information.
-          </Typography>
+          <Typography variant="body1">More complete FAQs are coming soon.</Typography>
         </Box>
       </Box>
     </Box>
