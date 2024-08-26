@@ -716,7 +716,7 @@ function substituteSlackNotificationTemplate(file: string) {
 }
 
 function defaultAlertSubstitutions(alert: string): string {
-  return alert.replaceAll('$NODATA', ENABLE_NO_DATA_ALERTS ? 'Error' : 'OK');
+  return alert.replaceAll('$NODATA', ENABLE_NO_DATA_ALERTS ? 'Alerting' : 'OK');
 }
 
 function createGrafanaAlerting(namespace: Input<string>) {
