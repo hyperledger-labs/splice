@@ -37,12 +37,13 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off from main.
     - Run `git diff (git merge-base origin/release-line-0.x.z origin/main) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
     - Run `git log (git merge-base origin/release-line-0.x.z origin/main)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
-- [ ] Review the output of the `preview-pulumi-changes` CircleCi workflow together with someone else to see that there are no unexpected changes.
+- [ ] Review the output of the `preview_pulumi_changes` CircleCi workflow together with someone else to see that there are no unexpected changes.
   - Pay particular attention to deleted or newly created resources.
+  - Note that this should be the `preview_pulumi_changes` run on the branch `release-line-0.x.z`, as those are the changes that will be applied after merging!
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
-  - [ ] Before merging, review the changes to the `deployment` stack from the `preview-pulumi-changes` CircleCi workflow.
+  - [ ] Before merging, review the changes to the `deployment` stack from the `preview_pulumi_changes` CircleCi workflow.
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
   - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
