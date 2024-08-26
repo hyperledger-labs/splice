@@ -124,6 +124,23 @@ class AcsSnapshotStoreTest
         } yield result should be("OK")
       }
 
+      "allow two snapshots with the same record time, different migration_ids" in {
+        MonadUtil
+          .sequentialTraverse(Seq(1, 2)) { migrationId =>
+            for {
+              updateHistory <- mkUpdateHistory(migrationId = migrationId.toLong)
+              store = mkStore(updateHistory, migrationId = migrationId.toLong)
+              _ <- ingestCreate(
+                updateHistory,
+                amuletRules(),
+                timestamp1.minusSeconds(1L),
+              )
+              _ <- store.insertNewSnapshot(None, timestamp1)
+            } yield succeed
+          }
+          .map(_ => succeed)
+      }
+
       "build snapshots incrementally" in {
         // each snapshot has a new contract
         val contracts = timestamps.zipWithIndex.map { case (_, i) =>
