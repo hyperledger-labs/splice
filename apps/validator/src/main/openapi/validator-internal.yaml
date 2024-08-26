@@ -581,31 +581,31 @@ paths:
     post:
       tags: [ validator ]
       x-jvm-package: validator_admin
-      operationId: "createNamespaceDelegationAndPartyTxs"
+      operationId: "generateExternalPartyTopology"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/CreateNamespaceDelegationAndPartyTxsRequest"
+              "$ref": "#/components/schemas/GenerateExternalPartyTopologyRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/CreateNamespaceDelegationAndPartyTxsResponse"
+                "$ref": "#/components/schemas/GenerateExternalPartyTopologyResponse"
   /v0/external-party-topology/submit:
     post:
       tags: [ validator ]
       x-jvm-package: validator_admin
-      operationId: "submitNamespaceDelegationAndPartyTxs"
+      operationId: "submitExternalPartyTopology"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/SubmitNamespaceDelegationAndPartyTxsRequest"
+              "$ref": "#/components/schemas/SubmitExternalPartyTopologyRequest"
       responses:
         "200":
           description: ok
@@ -633,7 +633,7 @@ components:
         party_id:
           type: string
 
-    CreateNamespaceDelegationAndPartyTxsRequest:
+    GenerateExternalPartyTopologyRequest:
       type: object
       required:
         - party_hint
@@ -644,7 +644,7 @@ components:
         public_key:
           description: hex-encoded ed25519 public key
           type: string
-    CreateNamespaceDelegationAndPartyTxsResponse:
+    GenerateExternalPartyTopologyResponse:
       type: object
       required:
         - topology_txs
@@ -664,7 +664,7 @@ components:
         hash:
           type: string
 
-    SubmitNamespaceDelegationAndPartyTxsRequest:
+    SubmitExternalPartyTopologyRequest:
       type: object
       required:
         - party_hint

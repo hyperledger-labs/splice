@@ -14,11 +14,11 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.v0.definitions.{
   CreateExternalPartySetupProposalRequest,
-  CreateNamespaceDelegationAndPartyTxsRequest,
-  CreateNamespaceDelegationAndPartyTxsResponse,
+  GenerateExternalPartyTopologyRequest,
+  GenerateExternalPartyTopologyResponse,
   PrepareAcceptExternalPartySetupProposalRequest,
   SubmitAcceptExternalPartySetupProposalRequest,
-  SubmitNamespaceDelegationAndPartyTxsRequest,
+  SubmitExternalPartyTopologyRequest,
   TopologyTx,
 }
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
@@ -231,13 +231,13 @@ class HttpValidatorAdminHandler(
     )
   }
 
-  override def createNamespaceDelegationAndPartyTxs(
-      respond: ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse.type
-  )(body: CreateNamespaceDelegationAndPartyTxsRequest)(
+  override def generateExternalPartyTopology(
+      respond: ValidatorAdminResource.GenerateExternalPartyTopologyResponse.type
+  )(body: GenerateExternalPartyTopologyRequest)(
       tuser: TracedUser
-  ): Future[ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse] = {
+  ): Future[ValidatorAdminResource.GenerateExternalPartyTopologyResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
-    withSpan(s"$workflowId.createNamespaceDelegationAndPartyTxs") { _ => _ =>
+    withSpan(s"$workflowId.generateExternalPartyTopology") { _ => _ =>
       val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
       ValidatorUtil
         .createTopologyMappings(
@@ -246,8 +246,8 @@ class HttpValidatorAdminHandler(
           participantAdminConnection = participantAdminConnection,
         )
         .map { topologyTxs =>
-          ValidatorAdminResource.CreateNamespaceDelegationAndPartyTxsResponse.OK(
-            CreateNamespaceDelegationAndPartyTxsResponse(
+          ValidatorAdminResource.GenerateExternalPartyTopologyResponse.OK(
+            GenerateExternalPartyTopologyResponse(
               topologyTxs
                 .map(tx =>
                   TopologyTx(
@@ -321,13 +321,13 @@ class HttpValidatorAdminHandler(
         .protocolVersionRepresentativeFor(ProtocolVersion.dev)
     )
 
-  override def submitNamespaceDelegationAndPartyTxs(
-      respond: ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse.type
-  )(body: SubmitNamespaceDelegationAndPartyTxsRequest)(
+  override def submitExternalPartyTopology(
+      respond: ValidatorAdminResource.SubmitExternalPartyTopologyResponse.type
+  )(body: SubmitExternalPartyTopologyRequest)(
       tuser: TracedUser
-  ): Future[ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponse] = {
+  ): Future[ValidatorAdminResource.SubmitExternalPartyTopologyResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
-    withSpan(s"$workflowId.submitNamespaceDelegationAndPartyTxs") { _ => _ =>
+    withSpan(s"$workflowId.submitExternalPartyTopology") { _ => _ =>
       val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
       for {
         _ <- participantAdminConnection.addTopologyTransactions(
@@ -362,7 +362,7 @@ class HttpValidatorAdminHandler(
           change = TopologyChangeOp.Replace,
         )
         // TODO(#14325) Check that the transactions got accepted to the topology store
-      } yield ValidatorAdminResource.SubmitNamespaceDelegationAndPartyTxsResponseOK
+      } yield ValidatorAdminResource.SubmitExternalPartyTopologyResponseOK
 
     }
   }

@@ -59,7 +59,7 @@ class ExternallySignedPartyOnboardingTest extends IntegrationTest with HasExecut
 
         val partyHint = UUID.randomUUID().toString
         val listOfTransactionsAndHashes = aliceValidatorBackend
-          .createNamespaceDelegationAndPartyTxs(
+          .generateExternalPartyTopology(
             partyHint,
             HexString.toHexString(signingPublicKey.key),
           )

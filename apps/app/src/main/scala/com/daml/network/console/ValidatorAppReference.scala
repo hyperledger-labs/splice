@@ -10,7 +10,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.{
-  CreateNamespaceDelegationAndPartyTxsResponse,
+  GenerateExternalPartyTopologyResponse,
   SignedTopologyTx,
 }
 import com.daml.network.identities.NodeIdentitiesDump
@@ -64,13 +64,13 @@ abstract class ValidatorAppReference(
     """Create a namespace delegation and party transaction
       |Return the topology transaction and transaction authorization hash (this should be signed by CCSP).""".stripMargin
   )
-  def createNamespaceDelegationAndPartyTxs(
+  def generateExternalPartyTopology(
       partyHint: String,
       publicKey: String,
-  ): CreateNamespaceDelegationAndPartyTxsResponse = {
+  ): GenerateExternalPartyTopologyResponse = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.CreateNamespaceDelegationAndPartyTxs(partyHint, publicKey)
+        HttpValidatorAdminAppClient.GenerateExternalPartyTopology(partyHint, publicKey)
       )
     }
   }
@@ -83,7 +83,7 @@ abstract class ValidatorAppReference(
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.SubmitNamespaceDelegationAndPartyTxs(
+        HttpValidatorAdminAppClient.SubmitExternalPartyTopology(
           partyHint,
           topologyTxs,
           publicKeyFingerprint,

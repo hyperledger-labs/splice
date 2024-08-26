@@ -10,10 +10,10 @@ import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpComman
 import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.{
-  CreateNamespaceDelegationAndPartyTxsResponse,
+  GenerateExternalPartyTopologyResponse,
   SignedTopologyTx,
 }
-import com.daml.network.http.v0.validator_admin.SubmitNamespaceDelegationAndPartyTxsResponse
+import com.daml.network.http.v0.validator_admin.SubmitExternalPartyTopologyResponse
 import com.daml.network.http.v0.{definitions, validator_admin as http}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.store.MultiDomainAcsStore.ContractState
@@ -43,10 +43,10 @@ object HttpValidatorAdminAppClient {
       )
   }
 
-  case class CreateNamespaceDelegationAndPartyTxs(partyHint: String, publicKey: String)
+  case class GenerateExternalPartyTopology(partyHint: String, publicKey: String)
       extends BaseCommand[
-        http.CreateNamespaceDelegationAndPartyTxsResponse,
-        CreateNamespaceDelegationAndPartyTxsResponse,
+        http.GenerateExternalPartyTopologyResponse,
+        GenerateExternalPartyTopologyResponse,
       ] {
 
     def submitRequest(
@@ -55,27 +55,27 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.CreateNamespaceDelegationAndPartyTxsResponse] =
-      client.createNamespaceDelegationAndPartyTxs(
-        definitions.CreateNamespaceDelegationAndPartyTxsRequest(partyHint, publicKey),
+    ], http.GenerateExternalPartyTopologyResponse] =
+      client.generateExternalPartyTopology(
+        definitions.GenerateExternalPartyTopologyRequest(partyHint, publicKey),
         headers,
       )
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): PartialFunction[http.CreateNamespaceDelegationAndPartyTxsResponse, Either[
+    ): PartialFunction[http.GenerateExternalPartyTopologyResponse, Either[
       String,
-      CreateNamespaceDelegationAndPartyTxsResponse,
-    ]] = { case http.CreateNamespaceDelegationAndPartyTxsResponse.OK(response) =>
+      GenerateExternalPartyTopologyResponse,
+    ]] = { case http.GenerateExternalPartyTopologyResponse.OK(response) =>
       Right(response)
     }
   }
 
-  case class SubmitNamespaceDelegationAndPartyTxs(
+  case class SubmitExternalPartyTopology(
       partyHint: String,
       topologyTx: Vector[SignedTopologyTx],
       publicKeyFingerprint: String,
-  ) extends BaseCommand[http.SubmitNamespaceDelegationAndPartyTxsResponse, Unit] {
+  ) extends BaseCommand[http.SubmitExternalPartyTopologyResponse, Unit] {
 
     def submitRequest(
         client: Client,
@@ -83,17 +83,17 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.SubmitNamespaceDelegationAndPartyTxsResponse] =
-      client.submitNamespaceDelegationAndPartyTxs(
+    ], http.SubmitExternalPartyTopologyResponse] =
+      client.submitExternalPartyTopology(
         definitions
-          .SubmitNamespaceDelegationAndPartyTxsRequest(partyHint, publicKeyFingerprint, topologyTx),
+          .SubmitExternalPartyTopologyRequest(partyHint, publicKeyFingerprint, topologyTx),
         headers,
       )
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): PartialFunction[SubmitNamespaceDelegationAndPartyTxsResponse, Either[String, Unit]] = {
-      case http.SubmitNamespaceDelegationAndPartyTxsResponse.OK => Right(())
+    ): PartialFunction[SubmitExternalPartyTopologyResponse, Either[String, Unit]] = {
+      case http.SubmitExternalPartyTopologyResponse.OK => Right(())
     }
   }
 
