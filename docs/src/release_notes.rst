@@ -97,6 +97,8 @@ Upcoming
   * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
     Its content has been renamed accordingly as well.
   * The configuration variable `clusterUrl` was removed from all Helm charts except `splitwell-web-ui`.
+  * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
+    example has been updated to match, and this change must be made to your own copy.
 
 * Documentation
 
