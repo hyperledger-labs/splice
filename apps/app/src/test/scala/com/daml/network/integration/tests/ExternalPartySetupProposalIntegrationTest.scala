@@ -5,12 +5,15 @@ import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.util.{Codec, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.util.HexString
 
 class ExternalPartySetupProposalIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
-    with WalletTestUtil {
+    with WalletTestUtil
+    with ExternallySignedPartyTestUtil {
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
@@ -50,6 +53,34 @@ class ExternalPartySetupProposalIntegrationTest
     val accept = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(cid, aliceUserParty)
     accept.txHash should not be empty
     accept.transaction should not be empty
+  }
+
+  "submit acceptExternalPartySetupProposal creates TransferPreapproval" in { implicit env =>
+    val OnboardingResult(party, _, privateKey) = onboardExternalParty(aliceValidatorBackend)
+    eventually() {
+      aliceValidatorBackend.participantClient.parties
+        .hosted(filterParty = party.filterString) should not be empty
+    }
+    val proposal = aliceValidatorBackend.createExternalPartySetupProposal(party)
+    val cid = Codec
+      .decodeJavaContractId(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(
+        proposal.contractId
+      )
+      .value
+    val prepare = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(cid, party)
+
+    aliceValidatorBackend.submitAcceptExternalPartySetupProposal(
+      party,
+      prepare.transaction,
+      crypto
+        .sign(
+          Hash.fromByteString(HexString.parseToByteString(prepare.txHash).value).value,
+          privateKey.asInstanceOf[SigningPrivateKey],
+        )
+        .value,
+    )
+
+    aliceValidatorBackend.listTransferPreapprovals() should not be empty
   }
 
   private def createExternalPartySetupProposal()(implicit

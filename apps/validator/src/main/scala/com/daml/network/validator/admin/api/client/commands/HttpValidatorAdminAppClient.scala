@@ -7,6 +7,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.splice.transferpreapproval as transferPreapprovalCodegen
 import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.{
@@ -19,8 +20,10 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.migration.DomainMigrationDump
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
@@ -308,6 +311,76 @@ object HttpValidatorAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.PrepareAcceptExternalPartySetupProposalResponse.OK(response) =>
       Right(response)
+    }
+  }
+
+  case class SubmitAcceptExternalPartySetupProposal(
+      userPartyId: PartyId,
+      transaction: String,
+      signedTxHash: Signature,
+  ) extends BaseCommand[
+        http.SubmitAcceptExternalPartySetupProposalResponse,
+        definitions.SubmitAcceptExternalPartySetupProposalResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.SubmitAcceptExternalPartySetupProposalResponse] =
+      client.submitAcceptExternalPartySetupProposal(
+        definitions.SubmitAcceptExternalPartySetupProposalRequest(
+          userPartyId.toProtoPrimitive,
+          transaction,
+          HexString.toHexString(signedTxHash.signature),
+          signedTxHash.signedBy.toProtoPrimitive,
+        ),
+        headers = headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.SubmitAcceptExternalPartySetupProposalResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  case class ListTransferPreapprovals()
+      extends BaseCommand[
+        http.ListTransferPreapprovalResponse,
+        Seq[ContractWithState[
+          transferPreapprovalCodegen.TransferPreapproval.ContractId,
+          transferPreapprovalCodegen.TransferPreapproval,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListTransferPreapprovalResponse] =
+      client.listTransferPreapproval(headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListTransferPreapprovalResponse.OK(response) =>
+      response.contracts.traverse(contractWithState =>
+        for {
+          contract <- Contract
+            .fromHttp(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
+              contractWithState.contract
+            )
+            .leftMap(_.toString)
+          domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+        } yield ContractWithState(
+          contract,
+          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+        )
+      )
     }
   }
 

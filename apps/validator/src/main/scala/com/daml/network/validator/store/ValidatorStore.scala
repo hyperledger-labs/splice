@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.splice.wallet.{
 import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  transferpreapproval as transferPreapprovalCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.environment.RetryProvider
@@ -100,6 +101,18 @@ trait ValidatorStore extends WalletStore with AppStore {
         externalPartyCodegen.ExternalPartySetupProposal.COMPANION
       )
     } yield proposals
+  }
+
+  def listTransferPreapprovals()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]
+  ] = {
+    for {
+      preapprovals <- multiDomainAcsStore.listContracts(
+        transferPreapprovalCodegen.TransferPreapproval.COMPANION
+      )
+    } yield preapprovals
   }
 
   def lookupExternalPartySetupProposalByUserPartyWithOffset(
@@ -378,6 +391,14 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
+        mkFilter(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(co =>
+          co.payload.provider == validator && co.payload.dso == dso
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>

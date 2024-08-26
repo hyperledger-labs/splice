@@ -5,6 +5,7 @@ package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.SpliceConsoleEnvironment
@@ -26,6 +27,7 @@ import com.daml.network.validator.migration.DomainMigrationDump
 import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
 import org.apache.pekko.actor.ActorSystem
@@ -206,6 +208,35 @@ abstract class ValidatorAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.PrepareAcceptExternalPartySetupProposal(contractId, userPartyId)
+      )
+    }
+  }
+
+  @Help.Summary("Submit AcceptExternalPartySetupProposal for a given party")
+  def submitAcceptExternalPartySetupProposal(
+      userPartyId: PartyId,
+      transaction: String,
+      signedTxHash: Signature,
+  ): definitions.SubmitAcceptExternalPartySetupProposalResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.SubmitAcceptExternalPartySetupProposal(
+          userPartyId,
+          transaction,
+          signedTxHash,
+        )
+      )
+    }
+  }
+
+  @Help.Summary("List TransferPreapprovals contracts")
+  def listTransferPreapprovals(): Seq[ContractWithState[
+    TransferPreapproval.ContractId,
+    TransferPreapproval,
+  ]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.ListTransferPreapprovals()
       )
     }
   }

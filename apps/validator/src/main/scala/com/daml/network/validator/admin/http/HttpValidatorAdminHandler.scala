@@ -5,7 +5,9 @@ package com.daml.network.validator.admin.http
 
 import cats.syntax.either.*
 import com.daml.network.auth.AuthExtractor.TracedUser
+import com.daml.network.codegen.java.splice.transferpreapproval as transferPreapprovalCodegen
 import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
+import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
@@ -27,7 +29,7 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.DisclosedContracts
+import com.daml.network.util.{Codec, DisclosedContracts}
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
@@ -42,7 +44,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
-import SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
@@ -334,16 +336,17 @@ class HttpValidatorAdminHandler(
           store = TopologyStoreId.AuthorizedStore,
           txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
         )
+        partyId = PartyId.tryCreate(
+          body.partyHint,
+          publicKey.fingerprint,
+        )
         participantId <- participantAdminConnection.getParticipantId()
         // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
         _ <- participantAdminConnection.proposeMapping(
           AuthorizedStore,
           PartyToParticipant
             .create(
-              partyId = PartyId.tryCreate(
-                body.partyHint,
-                fingerprint = publicKey.fingerprint,
-              ),
+              partyId = partyId,
               domainId = None,
               threshold = PositiveInt.one,
               participants = Seq(
@@ -362,6 +365,12 @@ class HttpValidatorAdminHandler(
           change = TopologyChangeOp.Replace,
         )
         // TODO(#14325) Check that the transactions got accepted to the topology store
+        _ <- storeWithIngestion.connection.waitForPartyOnLedgerApi(partyId)
+        _ <- storeWithIngestion.connection.grantUserRights(
+          config.ledgerApiUser,
+          Seq(),
+          Seq(partyId),
+        )
       } yield ValidatorAdminResource.SubmitExternalPartyTopologyResponseOK
 
     }
@@ -478,7 +487,7 @@ class HttpValidatorAdminHandler(
                   ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.OK(
                     definitions.PrepareAcceptExternalPartySetupProposalResponse(
                       Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
-                      HexString.toHexString(r.preparedTransactionHash.toByteArray),
+                      HexString.toHexString(r.preparedTransactionHash),
                     )
                   )
                 )
@@ -493,13 +502,62 @@ class HttpValidatorAdminHandler(
           )
         }
       }
-
     } yield result
   }
 
   override def submitAcceptExternalPartySetupProposal(
       respond: ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.type
   )(body: SubmitAcceptExternalPartySetupProposalRequest)(
-      extracted: TracedUser
-  ): Future[ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse] = ???
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
+    val signedTxHash = HexString.parseToByteString(body.signedTxHash) match {
+      case Some(hash) => hash
+      case None => throw new RuntimeException("Unable to parse signed tx hash")
+    }
+    for {
+      _ <- storeWithIngestion.connection.executeSubmissionAndWait(
+        userParty,
+        ByteString.copyFrom(Base64.getDecoder.decode(body.transaction)),
+        Map(
+          userParty ->
+            LedgerClient.Signature(
+              signedTxHash,
+              Fingerprint.tryCreate(body.publicKeyFingerprint),
+            )
+        ),
+      )
+
+      result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
+        case QueryResult(cid, Some(_)) =>
+          Future.successful(
+            Codec
+              .tryDecodeJavaContractId(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
+                cid
+              )
+          )
+        case QueryResult(_, None) =>
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"${transferPreapprovalCodegen.TransferPreapproval.COMPANION.TEMPLATE_ID.getEntityName} contract was not created."
+            )
+            .asRuntimeException()
+
+      }
+    } yield ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.OK(
+      definitions.SubmitAcceptExternalPartySetupProposalResponse(result.contractId)
+    )
+  }
+
+  override def listTransferPreapproval(
+      respond: ValidatorAdminResource.ListTransferPreapprovalResponse.type
+  )()(tuser: TracedUser): Future[ValidatorAdminResource.ListTransferPreapprovalResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    for {
+      preapprovals <- store.listTransferPreapprovals()
+    } yield definitions.ListTransferPreapprovalsResponse(
+      preapprovals.map(p => p.toHttp).toVector
+    )
+  }
 }

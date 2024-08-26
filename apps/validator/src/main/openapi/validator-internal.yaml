@@ -225,6 +225,20 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/admin/transfer-preapproval:
+    get:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "listTransferPreapproval"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListTransferPreapprovalsResponse"
+
+
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
@@ -1204,18 +1218,21 @@ components:
     SubmitAcceptExternalPartySetupProposalRequest:
       type: object
       required:
-        - contract_id
         - user_party_id
+        - transaction
         - signed_tx_hash
+        - public_key_fingerprint
       properties:
-        contract_id:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         user_party_id:
+          type: string
+        transaction:
           type: string
         signed_tx_hash:
           description: |
             hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form
             `${r}${s}`.
+          type: string
+        public_key_fingerprint:
           type: string
 
     SubmitAcceptExternalPartySetupProposalResponse:
@@ -1225,3 +1242,13 @@ components:
       properties:
         transfer_preapproval_contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+
+    ListTransferPreapprovalsResponse:
+      type: object
+      required:
+        - contracts
+      properties:
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"

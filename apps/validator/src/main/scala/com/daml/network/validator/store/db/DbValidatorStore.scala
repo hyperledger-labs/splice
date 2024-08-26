@@ -230,7 +230,7 @@ class DbValidatorStore(
                 template_id_qualified_name = ${QualifiedName(
                 TransferPreapproval.COMPANION.TEMPLATE_ID
               )}
-                and transfer_preapproval_receiver = $partyId
+                and user_party = $partyId
             """,
             orderLimit = sql"""
                 limit 1
