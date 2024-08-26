@@ -20,10 +20,8 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.migration.DomainMigrationDump
-import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
@@ -77,8 +75,8 @@ object HttpValidatorAdminAppClient {
   case class SubmitExternalPartyTopology(
       partyHint: String,
       topologyTx: Vector[SignedTopologyTx],
-      publicKeyFingerprint: String,
-  ) extends BaseCommand[http.SubmitExternalPartyTopologyResponse, Unit] {
+      publicKey: String,
+  ) extends BaseCommand[http.SubmitExternalPartyTopologyResponse, PartyId] {
 
     def submitRequest(
         client: Client,
@@ -89,14 +87,15 @@ object HttpValidatorAdminAppClient {
     ], http.SubmitExternalPartyTopologyResponse] =
       client.submitExternalPartyTopology(
         definitions
-          .SubmitExternalPartyTopologyRequest(partyHint, publicKeyFingerprint, topologyTx),
+          .SubmitExternalPartyTopologyRequest(partyHint, publicKey, topologyTx),
         headers,
       )
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): PartialFunction[SubmitExternalPartyTopologyResponse, Either[String, Unit]] = {
-      case http.SubmitExternalPartyTopologyResponse.OK => Right(())
+    ): PartialFunction[SubmitExternalPartyTopologyResponse, Either[String, PartyId]] = {
+      case http.SubmitExternalPartyTopologyResponse.OK(response) =>
+        Codec.decode(Codec.Party)(response.partyId)
     }
   }
 
@@ -317,10 +316,11 @@ object HttpValidatorAdminAppClient {
   case class SubmitAcceptExternalPartySetupProposal(
       userPartyId: PartyId,
       transaction: String,
-      signedTxHash: Signature,
+      signature: String,
+      publicKey: String,
   ) extends BaseCommand[
         http.SubmitAcceptExternalPartySetupProposalResponse,
-        definitions.SubmitAcceptExternalPartySetupProposalResponse,
+        transferPreapprovalCodegen.TransferPreapproval.ContractId,
       ] {
 
     override def submitRequest(
@@ -334,8 +334,8 @@ object HttpValidatorAdminAppClient {
         definitions.SubmitAcceptExternalPartySetupProposalRequest(
           userPartyId.toProtoPrimitive,
           transaction,
-          HexString.toHexString(signedTxHash.signature),
-          signedTxHash.signedBy.toProtoPrimitive,
+          signature,
+          publicKey,
         ),
         headers = headers,
       )
@@ -343,7 +343,9 @@ object HttpValidatorAdminAppClient {
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.SubmitAcceptExternalPartySetupProposalResponse.OK(response) =>
-      Right(response)
+      Codec.decodeJavaContractId(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
+        response.transferPreapprovalContractId
+      )
     }
   }
 

@@ -371,7 +371,9 @@ class HttpValidatorAdminHandler(
           Seq(),
           Seq(partyId),
         )
-      } yield ValidatorAdminResource.SubmitExternalPartyTopologyResponseOK
+      } yield ValidatorAdminResource.SubmitExternalPartyTopologyResponseOK(
+        definitions.SubmitExternalPartyTopologyResponse(Codec.encode(partyId))
+      )
 
     }
   }
@@ -516,6 +518,7 @@ class HttpValidatorAdminHandler(
       case Some(hash) => hash
       case None => throw new RuntimeException("Unable to parse signed tx hash")
     }
+    val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
     for {
       _ <- storeWithIngestion.connection.executeSubmissionAndWait(
         userParty,
@@ -524,19 +527,14 @@ class HttpValidatorAdminHandler(
           userParty ->
             LedgerClient.Signature(
               signedTxHash,
-              Fingerprint.tryCreate(body.publicKeyFingerprint),
+              publicKey.fingerprint,
             )
         ),
       )
 
       result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
-        case QueryResult(cid, Some(_)) =>
-          Future.successful(
-            Codec
-              .tryDecodeJavaContractId(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
-                cid
-              )
-          )
+        case QueryResult(_, Some(c)) =>
+          Future.successful(c.contractId)
         case QueryResult(_, None) =>
           throw Status.Code.FAILED_PRECONDITION.toStatus
             .withDescription(

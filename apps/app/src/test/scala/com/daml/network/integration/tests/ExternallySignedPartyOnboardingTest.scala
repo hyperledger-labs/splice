@@ -64,10 +64,30 @@ class ExternallySignedPartyOnboardingTest
         aliceValidatorBackend.token.value,
       )
 
-      eventually() {
-        aliceValidatorBackend.participantClient.parties
-          .hosted(filterParty = partyHint) should not be empty
-      }
+      val partyId = aliceValidatorBackend.participantClient.parties
+        .hosted(filterParty = partyHint)
+        .loneElement
+        .party
+
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "setup-transfer-preapproval",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName",
+          s"--party-id=${partyId.toProtoPrimitive}",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+
+      aliceValidatorBackend
+        .listTransferPreapprovals()
+        .loneElement
+        .payload
+        .receiver shouldBe partyId.toProtoPrimitive
+
     }
   }
 

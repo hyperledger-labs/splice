@@ -77,7 +77,46 @@ class ValidatorClient:
             f"{self.url}/api/validator/v0/external-party-topology/submit",
             payload,
         )
-        print(await response.text())
+        return await response.json()
+
+    async def create_external_party_setup_proposal(self, party_id):
+        payload = {
+            "user_party_id": party_id,
+        }
+        response = await session_post(
+            self.session,
+            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal",
+            payload,
+        )
+        return await response.json()
+
+    async def prepare_external_party_setup_proposal_accept(self, contract_id, party_id):
+        payload = {
+            "contract_id": contract_id,
+            "user_party_id": party_id,
+        }
+        response = await session_post(
+            self.session,
+            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal/prepare-accept",
+            payload,
+        )
+        return await response.json()
+
+    async def submit_external_party_setup_proposal_accept(
+        self, party_id, transaction, signed_tx_hash, public_key
+    ):
+        payload = {
+            "user_party_id": party_id,
+            "transaction": transaction,
+            "signed_tx_hash": signed_tx_hash,
+            "public_key": public_key,
+        }
+        response = await session_post(
+            self.session,
+            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal/submit-accept",
+            payload,
+        )
+        return await response.json()
 
 
 async def handle_generate_key_pair(args, validator_client):
@@ -130,10 +169,33 @@ async def handle_setup_party(args, validator_client):
         for tx in txs
     ]
 
-    await validator_client.submit_external_party_topology(
+    response = await validator_client.submit_external_party_topology(
         args.party_hint,
         signed_txs,
         public_key_hex,
+    )
+    party_id = response["party_id"]
+    logger.debug(f"Completed party setup, party id is: {party_id}")
+
+
+async def handle_setup_transfer_preapproval(args, validator_client):
+    logger.debug(f"Setting up TransferPreapproval for {args.party_id}")
+    [private_key, public_key] = read_key_pair(args.key_directory, args.key_name)
+    public_key_hex = public_key.export_key(format="raw").hex()
+    response = await validator_client.create_external_party_setup_proposal(
+        args.party_id
+    )
+    contract_id = response["contract_id"]
+    response = await validator_client.prepare_external_party_setup_proposal_accept(
+        contract_id, args.party_id
+    )
+    signer = eddsa.new(private_key, "rfc8032")
+    signed_hash = signer.sign(bytes.fromhex(response["tx_hash"])).hex()
+    response = await validator_client.submit_external_party_setup_proposal_accept(
+        args.party_id, response["transaction"], signed_hash, public_key_hex
+    )
+    logger.debug(
+        f"Created transfer preapproval with contract id {response['transfer_preapproval_contract_id']}"
     )
 
 
@@ -163,6 +225,17 @@ def parse_cli_args():
     parser_setup_party.add_argument("--party-hint", required=True)
     parser_setup_party.add_argument("--key-directory", required=True)
     parser_setup_party.add_argument("--key-name", required=True)
+
+    parser_setup_transfer_preapproval = subparsers.add_parser(
+        "setup-transfer-preapproval",
+        help="Setup the TransferPreapproval contract for an externally-hosted party",
+    )
+    parser_setup_transfer_preapproval.set_defaults(
+        handler=handle_setup_transfer_preapproval
+    )
+    parser_setup_transfer_preapproval.add_argument("--party-id", required=True)
+    parser_setup_transfer_preapproval.add_argument("--key-directory", required=True)
+    parser_setup_transfer_preapproval.add_argument("--key-name", required=True)
 
     return parser.parse_args()
 

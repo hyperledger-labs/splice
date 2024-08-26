@@ -9,6 +9,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.util.HexString
 
+// TODO(#14156) Merge this into ExternallySignedPartyOnboardingTest
 class ExternalPartySetupProposalIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -56,31 +57,30 @@ class ExternalPartySetupProposalIntegrationTest
   }
 
   "submit acceptExternalPartySetupProposal creates TransferPreapproval" in { implicit env =>
-    val OnboardingResult(party, _, privateKey) = onboardExternalParty(aliceValidatorBackend)
+    val OnboardingResult(party, publicKey, privateKey) = onboardExternalParty(aliceValidatorBackend)
     eventually() {
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty = party.filterString) should not be empty
     }
     val proposal = aliceValidatorBackend.createExternalPartySetupProposal(party)
-    val cid = Codec
-      .decodeJavaContractId(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(
-        proposal.contractId
-      )
-      .value
-    val prepare = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(cid, party)
+    val prepare = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(proposal, party)
 
-    aliceValidatorBackend.submitAcceptExternalPartySetupProposal(
+    val cid = aliceValidatorBackend.submitAcceptExternalPartySetupProposal(
       party,
       prepare.transaction,
-      crypto
-        .sign(
-          Hash.fromByteString(HexString.parseToByteString(prepare.txHash).value).value,
-          privateKey.asInstanceOf[SigningPrivateKey],
-        )
-        .value,
+      HexString.toHexString(
+        crypto
+          .sign(
+            Hash.fromByteString(HexString.parseToByteString(prepare.txHash).value).value,
+            privateKey.asInstanceOf[SigningPrivateKey],
+          )
+          .value
+          .signature
+      ),
+      HexString.toHexString(publicKey.key),
     )
 
-    aliceValidatorBackend.listTransferPreapprovals() should not be empty
+    aliceValidatorBackend.listTransferPreapprovals().loneElement.contractId shouldBe cid
   }
 
   private def createExternalPartySetupProposal()(implicit

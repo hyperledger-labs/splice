@@ -623,6 +623,10 @@ paths:
       responses:
         "200":
           description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SubmitExternalPartyTopologyResponse"
 
 components:
   schemas:
@@ -694,6 +698,15 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/SignedTopologyTx"
+
+    SubmitExternalPartyTopologyResponse:
+      type: object
+      required:
+        - party_id
+      properties:
+        party_id:
+          type: string
+
     SignedTopologyTx:
         type: object
         required:
@@ -1221,7 +1234,7 @@ components:
         - user_party_id
         - transaction
         - signed_tx_hash
-        - public_key_fingerprint
+        - public_key
       properties:
         user_party_id:
           type: string
@@ -1232,7 +1245,8 @@ components:
             hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form
             `${r}${s}`.
           type: string
-        public_key_fingerprint:
+        public_key:
+          description: hex-encoded ed25519 public key
           type: string
 
     SubmitAcceptExternalPartySetupProposalResponse:

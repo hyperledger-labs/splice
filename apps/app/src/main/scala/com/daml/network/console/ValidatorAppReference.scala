@@ -27,7 +27,6 @@ import com.daml.network.validator.migration.DomainMigrationDump
 import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
 import org.apache.pekko.actor.ActorSystem
@@ -81,14 +80,14 @@ abstract class ValidatorAppReference(
   def submitNameDelegationAndPartyTxs(
       partyHint: String,
       topologyTxs: Vector[SignedTopologyTx],
-      publicKeyFingerprint: String,
-  ): Unit = {
+      publicKey: String,
+  ): PartyId = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitExternalPartyTopology(
           partyHint,
           topologyTxs,
-          publicKeyFingerprint,
+          publicKey,
         )
       )
     }
@@ -216,14 +215,16 @@ abstract class ValidatorAppReference(
   def submitAcceptExternalPartySetupProposal(
       userPartyId: PartyId,
       transaction: String,
-      signedTxHash: Signature,
-  ): definitions.SubmitAcceptExternalPartySetupProposalResponse = {
+      signature: String,
+      publicKey: String,
+  ): TransferPreapproval.ContractId = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitAcceptExternalPartySetupProposal(
           userPartyId,
           transaction,
-          signedTxHash,
+          signature,
+          publicKey,
         )
       )
     }
