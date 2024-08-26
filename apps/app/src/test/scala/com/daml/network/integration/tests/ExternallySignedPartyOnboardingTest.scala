@@ -6,13 +6,19 @@ import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.tracing.TraceContext
+
+import java.util.UUID
+import scala.collection.mutable
+import scala.sys.process.{Process, ProcessLogger}
 
 class ExternallySignedPartyOnboardingTest
     extends IntegrationTest
     with HasExecutionContext
-    with ExternallySignedPartyTestUtil {
+    with ExternallySignedPartyTestUtil
+    with HasTempDirectory {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
@@ -30,6 +36,49 @@ class ExternallySignedPartyOnboardingTest
             .hosted(filterParty = party.filterString) should not be empty
         }
     }
+
+    "should be able to onboard an external party using the test python script" in { implicit env =>
+      val partyHint = UUID.randomUUID().toString
+      val keyName = "party-key"
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "generate-key-pair",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "setup-party",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName",
+          s"--party-hint=$partyHint",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+
+      eventually() {
+        aliceValidatorBackend.participantClient.parties
+          .hosted(filterParty = partyHint) should not be empty
+      }
+    }
   }
 
+  private def runProcess(args: Seq[String], token: String): Unit = {
+    val readLines = mutable.Buffer[String]()
+    val errorProcessor = ProcessLogger(line => readLines.append(line))
+    val exitCode = Process(args, None, ("VALIDATOR_JWT_TOKEN", token)).!(errorProcessor)
+    if (exitCode != 0) {
+      logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
+      readLines.foreach(logger.error(_)(TraceContext.empty))
+      throw new RuntimeException(s"$args failed.")
+    }
+  }
 }
