@@ -268,6 +268,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -412,6 +413,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
           "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
@@ -568,6 +570,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -652,6 +655,7 @@
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "decentralizedSynchronizer": {
@@ -712,6 +716,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
@@ -827,6 +832,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -963,6 +969,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1147,6 +1154,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -1275,6 +1283,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainnet"
         },
+        "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,

@@ -124,6 +124,8 @@ function cnChartValues(
         fixedTokens: fixedTokens(),
         dnsName: CLUSTER_HOSTNAME,
       },
+      // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
+      clusterUrl: CLUSTER_HOSTNAME,
     },
     overrideValues,
     (a, b) => (_.isArray(b) ? b : undefined)
@@ -158,6 +160,8 @@ export function installCNRunbookHelmChartByNamespaceName(
             ? repositories.google.dockerImages
             : undefined,
         ...appsAffinityAndTolerations,
+        // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
+        clusterUrl: CLUSTER_HOSTNAME,
       },
       timeout,
     },

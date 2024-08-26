@@ -192,6 +192,7 @@
           "hostname": "dev.global.canton.network.digitalasset.com",
           "svNamespace": "sv"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -386,6 +387,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
           "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
@@ -478,6 +480,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",
@@ -578,6 +581,7 @@
         "cluster": {
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -637,6 +641,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
@@ -700,6 +705,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true
@@ -906,6 +912,7 @@
           "audience": "https://sv.example.com/api",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -1342,6 +1349,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,

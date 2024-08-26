@@ -618,6 +618,8 @@ function installScan(
       id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
     enablePostgresMetrics: true,
+    // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
+    clusterUrl: CLUSTER_HOSTNAME,
   };
   const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
     dependsOn: [svApp, decentralizedSynchronizerNode],

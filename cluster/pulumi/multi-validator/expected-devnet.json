@@ -143,6 +143,7 @@
         "cluster": {
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4240,6 +4241,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
           "volumeSize": "600Gi"
@@ -4300,6 +4302,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
           "volumeSize": "600Gi"
@@ -4360,6 +4363,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
           "volumeSize": "600Gi"
@@ -4420,6 +4424,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
           "volumeSize": "600Gi"
@@ -4480,6 +4485,7 @@
             }
           }
         },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
           "volumeSize": "600Gi"

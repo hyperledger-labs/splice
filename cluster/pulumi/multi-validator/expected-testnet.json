@@ -33,6 +33,7 @@
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com"
         },
+        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "tolerations": [
           {
             "effect": "NoSchedule",
