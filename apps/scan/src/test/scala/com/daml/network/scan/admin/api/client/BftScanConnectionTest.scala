@@ -275,6 +275,18 @@ class BftScanConnectionTest
         },
       )
     }
+
+    "use all available connections on failures" in {
+      val connections = getMockedConnections(n = 4)
+      connections.zipWithIndex.foreach { case (connMock, idx) =>
+        makeMockReturn(connMock, PartyId.tryFromProtoPrimitive(s"whatever::$idx"))
+      }
+      val bft = getBft(connections)
+      bft.getDsoPartyId().failed.map { _ =>
+        connections.foreach(mockConnection => verify(mockConnection, atLeast(1)).getDsoPartyId())
+        succeed
+      }
+    }
   }
 
   "ScanAggregatesConnection" should {

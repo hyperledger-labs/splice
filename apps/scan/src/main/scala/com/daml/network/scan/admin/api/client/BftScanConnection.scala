@@ -179,19 +179,23 @@ class BftScanConnection(
       Future.failed(exception)
     } else {
       val nRequestsToDo = 2 * f + 1
-      val requestFrom = Random.shuffle(open).take(nRequestsToDo)
       retryProvider
         .retryForClientCalls(
           "bft_call",
           s"Bft call with f $f",
-          BftScanConnection.executeCall(call, requestFrom, nTargetSuccess = f + 1, logger),
+          BftScanConnection.executeCall(
+            call,
+            Random.shuffle(open).take(nRequestsToDo),
+            nTargetSuccess = f + 1,
+            logger,
+          ),
           logger,
           (_: String) => ConsensusNotReachedRetryable,
         )
         .recoverWith { case c: ConsensusNotReached =>
           val httpError = HttpErrorWithHttpCode(
             StatusCodes.BadGateway,
-            s"Failed to reach consensus from ${requestFrom.size} Scan nodes.",
+            s"Failed to reach consensus from $nRequestsToDo Scan nodes.",
           )
           logger.warn(s"Consensus not reached.", c)
           Future.failed(httpError)

@@ -93,4 +93,6 @@ Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 # TODO (#13985): we don't close cache metrics created by DbScanStoreMetrics
 Instrument daml.cache.* has recorded multiple values for the same attributes
 
+Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
+
 # Make sure to have a trailing newline
