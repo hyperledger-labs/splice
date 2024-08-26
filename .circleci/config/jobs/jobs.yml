@@ -89,6 +89,9 @@ jobs:
       with_docker_images:
         type: boolean
         default: false
+      additional_nix_args:
+        type: string
+        default: ""
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -166,6 +169,7 @@ jobs:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           start_canton_options: << parameters.start_canton_options >>
+          additional_nix_args: << parameters.additional_nix_args >>
       - stop_canton
       - cleanup_sbt_test_job
 

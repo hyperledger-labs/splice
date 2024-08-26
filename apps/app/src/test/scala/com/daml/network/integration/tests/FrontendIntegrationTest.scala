@@ -538,12 +538,13 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       username: String,
       password: String,
       assertCompleted: () => org.scalatest.Assertion,
+      timeUntilSuccess: FiniteDuration = 1.minutes,
   )(implicit
       webDriver: WebDriverType
   ) = {
     // Sometimes the whole auth0 login workflow gets stuck for unknown reasons.
     // Therefore we retry the whole workflow and take screenshots on each failed attempt.
-    eventually(timeUntilSuccess = 1.minutes) {
+    eventually(timeUntilSuccess) {
       try {
         dumpDebugInfoOnFailure {
           silentActAndCheck(

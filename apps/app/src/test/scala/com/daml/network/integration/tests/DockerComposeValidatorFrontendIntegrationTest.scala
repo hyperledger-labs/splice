@@ -3,13 +3,10 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.daml.network.util.ProcessTestUtil.startProcess
 import com.daml.network.util.{AnsFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.io.File
 import scala.concurrent.duration.*
-import scala.util.Using
 import scala.sys.process.*
 
 class DockerComposeValidatorFrontendIntegrationTest
@@ -21,21 +18,24 @@ class DockerComposeValidatorFrontendIntegrationTest
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
-  // TODO(#14303): auth0 variant (see AnsAuth0FrontendIntegrationTest)
-  // TODO(#14303): test the administrator user
-
-  "run through runbook with self-hosted validator" in { implicit env =>
-    Using.resource(
-      startProcess(
-        Seq("scripts/compose-validator-for-integration-test.sh"),
-        Seq.empty,
-      )
-    )(_ => {
+  "docker-compose based validator works" in { implicit env =>
+    val ret = "scripts/compose-validator-for-integration-test.sh".!
+    if (ret != 0) {
+      fail("Start script failed")
+    }
+    try {
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         actAndCheck(5.minute)(
+          "Login as administrator",
+          login(80, "administrator", "wallet.localhost"),
+        )(
+          "administrator is already onboarded",
+          _ => seleniumText(find(id("logged-in-user"))) should startWith("da-composeValidator-1"),
+        )
+        actAndCheck(
           "Login as alice",
-          login(80, "alice", "wallet.localhost"),
+          loginOnCurrentPage(80, "alice", "wallet.localhost"),
         )(
           "Alice can onboard",
           _ => find(id("onboard-button")).value.text should not be empty,
@@ -58,8 +58,44 @@ class DockerComposeValidatorFrontendIntegrationTest
           ansAcronym,
         )
       }
-    })(_ =>
-      "cluster/deployment/compose/stop.sh" ! new FileProcessLogger(new File("log/compose.log"))
-    )
+    } finally {
+      "cluster/deployment/compose/stop.sh" !
+    }
+  }
+
+  "docker-compose based validator with auth works" in { _ =>
+    val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
+    val builder =
+      new java.lang.ProcessBuilder("scripts/compose-validator-for-integration-test.sh", "-a")
+    builder
+      .environment()
+      .put(
+        "GCP_CLUSTER_BASENAME",
+        "cidaily",
+      ) // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
+    val ret = builder.!
+    if (ret != 0) {
+      fail("Start script failed")
+    }
+    try {
+      withFrontEnd("alice-selfhosted") { implicit webDriver =>
+        eventuallySucceeds()(go to s"http://wallet.localhost")
+        completeAuth0LoginWithAuthorization(
+          "http://wallet.localhost",
+          "admin@validator.com",
+          validatorUserPassword,
+          () => seleniumText(find(id("logged-in-user"))) should startWith("da-composeValidator-1"),
+          5.minute,
+        )
+        completeAuth0LoginWithAuthorization(
+          "http://ans.localhost",
+          "admin@validator.com",
+          validatorUserPassword,
+          () => seleniumText(find(id("logged-in-user"))) should startWith("da-composeValidator-1"),
+        )
+      }
+    } finally {
+      "cluster/deployment/compose/stop.sh" !
+    }
   }
 }
