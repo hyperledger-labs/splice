@@ -15,7 +15,6 @@ import {
   config,
   splitwellDarPath,
 } from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
@@ -115,15 +114,14 @@ export async function installSplitwell(
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
     ],
-    additionalConfig: (version: CnChartVersion) =>
-      [
-        'canton.validator-apps.validator_backend.app-instances.splitwell = {',
-        '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
-        '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
-        // We vet both versions to easily test upgrades.
-        `  dars = ["${splitwellDarPath(version)}"]`,
-        '}',
-      ].join('\n'),
+    additionalConfig: [
+      'canton.validator-apps.validator_backend.app-instances.splitwell = {',
+      '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
+      '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
+      // We vet both versions to easily test upgrades.
+      `  dars = ["${splitwellDarPath}"]`,
+      '}',
+    ].join('\n'),
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: `http://sv-app.sv-1:5014`,

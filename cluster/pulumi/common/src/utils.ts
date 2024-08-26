@@ -252,12 +252,4 @@ export const autoInitValues = (
   }
 };
 
-const withRenamedSpliceNode = (version: CnChartVersion) =>
-  version.type == 'local' ||
-  version.version.startsWith('0.2.0') ||
-  semver.gt(version.version, '0.2.0');
-
-export const splitwellDarPath = (version: CnChartVersion): string =>
-  withRenamedSpliceNode(version)
-    ? 'splice-node/dars/splitwell-current.dar'
-    : 'cn-node-0.1.0-SNAPSHOT/dars/splitwell-current.dar';
+export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';

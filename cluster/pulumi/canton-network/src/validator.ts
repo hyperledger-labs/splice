@@ -24,7 +24,6 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -58,10 +57,10 @@ type BasicValidatorConfig = {
   extraDependsOn?: pulumi.Resource[];
   scanAddress: Output<string> | string;
   persistenceConfig: PersistenceConfig;
-  appDars?: ((version: CnChartVersion) => string)[];
+  appDars?: string[];
   validatorPartyHint?: string;
   extraDomains?: ExtraDomain[];
-  additionalConfig?: (version: CnChartVersion) => string;
+  additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantAddress: Output<string> | string;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
@@ -200,7 +199,7 @@ export async function installValidatorApp(
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
-      appDars: config.appDars ? config.appDars.map(f => f(chartVersion)) : [],
+      appDars: config.appDars || [],
       decentralizedSynchronizerUrl: config.svValidator
         ? config.decentralizedSynchronizerUrl
         : undefined,
@@ -222,7 +221,7 @@ export async function installValidatorApp(
       persistence: config.persistenceConfig,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesDumpPeriodicBackup: config.backupConfig?.config,
-      additionalConfig: config.additionalConfig ? config.additionalConfig(chartVersion) : undefined,
+      additionalConfig: config.additionalConfig,
       participantIdentitiesDumpImport:
         !config.svValidator && config.participantBootstrapDump
           ? { secretName: participantBootstrapDumpSecretName }
