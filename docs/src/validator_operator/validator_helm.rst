@@ -114,6 +114,8 @@ Preparing for Validator Onboarding
 In order to become a validator, you need the sponsorship of an SV.
 Your SV will provide you with a required secret to authorize yourself towards their SV.
 
+The onboarding secret is a one-time use secret that expires after 24 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
+
 .. admonition:: DevNet-only
 
   On DevNet, you can obtain an onboarding secret automatically by

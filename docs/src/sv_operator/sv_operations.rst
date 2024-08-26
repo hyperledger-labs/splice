@@ -16,7 +16,9 @@ as well as general information useful to SV node operators.
 Generate a validator onboarding secret
 --------------------------------------
 
-If you want to onboard a new validator, you can obtain an onboarding secret directly from the SV web UI.
+If you want to onboard a new validator, you can obtain a one-time use onboarding secret directly from the SV web UI.
+
+The onboarding secret expires after 24 hours.
 
 To generate this key you need to :ref:`login into the SV web UI <local-sv-web-ui>` and navigate to the `Validator Onboarding` tab. In that tab, click on the button to create the secret
 and copy the last generated `onboarding secret`.
