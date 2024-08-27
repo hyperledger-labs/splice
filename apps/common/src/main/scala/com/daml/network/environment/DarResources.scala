@@ -90,7 +90,7 @@ object DarResources {
   val wallet_0_1_1 = DarResource("splice-wallet-0.1.1.dar")
   val wallet_0_1_2 = DarResource("splice-wallet-0.1.2.dar")
   val wallet_0_1_3 = DarResource("splice-wallet-0.1.3.dar")
-  val wallet_0_1_4 = DarResource("splice-wallet-0.1.5.dar")
+  val wallet_0_1_4 = DarResource("splice-wallet-0.1.4.dar")
   val wallet_0_1_5 = DarResource("splice-wallet-0.1.5.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
