@@ -238,7 +238,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum by(sender) (rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\", type=\"send-confirmation-request\"}[$__rate_interval]))",
+          "expr": "sum by(member) (rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\", type=\"send-confirmation-request\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -248,7 +248,7 @@
           "useBackend": false
         }
       ],
-      "title": "Confirmation Requests Rate by Sender",
+      "title": "Confirmation Requests Rate by Member",
       "type": "timeseries"
     },
     {
@@ -313,7 +313,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sort_desc(sum(delta(daml_sequencer_block_events_total{namespace=\"$namespace\",job=\"$job\",type=\"send-confirmation-request\"}[1h])) by (sender))",
+          "expr": "sort_desc(sum(delta(daml_sequencer_block_events_total{namespace=\"$namespace\",job=\"$job\",type=\"send-confirmation-request\"}[1h])) by (member))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -321,7 +321,7 @@
           "refId": "A"
         }
       ],
-      "title": "Confirmation Requests by Sender in the last Hour",
+      "title": "Confirmation Requests by Member in the last Hour",
       "transformations": [
         {
           "id": "organize",
@@ -427,7 +427,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\",sender=~\"PAR::.*\"}[$__rate_interval])) by (sender)",
+          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\",member=~\"PAR::.*\"}[$__rate_interval])) by (member)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -528,7 +528,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\",sender=~\"MED::.*\"}[$__rate_interval])) by (sender)",
+          "expr": "sum(rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\",member=~\"MED::.*\"}[$__rate_interval])) by (member)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -629,7 +629,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by(sender) (rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\", sender!~\"(MED|PAR)::.*\"}[$__rate_interval]))",
+          "expr": "sum by(member) (rate(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\", member!~\"(MED|PAR)::.*\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
