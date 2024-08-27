@@ -576,7 +576,7 @@ class HttpScanHandler(
               legacyConfig.sequencerId,
               legacyConfig.url,
               nodeState.svName,
-              OffsetDateTime.now,
+              OffsetDateTime.MIN,
             )
             sequencerConfig <- (legacySequencers ++ sequencers).distinct
           } yield sequencerConfig
