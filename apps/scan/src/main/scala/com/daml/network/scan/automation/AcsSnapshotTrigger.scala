@@ -132,10 +132,13 @@ class AcsSnapshotTrigger(
         case Some(firstNonAcsImport) =>
           val firstNonAcsImportRecordTime =
             firstNonAcsImport.update.update.recordTime.toInstant.atOffset(ZoneOffset.UTC)
-          val hourForSnapshot = timesToDoSnapshot
-            .find(_ > firstNonAcsImportRecordTime.get(ChronoField.HOUR_OF_DAY))
-            .getOrElse(0)
+          val (hourForSnapshot, plusDays) = timesToDoSnapshot
+            .find(_ > firstNonAcsImportRecordTime.get(ChronoField.HOUR_OF_DAY)) match {
+            case Some(hour) => hour -> 0 // current day at hour
+            case None => 0 -> 1 // next day at 00:00
+          }
           val until = firstNonAcsImportRecordTime.toLocalDate
+            .plusDays(plusDays.toLong)
             .atTime(hourForSnapshot, 0)
             .toInstant(ZoneOffset.UTC)
           Some(AcsSnapshotTrigger.Task(CantonTimestamp.assertFromInstant(until), None))
