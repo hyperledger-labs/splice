@@ -20,12 +20,12 @@ const config = {
     },
   },
   spliceInstanceNames: {
-    networkName: 'Canton Network',
-    networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
-    amuletName: 'Canton Coin',
-    amuletNameAcronym: 'CC',
-    nameServiceName: 'Canton Name Service',
-    nameServiceNameAcronym: 'CNS',
+    networkName: 'Ecilps',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
+    amuletName: 'Teluma',
+    amuletNameAcronym: 'TLM',
+    nameServiceName: 'Teluma Name Service',
+    nameServiceNameAcronym: 'TNS',
   },
 };
 

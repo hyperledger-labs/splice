@@ -28,12 +28,12 @@ window.splice_config = {
     },
   },
   spliceInstanceNames: {
-    networkName: 'Canton Network',
-    networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
-    amuletName: 'Canton Coin',
-    amuletNameAcronym: 'CC',
-    nameServiceName: 'Canton Name Service',
-    nameServiceNameAcronym: 'CNS',
+    networkName: 'Splice',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
+    amuletName: 'Amulet',
+    amuletNameAcronym: 'AMT',
+    nameServiceName: 'Amulet Name Service',
+    nameServiceNameAcronym: 'ANS',
   },
   // END_WALLET_CLUSTER_BACKEND_CONFIG
 };

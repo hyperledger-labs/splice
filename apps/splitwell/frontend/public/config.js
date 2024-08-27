@@ -16,12 +16,12 @@ window.splice_config = {
   //     token_scope: 'daml_ledger_api',
   //   },
   spliceInstanceNames: {
-    networkName: 'Canton Network',
-    networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
-    amuletName: 'Canton Coin',
-    amuletNameAcronym: 'CC',
-    nameServiceName: 'Canton Name Service',
-    nameServiceNameAcronym: 'CNS',
+    networkName: 'Splice',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
+    amuletName: 'Amulet',
+    amuletNameAcronym: 'AMT',
+    nameServiceName: 'Amulet Name Service',
+    nameServiceNameAcronym: 'ANS',
   },
   services: {
     wallet: {
