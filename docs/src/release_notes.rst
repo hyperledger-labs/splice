@@ -11,6 +11,9 @@ Release Notes
 Upcoming
 --------
 
+- Fix the Docker image digest which was used for the ``ans-web-ui``
+  empty and accidentally was empty (thereby not pinning the image) in
+  0.1.18 due to a rename.
 
 0.1.18
 --------
