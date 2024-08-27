@@ -383,7 +383,33 @@ class HttpValidatorAdminHandler(
           isProposal = true,
           change = TopologyChangeOp.Replace,
         )
-        // TODO(#14325) Check that the transactions got accepted to the topology store
+        _ <- participantAdminConnection
+          .listPartyToParticipant(
+            filterStore = TopologyStoreId.AuthorizedStore.filterName,
+            filterParty = partyId.filterString,
+          )
+          .map { txs =>
+            txs.headOption.getOrElse(
+              throw Status.INVALID_ARGUMENT
+                .withDescription(
+                  s"No PartyToParticipant state in Authorized Store for $partyId, check the Canton logs to find why the transactions got rejected"
+                )
+                .asRuntimeException
+            )
+          }
+        _ <- participantAdminConnection
+          .listPartyToKey(
+            filterParty = partyId.filterString
+          )
+          .map { txs =>
+            txs.headOption.getOrElse(
+              throw Status.INVALID_ARGUMENT
+                .withDescription(
+                  s"No PartyToKey mapping in Authorized Store for $partyId, check the Canton logs to find why the transactions got rejected"
+                )
+                .asRuntimeException
+            )
+          }
         _ <- storeWithIngestion.connection.waitForPartyOnLedgerApi(partyId)
         _ <- storeWithIngestion.connection.grantUserRights(
           config.ledgerApiUser,
