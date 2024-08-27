@@ -76,7 +76,7 @@
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
-    - [Participating in a hard domain migration](#participating-in-a-hard-domain-migration)
+    - [Participating in a hard domain migration or in a disaster recovery](#participating-in-a-hard-domain-migration)
       - [Via the Pulumi operator](#via-the-pulumi-operator)
       - [Manual steps](#manual-steps)
       - [Checking the readiness of partners](#checking-the-readiness-of-partners)
