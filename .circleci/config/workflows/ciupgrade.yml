@@ -12,6 +12,11 @@ workflow:
             - slack-context
           workflow_names: "deploy_ciupgrade"
           wait_type: "wait_workflow"
+      - autoscaler_prevent_scaledown:
+          <<: *main-branch-only
+          cluster: "ciupgrade"
+          requires:
+            - wait_for_previous_pipeline
       - reset_cluster:
           # note that this reset is executed on the latest version to properly cleanup previous deploy_ciupgrade runs
           name: reset_cluster
@@ -326,3 +331,8 @@ workflow:
           requires:
             - preflight_sv_check_after_sv_redeploy
             - preflight_validator_runbook_after_redeploy
+      - autoscaler_allow_scaledown:
+          <<: *main-branch-only
+          cluster: "ciupgrade"
+          requires:
+            - reset_cluster_after_upgrade
