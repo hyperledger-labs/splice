@@ -706,12 +706,9 @@ components:
     SubmitExternalPartyTopologyRequest:
       type: object
       required:
-        - party_hint
         - signed_topology_txs
         - public_key
       properties:
-        party_hint:
-          type: string
         public_key:
           description: hex-encoded ed25519 public key
           type: string

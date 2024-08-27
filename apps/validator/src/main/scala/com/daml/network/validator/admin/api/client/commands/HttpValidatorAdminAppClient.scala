@@ -73,7 +73,6 @@ object HttpValidatorAdminAppClient {
   }
 
   case class SubmitExternalPartyTopology(
-      partyHint: String,
       topologyTx: Vector[SignedTopologyTx],
       publicKey: String,
   ) extends BaseCommand[http.SubmitExternalPartyTopologyResponse, PartyId] {
@@ -87,7 +86,7 @@ object HttpValidatorAdminAppClient {
     ], http.SubmitExternalPartyTopologyResponse] =
       client.submitExternalPartyTopology(
         definitions
-          .SubmitExternalPartyTopologyRequest(partyHint, publicKey, topologyTx),
+          .SubmitExternalPartyTopologyRequest(publicKey, topologyTx),
         headers,
       )
 

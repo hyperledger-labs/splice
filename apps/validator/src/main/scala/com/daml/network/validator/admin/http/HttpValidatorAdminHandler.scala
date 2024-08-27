@@ -347,10 +347,18 @@ class HttpValidatorAdminHandler(
           store = TopologyStoreId.AuthorizedStore,
           txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
         )
-        partyId = PartyId.tryCreate(
-          body.partyHint,
-          publicKey.fingerprint,
-        )
+        partyId = body.signedTopologyTxs
+          .map(decodeSignedTopologyTx(publicKey, _))
+          .flatMap(_.selectMapping[PartyToParticipant])
+          .headOption
+          .getOrElse(
+            throw Status.INVALID_ARGUMENT
+              .withDescription(s"Failed to determine party id from PartyToParticipant transaction")
+              .asRuntimeException()
+          )
+          .transaction
+          .mapping
+          .partyId
         participantId <- participantAdminConnection.getParticipantId()
         // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
         _ <- participantAdminConnection.proposeMapping(

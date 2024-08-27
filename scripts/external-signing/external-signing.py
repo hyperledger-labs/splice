@@ -65,10 +65,9 @@ class ValidatorClient:
         return await response.json()
 
     async def submit_external_party_topology(
-        self, party_hint, signed_topology_txs, public_key
+        self, signed_topology_txs, public_key
     ):
         payload = {
-            "party_hint": party_hint,
             "signed_topology_txs": signed_topology_txs,
             "public_key": public_key,
         }
@@ -170,7 +169,6 @@ async def handle_setup_party(args, validator_client):
     ]
 
     response = await validator_client.submit_external_party_topology(
-        args.party_hint,
         signed_txs,
         public_key_hex,
     )

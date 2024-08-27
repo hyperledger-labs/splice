@@ -45,8 +45,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       )
     }
 
-    validatorBackend.submitNameDelegationAndPartyTxs(
-      partyHint,
+    validatorBackend.submitExternalPartyTopology(
       signedTopologyTxs,
       HexString.toHexString(signingPublicKey.key),
     )

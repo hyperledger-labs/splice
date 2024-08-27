@@ -77,15 +77,13 @@ abstract class ValidatorAppReference(
   }
 
   @Help.Summary("Submit a namespace delegation and party transaction")
-  def submitNameDelegationAndPartyTxs(
-      partyHint: String,
+  def submitExternalPartyTopology(
       topologyTxs: Vector[SignedTopologyTx],
       publicKey: String,
   ): PartyId = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitExternalPartyTopology(
-          partyHint,
           topologyTxs,
           publicKey,
         )
