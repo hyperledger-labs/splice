@@ -800,7 +800,7 @@ class UpdateHistory(
       domainId: DomainId,
       beforeRecordTime: CantonTimestamp,
       limit: PageLimit,
-  )(implicit tc: TraceContext): Future[Seq[(LedgerClient.GetTreeUpdatesResponse, Long)]] = {
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val query =
       sql"""
       (select
@@ -833,11 +833,14 @@ class UpdateHistory(
       exercises <- queryExerciseEvents(rows.map(_.rowId))
     } yield {
       rows.map { row =>
-        decodeTransaction(
-          row,
-          creates.getOrElse(row.rowId, Seq.empty),
-          exercises.getOrElse(row.rowId, Seq.empty),
-        ) -> row.migrationId
+        TreeUpdateWithMigrationId(
+          update = decodeTransaction(
+            row,
+            creates.getOrElse(row.rowId, Seq.empty),
+            exercises.getOrElse(row.rowId, Seq.empty),
+          ),
+          migrationId = row.migrationId,
+        )
       }
     }
   }
@@ -1252,7 +1255,7 @@ class UpdateHistory(
           domainId = domainId,
           beforeRecordTime = before,
           limit = PageLimit.tryCreate(count),
-        ).map(_.map(_._1))
+        ).map(_.map(_.update))
       }
 
       override def isBackfillingComplete(migrationId: Long)(implicit

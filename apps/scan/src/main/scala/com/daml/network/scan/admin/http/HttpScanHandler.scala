@@ -996,7 +996,7 @@ class HttpScanHandler(
                     .withDescription("No updates ever happened for a snapshot.")
                     .asRuntimeException()
                 )
-                ._1
+                .update
                 .update
                 .recordTime
             )

@@ -13,13 +13,13 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
 
-import java.time.Instant
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
@@ -40,7 +40,7 @@ abstract class UpdateHistoryTestBase
       offset: String,
       party: PartyId,
       store: UpdateHistory,
-      txEffectiveAt: Instant = defaultEffectiveAt,
+      txEffectiveAt: CantonTimestamp,
   ) = {
     DomainSyntax(domain).create(
       c = appRewardCoupon(
@@ -49,9 +49,9 @@ abstract class UpdateHistoryTestBase
         contractId = contractId,
       ),
       offset = offset,
-      txEffectiveAt = txEffectiveAt,
+      txEffectiveAt = txEffectiveAt.toInstant,
       createdEventSignatories = Seq(party),
-      recordTime = txEffectiveAt,
+      recordTime = txEffectiveAt.toInstant,
     )(
       store
     )
@@ -63,7 +63,7 @@ abstract class UpdateHistoryTestBase
       offset: String,
       party: PartyId,
       stores: Seq[UpdateHistory],
-      txEffectiveAt: Instant = defaultEffectiveAt,
+      txEffectiveAt: CantonTimestamp,
   ) = {
     DomainSyntax(domain).createMulti(
       c = appRewardCoupon(
@@ -72,9 +72,9 @@ abstract class UpdateHistoryTestBase
         contractId = contractId,
       ),
       offset = offset,
-      txEffectiveAt = txEffectiveAt,
+      txEffectiveAt = txEffectiveAt.toInstant,
       createdEventSignatories = Seq(party),
-      recordTime = txEffectiveAt,
+      recordTime = txEffectiveAt.toInstant,
     )(
       stores
     )
@@ -85,7 +85,8 @@ abstract class UpdateHistoryTestBase
     "%08d".format(i)
   }
 
-  protected def time(i: Int): Instant = defaultEffectiveAt.plusMillis(i.toLong)
+  protected def time(i: Int): CantonTimestamp =
+    CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong))
 
   // Universal begin offset (strictly smaller than any offset used in this suite)
   protected val beginOffset = "0".repeat(16)
