@@ -5,6 +5,7 @@ package com.daml.network.validator.admin.http
 
 import cats.syntax.either.*
 import com.daml.network.auth.AuthExtractor.TracedUser
+import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import com.daml.network.codegen.java.splice.transferpreapproval as transferPreapprovalCodegen
 import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
 import com.daml.network.environment.ledger.api.LedgerClient
@@ -26,10 +27,17 @@ import com.daml.network.http.v0.definitions.{
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.AppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{Codec, DisclosedContracts}
+import com.daml.network.store.MultiDomainAcsStore.{IngestionFilter, QueryResult}
+import com.daml.network.util.{
+  Codec,
+  Contract,
+  DisclosedContracts,
+  HoldingsSummary,
+  PackageQualifiedName,
+}
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
@@ -51,6 +59,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import java.util.Base64
@@ -63,12 +72,14 @@ class HttpValidatorAdminHandler(
     validatorUserName: String,
     validatorWalletUserName: Option[String],
     getAmuletRulesDomain: GetAmuletRulesDomain,
+    scanConnection: ScanConnection,
     participantAdminConnection: ParticipantAdminConnection,
     config: ValidatorAppBackendConfig,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends v0.ValidatorAdminHandler[TracedUser]
     with Spanning
@@ -557,5 +568,104 @@ class HttpValidatorAdminHandler(
     } yield definitions.ListTransferPreapprovalsResponse(
       preapprovals.map(p => p.toHttp).toVector
     )
+  }
+
+  def getExternalPartyAmulets(partyId: PartyId)(implicit tc: TraceContext): Future[
+    (Seq[Contract[Amulet.ContractId, Amulet]], Seq[Contract[LockedAmulet.ContractId, LockedAmulet]])
+  ] = {
+    for {
+      domainId <- getAmuletRulesDomain()(tc)
+      participantId <- participantAdminConnection.getParticipantId()
+      results <- participantAdminConnection.listPartyToParticipant(
+        filterStore = TopologyStoreId.DomainStore(domainId).filterName,
+        filterParty = partyId.toProtoPrimitive,
+      )
+      _ = results match {
+        case Seq() =>
+          throw Status.NOT_FOUND
+            .withDescription(s"Could not find topology mapping for party id $partyId")
+            .asRuntimeException
+        case Seq(result) =>
+          val hostingParticipants = result.mapping.participants.map(_.participantId)
+          if (!hostingParticipants.contains(participantId)) {
+            throw Status.INVALID_ARGUMENT
+              .withDescription(
+                s"Party $partyId is not hosted on participant $participantId but on participants $hostingParticipants"
+              )
+              .asRuntimeException
+          }
+        case _ =>
+          throw Status.INTERNAL
+            .withDescription(s"Invalid PartyToParticipant mapping: $results")
+            .asRuntimeException
+      }
+      ledgerEnd <- storeWithIngestion.connection.ledgerEnd()
+      acs <- storeWithIngestion.connection.activeContracts(
+        IngestionFilter(
+          partyId,
+          Set(
+            PackageQualifiedName(Amulet.TEMPLATE_ID),
+            PackageQualifiedName(LockedAmulet.TEMPLATE_ID),
+          ),
+        ),
+        ledgerEnd,
+      )
+    } yield {
+      acs._1.partitionMap { c =>
+        (
+          Contract.fromCreatedEvent(Amulet.COMPANION)(c.createdEvent),
+          Contract.fromCreatedEvent(LockedAmulet.COMPANION)(c.createdEvent),
+        ) match {
+          case (Some(amulet), _) => Left(amulet)
+          case (_, Some(lockedAmulet)) => Right(lockedAmulet)
+          case _ =>
+            throw Status.INTERNAL
+              .withDescription(
+                s"Unexpected contract ${c.createdEvent}, expected either Amulet or LockedAmulet"
+              )
+              .asRuntimeException
+        }
+      }
+    }
+  }
+
+  def getExternalPartyBalance(respond: ValidatorAdminResource.GetExternalPartyBalanceResponse.type)(
+      partyIdStr: String
+  )(tuser: TracedUser): Future[ValidatorAdminResource.GetExternalPartyBalanceResponse] = {
+    implicit val TracedUser(_, tc) = tuser
+    withSpan(s"$workflowId.getExternalPartyBalance") { implicit tc => _ =>
+      val partyId = PartyId.tryFromProtoPrimitive(partyIdStr)
+      for {
+        openRounds <- scanConnection.getOpenAndIssuingMiningRounds().map(_._1)
+        contracts <- getExternalPartyAmulets(partyId)
+      } yield {
+        val earliestOpenRound = openRounds
+          .minByOption(_.payload.round.number)
+          .fold(
+            throw Status.NOT_FOUND
+              .withDescription("No open mining round found")
+              .asRuntimeException()
+          )(_.payload.round.number)
+        val amuletsSummary = contracts._1.foldLeft(HoldingsSummary.Empty) { case (acc, amulet) =>
+          acc.addAmulet(amulet.payload, earliestOpenRound)
+        }
+        val summary = contracts._2.foldLeft(amuletsSummary) { case (acc, amulet) =>
+          acc.addLockedAmulet(amulet.payload, earliestOpenRound)
+        }
+        ValidatorAdminResource.GetExternalPartyBalanceResponse.OK(
+          definitions.ExternalPartyBalanceResponse(
+            partyId = partyIdStr,
+            totalUnlockedCoin = Codec.encode(summary.totalUnlockedCoin),
+            totalLockedCoin = Codec.encode(summary.totalLockedCoin),
+            totalCoinHoldings = Codec.encode(summary.totalCoinHoldings),
+            accumulatedHoldingFeesUnlocked = Codec.encode(summary.accumulatedHoldingFeesUnlocked),
+            accumulatedHoldingFeesLocked = Codec.encode(summary.accumulatedHoldingFeesLocked),
+            accumulatedHoldingFeesTotal = Codec.encode(summary.accumulatedHoldingFeesTotal),
+            totalAvailableCoin = Codec.encode(summary.totalAvailableCoin),
+            computedAsOfRound = earliestOpenRound,
+          )
+        )
+      }
+    }
   }
 }

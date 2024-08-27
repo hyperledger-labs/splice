@@ -386,4 +386,25 @@ object HttpValidatorAdminAppClient {
     }
   }
 
+  final case class GetExternalPartyBalance(partyId: PartyId)
+      extends BaseCommand[
+        http.GetExternalPartyBalanceResponse,
+        definitions.ExternalPartyBalanceResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetExternalPartyBalanceResponse] =
+      client.getExternalPartyBalance(Codec.encode(partyId), headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetExternalPartyBalanceResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
 }

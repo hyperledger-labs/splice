@@ -81,6 +81,11 @@ class ExternalPartySetupProposalIntegrationTest
     )
 
     aliceValidatorBackend.listTransferPreapprovals().loneElement.contractId shouldBe cid
+
+    aliceValidatorWalletClient.tap(50.0)
+    aliceValidatorBackend.getExternalPartyBalance(party).totalUnlockedCoin shouldBe "0.0000000000"
+    aliceValidatorWalletClient.transferPreapprovalSend(party, 40.0)
+    aliceValidatorBackend.getExternalPartyBalance(party).totalUnlockedCoin shouldBe "40.0000000000"
   }
 
   private def createExternalPartySetupProposal()(implicit

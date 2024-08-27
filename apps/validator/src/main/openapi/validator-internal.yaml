@@ -225,6 +225,27 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/admin/external-party/balance:
+    get:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "getExternalPartyBalance"
+      parameters:
+        - in: query
+          name: party_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExternalPartyBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/admin/transfer-preapproval:
     get:
       tags: [validator]
@@ -1256,6 +1277,39 @@ components:
       properties:
         transfer_preapproval_contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+
+    ExternalPartyBalanceResponse:
+      type: object
+      required:
+        - party_id
+        - total_unlocked_coin
+        - total_locked_coin
+        - total_coin_holdings
+        - accumulated_holding_fees_unlocked
+        - accumulated_holding_fees_locked
+        - accumulated_holding_fees_total
+        - total_available_coin
+        - computed_as_of_round
+      properties:
+        party_id:
+          type: string
+        total_unlocked_coin:
+          type: string
+        total_locked_coin:
+          type: string
+        total_coin_holdings:
+          type: string
+        accumulated_holding_fees_unlocked:
+          type: string
+        accumulated_holding_fees_locked:
+          type: string
+        accumulated_holding_fees_total:
+          type: string
+        total_available_coin:
+          type: string
+        computed_as_of_round:
+          type: integer
+          format: int64
 
     ListTransferPreapprovalsResponse:
       type: object

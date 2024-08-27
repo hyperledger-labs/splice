@@ -230,6 +230,16 @@ abstract class ValidatorAppReference(
     }
   }
 
+  def getExternalPartyBalance(partyId: PartyId): definitions.ExternalPartyBalanceResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.GetExternalPartyBalance(
+          partyId
+        )
+      )
+    }
+  }
+
   @Help.Summary("List TransferPreapprovals contracts")
   def listTransferPreapprovals(): Seq[ContractWithState[
     TransferPreapproval.ContractId,
