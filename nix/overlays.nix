@@ -32,7 +32,7 @@
     cargoDeps = old.cargoDeps.overrideAttrs {
       inherit version;
       inherit src;
-      outputHash = "sha256-BFEYZxzbaXmfQUl4EgbpQblTQ5QJmizqsdJnaWxgdaI=";
+      outputHash = "sha256-gopI5iOCSzD23mvOues76WIiBtpNf9A6X9NoOULm6Qo=";
     };
   });
   git-search-replace = super.callPackage ./git-search-replace.nix {};

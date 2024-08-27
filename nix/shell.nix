@@ -66,7 +66,7 @@ in pkgs.mkShell {
     ripgrep
     rsync
     sbt
-    scala
+    scala_2_13
     selenium-server-standalone
     shellcheck
     sphinx

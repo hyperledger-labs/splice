@@ -256,7 +256,7 @@ object CantonDependencies {
   lazy val junit_platform_runner = "org.junit.platform" % "junit-platform-runner" % "1.9.2"
   lazy val jupiter_interface = "net.aichler" % "jupiter-interface" % "0.9.0"
 
-  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.24.0"
+  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.25.0"
   lazy val protobuf_version = google_protobuf_java.revision
   // To override 3.19.2 from the daml repo's maven_install_2.13.json
   lazy val google_protobuf_java_util =
