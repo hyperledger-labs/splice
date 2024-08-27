@@ -13,11 +13,13 @@ import com.daml.network.scan.store.AcsSnapshotStore.AcsSnapshot
 import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.scalatest.wordspec.AnyWordSpec
+import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
@@ -188,6 +190,62 @@ class AcsSnapshotTriggerTest
           Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, None))
         )
       }
+
+      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope {
+        override def now =
+          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T23:15:30.00Z"))
+        def snapshotPeriodHours = 1
+
+        noPreviousSnapshot()
+
+        // data after ACS
+        when(
+          updateHistory.getUpdates(
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(PageLimit.tryCreate(1)),
+          )(any[TraceContext])
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1L)), dummyDomain),
+                1L,
+              )
+            )
+          )
+        )
+
+        val firstSnapshotTime =
+          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-04T00:00:00.00Z"))
+
+        // no updates pending
+        when(
+          updateHistory.getUpdates(
+            eqTo(Some((migrationId, firstSnapshotTime))),
+            eqTo(PageLimit.tryCreate(1)),
+          )(any[TraceContext])
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
+          )
+        )
+
+        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
+          trigger.retrieveTasks().futureValue should be(Seq.empty),
+          lines => {
+            forExactly(1, lines) { line =>
+              line.message should be(
+                s"Still not time to take a snapshot. Now: $now. Next snapshot time: $firstSnapshotTime."
+              )
+            }
+          },
+        )
+      }
     }
 
   }
@@ -197,7 +255,7 @@ class AcsSnapshotTriggerTest
 
     val clock = new SimClock(loggerFactory = loggerFactory)
 
-    val now = CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:15:30.00Z"))
+    def now = CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:15:30.00Z"))
     clock.advanceTo(now)
 
     val dummyDomain = DomainId.tryFromString("dummy::domain")
