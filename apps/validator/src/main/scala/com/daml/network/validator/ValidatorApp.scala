@@ -265,19 +265,57 @@ class ValidatorApp(
                 sys.error(
                   "ParticipantBootstrappingDumpConfig is required if MigrateValidatorPartyConfig is set"
                 )
-              case (None, _) =>
+              case (None, _) => {
                 // Note that for the validator of an SV app, the user will be created by the SV app with a
                 // primary party set to the SV app already so this is a noop.
                 appInitStep("Ensuring user primary party is allocated") {
-                  connection.ensureUserPrimaryPartyIsAllocated(
-                    config.ledgerApiUser,
-                    config.validatorPartyHint
+                  {
+                    val hint = config.validatorPartyHint
                       .getOrElse(
-                        BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                      ),
-                    participantAdminConnection,
-                  )
-                } whenA !config.svValidator
+                        throw Status.NOT_FOUND
+                          .withDescription("Missing validator party hint for non-SV validator")
+                          .asRuntimeException()
+                      )
+                    connection.getOptionalPrimaryParty(config.ledgerApiUser).flatMap {
+                      case None =>
+                        // A party has not yet been allocated
+                        // Enforce hint format before allocating it
+                        val pattern = "^[a-zA-Z0-9_]+-[a-zA-Z0-9_]+-[0-9]+$".r
+                        pattern.findFirstMatchIn(hint) match {
+                          case None =>
+                            throw Status.INVALID_ARGUMENT
+                              .withDescription(
+                                s"Validator party hint ($hint) must match pattern <organization>-<function>-<enumerator>, where organization & function are alphanumerical, and enumerator is an integer"
+                              )
+                              .asRuntimeException()
+                          case Some(_) =>
+                        }
+                        appInitStep(
+                          "Creating user primary party and waiting for it to be allocated"
+                        ) {
+                          connection.ensureUserPrimaryPartyIsAllocated(
+                            config.ledgerApiUser,
+                            hint,
+                            participantAdminConnection,
+                          )
+                        }
+                      case Some(partyId) =>
+                        val existingHint = partyId.uid.id.toLengthLimitedString
+                        if (existingHint != hint) {
+                          throw Status.INVALID_ARGUMENT
+                            .withDescription(
+                              s"PartyId hint $existingHint does not match configured hint $hint."
+                            )
+                            .asRuntimeException()
+                        } else {
+                          logger.debug(s"PartyId matches the configured hint $hint")
+
+                        }
+                        Future.successful(())
+                    }
+                  } whenA !config.svValidator
+                }
+              }
             }
           } yield ()
         }

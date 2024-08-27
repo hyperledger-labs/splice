@@ -173,19 +173,7 @@ class BaseLedgerConnection(
       RetryFor.WaitingOnInitDependency,
       "primary_party_allocated",
       s"User $userId has primary party",
-      check = getOptionalPrimaryParty(userId).map(
-        _.map { partyId =>
-          {
-            val partyHint = partyId.uid.id.toProtoPrimitive
-            if (partyHint != hint) {
-              logger.warn(
-                s"PartyId hint $partyHint does not match configured hint $hint. The configured hint will be ignored."
-              )
-            }
-            partyId
-          }
-        }
-      ),
+      check = getOptionalPrimaryParty(userId),
       establish = for {
         party <- ensurePartyAllocated(AuthorizedStore, hint, None, participantAdminConnection)
         _ <- setUserPrimaryParty(userId, party)

@@ -52,29 +52,42 @@ class AppUpgradeIntegrationTest
       // Makes the test a bit faster and easier to debug. See #11488
       ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
     })
-    .addConfigTransform((_, config) => {
-      config
-        .focus(_.validatorApps)
-        .modify(_.updatedWith(InstanceName.tryCreate("splitwellValidatorApp"))(_.map {
-          splitwellValidator =>
-            splitwellValidator
-              .focus(_.appInstances)
-              .modify(_.map {
-                case (n @ "splitwell", appInstance) =>
-                  n -> appInstance
-                    .focus(_.dars)
-                    .modify(_.map { darPath =>
-                      Paths.get(
-                        darPath.toString.replace(
-                          "current",
-                          DarResources.splitwell_current.metadata.version.toString(),
+    .addConfigTransforms(
+      (_, config) => {
+        config
+          .focus(_.validatorApps)
+          .modify(_.updatedWith(InstanceName.tryCreate("splitwellValidatorApp"))(_.map {
+            splitwellValidator =>
+              splitwellValidator
+                .focus(_.appInstances)
+                .modify(_.map {
+                  case (n @ "splitwell", appInstance) =>
+                    n -> appInstance
+                      .focus(_.dars)
+                      .modify(_.map { darPath =>
+                        Paths.get(
+                          darPath.toString.replace(
+                            "current",
+                            DarResources.splitwell_current.metadata.version.toString(),
+                          )
                         )
-                      )
-                    })
-                case x => x
-              })
-        }))
-    })
+                      })
+                  case x => x
+                })
+          }))
+      },
+      (_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
+          if (name == "bobValidator") {
+            validatorConfig.copy(validatorPartyHint = Some(s"bob_validator-${config.name.value}"))
+          } else if (name == "splitwellValidator") {
+            validatorConfig
+              .copy(validatorPartyHint = Some(s"splitwell_validator-${config.name.value}"))
+          } else {
+            validatorConfig
+          }
+        }(config),
+    )
 
   "A set of Splice apps" should {
     "be upgradeable" in { implicit env =>

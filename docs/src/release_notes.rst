@@ -11,9 +11,15 @@ Release Notes
 Upcoming
 --------
 
-- Fix the Docker image digest which was used for the ``ans-web-ui``
-  empty and accidentally was empty (thereby not pinning the image) in
+
+* Fix the Docker image digest which was used for the ``ans-web-ui``
+  and accidentally was empty (thereby not pinning the image) in
   0.1.18 due to a rename.
+
+* ``validatorPartyHint`` is now mandatory for non-SV validators. For an existing validator, it must be set to the current party hint
+  (otherwise, the app will fail to start).
+  For new validators, it must be of format ``<organization>-<function>-<enumerator>``, where ``organization`` and ``function``
+  are alphanumeric, and ``enumerator`` is a number starting from 1.
 
 0.1.18
 --------
