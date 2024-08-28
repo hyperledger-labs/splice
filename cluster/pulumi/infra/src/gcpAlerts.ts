@@ -77,6 +77,7 @@ resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
 -- istio-proxy is spammy with warnings
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 -resource.labels.container_name="postgres"
+-(resource.labels.container_name=~"postgres.*" AND resource.labels.namespace_name="multi-validator")
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
