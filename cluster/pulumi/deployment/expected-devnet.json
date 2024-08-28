@@ -709,7 +709,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.1.18"
+          "name": "refs/heads/release-line-0.1.19"
         },
         "secretRef": {
           "name": "github"
