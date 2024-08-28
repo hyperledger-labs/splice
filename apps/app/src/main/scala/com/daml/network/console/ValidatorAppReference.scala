@@ -228,6 +228,42 @@ abstract class ValidatorAppReference(
     }
   }
 
+  @Help.Summary("Prepare TransferPreapproval send")
+  def prepareTransferPreapprovalSend(
+      senderPartyId: PartyId,
+      receiverPartyId: PartyId,
+      amount: BigDecimal,
+  ): definitions.PrepareTransferPreapprovalSendResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.PrepareTransferPreapprovalSend(
+          senderPartyId,
+          receiverPartyId,
+          amount,
+        )
+      )
+    }
+  }
+
+  @Help.Summary("Submit TransferPreapproval send")
+  def submitTransferPreapprovalSend(
+      senderPartyId: PartyId,
+      transaction: String,
+      signature: String,
+      publicKey: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.SubmitTransferPreapprovalSend(
+          senderPartyId,
+          transaction,
+          signature,
+          publicKey,
+        )
+      )
+    }
+  }
+
   def getExternalPartyBalance(partyId: PartyId): definitions.ExternalPartyBalanceResponse = {
     consoleEnvironment.run {
       httpCommand(

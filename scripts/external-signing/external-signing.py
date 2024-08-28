@@ -105,10 +105,12 @@ class ValidatorClient:
         self, party_id, transaction, signed_tx_hash, public_key
     ):
         payload = {
-            "user_party_id": party_id,
-            "transaction": transaction,
-            "signed_tx_hash": signed_tx_hash,
-            "public_key": public_key,
+            "submission": {
+                "party_id": party_id,
+                "transaction": transaction,
+                "signed_tx_hash": signed_tx_hash,
+                "public_key": public_key,
+            }
         }
         response = await session_post(
             self.session,

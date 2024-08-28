@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.wallet.externalparty as externalPartyCodegen
+import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
-import com.daml.network.util.{Codec, WalletTestUtil}
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.crypto.*
@@ -18,81 +18,118 @@ class ExternalPartySetupProposalIntegrationTest
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
-  "createExternalPartySetupProposal is returned in listExternalPartySetupProposal" in {
-    implicit env =>
-      val (_, proposal) = createExternalPartySetupProposal()
-      val cids = aliceValidatorBackend
-        .listExternalPartySetupProposal()
-        .map(c => c.contract.contractId.contractId)
-
-      cids contains proposal.contractId
+  "createExternalPartySetupProposal fails if a proposal already exists" in { implicit env =>
+    loggerFactory.suppressErrors {
+      val OnboardingResult(party, _, _) = onboardExternalParty(aliceValidatorBackend)
+      aliceValidatorBackend.createExternalPartySetupProposal(party)
+      intercept[Throwable](
+        aliceValidatorBackend.createExternalPartySetupProposal(party)
+      ) shouldBe a[CommandFailure]
+    }
   }
 
-  "createExternalPartySetupProposal fails if a proposal for the same user already exists" in {
+  "createExternalPartySetupProposal fails if a TransferPreapproval already exists" in {
     implicit env =>
       loggerFactory.suppressErrors {
-        createExternalPartySetupProposal()
-        intercept[Throwable](createExternalPartySetupProposal()) shouldBe a[CommandFailure]
+        val onboarding @ OnboardingResult(party, _, _) = onboardExternalParty(aliceValidatorBackend)
+        createAndAcceptExternalPartySetupProposal(onboarding)
+        intercept[Throwable](
+          aliceValidatorBackend.createExternalPartySetupProposal(party)
+        ) shouldBe a[CommandFailure]
       }
   }
 
-  "listExternalPartySetupProposal contains an empty array is no contracts exist" in {
-    implicit env =>
-      aliceValidatorBackend
-        .listExternalPartySetupProposal() shouldBe empty
+  "listExternalPartySetupProposal returns an empty array if no contracts exist" in { implicit env =>
+    aliceValidatorBackend
+      .listExternalPartySetupProposal() shouldBe empty
   }
 
-  "acceptExternalPartySetupProposal can be prepared by user party" in { implicit env =>
-    val (aliceUserParty, proposal) = createExternalPartySetupProposal()
-    val cid = Codec
-      .decodeJavaContractId(externalPartyCodegen.ExternalPartySetupProposal.COMPANION)(
-        proposal.contractId
-      ) match {
-      case Right(cid) => cid
-      case _ => throw new RuntimeException("Unable to decode contractId")
-    }
-    val accept = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(cid, aliceUserParty)
-    accept.txHash should not be empty
-    accept.transaction should not be empty
+  "listTransferPreapprovals returns an empty array if no contracts exist" in { implicit env =>
+    aliceValidatorBackend
+      .listTransferPreapprovals() shouldBe empty
   }
 
-  "submit acceptExternalPartySetupProposal creates TransferPreapproval" in { implicit env =>
-    val OnboardingResult(party, publicKey, privateKey) = onboardExternalParty(aliceValidatorBackend)
-    eventually() {
-      aliceValidatorBackend.participantClient.parties
-        .hosted(filterParty = party.filterString) should not be empty
-    }
-    val proposal = aliceValidatorBackend.createExternalPartySetupProposal(party)
-    val prepare = aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(proposal, party)
+  "TransferPreapproval allows to transfer between externally signed parties" in { implicit env =>
+    // Onboard and Create/Accept ExternalPartySetupProposal for Alice
+    val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+      onboardExternalParty(aliceValidatorBackend)
+    aliceValidatorBackend.participantClient.parties
+      .hosted(filterParty = aliceParty.filterString) should not be empty
+    val cid = createAndAcceptExternalPartySetupProposal(onboardingAlice)
+    aliceValidatorBackend.listTransferPreapprovals().loneElement.contractId shouldBe cid
 
-    val cid = aliceValidatorBackend.submitAcceptExternalPartySetupProposal(
-      party,
+    // Transfer 40.0 to Alice
+    aliceValidatorWalletClient.tap(50.0)
+    aliceValidatorBackend
+      .getExternalPartyBalance(aliceParty)
+      .totalUnlockedCoin shouldBe "0.0000000000"
+    aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 40.0)
+    aliceValidatorBackend
+      .getExternalPartyBalance(aliceParty)
+      .totalUnlockedCoin shouldBe "40.0000000000"
+
+    // Onboard and Create/Accept ExternalPartySetupProposal for Bob
+    val onboardingBob @ OnboardingResult(bobParty, _, _) =
+      onboardExternalParty(aliceValidatorBackend)
+    aliceValidatorBackend.participantClient.parties
+      .hosted(filterParty = bobParty.filterString) should not be empty
+    val cidBob = createAndAcceptExternalPartySetupProposal(onboardingBob)
+    aliceValidatorBackend
+      .listTransferPreapprovals()
+      .map(tp => tp.contract.contractId) contains cidBob
+
+    // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
+    val prepareSend =
+      aliceValidatorBackend.prepareTransferPreapprovalSend(aliceParty, bobParty, BigDecimal(10.0))
+    aliceValidatorBackend.submitTransferPreapprovalSend(
+      aliceParty,
+      prepareSend.transaction,
+      HexString.toHexString(
+        crypto
+          .sign(
+            Hash.fromByteString(HexString.parseToByteString(prepareSend.txHash).value).value,
+            alicePrivateKey.asInstanceOf[SigningPrivateKey],
+          )
+          .value
+          .signature
+      ),
+      HexString.toHexString(alicePublicKey.key),
+    )
+    aliceValidatorBackend
+      .getExternalPartyBalance(aliceParty)
+      .totalUnlockedCoin shouldBe "17.9000000000"
+    aliceValidatorBackend
+      .getExternalPartyBalance(bobParty)
+      .totalUnlockedCoin shouldBe "10.0000000000"
+  }
+
+  private def createAndAcceptExternalPartySetupProposal(
+      onboarding: OnboardingResult
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): TransferPreapproval.ContractId = {
+    val proposal = aliceValidatorBackend.createExternalPartySetupProposal(onboarding.party)
+    aliceValidatorBackend
+      .listExternalPartySetupProposal()
+      .map(c => c.contract.contractId.contractId) contains proposal.contractId
+
+    val prepare =
+      aliceValidatorBackend.prepareAcceptExternalPartySetupProposal(proposal, onboarding.party)
+    prepare.txHash should not be empty
+    prepare.transaction should not be empty
+
+    aliceValidatorBackend.submitAcceptExternalPartySetupProposal(
+      onboarding.party,
       prepare.transaction,
       HexString.toHexString(
         crypto
           .sign(
             Hash.fromByteString(HexString.parseToByteString(prepare.txHash).value).value,
-            privateKey.asInstanceOf[SigningPrivateKey],
+            onboarding.privateKey.asInstanceOf[SigningPrivateKey],
           )
           .value
           .signature
       ),
-      HexString.toHexString(publicKey.key),
+      HexString.toHexString(onboarding.publicKey.key),
     )
-
-    aliceValidatorBackend.listTransferPreapprovals().loneElement.contractId shouldBe cid
-
-    aliceValidatorWalletClient.tap(50.0)
-    aliceValidatorBackend.getExternalPartyBalance(party).totalUnlockedCoin shouldBe "0.0000000000"
-    aliceValidatorWalletClient.transferPreapprovalSend(party, 40.0)
-    aliceValidatorBackend.getExternalPartyBalance(party).totalUnlockedCoin shouldBe "40.0000000000"
-  }
-
-  private def createExternalPartySetupProposal()(implicit
-      env: SpliceTests.SpliceTestConsoleEnvironment
-  ) = clue("Create ExternalPartySetupProposal") {
-    val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-    (aliceUserParty, aliceValidatorBackend.createExternalPartySetupProposal(aliceUserParty))
   }
 
 }

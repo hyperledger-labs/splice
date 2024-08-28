@@ -6,6 +6,8 @@ package com.daml.network.validator.util
 import cats.syntax.either.*
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.*
+import com.daml.network.environment.ledger.api.LedgerClient
+import com.daml.network.http.v0.definitions.ExternalPartySubmission
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
@@ -15,14 +17,17 @@ import com.daml.network.wallet.{UserWalletManager, UserWalletService}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions.Proposal
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.SigningPublicKey
+import com.digitalasset.canton.crypto.{SigningPublicKey, v30}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 import io.grpc.Status
 
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 private[validator] object ValidatorUtil {
@@ -327,4 +332,52 @@ private[validator] object ValidatorUtil {
         )
       case Some(wallet) => Future.successful(wallet)
     }
+
+  def submitAsExternalParty(
+      connection: SpliceLedgerConnection,
+      submission: ExternalPartySubmission,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val senderParty = PartyId.tryFromProtoPrimitive(submission.partyId)
+    val signedTxHash = HexString.parseToByteString(submission.signedTxHash) match {
+      case Some(hash) => hash
+      case None => throw new RuntimeException("Unable to parse signed tx hash")
+    }
+    val publicKey = signingPublicKeyFromHexEd25119(submission.publicKey)
+    for {
+      _ <- connection.executeSubmissionAndWait(
+        senderParty,
+        ByteString.copyFrom(Base64.getDecoder.decode(submission.transaction)),
+        Map(
+          senderParty ->
+            LedgerClient.Signature(
+              signedTxHash,
+              publicKey.fingerprint,
+            )
+        ),
+      )
+    } yield ()
+  }
+
+  def signingPublicKeyFromHexEd25119(publicKey: String): SigningPublicKey = {
+    val publicKeyBytes = HexString
+      .parseToByteString(publicKey)
+      .getOrElse(
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Could not decode public key $publicKey as a hex string")
+          .asRuntimeException()
+      )
+    SigningPublicKey
+      .fromProtoV30(
+        v30.SigningPublicKey(
+          v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
+          publicKeyBytes,
+          v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
+        )
+      )
+      .valueOr(err =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Failed to decode public key: $err")
+          .asRuntimeException()
+      )
+  }
 }

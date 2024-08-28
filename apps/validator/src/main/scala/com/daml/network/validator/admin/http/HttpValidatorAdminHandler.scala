@@ -5,10 +5,11 @@ package com.daml.network.validator.admin.http
 
 import cats.syntax.either.*
 import com.daml.network.auth.AuthExtractor.TracedUser
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import com.daml.network.codegen.java.splice.amuletrules.transferinput.InputAmulet
 import com.daml.network.codegen.java.splice.transferpreapproval as transferPreapprovalCodegen
 import com.daml.network.codegen.java.splice.wallet.externalparty.ExternalPartySetupProposal
-import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
@@ -20,8 +21,10 @@ import com.daml.network.http.v0.definitions.{
   GenerateExternalPartyTopologyRequest,
   GenerateExternalPartyTopologyResponse,
   PrepareAcceptExternalPartySetupProposalRequest,
+  PrepareTransferPreapprovalSendRequest,
   SubmitAcceptExternalPartySetupProposalRequest,
   SubmitExternalPartyTopologyRequest,
+  SubmitTransferPreapprovalSendRequest,
   TopologyTx,
 }
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
@@ -31,13 +34,7 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.{IngestionFilter, QueryResult}
-import com.daml.network.util.{
-  Codec,
-  Contract,
-  DisclosedContracts,
-  HoldingsSummary,
-  PackageQualifiedName,
-}
+import com.daml.network.util.*
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.migration.DomainMigrationDumpGenerator
 import com.daml.network.validator.store.ValidatorStore
@@ -251,7 +248,7 @@ class HttpValidatorAdminHandler(
   ): Future[ValidatorAdminResource.GenerateExternalPartyTopologyResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.generateExternalPartyTopology") { _ => _ =>
-      val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
+      val publicKey = ValidatorUtil.signingPublicKeyFromHexEd25119(body.publicKey)
       ValidatorUtil
         .createTopologyMappings(
           partyHint = body.partyHint,
@@ -273,29 +270,6 @@ class HttpValidatorAdminHandler(
           )
         }
     }
-  }
-
-  private def signingPublicKeyFromHexEd25119(publicKey: String): SigningPublicKey = {
-    val publicKeyBytes = HexString
-      .parseToByteString(publicKey)
-      .getOrElse(
-        throw Status.INVALID_ARGUMENT
-          .withDescription(s"Could not decode public key $publicKey as a hex string")
-          .asRuntimeException()
-      )
-    SigningPublicKey
-      .fromProtoV30(
-        v30.SigningPublicKey(
-          v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
-          publicKeyBytes,
-          v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
-        )
-      )
-      .valueOr(err =>
-        throw Status.INVALID_ARGUMENT
-          .withDescription(s"Failed to decode public key: $err")
-          .asRuntimeException()
-      )
   }
 
   private def decodeSignedTopologyTx(
@@ -341,7 +315,7 @@ class HttpValidatorAdminHandler(
   ): Future[ValidatorAdminResource.SubmitExternalPartyTopologyResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.submitExternalPartyTopology") { _ => _ =>
-      val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
+      val publicKey = ValidatorUtil.signingPublicKeyFromHexEd25119(body.publicKey)
       for {
         _ <- participantAdminConnection.addTopologyTransactions(
           store = TopologyStoreId.AuthorizedStore,
@@ -435,37 +409,6 @@ class HttpValidatorAdminHandler(
     for {
       domainId <- getAmuletRulesDomain()(tracedContext)
       result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
-        case QueryResult(offset, None) => {
-          // TODO(#14156): check for existing TransferPreapproval
-          storeWithIngestion.connection
-            .submit(
-              Seq(validatorServiceParty),
-              Seq(validatorServiceParty),
-              ExternalPartySetupProposal.create(
-                validatorServiceParty.toProtoPrimitive,
-                userParty.toProtoPrimitive,
-                dsoParty.toProtoPrimitive,
-              ),
-            )
-            .withDedup(
-              commandId = SpliceLedgerConnection.CommandId(
-                "com.daml.network.validator.createExternalPartySetupProposal",
-                Seq(validatorServiceParty),
-                BaseLedgerConnection.sanitizeUserIdToPartyString(body.userPartyId),
-              ),
-              deduplicationOffset =
-                offset, // TODO(#14156): replace with min of this and offset of TransferPreapproval
-            )
-            .withDomainId(domainId)
-            .yieldResult()
-            .map(contract =>
-              ValidatorAdminResource.CreateExternalPartySetupProposalResponse.OK(
-                definitions.CreateExternalPartySetupProposalResponse(
-                  contract.contractId.contractId
-                )
-              )
-            )
-        }
         case QueryResult(_, Some(c)) =>
           Future.successful(
             ValidatorAdminResource.CreateExternalPartySetupProposalResponse.Conflict(
@@ -474,6 +417,50 @@ class HttpValidatorAdminHandler(
               )
             )
           )
+        case QueryResult(offsetSP, None) => {
+          store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
+            case QueryResult(_, Some(c)) =>
+              Future.successful(
+                ValidatorAdminResource.CreateExternalPartySetupProposalResponse.Conflict(
+                  definitions.ErrorResponse(
+                    s"TransferPreapproval contract already exists: ${c.contract.contractId}"
+                  )
+                )
+              )
+            case QueryResult(offsetTP, None) =>
+              storeWithIngestion.connection
+                .submit(
+                  Seq(validatorServiceParty),
+                  Seq(validatorServiceParty),
+                  ExternalPartySetupProposal.create(
+                    validatorServiceParty.toProtoPrimitive,
+                    userParty.toProtoPrimitive,
+                    dsoParty.toProtoPrimitive,
+                  ),
+                )
+                .withDedup(
+                  commandId = SpliceLedgerConnection.CommandId(
+                    "com.daml.network.validator.createExternalPartySetupProposal",
+                    Seq(validatorServiceParty),
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(body.userPartyId),
+                  ),
+                  deduplicationOffset = Ordering.String.min(
+                    offsetSP,
+                    offsetTP,
+                  ),
+                )
+                .withDomainId(domainId)
+                .yieldResult()
+                .map(contract =>
+                  ValidatorAdminResource.CreateExternalPartySetupProposalResponse.OK(
+                    definitions.CreateExternalPartySetupProposalResponse(
+                      contract.contractId.contractId
+                    )
+                  )
+                )
+          }
+        }
+
       }
 
     } yield result
@@ -541,13 +528,12 @@ class HttpValidatorAdminHandler(
               }
           }
         }
-        case QueryResult(_, None) => {
+        case QueryResult(_, None) =>
           Future.successful(
             ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.NotFound(
               definitions.ErrorResponse("Contract not found.")
             )
           )
-        }
       }
     } yield result
   }
@@ -558,25 +544,9 @@ class HttpValidatorAdminHandler(
       tuser: TracedUser
   ): Future[ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
-    val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
-    val signedTxHash = HexString.parseToByteString(body.signedTxHash) match {
-      case Some(hash) => hash
-      case None => throw new RuntimeException("Unable to parse signed tx hash")
-    }
-    val publicKey = signingPublicKeyFromHexEd25119(body.publicKey)
+    val userParty = PartyId.tryFromProtoPrimitive(body.submission.partyId)
     for {
-      _ <- storeWithIngestion.connection.executeSubmissionAndWait(
-        userParty,
-        ByteString.copyFrom(Base64.getDecoder.decode(body.transaction)),
-        Map(
-          userParty ->
-            LedgerClient.Signature(
-              signedTxHash,
-              publicKey.fingerprint,
-            )
-        ),
-      )
-
+      _ <- ValidatorUtil.submitAsExternalParty(storeWithIngestion.connection, body.submission)
       result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
         case QueryResult(_, Some(c)) =>
           Future.successful(c.contractId)
@@ -586,7 +556,6 @@ class HttpValidatorAdminHandler(
               s"${transferPreapprovalCodegen.TransferPreapproval.COMPANION.TEMPLATE_ID.getEntityName} contract was not created."
             )
             .asRuntimeException()
-
       }
     } yield ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.OK(
       definitions.SubmitAcceptExternalPartySetupProposalResponse(result.contractId)
@@ -602,6 +571,91 @@ class HttpValidatorAdminHandler(
     } yield definitions.ListTransferPreapprovalsResponse(
       preapprovals.map(p => p.toHttp).toVector
     )
+  }
+
+  override def prepareTransferPreapprovalSend(
+      respond: ValidatorAdminResource.PrepareTransferPreapprovalSendResponse.type
+  )(body: PrepareTransferPreapprovalSendRequest)(
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.PrepareTransferPreapprovalSendResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    val senderParty = PartyId.tryFromProtoPrimitive(body.senderPartyId)
+    val receiverParty = PartyId.tryFromProtoPrimitive(body.receiverPartyId)
+    for {
+      domainId <- getAmuletRulesDomain()(tracedContext)
+      result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverParty).flatMap {
+        case QueryResult(_, None) => {
+          Future.failed(
+            Status.INVALID_ARGUMENT
+              .withDescription(s"Receiver $receiverParty does not have a TransferPreapproval")
+              .asRuntimeException
+          )
+        }
+        case QueryResult(_, Some(contractWithState)) =>
+          scanConnection
+            .getPaymentTransferContext(
+              storeWithIngestion.connection,
+              PartyId.tryFromProtoPrimitive(contractWithState.contract.payload.provider),
+            )
+            .flatMap { paymentTransferContext =>
+              getExternalPartyAmulets(senderParty).flatMap { amuletContracts =>
+                val transferInput = amuletContracts._1
+                  .map[splice.amuletrules.TransferInput](c => new InputAmulet(c.contractId))
+
+                val commands = contractWithState.toAssignedContract
+                  .getOrElse(
+                    throw Status.Code.FAILED_PRECONDITION.toStatus
+                      .withDescription(s"Invalid contract")
+                      .asRuntimeException()
+                  )
+                  .exercise(
+                    _.exerciseTransferPreapproval_Send(
+                      paymentTransferContext._1,
+                      transferInput.asJava,
+                      body.amount.bigDecimal,
+                      senderParty.toProtoPrimitive,
+                    )
+                  )
+                  .update
+                  .commands()
+                  .asScala
+                  .toSeq
+
+                storeWithIngestion.connection
+                  .prepareSubmission(
+                    Some(domainId),
+                    Seq(senderParty),
+                    Seq(senderParty),
+                    commands,
+                    storeWithIngestion.connection
+                      .disclosedContracts(contractWithState)
+                      .merge(paymentTransferContext._2),
+                  )
+                  .flatMap { r =>
+                    Future.successful(
+                      ValidatorAdminResource.PrepareTransferPreapprovalSendResponse.OK(
+                        definitions.PrepareTransferPreapprovalSendResponse(
+                          Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
+                          HexString.toHexString(r.preparedTransactionHash),
+                        )
+                      )
+                    )
+                  }
+              }
+            }
+      }
+    } yield result
+  }
+
+  override def submitTransferPreapprovalSend(
+      respond: ValidatorAdminResource.SubmitTransferPreapprovalSendResponse.type
+  )(body: SubmitTransferPreapprovalSendRequest)(
+      tuser: TracedUser
+  ): Future[ValidatorAdminResource.SubmitTransferPreapprovalSendResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    for {
+      _ <- ValidatorUtil.submitAsExternalParty(storeWithIngestion.connection, body.submission)
+    } yield ValidatorAdminResource.SubmitTransferPreapprovalSendResponseOK
   }
 
   def getExternalPartyAmulets(partyId: PartyId)(implicit tc: TraceContext): Future[

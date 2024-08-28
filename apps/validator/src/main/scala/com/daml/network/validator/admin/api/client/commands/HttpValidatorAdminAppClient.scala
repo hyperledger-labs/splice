@@ -331,10 +331,12 @@ object HttpValidatorAdminAppClient {
     ], http.SubmitAcceptExternalPartySetupProposalResponse] =
       client.submitAcceptExternalPartySetupProposal(
         definitions.SubmitAcceptExternalPartySetupProposalRequest(
-          userPartyId.toProtoPrimitive,
-          transaction,
-          signature,
-          publicKey,
+          definitions.ExternalPartySubmission(
+            userPartyId.toProtoPrimitive,
+            transaction,
+            signature,
+            publicKey,
+          )
         ),
         headers = headers,
       )
@@ -404,6 +406,72 @@ object HttpValidatorAdminAppClient {
     ) = { case http.GetExternalPartyBalanceResponse.OK(response) =>
       Right(response)
     }
+  }
+
+  case class PrepareTransferPreapprovalSend(
+      senderPartyId: PartyId,
+      receiverPartyId: PartyId,
+      amount: BigDecimal,
+  ) extends BaseCommand[
+        http.PrepareTransferPreapprovalSendResponse,
+        definitions.PrepareTransferPreapprovalSendResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.PrepareTransferPreapprovalSendResponse] =
+      client.prepareTransferPreapprovalSend(
+        definitions.PrepareTransferPreapprovalSendRequest(
+          senderPartyId.toProtoPrimitive,
+          receiverPartyId.toProtoPrimitive,
+          amount,
+        ),
+        headers = headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.PrepareTransferPreapprovalSendResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  case class SubmitTransferPreapprovalSend(
+      senderPartyId: PartyId,
+      transaction: String,
+      signature: String,
+      publicKey: String,
+  ) extends BaseCommand[
+        http.SubmitTransferPreapprovalSendResponse,
+        Unit,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.SubmitTransferPreapprovalSendResponse] =
+      client.submitTransferPreapprovalSend(
+        definitions.SubmitTransferPreapprovalSendRequest(
+          definitions.ExternalPartySubmission(
+            senderPartyId.toProtoPrimitive,
+            transaction,
+            signature,
+            publicKey,
+          )
+        ),
+        headers = headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.SubmitTransferPreapprovalSendResponse.OK => Right(()) }
   }
 
 }

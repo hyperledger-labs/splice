@@ -259,6 +259,48 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListTransferPreapprovalsResponse"
 
+  /v0/admin/transfer-preapproval/prepare-send:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "prepareTransferPreapprovalSend"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PrepareTransferPreapprovalSendRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PrepareTransferPreapprovalSendResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/transfer-preapproval/submit-send:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "submitTransferPreapprovalSend"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SubmitTransferPreapprovalSendRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
 
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
@@ -1264,23 +1306,10 @@ components:
     SubmitAcceptExternalPartySetupProposalRequest:
       type: object
       required:
-        - user_party_id
-        - transaction
-        - signed_tx_hash
-        - public_key
+        - submission
       properties:
-        user_party_id:
-          type: string
-        transaction:
-          type: string
-        signed_tx_hash:
-          description: |
-            hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form
-            `${r}${s}`.
-          type: string
-        public_key:
-          description: hex-encoded ed25519 public key
-          type: string
+        submission:
+          "$ref": "#/components/schemas/ExternalPartySubmission"
 
     SubmitAcceptExternalPartySetupProposalResponse:
       type: object
@@ -1332,3 +1361,58 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    PrepareTransferPreapprovalSendRequest:
+      type: object
+      required:
+        - sender_party_id
+        - receiver_party_id
+        - amount
+      properties:
+        sender_party_id:
+          type: string
+        receiver_party_id:
+          type: string
+        amount:
+          type: number
+
+    PrepareTransferPreapprovalSendResponse:
+      type: object
+      required:
+        - transaction
+        - tx_hash
+      properties:
+        transaction:
+          type: string
+        tx_hash:
+          description: Hex-encoded hash of the transaction
+          type: string
+
+    SubmitTransferPreapprovalSendRequest:
+      type: object
+      required:
+        - submission
+      properties:
+        submission:
+          "$ref": "#/components/schemas/ExternalPartySubmission"
+
+    ExternalPartySubmission:
+      type: object
+      required:
+        - party_id
+        - transaction
+        - signed_tx_hash
+        - public_key
+      properties:
+        party_id:
+          type: string
+        transaction:
+          type: string
+        signed_tx_hash:
+          description: |
+            hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form
+            `${r}${s}`.
+          type: string
+        public_key:
+          description: hex-encoded ed25519 public key
+          type: string
