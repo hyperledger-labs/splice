@@ -411,6 +411,12 @@ abstract class ScanAppReference(
     }
   }
 
+  def getSpliceInstanceNames() = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetSpliceInstanceNames())
+    }
+  }
+
 }
 
 final class ScanAppBackendReference(

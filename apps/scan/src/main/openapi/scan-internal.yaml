@@ -465,7 +465,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateHistoryItem'
+                $ref: "#/components/schemas/UpdateHistoryItem"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -560,7 +560,7 @@ paths:
 
   /v0/holdings/state:
     post:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "getHoldingsStateAt"
       description: |
@@ -585,10 +585,9 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-
   /v0/holdings/summary:
     post:
-      tags: [ scan ]
+      tags: [scan]
       x-jvm-package: scan
       operationId: "getHoldingsSummaryAt"
       description: |
@@ -816,8 +815,45 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/splice-instance-names:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getSpliceInstanceNames"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSpliceInstanceNamesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
 components:
   schemas:
+    GetSpliceInstanceNamesResponse:
+      type: object
+      required:
+        - network_name
+        - network_favicon_url
+        - amulet_name
+        - amulet_name_acronym
+        - name_service_name
+        - name_service_name_acronym
+      properties:
+        network_name:
+          type: string
+        network_favicon_url:
+          type: string
+        amulet_name:
+          type: string
+        amulet_name_acronym:
+          type: string
+        name_service_name:
+          type: string
+        name_service_name_acronym:
+          type: string
     GetDsoPartyIdResponse:
       type: object
       required: ["dso_party_id"]

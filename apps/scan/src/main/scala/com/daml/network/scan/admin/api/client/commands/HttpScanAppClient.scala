@@ -18,6 +18,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.ans.AnsRules
+import com.daml.network.config.SpliceInstanceNamesConfig
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
@@ -1009,6 +1010,36 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdateByIdResponse.OK(response) =>
         Right(response)
+    }
+  }
+
+  case class GetSpliceInstanceNames()
+      extends InternalBaseCommand[
+        http.GetSpliceInstanceNamesResponse,
+        SpliceInstanceNamesConfig,
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetSpliceInstanceNamesResponse] = {
+      client.getSpliceInstanceNames(headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetSpliceInstanceNamesResponse.OK(response) =>
+        Right(
+          SpliceInstanceNamesConfig(
+            networkName = response.networkName,
+            networkFaviconUrl = response.networkFaviconUrl,
+            amuletName = response.amuletName,
+            amuletNameAcronym = response.amuletNameAcronym,
+            nameServiceName = response.nameServiceName,
+            nameServiceNameAcronym = response.nameServiceNameAcronym,
+          )
+        )
     }
   }
 }

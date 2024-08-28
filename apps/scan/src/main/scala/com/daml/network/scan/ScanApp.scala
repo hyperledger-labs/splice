@@ -193,6 +193,7 @@ class ScanApp(
       internalHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
+        config.spliceInstanceNames,
         participantAdminConnection,
         store,
         acsSnapshotStore,

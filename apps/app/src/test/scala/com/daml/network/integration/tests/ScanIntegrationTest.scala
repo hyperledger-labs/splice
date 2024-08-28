@@ -109,6 +109,19 @@ class ScanIntegrationTest
     )
   }
 
+  "returns expected splice instance names" in { implicit env =>
+    val spliceInstanceNames = sv1ScanBackend.getSpliceInstanceNames()
+
+    spliceInstanceNames.networkName should be("Canton Network")
+    spliceInstanceNames.networkFaviconUrl should be(
+      "https://www.canton.network/hubfs/cn-favicon-05%201-1.png"
+    )
+    spliceInstanceNames.amuletName should be("Canton Coin")
+    spliceInstanceNames.amuletNameAcronym should be("CC")
+    spliceInstanceNames.nameServiceName should be("Canton Name Service")
+    spliceInstanceNames.nameServiceNameAcronym should be("CNS")
+  }
+
   "list transaction pages in ascending and descending order" in { implicit env =>
     val aliceWalletUser = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     def tapsForAlice = (t: TransactionHistoryResponseItem) =>

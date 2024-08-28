@@ -18,6 +18,7 @@ import com.daml.network.codegen.java.splice.round.{
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.config.Thresholds
+import com.daml.network.config.SpliceInstanceNamesConfig
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.{
@@ -66,6 +67,7 @@ import com.digitalasset.canton.time.Clock
 class HttpScanHandler(
     svParty: PartyId,
     svUserName: String,
+    spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
     snapshotStore: AcsSnapshotStore,
@@ -1323,6 +1325,26 @@ class HttpScanHandler(
             schedule
           )
         )
+    }
+  }
+
+  override def getSpliceInstanceNames(
+      respond: ScanResource.GetSpliceInstanceNamesResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.GetSpliceInstanceNamesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSpliceInstanceNames") { _ => _ =>
+      Future.successful {
+        ScanResource.GetSpliceInstanceNamesResponse.OK(
+          definitions.GetSpliceInstanceNamesResponse(
+            networkName = spliceInstanceNames.networkName,
+            networkFaviconUrl = spliceInstanceNames.networkFaviconUrl,
+            amuletName = spliceInstanceNames.amuletName,
+            amuletNameAcronym = spliceInstanceNames.amuletNameAcronym,
+            nameServiceName = spliceInstanceNames.nameServiceName,
+            nameServiceNameAcronym = spliceInstanceNames.nameServiceNameAcronym,
+          )
+        )
+      }
     }
   }
 }

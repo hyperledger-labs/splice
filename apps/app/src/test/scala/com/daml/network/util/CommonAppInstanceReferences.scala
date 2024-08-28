@@ -17,13 +17,10 @@ import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironme
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.console.AnsExternalAppClientReference
 import com.digitalasset.canton.DomainAlias
-import org.slf4j.LoggerFactory
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonAppInstanceReferences {
-  private val logger = LoggerFactory.getLogger(getClass)
-
   def decentralizedSynchronizerId(implicit env: SpliceTestConsoleEnvironment): DomainId =
     sv1Backend.participantClientWithAdminToken.domains.id_of(sv1Backend.config.domains.global.alias)
   def decentralizedSynchronizerAlias(implicit env: SpliceTestConsoleEnvironment): DomainAlias =
@@ -310,43 +307,13 @@ trait CommonAppInstanceReferences {
       .getOrElse(sys.error(s"scan app client [$name] not configured"))
 
   def spliceInstanceNames(implicit env: SpliceTestConsoleEnvironment): SpliceInstanceNamesConfig = {
-    // Find any SV reference that contains splice instance names
+    // Find any SV or remote scan reference to read a splice instance name config
     env.svs.local.headOption
       .map(_.config.spliceInstanceNames)
       .getOrElse(
-        // TODO(#13480): figure out how to not rely on this default for runbook preflight tests
-        {
-          val enableCnInstanceNames = sys.env.getOrElse("ENABLE_CN_INSTANCE_NAMES", "false")
-          val useCnInstanceNames =
-            try { enableCnInstanceNames.toBoolean }
-            catch {
-              case _: IllegalArgumentException => {
-                logger.warn(
-                  s"ENABLE_CN_INSTANCE_NAMES had the value $enableCnInstanceNames whhich could not be parsed as a boolean: defaulting to false"
-                )
-                false
-              }
-            }
-
-          if (useCnInstanceNames)
-            SpliceInstanceNamesConfig(
-              networkName = "Canton Network",
-              networkFaviconUrl = "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
-              amuletName = "Canton Coin",
-              amuletNameAcronym = "CC",
-              nameServiceName = "Canton Name Service",
-              nameServiceNameAcronym = "CNS",
-            )
-          else
-            SpliceInstanceNamesConfig(
-              networkName = "Splice",
-              networkFaviconUrl = "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
-              amuletName = "Amulet",
-              amuletNameAcronym = "AMT",
-              nameServiceName = "Amulet Name Service",
-              nameServiceNameAcronym = "ANS",
-            )
-        }
+        env.scans.remote.headOption
+          .getOrElse(sys.error("No SV or remote scan reference to get splice instance names from"))
+          .getSpliceInstanceNames()
       )
   }
 
