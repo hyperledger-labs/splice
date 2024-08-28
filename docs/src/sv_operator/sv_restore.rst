@@ -128,7 +128,7 @@ The data dump can be fetched from the SV app by running the following command:
 
 .. code-block:: bash
 
-    data=$(curl -sSLf `https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/data-snapshot?timestamp=<timestamp>` -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json")
+    data=$(curl -sSLf 'https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/data-snapshot?timestamp=<timestamp>' -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json")
 
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the SV app, as obtained from your OAuth provider, and `<timestamp>` is the agreed upon timestamp,
 in the format `"2024-04-17T19:12:02Z"`.
