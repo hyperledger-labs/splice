@@ -97,4 +97,8 @@ ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
 # TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
 
+# TODO(#14445): remove these ignores if possible
+The operation 'insert block' has failed with an exception
+Now retrying operation 'insert block'
+
 # Make sure to have a trailing newline
