@@ -21,6 +21,10 @@ Upcoming
   For new validators, it must be of format ``<organization>-<function>-<enumerator>``, where ``organization`` and ``function``
   are alphanumeric, and ``enumerator`` is a number starting from 1.
 
+* Fix an issue in the scan ACS snapshot functionality added in 0.1.18 for network bootstrapped just before 0:00.
+
+* Fix an issue in the ACS snapshot functionality added in 0.1.18 around hard domain migrations. This only affects a hard domain migration *to* 0.1.18 but not *from* 0.1.18.
+
 0.1.18
 --------
 
