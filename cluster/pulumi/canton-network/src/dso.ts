@@ -63,7 +63,7 @@ export class Dso extends pulumi.ComponentResource {
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
     isFirstSv = false,
-    cometBftSyncSource?: k8s.helm.v3.Release
+    sv1SvApp?: k8s.helm.v3.Release
   ) {
     const defaultApprovedSvIdentities = approvedSvIdentities();
 
@@ -104,7 +104,7 @@ export class Dso extends pulumi.ComponentResource {
         sweep: svConf.sweep,
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
-      cometBftSyncSource
+      sv1SvApp
     );
   }
 

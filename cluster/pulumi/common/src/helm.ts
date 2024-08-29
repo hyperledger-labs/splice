@@ -141,7 +141,7 @@ export function installCNRunbookHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  dependsOn: CnInput<pulumi.Resource>[] = [],
+  opts?: CNCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
@@ -165,9 +165,7 @@ export function installCNRunbookHelmChartByNamespaceName(
       },
       timeout,
     },
-    {
-      dependsOn: dependsOn,
-    }
+    opts
   );
 }
 
@@ -177,7 +175,7 @@ export function installCNRunbookHelmChart(
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  dependsOn: CnInput<pulumi.Resource>[] = [],
+  opts?: CNCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
   return installCNRunbookHelmChartByNamespaceName(
@@ -187,7 +185,7 @@ export function installCNRunbookHelmChart(
     chartName,
     values,
     version,
-    dependsOn.concat([ns.ns]),
+    { ...opts, dependsOn: opts?.dependsOn?.concat([ns.ns]) || [] },
     timeout
   );
 }

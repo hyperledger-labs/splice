@@ -1,12 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Output } from '@pulumi/pulumi';
-import {
-  cometbftRetainBlocks,
-  isDevNet,
-  isMainNet,
-  SvCometBftKeys,
-  svCometBftKeysFromSecret,
-} from 'cn-pulumi-common';
+import { isDevNet, isMainNet, SvCometBftKeys, svCometBftKeysFromSecret } from 'cn-pulumi-common';
+import { cometbftRetainBlocks } from 'cn-pulumi-common/src/synchronizer/cometbftConfig';
 
 import { SweepConfig, sweepConfigFromEnv } from './validator';
 
@@ -23,15 +18,15 @@ export interface StaticSvConfig {
 }
 
 export type StaticCometBftConfig = {
-  privateKey: Output<string> | string;
-  validator: {
+  privateKey?: Output<string> | string;
+  validator?: {
     keyAddress: Output<string> | string;
     privateKey: Output<string> | string;
     publicKey: Output<string> | string;
   };
   nodeIndex: number;
   retainBlocks: number;
-  id: Output<string> | string;
+  id: string;
 };
 
 export interface StaticCometBftConfigWithNodeName extends StaticCometBftConfig {

@@ -151,7 +151,7 @@ export async function installNode(
       },
     },
     defaultVersion,
-    ingressImagePullDeps.concat([sv, validator])
+    { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
   );
 }
 
@@ -270,9 +270,11 @@ async function installSvAndValidator(
         'cn-participant',
         participantValuesWithSpecifiedAud,
         version,
-        imagePullDeps
-          .concat([participantPg, svAppSecret, svKeySecret_])
-          .concat(loopback !== null ? loopback : [])
+        {
+          dependsOn: imagePullDeps
+            .concat([participantPg, svAppSecret, svKeySecret_])
+            .concat(loopback !== null ? loopback : []),
+        }
       );
     }
   ).activeComponent;
@@ -371,10 +373,12 @@ async function installSvAndValidator(
     'cn-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     defaultVersion,
-    imagePullDeps
-      .concat([participant, decentralizedSynchronizer])
-      .concat([svAppSecret, svAppUISecret, appsPg])
-      .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
+    {
+      dependsOn: imagePullDeps
+        .concat([participant, decentralizedSynchronizer])
+        .concat([svAppSecret, svAppUISecret, appsPg])
+        .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
+    },
     SV_APP_HELM_CHART_TIMEOUT_SEC
   );
 
@@ -405,7 +409,7 @@ async function installSvAndValidator(
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     defaultVersion,
-    imagePullDeps.concat([sv, participant, svAppSecret, appsPg])
+    { dependsOn: imagePullDeps.concat([sv, participant, svAppSecret, appsPg]) }
   );
 
   const validatorValues = {
@@ -462,12 +466,14 @@ async function installSvAndValidator(
     'cn-validator',
     validatorValuesWithMaybeTopups,
     defaultVersion,
-    imagePullDeps
-      .concat([sv, participant])
-      .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
-      .concat(backupConfigSecret ? [backupConfigSecret] : [])
-      .concat([appsPg])
+    {
+      dependsOn: imagePullDeps
+        .concat([sv, participant])
+        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
+        .concat(backupConfigSecret ? [backupConfigSecret] : [])
+        .concat([appsPg]),
+    }
   );
 
   return { sv, validator };

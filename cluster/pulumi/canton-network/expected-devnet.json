@@ -2139,7 +2139,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -2160,7 +2160,7 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": "true"
+              "value": true
             }
           ],
           "migration": {
@@ -2174,6 +2174,7 @@
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26316,
+          "keysSecret": "",
           "privateKey": "sv1-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -2198,10 +2199,11 @@
           }
         ],
         "stateSync": {
-          "enable": false
+          "enable": false,
+          "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3252,7 +3254,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3273,7 +3275,7 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": "true"
+              "value": true
             }
           ],
           "migration": {
@@ -3287,6 +3289,7 @@
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26326,
+          "keysSecret": "",
           "privateKey": "sv2-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -3308,10 +3311,10 @@
         ],
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -4328,7 +4331,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -4349,7 +4352,7 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": "true"
+              "value": true
             }
           ],
           "migration": {
@@ -4363,6 +4366,7 @@
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26336,
+          "keysSecret": "",
           "privateKey": "sv3-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -4384,10 +4388,10 @@
         ],
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -5404,7 +5408,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -5425,7 +5429,7 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": "true"
+              "value": true
             }
           ],
           "migration": {
@@ -5439,6 +5443,7 @@
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26346,
+          "keysSecret": "",
           "privateKey": "sv4-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
           "validator": {
@@ -5460,10 +5465,10 @@
         ],
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "global-domain-3-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="

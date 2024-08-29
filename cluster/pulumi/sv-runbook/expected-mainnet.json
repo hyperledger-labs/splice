@@ -382,99 +382,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
-      "compat": "true",
-      "name": "global-domain-0-cometbft",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
-      },
-      "timeout": 480,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "clusterUrl": "global.canton.network.digitalasset.com",
-        "db": {},
-        "founder": {
-          "externalAddress": "global.canton.network.digitalasset.com:26016",
-          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
-          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
-        },
-        "genesis": {
-          "chainId": "main-0",
-          "chainIdSuffix": "2"
-        },
-        "istioVirtualService": {
-          "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": "26056"
-        },
-        "logLevel": "debug",
-        "metrics": {
-          "enable": true,
-          "labels": [
-            {
-              "key": "active_migration",
-              "value": true
-            }
-          ],
-          "migration": {
-            "active": true,
-            "id": 0
-          }
-        },
-        "node": {
-          "externalAddress": "global-domain-0-cometbft.sv.global.canton.network.digitalasset.com:26056",
-          "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
-          "identifier": "global-domain-0-cometbft",
-          "keysSecret": "cometbft-keys",
-          "retainBlocks": 5040000
-        },
-        "nodeName": "DA-Helm-Test-Node",
-        "stateSync": {
-          "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
-        },
-        "sv1": {
-          "externalAddress": "global.canton.network.digitalasset.com:26016",
-          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
-          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.1.16"
-    },
-    "name": "global-domain-0-cometbft",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
       "name": "global-domain-0",
@@ -990,6 +897,110 @@
       "version": "0.1.16"
     },
     "name": "sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-cometbft",
+      "compat": "true",
+      "name": "cometbft-global-domain-0",
+      "namespace": "sv",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "artie"
+      },
+      "timeout": 480,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "global.canton.network.digitalasset.com",
+          "name": "cn-mainnet"
+        },
+        "clusterUrl": "global.canton.network.digitalasset.com",
+        "db": {},
+        "founder": {
+          "externalAddress": "global.canton.network.digitalasset.com:26016",
+          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
+          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
+          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
+        },
+        "genesis": {
+          "chainId": "main-0",
+          "chainIdSuffix": "2"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "istioVirtualService": {
+          "enabled": true,
+          "gateway": "cluster-ingress/cn-apps-gateway",
+          "port": 26006
+        },
+        "logLevel": "debug",
+        "metrics": {
+          "enable": true,
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": true
+            }
+          ],
+          "migration": {
+            "active": true,
+            "id": 0
+          }
+        },
+        "node": {
+          "enableTimeoutCommit": false,
+          "externalAddress": "global.canton.network.digitalasset.com:26006",
+          "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26006,
+          "keysSecret": "cometbft-keys",
+          "retainBlocks": 5040000
+        },
+        "nodeName": "DA-Helm-Test-Node",
+        "peers": [],
+        "stateSync": {
+          "enable": true,
+          "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+        },
+        "sv1": {
+          "externalAddress": "global.canton.network.digitalasset.com:26016",
+          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
+          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
+          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.16"
+    },
+    "name": "sv-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

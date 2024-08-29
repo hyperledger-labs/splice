@@ -29,6 +29,6 @@ export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.
       },
     },
     defaultVersion,
-    [passwordSecret]
+    { dependsOn: [passwordSecret] }
   );
 }

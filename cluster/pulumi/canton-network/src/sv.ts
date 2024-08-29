@@ -15,7 +15,6 @@ import {
   CLUSTER_HOSTNAME,
   CnInput,
   defaultVersion,
-  disableCometBftStateSync,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
@@ -46,7 +45,7 @@ import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';
-import { DecentralizedSynchronizerNode } from './decentralizedSynchronizerNode';
+import { DecentralizedSynchronizerNode } from '../../common/src/synchronizer/decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
 import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
@@ -138,7 +137,7 @@ export type InstalledSv = {
 export async function installSvNode(
   baseConfig: SvConfig,
   decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
-  cometBftSyncSource?: k8s.helm.v3.Release
+  sv1SvApp?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
   const loopback = installCNHelmChart(
@@ -235,7 +234,7 @@ export async function installSvNode(
         ...config.nodeConfigs,
         self: { ...config.cometBft, nodeName: config.nodeName },
       },
-      syncSource: cometBftSyncSource,
+      sv1SvApp: sv1SvApp,
     },
     config
   ).activeComponent;
@@ -372,7 +371,7 @@ function installMigrationIdSpecificComponents(
       sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     };
-    syncSource?: Release;
+    sv1SvApp?: Release;
   },
   svConfig: SvConfig
 ) {
@@ -449,15 +448,6 @@ function installMigrationIdSpecificComponents(
           ? 'INFO'
           : 'DEBUG';
 
-      // legacy domains don't need cometbft state sync because no new nodes will join
-      // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
-      // also for upgrade domains we first deploy the domain and then redeploy the sv app, and as we proxy the calls for state sync through the
-      // sv-app we cannot configure state sync until the sv app has migrated
-      // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
-      const canSyncFromCometBft =
-        !disableCometBftStateSync &&
-        isActive &&
-        !decentralizedSynchronizerMigrationConfig.isRunningMigration();
       const participant = installParticipant(
         xns,
         `participant-${migrationId}`,
@@ -475,8 +465,9 @@ function installMigrationIdSpecificComponents(
         xns,
         sequencerDb,
         mediatorDb,
-        canSyncFromCometBft ? cometbft : { ...cometbft, syncSource: undefined },
+        cometbft,
         isActive,
+        decentralizedSynchronizerMigrationConfig.isRunningMigration(),
         svConfig.onboardingName,
         logLevel,
         version

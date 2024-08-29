@@ -1,6 +1,8 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { ComponentResource } from '@pulumi/pulumi';
+import { ComponentResource, Resource } from '@pulumi/pulumi';
+import { StaticCometBftConfigWithNodeName } from 'canton-network-pulumi-deployment/src/svConfigs';
+
 import {
   autoInitValues,
   defaultVersion,
@@ -11,12 +13,11 @@ import {
   LogLevel,
   sequencerResources,
   sequencerTokenExpirationTime,
-} from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
-
-import { Postgres } from '../../common/src/postgres';
+} from '../.';
+import { CnChartVersion } from '../artifacts';
+import { Postgres } from '../postgres';
+import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
-import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
 export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
@@ -43,9 +44,10 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
         sv1: StaticCometBftConfigWithNodeName;
         peers: StaticCometBftConfigWithNodeName[];
       };
-      syncSource?: Release;
+      sv1SvApp?: Resource;
     },
     active: boolean,
+    runningMigration: boolean,
     nodeIdentifier: string,
     logLevel: LogLevel,
     version: CnChartVersion = defaultVersion
@@ -62,14 +64,14 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
     const sequencerDbName = `${sanitizedName}_sequencer`;
     const cometbftRelease = installCometBftNode(
       xns,
-      cometbft.name,
       cometbft.onboardingName,
-      cometbft.nodeConfigs,
+      new CometBftNodeConfigs(domainMigrationId, cometbft.nodeConfigs),
       domainMigrationId,
       active,
+      runningMigration,
       logLevel.toLowerCase(),
       version,
-      cometbft.syncSource,
+      cometbft.sv1SvApp,
       { parent: this }
     );
 

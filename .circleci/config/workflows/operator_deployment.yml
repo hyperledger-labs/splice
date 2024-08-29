@@ -27,6 +27,10 @@ workflow:
           type: approval
       - set_previews:
           <<: *main-branch-never
+          name: set_previews_cilr
+          type: approval
+      - set_previews:
+          <<: *main-branch-never
           name: set_previews_deployment
           type: approval
       - preview_pulumi_changes:
@@ -60,6 +64,16 @@ workflow:
           requires:
             - set_previews_mainnet
       - preview_pulumi_changes:
+          name: Preview pulumi changes for CILR
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cilr"
+          deployment_only: false
+          requires:
+            - set_previews_cilr
+      - preview_pulumi_changes:
           name: Preview operator pulumi changes for DevNet
           context:
             - artifactory
@@ -89,5 +103,3 @@ workflow:
           deployment_only: true
           requires:
             - set_previews_deployment
-
-

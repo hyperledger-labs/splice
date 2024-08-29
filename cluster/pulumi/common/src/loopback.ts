@@ -19,6 +19,6 @@ export function installLoopback(
       },
     },
     version,
-    [namespace.ns]
+    { dependsOn: [namespace.ns] }
   );
 }

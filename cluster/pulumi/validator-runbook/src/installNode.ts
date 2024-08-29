@@ -128,7 +128,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       withSvIngress: false,
     },
     defaultVersion,
-    ingressImagePullDeps.concat([validator])
+    { dependsOn: ingressImagePullDeps.concat([validator]) }
   );
 }
 
@@ -166,14 +166,15 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ),
     { db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined } }
   );
-
   const postgres = installCNRunbookHelmChart(
     xns,
     'postgres',
     'cn-postgres',
     postgresValues,
     defaultVersion,
-    otherDeps
+    {
+      dependsOn: otherDeps,
+    }
   );
 
   const participantValues: ChartValues = {
@@ -209,7 +210,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     'cn-participant',
     participantValuesWithSpecifiedAud,
     defaultVersion,
-    imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : [])
+    { dependsOn: imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : []) }
   );
 
   const fixedTokensValue: ChartValues = {
@@ -331,6 +332,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     'cn-validator',
     validatorValuesWithMaybeTopups,
     defaultVersion,
-    dependsOn
+    { dependsOn: dependsOn }
   );
 }

@@ -14,4 +14,4 @@ echo "posting slack message"
 curl -X POST --url "https://slack.com/api/chat.postMessage" \
   -H "Content-type: application/json" \
   -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
-  --data '{ "text": "'"$text"'", "channel": "'"$channel"'" }'
+  --data '{ "text": "'"a$text"'", "channel": "'"$channel"'" }'
