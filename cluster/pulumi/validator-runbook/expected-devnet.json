@@ -298,7 +298,6 @@
           "targetAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "db": {},
         "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
@@ -366,6 +365,9 @@
           }
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "db": {
+          "volumeSize": "50Gi"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

@@ -413,7 +413,7 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} --wait
+    helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-validator-participant.yaml --wait
     helm install participant canton-network-helm/cn-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
     helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
 

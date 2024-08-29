@@ -1,0 +1,4 @@
+db:
+  # This is only the suggested initial value.
+  # The volume usage should be monitored and the size adjusted as usage grows.
+  volumeSize: 50Gi

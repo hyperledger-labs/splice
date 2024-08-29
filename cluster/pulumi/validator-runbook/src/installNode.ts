@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
+import * as _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -159,11 +160,18 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     topupConfig,
   } = config;
 
+  const postgresValues: ChartValues = _.merge(
+    loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
+    ),
+    { db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined } }
+  );
+
   const postgres = installCNRunbookHelmChart(
     xns,
     'postgres',
     'cn-postgres',
-    {},
+    postgresValues,
     defaultVersion,
     otherDeps
   );
@@ -191,7 +199,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       ...participantValues.persistence,
       postgresName: 'postgres',
     },
-    db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...autoInitValues('cn-participant', defaultVersion, config.nodeIdentifier),
   };

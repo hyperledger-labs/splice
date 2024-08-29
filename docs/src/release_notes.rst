@@ -99,6 +99,8 @@ Upcoming
   * The configuration variable `clusterUrl` was removed from all Helm charts except `splitwell-web-ui`.
   * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
     example has been updated to match, and this change must be made to your own copy.
+  * Default Postgres PVC size for validators is configured as 50GiB in the new `postgres-values-validator-participant.yaml` examples file.
+    Note also the change in the :ref:`validator installation docs <validator-helm-charts-install>` to use this file while installing the Postgres chart.
 
 * Documentation
 
