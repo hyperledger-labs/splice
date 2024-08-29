@@ -26,7 +26,7 @@ export const gitRepo = new k8s.apiextensions.CustomResource(
       interval: '5m',
       url: 'https://github.com/DACH-NY/canton-network-node',
       ref: {
-        name: config.requireEnv('CN_DEPLOYMENT_FLUX_REF'),
+        name: config.requireEnv('SPLICE_DEPLOYMENT_FLUX_REF'),
       },
       secretRef: { name: githubSecret.metadata.name },
       recurseSubmodules: true,

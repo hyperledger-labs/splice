@@ -107,15 +107,15 @@ services:
     env_file:
       - auth-wallet.env
     environment:
-      - CN_APP_UI_HTTP_URL=true
+      - SPLICE_APP_UI_HTTP_URL=true
 
   ans-web-ui:
     image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
     env_file:
       - auth-ans.env
     environment:
-      - CN_APP_WALLET_REDIRECT=http://wallet.localhost
-      - CN_APP_UI_HTTP_URL=true
+      - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost
+      - SPLICE_APP_UI_HTTP_URL=true
 
   nginx:
     image: nginx:1.27.0

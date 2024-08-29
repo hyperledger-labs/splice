@@ -12,7 +12,7 @@ window.splice_config = {
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: "${CN_APP_WALLET_REDIRECT}" || window.location.origin.replace(/\b.?ns\b/g, "wallet"),
+      uiUrl: "${SPLICE_APP_WALLET_REDIRECT}" || window.location.origin.replace(/\b.?ns\b/g, "wallet"),
     },
   },
   spliceInstanceNames: {

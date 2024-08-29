@@ -24,7 +24,7 @@ import {
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
-  installCNHelmChart,
+  installSpliceHelmChart,
   installMigrationIdSpecificComponent,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
@@ -140,7 +140,7 @@ export async function installSvNode(
   sv1SvApp?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installCNHelmChart(
+  const loopback = installSpliceHelmChart(
     xns,
     'loopback',
     'cn-cluster-loopback-gateway',
@@ -271,7 +271,7 @@ export async function installSvNode(
     scan
   );
 
-  const ingress = installCNHelmChart(
+  const ingress = installSpliceHelmChart(
     xns,
     'ingress-sv',
     'cn-cluster-ingress-runbook',
@@ -442,8 +442,8 @@ function installMigrationIdSpecificComponents(
         mediatorDb = mediatorPostgres;
       }
       const logLevel =
-        config.envFlag('CN_DEPLOYMENT_NO_SV_DEBUG') ||
-        (config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') &&
+        config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG') ||
+        (config.envFlag('SPLICE_DEPLOYMENT_SINGLE_SV_DEBUG') &&
           svConfig.onboardingName !== svConfigs[0].onboardingName)
           ? 'INFO'
           : 'DEBUG';
@@ -566,7 +566,7 @@ function installSvApp(
     };
   }
 
-  const svApp = installCNHelmChart(
+  const svApp = installSpliceHelmChart(
     xns,
     `sv-app`,
     'cn-sv-node',
@@ -612,7 +612,7 @@ function installScan(
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
+  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
     dependsOn: [svApp, decentralizedSynchronizerNode],
   });
   return scan;

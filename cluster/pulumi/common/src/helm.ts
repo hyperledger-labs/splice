@@ -20,7 +20,7 @@ import {
 } from './utils';
 
 // The default type of dependsOn is an unworkable abonimation.
-export type CNCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
+export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
   dependsOn?: pulumi.Input<pulumi.Resource>[];
 };
 
@@ -47,14 +47,14 @@ function getVersionOverrideFromVersionsFile(
   );
 }
 
-function installCNHelmChartByNamespaceName(
+function installSpliceHelmChartByNamespaceName(
   nsLogicalName: string,
   nsMetadataName: pulumi.Output<string>,
   name: string,
   chartName: string,
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions,
+  opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
@@ -77,18 +77,18 @@ function installCNHelmChartByNamespaceName(
   );
 }
 
-export function installCNHelmChart(
+export function installSpliceHelmChart(
   xns: ExactNamespace,
   name: string,
   chartName: string,
   values: ChartValues = {},
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions,
+  opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): Release {
-  return installCNHelmChartByNamespaceName(
+  return installSpliceHelmChartByNamespaceName(
     xns.logicalName,
     xns.ns.metadata.name,
     name,
@@ -134,14 +134,14 @@ function cnChartValues(
   return values;
 }
 
-export function installCNRunbookHelmChartByNamespaceName(
+export function installSpliceRunbookHelmChartByNamespaceName(
   nsMetadataName: pulumi.Output<string> | string,
   nsLogicalName: string,
   name: string,
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions,
+  opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
@@ -169,16 +169,16 @@ export function installCNRunbookHelmChartByNamespaceName(
   );
 }
 
-export function installCNRunbookHelmChart(
+export function installSpliceRunbookHelmChart(
   ns: ExactNamespace,
   name: string,
   chartName: string,
   values: ChartValues,
   version: CnChartVersion = defaultVersion,
-  opts?: CNCustomResourceOptions,
+  opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
-  return installCNRunbookHelmChartByNamespaceName(
+  return installSpliceRunbookHelmChartByNamespaceName(
     ns.ns.metadata.name,
     ns.logicalName,
     name,

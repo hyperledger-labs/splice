@@ -9,7 +9,7 @@ import {
   useUserState,
   PackageIdResolver,
 } from 'common-frontend';
-import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { replaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React, { useEffect } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
@@ -50,7 +50,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        structuralSharing: cnReplaceEqualDeep,
+        structuralSharing: replaceEqualDeep,
       },
       mutations: {
         retry: (failureCount, error) =>

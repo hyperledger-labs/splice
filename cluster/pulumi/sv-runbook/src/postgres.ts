@@ -6,7 +6,7 @@ import {
   REPO_ROOT,
   config,
 } from 'cn-pulumi-common';
-import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
+import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
 
 const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
 
@@ -15,7 +15,7 @@ export function installPostgres(
   name: string,
   secretName: string,
   selfHostedValuesFile: string
-): CNPostgres | CloudPostgres {
+): SplicePostgres | CloudPostgres {
   if (cloudSqlEnabled) {
     return new CloudPostgres(xns, name, name, secretName);
   } else {
@@ -24,7 +24,7 @@ export function installPostgres(
     );
     const volumeSizeOverride = determineVolumeSizeOverride(valuesFromFile.db?.volumeSize);
     const values = _.merge(valuesFromFile || {}, { db: { volumeSize: volumeSizeOverride } });
-    return new CNPostgres(xns, name, name, secretName, values);
+    return new SplicePostgres(xns, name, name, secretName, values);
   }
 }
 

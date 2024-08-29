@@ -10,7 +10,7 @@ import {
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
   installAuth0Secret,
-  installCNHelmChart,
+  installSpliceHelmChart,
   ValidatorTopupConfig,
   config,
   splitwellDarPath,
@@ -39,7 +39,7 @@ export async function installSplitwell(
     ? undefined
     : postgres.installPostgres(xns, 'splitwell-pg', 'splitwell-pg', splitPostgresInstances);
 
-  const loopback = installCNHelmChart(
+  const loopback = installSpliceHelmChart(
     xns,
     'loopback',
     'cn-cluster-loopback-gateway',
@@ -69,7 +69,7 @@ export async function installSplitwell(
   const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
-  installCNHelmChart(
+  installSpliceHelmChart(
     xns,
     'splitwell-app',
     'cn-splitwell-app',
@@ -156,7 +156,7 @@ export async function installSplitwell(
 }
 
 function installIngress(xns: ExactNamespace) {
-  installCNHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
+  installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,

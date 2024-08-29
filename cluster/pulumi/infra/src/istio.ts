@@ -6,7 +6,7 @@ import {
   defaultVersion,
   ExactNamespace,
   infraAffinityAndTolerations,
-  installCNHelmChart,
+  installSpliceHelmChart,
   isMainNet,
   loadIPRanges,
 } from '../../common';
@@ -367,7 +367,7 @@ function configureGateway(
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
-  return installCNHelmChart(
+  return installSpliceHelmChart(
     ingressNs,
     'cluster-gateway',
     'cn-istio-gateway',

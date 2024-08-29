@@ -711,6 +711,76 @@ function subcmd_cn_splice {
   run_and_commit_rename "rename: CN to Splice when standalone" \
     "'\b(?:CN|Cn)\b///Splice'" \
     "$GSR_ARGS"
+
+  simple_rename '(?x)CN_(?=
+      APP_(?! # helm exclusions; simply excluding cluster/helm is not good enough
+              # because we want to also avoid altering their external references
+              (?: \{\{\s[$]app\s\|\supper\s\}\} | [A-Z]+)_LEDGER_API_AUTH_
+            | CONTACT_POINT
+            | DARS
+            | DEVNET
+            | POSTGRES_PASSWORD
+            | SV_(?:MEDIATOR|PARTICIPANT|SEQUENCER)_IDENTIFIER
+            | SCAN_PARTICIPANT_ADDRESS
+            | SCAN_SEQUENCER_ADDRESS
+            | SPLITWELL_MIGRATION_ID
+            | SPLITWELL_PARTICIPANT_HOST
+            | SPLITWELL_SCAN_URL
+            | SV_AUTH_AUDIENCE
+            | SV_AUTH_JWKS_URL
+            | SV_COMETBFT_CONNECTION_URI
+            | SV_COMETBFT_ENABLED
+            | SV_GLOBAL_DOMAIN_URL
+            | SV_IDENTITIES_EXPORT
+            | SV_IDS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+            | SV_INITIAL_HOLDING_FEE
+            | SV_INITIAL_TICK_DURATION
+            | SV_IS_DEV_NET
+            | SV_ONBOARDING_(?:NAME|TYPE)
+            | SV_PARTICIPANT_ADDRESS
+            | SV_PARTICIPANT_IDENTITIES_DUMP_IMPORT
+            | SV_PRIVATE_KEY
+            | SV_PUBLIC_KEY
+            | SV_ROUND_ZERO_DURATION
+            | SV_SV1_REWARD_WEIGHT
+            | UI_AMULET_(?:NAME|ACRONYM)
+            | UI_AUTH_AUDIENCE
+            | UI_AUTH_CLIENT_ID
+            | UI_AUTH_URL
+            | UI_CLUSTER
+            | UI_NAME_SERVICE_NAME
+            | UI_NETWORK_FAVICON_URL
+            | UI_NETWORK_NAME
+            | VALIDATOR_AUTH_AUDIENCE
+            | VALIDATOR_AUTH_JWKS_URL
+            | VALIDATOR_ONBOARDING_SECRET
+            | VALIDATOR_PARTICIPANT_ADDRESS
+            | VALIDATOR_PARTICIPANT_IDENTIFIER
+            | VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_PERIODIC_BACKUP
+            | VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+            | VALIDATOR_PARTY_HINT
+            | VALIDATOR_SCAN_ADDRESS
+            | VALIDATOR_SV_SPONSOR_ADDRESS
+            | VALIDATOR_SV_VALIDATOR
+            | VALIDATOR_WALLET_USER_NAME
+            # pulumi deployment conf
+            | SPLITWELL_PROVIDER_WALLET_USER_NAME
+            | VALIDATOR_MIGRATION_ID
+            | VALIDATOR_SCAN_URL
+            | POSTGRES_(?:DATABASE_NAME|HOST|PORT|SCHEMA|USER)
+          )
+    | ARTIFACTS_REPOSITORY
+    | DEPLOY_
+    | DEPLOYMENT_
+    # TODO (#14137 fails integration test) | INSTALL_(?:VALIDATOR1|SPLITWELL)
+    # TODO (#14137 pulumi conf) | PULUMI_LOAD_ENV_CONFIG_FILE
+  )///SPLICE_'
+  simple_rename '\bCN(?=Postgres|CustomResourceOptions)///Splice'
+  # TODO (#14137) transform lowercase
+  simple_rename '(?<=\binstall)CN(?=(?:Runbook)?HelmChart)///Splice'
+  simple_rename '\bcnR(?=eplaceEqualDeep\b)///r'
+  # AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+  # AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
 }
 
 subcommand_whitelist[cn_module_splice]='Rename: CN Module prefix to Splice'

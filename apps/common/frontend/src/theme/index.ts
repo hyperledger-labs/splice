@@ -6,7 +6,7 @@ import { createTheme, TypographyStyle } from '@mui/material';
 
 import { generateHslPalette, generateRemValue, stylePillButton } from './utils';
 
-// TS module augmentation to add custom theme vars for storing our CN-theme color values
+// TS module augmentation to add custom theme vars for storing our custom color values
 declare module '@mui/material/styles' {
   interface Theme {
     fonts: {

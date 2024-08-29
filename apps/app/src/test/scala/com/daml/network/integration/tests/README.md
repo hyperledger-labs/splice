@@ -88,7 +88,7 @@ When working in a test class that uses a shared environment, you must take a bit
 For example:
 Whenever you are registering new identifiers, such as ANS names, you must wrap them in a `perTestCaseName(...)` to avoid name collisions.
 Many ledger API user names are automatically wrapped in this way when you are using references like `aliceWallet`.
-Some aren't though - such as service users (for the SV and validator participants) that are allocated via a test's [environment definition](/apps/app/src/test/scala/com/daml/network/integration/CNNodeEnvironmentDefinition.scala).
+Some aren't though - such as service users (for the SV and validator participants) that are allocated via a test's [environment definition](/apps/app/src/test/scala/com/daml/network/integration/EnvironmentDefinition.scala).
 
 ## Errors and warnings in log files
 

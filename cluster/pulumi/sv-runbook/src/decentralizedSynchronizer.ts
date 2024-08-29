@@ -7,7 +7,7 @@ import {
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
   REPO_ROOT,
-  installCNRunbookHelmChart,
+  installSpliceRunbookHelmChart,
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
   sequencerResources,
@@ -29,7 +29,8 @@ export function installDecentralizedSynchronizerNode(
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const logLevel =
-    config.envFlag('CN_DEPLOYMENT_SINGLE_SV_DEBUG') || config.envFlag('CN_DEPLOYMENT_NO_SV_DEBUG')
+    config.envFlag('SPLICE_DEPLOYMENT_SINGLE_SV_DEBUG') ||
+    config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG')
       ? 'INFO'
       : 'DEBUG';
 
@@ -94,7 +95,7 @@ export function installDecentralizedSynchronizerNode(
         },
       };
 
-      return installCNRunbookHelmChart(
+      return installSpliceRunbookHelmChart(
         svNamespace,
         `global-domain-${migrationId}`,
         'cn-global-domain',

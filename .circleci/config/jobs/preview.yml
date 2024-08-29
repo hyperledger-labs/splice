@@ -37,15 +37,15 @@ jobs:
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "sv-runbook"
-                when_env: "CN_DEPLOY_SV_RUNBOOK"
+                when_env: "SPLICE_DEPLOY_SV_RUNBOOK"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "multi-validator"
-                when_env: "CN_DEPLOY_MULTI_VALIDATOR"
+                when_env: "SPLICE_DEPLOY_MULTI_VALIDATOR"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "validator-runbook"
-                when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
+                when_env: "SPLICE_DEPLOY_VALIDATOR_RUNBOOK"
       - when:
           condition: << parameters.deployment_only >>
           steps:

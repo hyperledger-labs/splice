@@ -50,7 +50,7 @@ function newUiApp(
   return ret;
 }
 
-function cnAuth0(clusterBasename: string, dnsNames: string[]) {
+function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
   const auth0Domain = 'canton-network-dev.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
@@ -365,7 +365,7 @@ export function configureAuth0(
       return r;
     });
   } else {
-    const cnAuth0Cfg = cnAuth0(clusterBasename, dnsNames);
+    const spliceAuth0Cfg = spliceAuth0(clusterBasename, dnsNames);
     const svRunbookAuth0Cfg = svRunbookAuth0(
       clusterBasename,
       dnsNames,
@@ -385,10 +385,10 @@ export function configureAuth0(
     );
     const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
     return pulumi
-      .all([cnAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
-      .apply(([cn, sv, validator]) => {
+      .all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg])
+      .apply(([splice, sv, validator]) => {
         const r: Auth0ClusterConfig = {
-          cantonNetwork: cn,
+          cantonNetwork: splice,
           svRunbook: sv,
           validatorRunbook: validator,
         };

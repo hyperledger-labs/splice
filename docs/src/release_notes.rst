@@ -101,6 +101,25 @@ Upcoming
     example has been updated to match, and this change must be made to your own copy.
   * Default Postgres PVC size for validators is configured as 50GiB in the new `postgres-values-validator-participant.yaml` examples file.
     Note also the change in the :ref:`validator installation docs <validator-helm-charts-install>` to use this file while installing the Postgres chart.
+  * For the Pulumi scripts, these environment variables have been renamed,
+    replacing ``CN`` with ``SPLICE``:
+
+      * ``CN_ARTIFACTS_REPOSITORY``
+      * ``CN_DEPLOYMENT_FLUX_REF``
+      * ``CN_DEPLOYMENT_NO_SV_DEBUG``
+      * ``CN_DEPLOYMENT_SINGLE_SV_DEBUG``
+      * ``CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS``
+      * ``CN_DEPLOY_MULTI_RUNBOOK``
+      * ``CN_DEPLOY_MULTI_VALIDATOR``
+      * ``CN_DEPLOY_SV_RUNBOOK``
+      * ``CN_DEPLOY_VALIDATOR_RUNBOOK``
+  * For the Docker images, these input environment variables have been renamed,
+    replacing ``CN`` with ``SPLICE``:
+
+      * ``CN_APP_UI_HTTP_URL``
+      * ``CN_APP_UI_UNSAFE_SECRET``
+      * ``CN_APP_UI_UNSAFE``
+      * ``CN_APP_WALLET_REDIRECT``
 
 * Documentation
 

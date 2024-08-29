@@ -6,7 +6,7 @@ import {
   config,
   exactNamespace,
   generatePortSequence,
-  installCNHelmChart,
+  installSpliceHelmChart,
   isDevNet,
   numInstances,
   numNodesPerInstance,
@@ -19,7 +19,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const clusterHostname = `${CLUSTER_HOSTNAME}`;
 
     // install loopback so the test can hit the wallet/validator API via its public DNS name
-    const loopback = installCNHelmChart(
+    const loopback = installSpliceHelmChart(
       xns,
       'loopback',
       'cn-cluster-loopback-gateway',
@@ -72,7 +72,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
 
     const validators = numInstances > 0 ? multiValidatorConfigs : [validator1];
 
-    installCNHelmChart(
+    installSpliceHelmChart(
       xns,
       'load-tester',
       'cn-load-tester',

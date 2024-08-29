@@ -17,7 +17,7 @@ import {
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
-  installCNHelmChart,
+  installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
   spliceInstanceNames,
@@ -191,7 +191,7 @@ export async function installValidatorApp(
 
   const chartVersion = defaultVersion;
 
-  return installCNHelmChart(
+  return installSpliceHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
     'cn-validator',

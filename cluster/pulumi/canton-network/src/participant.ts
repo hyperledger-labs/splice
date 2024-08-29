@@ -6,7 +6,7 @@ import {
   BootstrappingDumpConfig,
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
-  installCNHelmChart,
+  installSpliceHelmChart,
   installMigrationIdSpecificComponent,
   jmxOptions,
   sanitizedForPostgres,
@@ -73,7 +73,7 @@ export function installParticipant(
 ): Release {
   const pgName = sanitizedForPostgres(name);
 
-  const participant = installCNHelmChart(
+  const participant = installSpliceHelmChart(
     xns,
     name,
     'cn-participant',

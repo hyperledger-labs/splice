@@ -1426,7 +1426,7 @@ commands:
               cncluster activate
               export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
               # overwrite the use of internal DNS in the config file directly
-              sed -i 's/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
+              sed -i 's/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
               cncluster pulumi << parameters.project >> preview --diff
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
@@ -3847,15 +3847,15 @@ jobs:
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "sv-runbook"
-                when_env: "CN_DEPLOY_SV_RUNBOOK"
+                when_env: "SPLICE_DEPLOY_SV_RUNBOOK"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "multi-validator"
-                when_env: "CN_DEPLOY_MULTI_VALIDATOR"
+                when_env: "SPLICE_DEPLOY_MULTI_VALIDATOR"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "validator-runbook"
-                when_env: "CN_DEPLOY_VALIDATOR_RUNBOOK"
+                when_env: "SPLICE_DEPLOY_VALIDATOR_RUNBOOK"
       - when:
           condition: << parameters.deployment_only >>
           steps:

@@ -14,7 +14,7 @@ export const repositories = {
     helm: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
   },
 };
-export const artifactsRepository = config.optionalEnv('CN_ARTIFACTS_REPOSITORY');
+export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
 let repository: Repository;
 if (artifactsRepository === undefined) {
   repository = repositories.artifactory;

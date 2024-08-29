@@ -32,11 +32,11 @@ prod_clusters="devnet testnet mainnet"
 
 for cluster in $prod_clusters
   do
-    if git show "main:cluster/deployment/${cluster}/.envrc.vars" | grep "CN_DEPLOYMENT_FLUX_REF" | grep "${TARGET_BRANCH}"; then
+    if git show "main:cluster/deployment/${cluster}/.envrc.vars" | grep "SPLICE_DEPLOYMENT_FLUX_REF" | grep "${TARGET_BRANCH}"; then
         approve_job "${job_name}" "${cluster}"
     elif [ "${TARGET_BRANCH}" = "main" ]; then
         approve_job "${job_name}" "deployment"
     else
-        echo "TARGET_BRANCH (${TARGET_BRANCH}) does not match CN_DEPLOYMENT_FLUX_REF for ${cluster}"
+        echo "TARGET_BRANCH (${TARGET_BRANCH}) does not match SPLICE_DEPLOYMENT_FLUX_REF for ${cluster}"
     fi
   done

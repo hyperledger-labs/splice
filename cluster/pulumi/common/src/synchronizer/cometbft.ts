@@ -6,12 +6,12 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
-  CNCustomResourceOptions,
+  SpliceCustomResourceOptions,
   config,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
-  installCNHelmChart,
+  installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
@@ -44,7 +44,7 @@ export function installCometBftNode(
   logLevel: string,
   version: CnChartVersion = defaultVersion,
   syncSource?: Resource,
-  opts?: CNCustomResourceOptions
+  opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
@@ -67,7 +67,7 @@ export function installCometBftNode(
   // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
   const stateSyncEnabled =
     !isSv1 && !disableCometBftStateSync && !isRunningMigration && isActiveDomain;
-  const release = installCNHelmChart(
+  const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
     'cn-cometbft',

@@ -68,9 +68,9 @@ function hasObjectPrototype(o: any): boolean {
   return Object.prototype.toString.call(o) === '[object Object]';
 }
 
-export function cnReplaceEqualDeep<T>(a: unknown, b: T): T;
+export function replaceEqualDeep<T>(a: unknown, b: T): T;
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
-export function cnReplaceEqualDeep(a: any, b: any): any {
+export function replaceEqualDeep(a: any, b: any): any {
   if (a === b) {
     return a;
   }
@@ -103,7 +103,7 @@ export function cnReplaceEqualDeep(a: any, b: any): any {
 
     for (let i = 0; i < bSize; i++) {
       const key = array ? i : bItems[i];
-      copy[key] = cnReplaceEqualDeep(a[key], b[key]);
+      copy[key] = replaceEqualDeep(a[key], b[key]);
       if (copy[key] === a[key]) {
         equalItems++;
       }

@@ -19,7 +19,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the preg version)
   - [ ] Update `cluster/deployment/*/.envrc.vars`, bumping the release version.
     - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
-    - Do NOT change `CN_DEPLOYMENT_FLUX_REF`. This value is used by the operator to determine what to deploy, and we do not want to change any deployment yet.
+    - Do NOT change `SPLICE_DEPLOYMENT_FLUX_REF`. This value is used by the operator to determine what to deploy, and we do not want to change any deployment yet.
   - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
 - [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
   - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
@@ -41,7 +41,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Pay particular attention to deleted or newly created resources.
   - Note that this should be the `preview_pulumi_changes` run on the branch `release-line-0.x.z`, as those are the changes that will be applied after merging!
 - [ ] Merge a PR into `main` with the following changes:
-  - [ ] Update `CN_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
+  - [ ] Update `SPLICE_DEPLOYMENT_FLUX_REF` in `cluster/deployment/devnet/.envrc.vars`.
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
   - [ ] Before merging, review the changes to the `deployment` stack from the `preview_pulumi_changes` CircleCi workflow.
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.

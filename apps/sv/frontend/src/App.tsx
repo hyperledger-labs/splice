@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, ErrorBoundary, ErrorRouterPage, UserProvider, theme } from 'common-frontend';
-import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { replaceEqualDeep } from 'common-frontend-utils';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   Route,
@@ -32,7 +32,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        structuralSharing: cnReplaceEqualDeep,
+        structuralSharing: replaceEqualDeep,
       },
     },
     logger: {

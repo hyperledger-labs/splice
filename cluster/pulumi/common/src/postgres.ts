@@ -5,7 +5,7 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 
 import { config } from './config';
-import { defaultVersion, installCNHelmChart } from './helm';
+import { defaultVersion, installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from './utils';
 
@@ -142,7 +142,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
   }
 }
 
-export class CNPostgres extends pulumi.ComponentResource implements Postgres {
+export class SplicePostgres extends pulumi.ComponentResource implements Postgres {
   instanceName: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
@@ -176,7 +176,7 @@ export class CNPostgres extends pulumi.ComponentResource implements Postgres {
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
-    const pg = installCNHelmChart(
+    const pg = installSpliceHelmChart(
       xns,
       instanceName,
       'cn-postgres',
@@ -216,7 +216,7 @@ export function installPostgres(
   if (enableCloudSql) {
     ret = new CloudPostgres(xns, instanceName, alias, secretName);
   } else {
-    ret = new CNPostgres(xns, instanceName, alias, secretName);
+    ret = new SplicePostgres(xns, instanceName, alias, secretName);
   }
   return ret;
 }

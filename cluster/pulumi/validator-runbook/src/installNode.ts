@@ -14,8 +14,8 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   imagePullSecret,
   imagePullSecretByNamespaceName,
-  installCNRunbookHelmChart,
-  installCNRunbookHelmChartByNamespaceName,
+  installSpliceRunbookHelmChart,
+  installSpliceRunbookHelmChartByNamespaceName,
   installLoopback,
   installPostgresPasswordSecret,
   installValidatorOnboardingSecret,
@@ -115,7 +115,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
     defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
-  installCNRunbookHelmChartByNamespaceName(
+  installSpliceRunbookHelmChartByNamespaceName(
     xns.ns.metadata.name,
     xns.logicalName,
     'cluster-ingress-validator',
@@ -166,7 +166,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ),
     { db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined } }
   );
-  const postgres = installCNRunbookHelmChart(
+  const postgres = installSpliceRunbookHelmChart(
     xns,
     'postgres',
     'cn-postgres',
@@ -204,7 +204,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...autoInitValues('cn-participant', defaultVersion, config.nodeIdentifier),
   };
 
-  const participant = installCNRunbookHelmChart(
+  const participant = installSpliceRunbookHelmChart(
     xns,
     'participant',
     'cn-participant',
@@ -326,7 +326,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  return installCNRunbookHelmChart(
+  return installSpliceRunbookHelmChart(
     xns,
     'validator',
     'cn-validator',

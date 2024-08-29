@@ -12,8 +12,8 @@ import {
   fixedTokens,
   setupBootstrapping,
   imagePullSecretByNamespaceName,
-  installCNRunbookHelmChart,
-  installCNRunbookHelmChartByNamespaceName,
+  installSpliceRunbookHelmChart,
+  installSpliceRunbookHelmChartByNamespaceName,
   installMigrationIdSpecificComponent,
   isDevNet,
   loadYamlFromFile,
@@ -42,7 +42,7 @@ import {
   spliceInstanceNames,
   autoInitValues,
 } from 'cn-pulumi-common';
-import { CloudPostgres, CNPostgres } from 'cn-pulumi-common/src/postgres';
+import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
@@ -132,7 +132,7 @@ export async function installNode(
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
     defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
-  installCNRunbookHelmChartByNamespaceName(
+  installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
     'cluster-ingress-sv',
@@ -172,7 +172,7 @@ type SvConfig = {
   disableOnboardingParticipantPromotionDelay: boolean;
 };
 
-function persistenceForPostgres(pg: CNPostgres | CloudPostgres, values: ChartValues) {
+function persistenceForPostgres(pg: SplicePostgres | CloudPostgres, values: ChartValues) {
   return {
     persistence: {
       ...values?.persistence,
@@ -264,7 +264,7 @@ async function installSvAndValidator(
         ...autoInitValues('cn-participant', version, onboardingName),
       };
 
-      return installCNRunbookHelmChart(
+      return installSpliceRunbookHelmChart(
         xns,
         `participant-${migrationId}`,
         'cn-participant',
@@ -367,7 +367,7 @@ async function installSvAndValidator(
     walletUiClientId
   );
 
-  const sv = installCNRunbookHelmChart(
+  const sv = installSpliceRunbookHelmChart(
     xns,
     'sv-app',
     'cn-sv-node',
@@ -403,7 +403,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  installCNRunbookHelmChart(
+  installSpliceRunbookHelmChart(
     xns,
     `scan`,
     'cn-scan',
@@ -460,7 +460,7 @@ async function installSvAndValidator(
     throw new Error('No CNS ui client id in auth0 config');
   }
 
-  const validator = installCNRunbookHelmChart(
+  const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
     'cn-validator',

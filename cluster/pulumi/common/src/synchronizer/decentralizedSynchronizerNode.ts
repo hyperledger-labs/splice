@@ -8,7 +8,7 @@ import {
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
-  installCNHelmChart,
+  installSpliceHelmChart,
   jmxOptions,
   LogLevel,
   sequencerResources,
@@ -77,7 +77,7 @@ export class DecentralizedSynchronizerNode extends ComponentResource {
 
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
-    installCNHelmChart(
+    installSpliceHelmChart(
       xns,
       this.name,
       'cn-global-domain',

@@ -3,7 +3,7 @@ import * as random from '@pulumi/random';
 import {
   defaultVersion,
   ExactNamespace,
-  installCNRunbookHelmChart,
+  installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
 } from 'cn-pulumi-common';
 
@@ -16,7 +16,7 @@ export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.
   const secretName = `${name}-secret`;
   const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
 
-  return installCNRunbookHelmChart(
+  return installSpliceRunbookHelmChart(
     xns,
     name,
     'cn-postgres',

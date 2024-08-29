@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, theme, UserProvider, ErrorRouterPage } from 'common-frontend';
-import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { replaceEqualDeep } from 'common-frontend-utils';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
@@ -28,7 +28,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        structuralSharing: cnReplaceEqualDeep,
+        structuralSharing: replaceEqualDeep,
       },
     },
   });

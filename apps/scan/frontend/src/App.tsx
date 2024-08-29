@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ErrorRouterPage, theme } from 'common-frontend';
-import { cnReplaceEqualDeep } from 'common-frontend-utils';
+import { replaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
@@ -32,7 +32,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       queries: {
         // rounds update every 2.5 minutes, but for testing it's better to refresh more often, e.g. every 5 seconds
         refetchInterval: 5 * 1000,
-        structuralSharing: cnReplaceEqualDeep,
+        structuralSharing: replaceEqualDeep,
       },
     },
   });

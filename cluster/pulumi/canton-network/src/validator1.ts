@@ -9,7 +9,7 @@ import {
   exactNamespace,
   DecentralizedSynchronizerMigrationConfig,
   installAuth0UISecret,
-  installCNHelmChart,
+  installSpliceHelmChart,
   ValidatorTopupConfig,
   spliceInstanceNames,
   config,
@@ -40,7 +40,7 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const loopback = installCNHelmChart(
+  const loopback = installSpliceHelmChart(
     xns,
     'loopback',
     'cn-cluster-loopback-gateway',
@@ -116,7 +116,7 @@ export async function installValidator1(
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 
   if (installSplitwell) {
-    installCNHelmChart(
+    installSpliceHelmChart(
       xns,
       'splitwell-web-ui',
       'cn-splitwell-web-ui',
@@ -139,7 +139,7 @@ function installIngress(
   splitwell: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig
 ) {
-  installCNHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
+  installSpliceHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
