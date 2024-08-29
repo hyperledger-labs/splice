@@ -15,7 +15,7 @@ class AnsFrontendIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
-  "A CNS UI" should {
+  "A Name Service UI" should {
 
     "allow requesting an entry with subscription payments and then list it" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser

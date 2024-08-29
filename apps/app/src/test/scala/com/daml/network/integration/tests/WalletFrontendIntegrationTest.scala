@@ -68,7 +68,7 @@ class WalletFrontendIntegrationTest
             val usdBefore = BigDecimal(usdTextBefore.split(" ").head)
 
             actAndCheck(
-              s"User taps $amount CC in the wallet", {
+              s"User taps $amount Amulet in the wallet", {
                 tapAmulets(amountUsd)
               },
             )(
@@ -219,7 +219,7 @@ class WalletFrontendIntegrationTest
             browseToAliceWallet(aliceDamlUser)
           },
         )(
-          "Alice sees her CNS entry name",
+          "Alice sees her Name Service entry name",
           _ => {
             seleniumText(find(id("logged-in-user"))) should matchText(entryName)
           },

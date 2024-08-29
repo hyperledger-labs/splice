@@ -31,7 +31,7 @@ class AnsAuth0FrontendIntegrationTest
         )(c)
       )
 
-  "A CNS UI" should {
+  "A Name Service UI" should {
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
       // onboard the user through the wallet UI since the console command refs are not set up to get tokens from the auth0 test tenant -- then log in to the directory UI
       withAuth0LoginCheck("alice", aliceWalletUIPort, onboardThroughWalletUI = true) {

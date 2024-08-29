@@ -319,4 +319,10 @@ trait CommonAppInstanceReferences {
 
   def ansAcronym(implicit env: SpliceTestConsoleEnvironment): String =
     spliceInstanceNames.nameServiceNameAcronym.toLowerCase()
+
+  def amuletName(implicit env: SpliceTestConsoleEnvironment): String =
+    spliceInstanceNames.amuletName
+
+  def amuletNameAcronym(implicit env: SpliceTestConsoleEnvironment): String =
+    spliceInstanceNames.amuletNameAcronym
 }

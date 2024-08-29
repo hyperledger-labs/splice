@@ -60,7 +60,9 @@ class ScanFrontendTimeBasedIntegrationTest
         aliceValidatorWalletClient.tap(100.0)
       }
 
-      clue("Feature alice's validator and transfer some CC, to generate reward coupons")({
+      clue(
+        s"Feature alice's validator and transfer some Amulet, to generate reward coupons"
+      )({
         p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
         advanceRoundsByOneTick
         advanceRoundsByOneTick
@@ -89,7 +91,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
-            Seq(s"${aliceValidatorWalletParty} 0.249 CC"),
+            Seq(s"${aliceValidatorWalletParty} 0.249 $amuletNameAcronym"),
           )
         }
 
@@ -106,7 +108,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare validator leaderboard values") {
           compareLeaderboardTable(
             "validator-leaderboard-row",
-            Seq(s"${aliceValidatorWalletParty} 0.083 CC"),
+            Seq(s"${aliceValidatorWalletParty} 0.083 $amuletNameAcronym"),
           )
         }
       }
@@ -398,8 +400,8 @@ class ScanFrontendTimeBasedIntegrationTest
             Seq(
               s"${aliceValidatorWalletParty} 2 ${2 * trafficAmount} ${stripTrailingZeros(
                   2 * trafficCostCc
-                )} CC ${(firstRound + 1).toString}",
-              s"${bobValidatorWalletParty} 1 ${trafficAmount} ${stripTrailingZeros(trafficCostCc)} CC ${(firstRound + 1).toString}",
+                )} $amuletNameAcronym ${(firstRound + 1).toString}",
+              s"${bobValidatorWalletParty} 1 ${trafficAmount} ${stripTrailingZeros(trafficCostCc)} $amuletNameAcronym ${(firstRound + 1).toString}",
             ),
           )
         }
@@ -441,7 +443,7 @@ class ScanFrontendTimeBasedIntegrationTest
           _ => {
             val totalText = seleniumText(find(id("total-amulet-balance-cc")))
             val totalBalance = sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)
-            parseAmountText(totalText, "CC") shouldBe totalBalance
+            parseAmountText(totalText, amuletNameAcronym) shouldBe totalBalance
             val totalUsdText = seleniumText(find(id("total-amulet-balance-usd")))
             val totalUsdBalance = totalBalance * amuletPrice
             parseAmountText(totalUsdText, "USD") shouldBe totalUsdBalance

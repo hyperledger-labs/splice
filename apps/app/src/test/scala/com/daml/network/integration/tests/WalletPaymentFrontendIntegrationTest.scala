@@ -38,7 +38,7 @@ class WalletPaymentFrontendIntegrationTest
 
     "for single receiver" should {
 
-      "allow accepting payments in CC" in { implicit env =>
+      "allow accepting payments in Amulet unit" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
@@ -58,7 +58,7 @@ class WalletPaymentFrontendIntegrationTest
           tapAmount = 5 * amuletPrice,
         )
 
-        val description = "this will be accepted (in CC)"
+        val description = s"this will be accepted (in $amuletNameAcronym)"
 
         val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -85,7 +85,7 @@ class WalletPaymentFrontendIntegrationTest
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 1.5,
-                expectedComputeText = "3 USD @ 0.5 CC/USD",
+                expectedComputeText = s"3 USD @ 0.5 $amuletNameAcronym/USD",
                 expectedDescription = description,
               )
             },
@@ -166,7 +166,7 @@ class WalletPaymentFrontendIntegrationTest
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
-                expectedComputeText = "5.5 USD @ 2 USD/CC",
+                expectedComputeText = s"5.5 USD @ 2 USD/$amuletNameAcronym",
                 expectedDescription = description,
               )
             },
@@ -204,7 +204,7 @@ class WalletPaymentFrontendIntegrationTest
 
     "for multiple receivers" should {
 
-      "allow accepting payments in CC" in { implicit env =>
+      "allow accepting payments in Amulet unit" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
@@ -224,7 +224,7 @@ class WalletPaymentFrontendIntegrationTest
           tapAmount = 5 * amuletPrice,
         )
 
-        val description = "this will be accepted (in CC)"
+        val description = s"this will be accepted (in $amuletNameAcronym)"
 
         val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -249,12 +249,12 @@ class WalletPaymentFrontendIntegrationTest
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
-                  (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
-                  (charlieUserParty, charlieEntryName, "2.5 CC", "5 USD"),
+                  (aliceUserParty, aliceEntryName, s"1.5 $amuletNameAcronym", "3 USD"),
+                  (charlieUserParty, charlieEntryName, s"2.5 $amuletNameAcronym", "5 USD"),
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 4.0,
-                expectedComputeText = "8 USD @ 0.5 CC/USD",
+                expectedComputeText = s"8 USD @ 0.5 $amuletNameAcronym/USD",
                 expectedDescription = description,
               )
             },
@@ -333,12 +333,12 @@ class WalletPaymentFrontendIntegrationTest
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
-                  (aliceUserParty, aliceEntryName, "1.5 USD", "0.75 CC"),
-                  (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
+                  (aliceUserParty, aliceEntryName, "1.5 USD", s"0.75 $amuletNameAcronym"),
+                  (charlieUserParty, charlieEntryName, "2.5 USD", s"1.25 $amuletNameAcronym"),
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.0,
-                expectedComputeText = "4 USD @ 2 USD/CC",
+                expectedComputeText = s"4 USD @ 2 USD/$amuletNameAcronym",
                 expectedDescription = description,
               )
             },
@@ -372,7 +372,7 @@ class WalletPaymentFrontendIntegrationTest
         }
       }
 
-      "allow accepting payments in both CC & USD" in { implicit env =>
+      "allow accepting payments in both Amulet unit & USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
@@ -417,12 +417,12 @@ class WalletPaymentFrontendIntegrationTest
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
-                  (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
-                  (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
+                  (aliceUserParty, aliceEntryName, s"1.5 $amuletNameAcronym", "3 USD"),
+                  (charlieUserParty, charlieEntryName, "2.5 USD", s"1.25 $amuletNameAcronym"),
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
-                expectedComputeText = "5.5 USD @ 0.5 CC/USD",
+                expectedComputeText = s"5.5 USD @ 0.5 $amuletNameAcronym/USD",
                 expectedDescription = description,
               )
             },
@@ -480,9 +480,11 @@ class WalletPaymentFrontendIntegrationTest
     )._2
   }
 
-  private def renderPaymentUnit(unit: paymentCodegen.Unit): String =
+  private def renderPaymentUnit(
+      unit: paymentCodegen.Unit
+  )(implicit env: SpliceTestConsoleEnvironment): String =
     unit match {
-      case paymentCodegen.Unit.AMULETUNIT => "CC"
+      case paymentCodegen.Unit.AMULETUNIT => amuletNameAcronym
       case paymentCodegen.Unit.USDUNIT => "USD"
       case _ => fail(s"Invalid unit: $unit")
     }
@@ -495,7 +497,7 @@ class WalletPaymentFrontendIntegrationTest
       expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
-  ) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     matchPaymentCommon(element)(
       expectedBalance,
       expectedProvider,
@@ -520,7 +522,7 @@ class WalletPaymentFrontendIntegrationTest
       expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
-  ): Unit = {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     matchPaymentCommon(element)(
       expectedBalance,
       expectedProvider,
@@ -548,9 +550,9 @@ class WalletPaymentFrontendIntegrationTest
       expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
-  ) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     element.childElement(className("available-balance")).text should matchTextMixedWithNumbers(
-      raw"Total Available Balance: ([0-9.,]+) CC / ([0-9.,]+) USD".r,
+      raw"Total Available Balance: ([0-9.,]+) $amuletNameAcronym / ([0-9.,]+) USD".r,
       Seq(expectedBalance._1, expectedBalance._2),
       tolerance,
     )
@@ -561,7 +563,7 @@ class WalletPaymentFrontendIntegrationTest
 
     // TODO (#3492): test with fee
     element.childElement(className("payment-total-cc")).text should matchTextMixedWithNumbers(
-      raw"([0-9.,]+) CC".r,
+      raw"([0-9.,]+) $amuletNameAcronym".r,
       Seq(expectedTotalCC),
       tolerance,
     )

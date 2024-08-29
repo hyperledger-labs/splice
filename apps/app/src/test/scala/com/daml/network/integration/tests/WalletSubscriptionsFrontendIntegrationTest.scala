@@ -47,8 +47,8 @@ class WalletSubscriptionsFrontendIntegrationTest
       def matchSecondSubscription(row: Element) = matchSubscription(row)(
         expectedReceiver = expectedAns(alicePartyId, aliceEntryName),
         expectedProvider = expectedAns(alicePartyId, aliceEntryName),
-        expectedPrice = "42 CC per 1 day",
-        expectedAmuletPrice = "84 USD @ 0.5CC/USD",
+        expectedPrice = s"42 $amuletNameAcronym per 1 day",
+        expectedAmuletPrice = s"84 USD @ 0.5$amuletNameAcronym/USD",
         expectedPaymentDate = s"${aDate.getMonthValue}/${aDate.getDayOfMonth}/${aDate.getYear}",
         expectedButtonEnabled = true,
         expectedDescription = selfSubscriptionDescription,
@@ -69,11 +69,11 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedReceiver = dsoEntry,
               expectedProvider = dsoEntry,
               expectedPrice = "1 USD per 90 days",
-              expectedAmuletPrice = "0.5 CC @ 2USD/CC",
+              expectedAmuletPrice = s"0.5 $amuletNameAcronym @ 2USD/$amuletNameAcronym",
               expectedPaymentDate =
                 s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"CNS entry: \"$aliceEntryName\"",
+              expectedDescription = s"${ansAcronym.toUpperCase()} entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -158,11 +158,13 @@ class WalletSubscriptionsFrontendIntegrationTest
             find(className("available-balance"))
               .valueOrFail("Balance is not shown")
               // from the original `createAnsEntry`
-              .text should matchText("Total Available Balance: 4.4475 CC / 8.895 USD")
+              .text should matchText(
+              s"Total Available Balance: 4.4475 $amuletNameAcronym / 8.895 USD"
+            )
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText(s"CNS entry: \"$newlyPurchasedName\"")
+              .text should matchText(s"${ansAcronym.toUpperCase()} entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -170,7 +172,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
             find(className("sub-request-price-converted"))
               .valueOrFail("Price conversion is not shown")
-              .text should matchText("0.5 CC @ 2 USD/CC")
+              .text should matchText(s"0.5 $amuletNameAcronym @ 2 USD/$amuletNameAcronym")
           },
         )
 
@@ -192,11 +194,11 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedReceiver = dsoEntry,
               expectedProvider = dsoEntry,
               expectedPrice = "1 USD per 90 days",
-              expectedAmuletPrice = "0.5 CC @ 2USD/CC",
+              expectedAmuletPrice = s"0.5 $amuletNameAcronym @ 2USD/$amuletNameAcronym",
               expectedPaymentDate =
                 s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"CNS entry: \"$newlyPurchasedName\"",
+              expectedDescription = s"${ansAcronym.toUpperCase()} entry: \"$newlyPurchasedName\"",
             )
           },
         )

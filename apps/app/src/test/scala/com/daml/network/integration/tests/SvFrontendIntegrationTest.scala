@@ -100,7 +100,7 @@ class SvFrontendIntegrationTest
               e.text shouldBe "DSO Info"
             }
             inside(find(id("information-tab-cc-info"))) { case Some(e) =>
-              e.text shouldBe "Canton Coin Info"
+              e.text shouldBe s"$amuletName Info"
             }
             inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
               e.text shouldBe "CometBFT Debug Info"
