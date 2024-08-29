@@ -7,6 +7,9 @@ let
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
+
+  # Import the sphinx-lint derivation
+  sphinxLint = import ./sphinx-lint.nix { inherit pkgs; };
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -70,6 +73,7 @@ in pkgs.mkShell {
     selenium-server-standalone
     shellcheck
     sphinx
+    sphinxLint
     tmux
     toxiproxy
     unzip
