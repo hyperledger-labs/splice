@@ -30,6 +30,10 @@ export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
 
 export const LOAD_TESTER_MIN_RATE = config.optionalEnv('LOAD_TESTER_MIN_RATE') || '0.95';
 
+// Wasted traffic alert fires when the value exceeds WASTED_TRAFFIC_ALERT_THRESHOLD_KB over WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS
+export const WASTED_TRAFFIC_ALERT_THRESHOLD_KB = 1;
+export const WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS = 5;
+
 export type LogLevel = 'INFO' | 'DEBUG';
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);

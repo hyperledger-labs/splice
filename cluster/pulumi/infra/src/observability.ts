@@ -19,6 +19,8 @@ import {
   LOAD_TESTER_MIN_RATE,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
+  WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS,
+  WASTED_TRAFFIC_ALERT_THRESHOLD_KB,
 } from 'cn-pulumi-common';
 import { infraAffinityAndTolerations } from 'cn-pulumi-common';
 
@@ -756,6 +758,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
+            'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_THRESHOLD_KB',
+                WASTED_TRAFFIC_ALERT_THRESHOLD_KB.toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
+                WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS.toString()
+              ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
               readGrafanaAlertingFile('templates.yaml')
