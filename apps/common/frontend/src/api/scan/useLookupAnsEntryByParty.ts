@@ -25,7 +25,7 @@ export function useLookupAnsEntryByPartyFromResponse(
         return response.entry;
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
-          console.debug(`No CNS entry for party ${party} found`);
+          console.debug(`No name service entry for party ${party} found`);
           return null;
         } else {
           throw e;

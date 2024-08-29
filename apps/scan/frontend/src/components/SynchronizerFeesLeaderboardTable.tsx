@@ -9,6 +9,8 @@ import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@m
 
 import { config } from '../utils';
 
+const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
+
 export const SynchronizerFeesLeaderboardTable: React.FC = () => {
   const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
 
@@ -39,9 +41,7 @@ export const SynchronizerFeesLeaderboardTable: React.FC = () => {
               <TableCell>Name</TableCell>
               <TableCell align="right">Number of Purchases</TableCell>
               <TableCell align="right">Total Traffic Purchased</TableCell>
-              <TableCell align="right">
-                Total {config.spliceInstanceNames.amuletNameAcronym.toUpperCase()} Spent
-              </TableCell>
+              <TableCell align="right">Total {amuletNameAcronym} Spent</TableCell>
               <TableCell align="right">Last Purchased In Round</TableCell>
             </TableRow>
           </TableHead>

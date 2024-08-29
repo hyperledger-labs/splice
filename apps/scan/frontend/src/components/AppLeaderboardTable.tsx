@@ -7,6 +7,10 @@ import { useTopAppProviders } from 'common-frontend/scan-api';
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
+import { config } from '../utils/config';
+
+const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
+
 export const AppLeaderboardTable: React.FC = () => {
   const topAppProvidersQuery = useTopAppProviders();
 
@@ -53,7 +57,10 @@ const AppRow: React.FC<{
   totalRewards: BigNumber;
 }> = ({ name, totalRewards }) => {
   return (
-    <TableRow className="app-leaderboard-row" data-selenium-text={`${name} ${totalRewards} CC`}>
+    <TableRow
+      className="app-leaderboard-row"
+      data-selenium-text={`${name} ${totalRewards} ${amuletNameAcronym}`}
+    >
       <TableCell>
         <PartyId partyId={name} />
       </TableCell>
