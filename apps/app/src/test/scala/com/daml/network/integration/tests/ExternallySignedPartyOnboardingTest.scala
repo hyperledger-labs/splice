@@ -88,6 +88,74 @@ class ExternallySignedPartyOnboardingTest
         .payload
         .receiver shouldBe partyId.toProtoPrimitive
 
+      aliceValidatorWalletClient.tap(50.0)
+      aliceValidatorWalletClient.transferPreapprovalSend(partyId, 40.0)
+      aliceValidatorBackend
+        .getExternalPartyBalance(partyId)
+        .totalUnlockedCoin shouldBe "40.0000000000"
+
+      val partyHint2 = UUID.randomUUID().toString
+      val keyName2 = "party-key-2"
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "generate-key-pair",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName2",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "setup-party",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName2",
+          s"--party-hint=$partyHint2",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+
+      val partyId2 = aliceValidatorBackend.participantClient.parties
+        .hosted(filterParty = partyHint2)
+        .loneElement
+        .party
+
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "setup-transfer-preapproval",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName2",
+          s"--party-id=${partyId2.toProtoPrimitive}",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+
+      runProcess(
+        Seq(
+          "python",
+          "scripts/external-signing/external-signing.py",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+          "transfer-preapproval-send",
+          s"--key-directory=${tempDirectory.path}",
+          s"--key-name=$keyName",
+          s"--sender-party-id=${partyId.toProtoPrimitive}",
+          s"--receiver-party-id=${partyId2.toProtoPrimitive}",
+          s"--amount=20.0",
+        ),
+        aliceValidatorBackend.token.value,
+      )
+
+      aliceValidatorBackend
+        .getExternalPartyBalance(partyId2)
+        .totalUnlockedCoin shouldBe "20.0000000000"
     }
   }
 

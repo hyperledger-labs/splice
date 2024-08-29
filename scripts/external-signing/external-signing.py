@@ -119,6 +119,35 @@ class ValidatorClient:
         )
         return await response.json()
 
+    async def prepare_transfer_proposal_send(self, sender_party_id, receiver_party_id, amount):
+        payload = {
+            "sender_party_id": sender_party_id,
+            "receiver_party_id": receiver_party_id,
+            "amount": amount,
+        }
+        response = await session_post(
+            self.session,
+            f"{self.url}/api/validator/v0/admin/transfer-preapproval/prepare-send",
+            payload,
+        )
+        return await response.json()
+
+    async def submit_transfer_proposal_send(
+        self, party_id, transaction, signed_tx_hash, public_key
+    ):
+        payload = {
+            "submission": {
+                "party_id": party_id,
+                "transaction": transaction,
+                "signed_tx_hash": signed_tx_hash,
+                "public_key": public_key,
+            }
+        }
+        await session_post(
+            self.session,
+            f"{self.url}/api/validator/v0/admin/transfer-preapproval/submit-send",
+            payload,
+        )
 
 async def handle_generate_key_pair(args, validator_client):
     private_key = ECC.generate(curve="ed25519")
@@ -198,6 +227,21 @@ async def handle_setup_transfer_preapproval(args, validator_client):
         f"Created transfer preapproval with contract id {response['transfer_preapproval_contract_id']}"
     )
 
+async def handle_transfer_preapproval_send(args, validator_client):
+    logger.debug(f"Exercise choice TransferPreapproval_Send to transfer {args.amount} \
+        from {args.sender_party_id} to {args.receiver_party_id}")
+    [private_key, public_key] = read_key_pair(args.key_directory, args.key_name)
+    public_key_hex = public_key.export_key(format="raw").hex()
+    response = await validator_client.prepare_transfer_proposal_send(
+        args.sender_party_id, args.receiver_party_id, args.amount
+    )
+    signer = eddsa.new(private_key, "rfc8032")
+    signed_hash = signer.sign(bytes.fromhex(response["tx_hash"])).hex()
+    await validator_client.submit_transfer_proposal_send(
+        args.sender_party_id, response["transaction"], signed_hash, public_key_hex
+    )
+    logger.debug("Transfer complete.")
+
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(
@@ -236,6 +280,19 @@ def parse_cli_args():
     parser_setup_transfer_preapproval.add_argument("--party-id", required=True)
     parser_setup_transfer_preapproval.add_argument("--key-directory", required=True)
     parser_setup_transfer_preapproval.add_argument("--key-name", required=True)
+
+    parser_transfer_preapproval_send = subparsers.add_parser(
+        "transfer-preapproval-send",
+        help="Initiate a pre-approved transfer",
+    )
+    parser_transfer_preapproval_send.set_defaults(
+        handler=handle_transfer_preapproval_send
+    )
+    parser_transfer_preapproval_send.add_argument("--sender-party-id", required=True)
+    parser_transfer_preapproval_send.add_argument("--receiver-party-id", required=True)
+    parser_transfer_preapproval_send.add_argument("--amount", required=True)
+    parser_transfer_preapproval_send.add_argument("--key-directory", required=True)
+    parser_transfer_preapproval_send.add_argument("--key-name", required=True)
 
     return parser.parse_args()
 
