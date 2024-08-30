@@ -59,21 +59,19 @@ class ValidatorClient:
         payload = {"party_hint": party_hint, "public_key": public_key}
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/external-party-topology/generate",
+            f"{self.url}/api/validator/v0/admin/external-party/topology/generate",
             payload,
         )
         return await response.json()
 
-    async def submit_external_party_topology(
-        self, signed_topology_txs, public_key
-    ):
+    async def submit_external_party_topology(self, signed_topology_txs, public_key):
         payload = {
             "signed_topology_txs": signed_topology_txs,
             "public_key": public_key,
         }
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/external-party-topology/submit",
+            f"{self.url}/api/validator/v0/admin/external-party/topology/submit",
             payload,
         )
         return await response.json()
@@ -84,7 +82,7 @@ class ValidatorClient:
         }
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal",
+            f"{self.url}/api/validator/v0/admin/external-party/setup-proposal",
             payload,
         )
         return await response.json()
@@ -96,7 +94,7 @@ class ValidatorClient:
         }
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal/prepare-accept",
+            f"{self.url}/api/validator/v0/admin/external-party/setup-proposal/prepare-accept",
             payload,
         )
         return await response.json()
@@ -114,12 +112,14 @@ class ValidatorClient:
         }
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/admin/external-party-setup-proposal/submit-accept",
+            f"{self.url}/api/validator/v0/admin/external-party/setup-proposal/submit-accept",
             payload,
         )
         return await response.json()
 
-    async def prepare_transfer_proposal_send(self, sender_party_id, receiver_party_id, amount):
+    async def prepare_transfer_proposal_send(
+        self, sender_party_id, receiver_party_id, amount
+    ):
         payload = {
             "sender_party_id": sender_party_id,
             "receiver_party_id": receiver_party_id,
@@ -127,7 +127,7 @@ class ValidatorClient:
         }
         response = await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/admin/transfer-preapproval/prepare-send",
+            f"{self.url}/api/validator/v0/admin/external-party/transfer-preapproval/prepare-send",
             payload,
         )
         return await response.json()
@@ -145,9 +145,10 @@ class ValidatorClient:
         }
         await session_post(
             self.session,
-            f"{self.url}/api/validator/v0/admin/transfer-preapproval/submit-send",
+            f"{self.url}/api/validator/v0/admin/external-party/transfer-preapproval/submit-send",
             payload,
         )
+
 
 async def handle_generate_key_pair(args, validator_client):
     private_key = ECC.generate(curve="ed25519")
@@ -227,9 +228,12 @@ async def handle_setup_transfer_preapproval(args, validator_client):
         f"Created transfer preapproval with contract id {response['transfer_preapproval_contract_id']}"
     )
 
+
 async def handle_transfer_preapproval_send(args, validator_client):
-    logger.debug(f"Exercise choice TransferPreapproval_Send to transfer {args.amount} \
-        from {args.sender_party_id} to {args.receiver_party_id}")
+    logger.debug(
+        f"Exercise choice TransferPreapproval_Send to transfer {args.amount} \
+        from {args.sender_party_id} to {args.receiver_party_id}"
+    )
     [private_key, public_key] = read_key_pair(args.key_directory, args.key_name)
     public_key_hex = public_key.export_key(format="raw").hex()
     response = await validator_client.prepare_transfer_proposal_send(
