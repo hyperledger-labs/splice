@@ -2428,6 +2428,10 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "CN_APP_LEGACY_PARTY_HINT",
+                    "value": "true"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2793,6 +2797,10 @@
                   {
                     "name": "CN_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "CN_APP_LEGACY_PARTY_HINT",
+                    "value": "true"
                   },
                   {
                     "name": "NUM_NODES",
@@ -3162,6 +3170,10 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "CN_APP_LEGACY_PARTY_HINT",
+                    "value": "true"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3529,6 +3541,10 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "CN_APP_LEGACY_PARTY_HINT",
+                    "value": "true"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3894,6 +3910,10 @@
                   {
                     "name": "CN_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "CN_APP_LEGACY_PARTY_HINT",
+                    "value": "true"
                   },
                   {
                     "name": "NUM_NODES",

@@ -50,6 +50,10 @@ function write_validator_config() {
     local validator_admin_port=$(( base_port + 3 ))
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
+    local partyHint="Digital_Asset-load_test-${index}"
+    if [ -z "${CN_APP_LEGACY_PARTY_HINT:-}" ]; then
+        partyHint="$user"
+    fi
 
     secret="$(request_onboarding_secret)"
 
@@ -107,7 +111,7 @@ canton.validator-apps.validator_backend_$index = {
 
     ledger-api-user = $user
     validator-wallet-user = $user
-    validator-party-hint = $user
+    validator-party-hint = $partyHint
 
     auth {
         algorithm = "hs-256-unsafe"
