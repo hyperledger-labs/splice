@@ -5401,9 +5401,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "ciupgrade"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
           requires:
             - reset_cluster
       - deploy_sv_runbook:
@@ -5535,6 +5533,8 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "ciupgrade"
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
+          with_docker: true
           wait_for_sv: false
           requires:
             - deploy_final_upgrade
