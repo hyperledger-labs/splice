@@ -51,7 +51,7 @@ function write_validator_config() {
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
     local partyHint="Digital_Asset-load_test-${index}"
-    if [ -z "${CN_APP_LEGACY_PARTY_HINT:-}" ]; then
+    if [ -n "${CN_APP_LEGACY_PARTY_HINT:-}" ]; then
         partyHint="$user"
     fi
 
