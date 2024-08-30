@@ -335,7 +335,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_0",
+          "databaseName": "participant_1",
           "host": "postgres",
           "postgresName": "postgres",
           "schema": "participant",
@@ -522,7 +522,8 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "0"
+          "id": "1",
+          "migrating": true
         },
         "nodeIdentifier": "validator-runbook",
         "participantAddress": "participant",
