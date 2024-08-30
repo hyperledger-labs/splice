@@ -34,6 +34,8 @@ import { Transaction, TransactionSubtype } from '../models/models';
 import { config } from '../utils/config';
 import BftAnsEntry from './BftAnsEntry';
 
+const { amuletName, nameServiceNameAcronym } = config.spliceInstanceNames;
+
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
 
@@ -208,7 +210,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
           text = 'Automation';
           break;
         default:
-          console.warn('Unknown Transaction Canton Coin Operation', subtype);
+          console.warn(`Unknown Transaction ${amuletName} Operation`, subtype);
           text = subtype.choice;
       }
       break;
@@ -258,7 +260,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'Amulet_Expire':
       // AmuletExpired
-      text = `${config.spliceInstanceNames.amuletName} Expired`;
+      text = `${amuletName} Expired`;
       break;
     case 'SvRewardCoupon_ArchiveAsBeneficiary':
       // SvRewardCollected
@@ -270,7 +272,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'LockedAmulet_Unlock':
       // LockedAmuletUnlocked
-      text = `Locked ${config.spliceInstanceNames.amuletName} Unlocked`;
+      text = `Locked ${amuletName} Unlocked`;
       break;
     case 'SubscriptionInitialPayment_Reject':
       // SubscriptionInitialPaymentRejected
@@ -278,11 +280,11 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'LockedAmulet_OwnerExpireLock':
       // LockedAmuletOwnerExpired
-      text = `Locked ${config.spliceInstanceNames.amuletName} Owner Expired`;
+      text = `Locked ${amuletName} Owner Expired`;
       break;
     case 'LockedAmulet_ExpireAmulet':
       // LockedAmuletExpired
-      text = `Locked ${config.spliceInstanceNames.amuletName} Expired`;
+      text = `Locked ${amuletName} Expired`;
       break;
     case 'AcceptedAppPayment_Reject':
       // AppPaymentRejected
@@ -306,11 +308,11 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       break;
     case 'AnsRules_CollectInitialEntryPayment':
       // AnsEntryInitialPaymentCollected
-      text = `${config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} Entry Initial Payment Collected`;
+      text = `${nameServiceNameAcronym.toUpperCase()} Entry Initial Payment Collected`;
       break;
     case 'AnsRules_CollectEntryRenewalPayment':
       // AnsEntryRenewalPaymentCollected
-      text = `${config.spliceInstanceNames.nameServiceNameAcronym.toUpperCase()} Entry Renewal Payment Collected`;
+      text = `${nameServiceNameAcronym.toUpperCase()} Entry Renewal Payment Collected`;
       break;
     default:
       console.warn('Unknown Transaction Subtype', subtype);

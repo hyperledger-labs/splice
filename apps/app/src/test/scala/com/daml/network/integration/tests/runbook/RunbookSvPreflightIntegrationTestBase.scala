@@ -227,7 +227,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
           val totalAmuletBalanceSv = find(id("total-amulet-balance-cc")).value.text
           val totalAmuletBalanceSv1 = sv1ScanClient.getTotalAmuletBalance(round)
-          parseAmountText(totalAmuletBalanceSv, "CC") shouldBe totalAmuletBalanceSv1
+          parseAmountText(totalAmuletBalanceSv, amuletNameAcronym) shouldBe totalAmuletBalanceSv1
         }
       }
     } else {
@@ -235,7 +235,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The CNS UI is working" in { implicit env =>
+  "The Name Service UI is working" in { implicit env =>
     val ansUrl = s"https://cns.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     val ansName =
@@ -260,7 +260,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
         )
 
       }
-      if (isDevNet) { // SV missing CC in NonDevNet
+      if (isDevNet) { // SV missing Amulet in NonDevNet
         reserveAnsNameFor(
           () => login(),
           ansName,

@@ -195,7 +195,7 @@ abstract class ValidatorPreflightIntegrationTestBase
               transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
               // we can't test a specific amulet price as the amulet price on a live network can change
               val rateR =
-                raw"""^\s*(\d+(?:\.\d+)?)\s*${spliceInstanceNames.amuletNameAcronym}/USD\s*$$""".r
+                raw"""^\s*(\d+(?:\.\d+)?)\s*${amuletNameAcronym}/USD\s*$$""".r
               inside(transaction.rate) { case rateR(rate) =>
                 BigDecimal(rate) should be > BigDecimal(0)
                 transaction.usdAmount should beWithin(
@@ -291,7 +291,7 @@ abstract class ValidatorPreflightIntegrationTestBase
                 Seq("sender", "description"),
                 Seq(
                   aliceUserPartyId,
-                  s"paid 100.0 ${spliceInstanceNames.amuletNameAcronym} for Team lunch",
+                  s"paid 100.0 ${amuletNameAcronym} for Team lunch",
                 ),
               )(row)
             )
@@ -300,7 +300,7 @@ abstract class ValidatorPreflightIntegrationTestBase
                 Seq("sender", "description", "receiver"),
                 Seq(
                   bobUserPartyId,
-                  s"sent 50.0 ${spliceInstanceNames.amuletNameAcronym} to",
+                  s"sent 50.0 ${amuletNameAcronym} to",
                   aliceUserPartyId,
                 ),
               )(row)
@@ -311,14 +311,14 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
   }
 
-  "test the CNS ui of a validator" in { implicit env =>
+  "test the Name Service UI of a validator" in { implicit env =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     withFrontEnd("alice-validator") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser)
 
       if (isDevNet) {
-        // On DevNet-like clusters, we test the full CNS entry creation flow
+        // On DevNet-like clusters, we test the full ANS entry creation flow
 
         // Generate new random ANS names to avoid conflicts between multiple preflight check runs
         val entryId = (new scala.util.Random).nextInt().toHexString

@@ -12,7 +12,10 @@ import { useUserState } from 'common-frontend';
 import { BaseApiMiddleware, OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 
+import { config } from '../utils/config';
+
 const ExternalAnsContext = React.createContext<AnsApi | undefined>(undefined);
+const nameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym;
 
 export interface ExternalAnsProps {
   url: string;
@@ -48,7 +51,7 @@ export const ExternalAnsClientProvider: React.FC<React.PropsWithChildren<Externa
 export const useExternalAnsClient: () => AnsApi = () => {
   const client = useContext<AnsApi | undefined>(ExternalAnsContext);
   if (!client) {
-    throw new Error('External CNS client not initialized');
+    throw new Error(`External ${nameServiceAcronym} client not initialized`);
   }
   return client;
 };
