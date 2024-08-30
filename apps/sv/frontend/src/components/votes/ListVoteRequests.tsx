@@ -29,7 +29,7 @@ import { ContractId } from '@daml/types';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { useListVotes } from '../../hooks/useListVotes';
-import { config } from '../../utils';
+import { useSvConfig } from '../../utils';
 import { ListVoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
@@ -299,6 +299,7 @@ const ListVoteRequests: React.FC = () => {
 };
 
 const ListVoteRequestsWithContexts: React.FC = () => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <ListVoteRequests />

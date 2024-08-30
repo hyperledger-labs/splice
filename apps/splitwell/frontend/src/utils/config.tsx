@@ -2,29 +2,43 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   authSchema,
-  ConfigReader,
   testAuthSchema,
   serviceSchema,
   spliceInstanceNamesSchema,
   useAppManagerConfig,
   appManagerAuthConfig,
   walletSchema,
+  ConfigProvider,
+  useConfig as useConfigFromContext,
 } from 'common-frontend';
+import React from 'react';
 import { z } from 'zod';
 
-const reader = new ConfigReader(
-  z.object({
-    auth: authSchema.optional(),
-    testAuth: testAuthSchema.optional(),
-    spliceInstanceNames: spliceInstanceNamesSchema,
-    services: z.object({
-      wallet: walletSchema.optional(),
-      scan: serviceSchema,
-      splitwell: serviceSchema,
-      jsonApi: serviceSchema.optional(),
-    }),
-  })
-);
+const configScheme = z.object({
+  auth: authSchema.optional(),
+  testAuth: testAuthSchema.optional(),
+  spliceInstanceNames: spliceInstanceNamesSchema,
+  services: z.object({
+    wallet: walletSchema.optional(),
+    scan: serviceSchema,
+    splitwell: serviceSchema,
+    jsonApi: serviceSchema.optional(),
+  }),
+});
+
+type SplitwellServicesStaticConfig = {
+  wallet?: z.infer<typeof walletSchema>;
+  scan: z.infer<typeof serviceSchema>;
+  splitwell: z.infer<typeof serviceSchema>;
+  jsonApi?: z.infer<typeof serviceSchema>;
+};
+
+type SplitwellStaticConfig = {
+  auth?: z.infer<typeof authSchema>;
+  testAuth?: z.infer<typeof testAuthSchema>;
+  spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
+  services: SplitwellServicesStaticConfig;
+};
 
 type SplitwellServicesConfig = {
   wallet: z.infer<typeof walletSchema>;
@@ -41,16 +55,27 @@ type SplitwellConfig = {
   appManager: boolean;
 };
 
-const staticConfig = reader.loadConfig();
+export const ConfigContext = React.createContext<SplitwellStaticConfig | undefined>(undefined);
 
-const mandatoryConfig = <T>(name: string, config: T | undefined): T => {
-  if (!config) {
-    throw new Error(`${name} was not specified in app manager config or in static config`);
-  }
-  return config;
+export const SplitwellStaticConfigProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  return (
+    <ConfigProvider configScheme={configScheme} configContext={ConfigContext}>
+      {children}
+    </ConfigProvider>
+  );
 };
 
 export const useConfig = (): SplitwellConfig => {
+  const staticConfig = useConfigFromContext<SplitwellStaticConfig>(ConfigContext);
+  const mandatoryConfig: <T>(name: string, config: T | undefined) => T = (name, config) => {
+    if (!config) {
+      throw new Error(`${name} was not specified in app manager config or in static config`);
+    }
+    return config;
+  };
+
   const appManagerConfig = useAppManagerConfig();
   const authConfig: z.infer<typeof authSchema> = mandatoryConfig(
     'auth',

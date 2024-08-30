@@ -7,9 +7,7 @@ import { useTopAppProviders } from 'common-frontend/scan-api';
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
-import { config } from '../utils/config';
-
-const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
+import { useScanConfig } from '../utils/config';
 
 export const AppLeaderboardTable: React.FC = () => {
   const topAppProvidersQuery = useTopAppProviders();
@@ -56,6 +54,9 @@ const AppRow: React.FC<{
   name: string;
   totalRewards: BigNumber;
 }> = ({ name, totalRewards }) => {
+  const config = useScanConfig();
+  const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
+
   return (
     <TableRow
       className="app-leaderboard-row"

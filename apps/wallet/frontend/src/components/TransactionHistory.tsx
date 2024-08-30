@@ -31,10 +31,8 @@ import { Party } from '@daml/types';
 import { usePrimaryParty, useTransactions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { Transaction, TransactionSubtype } from '../models/models';
-import { config } from '../utils/config';
+import { useWalletConfig } from '../utils/config';
 import BftAnsEntry from './BftAnsEntry';
-
-const { amuletName, nameServiceNameAcronym } = config.spliceInstanceNames;
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
@@ -193,6 +191,8 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
 };
 
 const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ subtype }) => {
+  const config = useWalletConfig();
+  const { amuletName, nameServiceNameAcronym } = config.spliceInstanceNames;
   let text: string;
   // This should be replaced by localization in the future.
   switch (subtype.choice) {

@@ -23,10 +23,11 @@ import {
 import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/module';
 import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
-import { config } from '../utils/config';
+import { useScanConfig } from '../utils';
 
-const amuletName = config.spliceInstanceNames.amuletName;
 const NetworkInfo: React.FC = () => {
+  const config = useScanConfig();
+  const amuletName = config.spliceInstanceNames.amuletName;
   const getAmuletRulesQuery = useGetAmuletRules();
   const openRoundsQuery = useOpenRounds();
 
@@ -148,6 +149,8 @@ const NextConfigUpdate: React.FC = () => {
 };
 
 const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConfig }) => {
+  const config = useScanConfig();
+  const amuletName = config.spliceInstanceNames.amuletName;
   return (
     <TableContainer>
       <Table>
@@ -215,6 +218,8 @@ const FeeTableRow: React.FC<{ name: string; description: string; value: string }
 const toPercentFmt = (rate: string): string => `${BigNumber(rate).multipliedBy(100)}%`;
 
 const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees }) => {
+  const config = useScanConfig();
+  const amuletName = config.spliceInstanceNames.amuletName;
   const transferFeeSteps = transferFees.steps.reduce<
     { fee: string; range: string; last: boolean }[]
   >(

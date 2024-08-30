@@ -4,6 +4,6 @@ export {};
 
 declare global {
   interface Window {
-    splice_config: import('utils/config.ts').Config;
+    splice_config: import('src/utils/config.tsx').Config;
   }
 }

@@ -4,10 +4,15 @@ import { render, screen } from '@testing-library/react';
 import { test, expect } from 'vitest';
 
 import App from '../App';
+import { AnsConfigProvider } from '../utils';
 
 test('login screen shows up', async () => {
   // arrange
-  render(<App />);
+  render(
+    <AnsConfigProvider>
+      <App />
+    </AnsConfigProvider>
+  );
 
   // assert
   expect(() => screen.findByText('Log In')).toBeDefined();

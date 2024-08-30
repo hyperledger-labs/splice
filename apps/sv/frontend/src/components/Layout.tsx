@@ -8,13 +8,14 @@ import { Box, Button, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 
-import { config } from '../utils';
+import { useSvConfig } from '../utils';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
+  const config = useSvConfig();
   const { logout } = useUserState();
 
   return (

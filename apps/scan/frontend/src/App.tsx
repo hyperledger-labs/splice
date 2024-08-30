@@ -24,9 +24,10 @@ import DsoWithContexts from './routes/dso';
 import Root from './routes/root';
 import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
-import { config } from './utils';
+import { useScanConfig } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const config = useScanConfig();
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -61,21 +62,24 @@ const router = createBrowserRouter(
   )
 );
 
-const pageTitle = `${config.spliceInstanceNames.networkName} Scan`;
-const App: React.FC = () => (
-  <ThemeProvider theme={theme}>
-    <HelmetProvider>
-      <Helmet>
-        <title>{pageTitle}</title>
-        <meta name="description" content={pageTitle} />
-        <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
-      </Helmet>
-      <CssBaseline />
-      <Providers>
-        <RouterProvider router={router} />
-      </Providers>
-    </HelmetProvider>
-  </ThemeProvider>
-);
+const App: React.FC = () => {
+  const config = useScanConfig();
+  const pageTitle = `${config.spliceInstanceNames.networkName} Scan`;
+  return (
+    <ThemeProvider theme={theme}>
+      <HelmetProvider>
+        <Helmet>
+          <title>{pageTitle}</title>
+          <meta name="description" content={pageTitle} />
+          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+        </Helmet>
+        <CssBaseline />
+        <Providers>
+          <RouterProvider router={router} />
+        </Providers>
+      </HelmetProvider>
+    </ThemeProvider>
+  );
+};
 
 export default App;

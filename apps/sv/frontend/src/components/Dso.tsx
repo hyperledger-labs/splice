@@ -8,9 +8,10 @@ import { useDsoInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { useMediatorStatus } from '../hooks/useMediatorStatus';
 import { useSequencerStatus } from '../hooks/useSequencerStatus';
-import { config } from '../utils';
+import { useSvConfig } from '../utils';
 
 const DsoWithContexts: React.FC = () => {
+  const config = useSvConfig();
   const WithProvider = () => {
     const dsoInfoQuery = useDsoInfos();
     const cometBftNodeDebugQuery = useCometBftDebug();

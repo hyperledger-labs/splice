@@ -19,7 +19,7 @@ import {
 
 import { useAppManagerClient } from '../contexts/AppManagerServiceContext';
 import { useApproveAppReleaseConfiguration, useInstallApp, useInstalledApps } from '../hooks';
-import { config } from '../utils/config';
+import { useAppManagerConfig } from '../utils/config';
 
 const Timespan: React.FC<{ timespan: openapi.Timespan }> = ({ timespan }) => (
   <Stack direction="row">
@@ -102,6 +102,7 @@ const UnapprovedReleaseConfiguration: React.FC<{
 };
 
 const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
+  const config = useAppManagerConfig();
   const redirectUri = appLaunchUrl(
     {
       oidcAuthority: `${config.services.validator.url}/v0/app-manager/oauth2/`,

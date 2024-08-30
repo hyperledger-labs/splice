@@ -6,13 +6,14 @@ import { Header } from 'common-frontend';
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { config } from '../utils/config';
+import { useScanConfig } from '../utils';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
+  const config = useScanConfig();
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">

@@ -11,6 +11,7 @@ import {
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
+import { SplitwellStaticConfigProvider } from '../utils/config';
 import {
   alicePartyId,
   bobPartyId,
@@ -21,10 +22,18 @@ import {
 import { makeAcceptedGroupInvite, makeBalanceUpdate, makeGroupInvite } from './mocks/templates';
 import { server } from './setup/setup';
 
+const AppWithConfig = () => {
+  return (
+    <SplitwellStaticConfigProvider>
+      <App />
+    </SplitwellStaticConfigProvider>
+  );
+};
+
 describe('alice can', () => {
   test('login and see her party ID', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppWithConfig />);
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'alice_wallet_user');
@@ -37,7 +46,7 @@ describe('alice can', () => {
 
   test('submit a group create request', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppWithConfig />);
 
     const input = await screen.findByRole('textbox', { name: 'Group ID' });
     await user.type(input, groupName);
@@ -47,14 +56,14 @@ describe('alice can', () => {
   });
 
   test('see a group', async () => {
-    render(<App />);
+    render(<AppWithConfig />);
 
     await expect(screen.findByText(groupName)).resolves.toBeDefined();
   });
 
   test('request a membership invite', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppWithConfig />);
 
     await expect(screen.findByText(groupName)).resolves.toBeDefined();
 
@@ -87,7 +96,7 @@ describe('alice can', () => {
   });
 
   test('see pending membership request', async () => {
-    render(<App />);
+    render(<AppWithConfig />);
 
     server.use(
       rest.get(
@@ -113,7 +122,7 @@ describe('alice can', () => {
   });
 
   test('view balance updates', async () => {
-    render(<App />);
+    render(<AppWithConfig />);
 
     server.use(
       rest.get(`${window.splice_config.services.splitwell.url}/balance-updates`, (_, res, ctx) => {

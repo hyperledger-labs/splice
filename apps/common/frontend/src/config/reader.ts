@@ -25,15 +25,27 @@ export class ConfigReader<
   }
 
   loadConfig(): z.infer<T> {
+    const parseConfig = (config: unknown) => {
+      const parsedConfig = this.schema.safeParse(config);
+      if (parsedConfig.success) {
+        return parsedConfig.data;
+      } else {
+        throw new Error(
+          `Error when parsing config: ${JSON.stringify(parsedConfig.error, null, 2)}.`
+        );
+      }
+    };
+
     if (envConfigString !== undefined) {
       const envConfig = JSON.parse(envConfigString);
       // Printing whole config files to the log is usually a bad idea because it can leak secrets,
       // but frontend configs are inherently unsafe and must not contain any secrets.
       console.info(`Config from VITE_SPLICE_CONFIG:`, envConfigString);
       window.splice_config = envConfig;
-      return this.schema.parse(envConfig);
+      return parseConfig(envConfig);
     } else if (externalConfig !== undefined) {
-      return this.schema.parse(externalConfig);
+      console.info(`Config from window.splice_config:`, externalConfig);
+      return parseConfig(externalConfig);
     } else {
       throw new Error(
         `No configuration found. Make sure 'window.splice_config' is set before the UI code is loaded.`

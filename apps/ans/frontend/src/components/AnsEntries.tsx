@@ -12,11 +12,11 @@ import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 import { useEntriesWithPayData } from '../hooks';
-import { config } from '../utils';
-
-const nameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym;
+import { useAnsConfig } from '../utils';
 
 const AnsEntries: React.FC = () => {
+  const config = useAnsConfig();
+  const nameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym;
   const { data: ownedEntries, isError, isLoading } = useEntriesWithPayData();
 
   return (

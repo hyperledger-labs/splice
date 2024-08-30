@@ -17,7 +17,7 @@ import TableRow from '@mui/material/TableRow';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useValidatorOnboardings } from '../hooks/useValidatorOnboardings';
-import { config } from '../utils';
+import { useSvConfig } from '../utils';
 
 const ValidatorOnboardingSecrets: React.FC = () => {
   const ONBOARDING_SECRET_EXPIRY_IN_SECOND = 86400; // We allow validator to be onboarded in 24 hours
@@ -104,6 +104,7 @@ const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, secret }) => {
 };
 
 const ValidatorOnboardingSecretsWithContexts: React.FC = () => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <ValidatorOnboardingSecrets />

@@ -22,9 +22,10 @@ import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import PostPayment from './routes/postPayment';
 import Root from './routes/root';
-import { config } from './utils';
+import { useAnsConfig } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const config = useAnsConfig();
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -51,38 +52,40 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route
-      errorElement={<ErrorRouterPage />}
-      element={
-        <Providers>
-          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
-        </Providers>
-      }
-    >
-      <Route path="/" element={<Root />}>
-        <Route index element={<Home />} />
-        <Route path="home" element={<Home />} />
-        <Route path="post-payment" element={<PostPayment />} />
+const App: React.FC = () => {
+  const config = useAnsConfig();
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route
+        errorElement={<ErrorRouterPage />}
+        element={
+          <Providers>
+            <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+          </Providers>
+        }
+      >
+        <Route path="/" element={<Root />}>
+          <Route index element={<Home />} />
+          <Route path="home" element={<Home />} />
+          <Route path="post-payment" element={<PostPayment />} />
+        </Route>
       </Route>
-    </Route>
-  )
-);
-
-const pageTitle = config.spliceInstanceNames.nameServiceName;
-const App: React.FC = () => (
-  <ThemeProvider theme={theme}>
-    <HelmetProvider>
-      <Helmet>
-        <title>{pageTitle}</title>
-        <meta name="description" content={pageTitle} />
-        <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
-      </Helmet>
-      <CssBaseline />
-      <RouterProvider router={router} />
-    </HelmetProvider>
-  </ThemeProvider>
-);
+    )
+  );
+  const pageTitle = config.spliceInstanceNames.nameServiceName;
+  return (
+    <ThemeProvider theme={theme}>
+      <HelmetProvider>
+        <Helmet>
+          <title>{pageTitle}</title>
+          <meta name="description" content={pageTitle} />
+          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+        </Helmet>
+        <CssBaseline />
+        <RouterProvider router={router} />
+      </HelmetProvider>
+    </ThemeProvider>
+  );
+};
 
 export default App;

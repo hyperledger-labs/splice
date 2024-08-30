@@ -7,11 +7,12 @@ import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
 import { useBalance } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import { config } from '../utils/config';
+import { useWalletConfig } from '../utils/config';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
 
 const PaymentHeader: React.FC = () => {
+  const config = useWalletConfig();
   const amuletPriceQuery = useAmuletPrice();
   const balanceQuery = useBalance();
 

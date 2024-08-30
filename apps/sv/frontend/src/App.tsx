@@ -25,9 +25,10 @@ import Leader from './routes/leader';
 import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
-import { config } from './utils';
+import { useSvConfig } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const config = useSvConfig();
   const navigate = useNavigate();
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -54,42 +55,44 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route
-      errorElement={<ErrorRouterPage />}
-      element={
-        <Providers>
-          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
-        </Providers>
-      }
-    >
-      <Route path="/" element={<Root />}>
-        <Route index element={<Dso />} />
-        <Route path="dso" element={<Dso />} />
-        <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
-        <Route path="cc-price" element={<AmuletPrice />} />
-        <Route path="votes" element={<Voting />} />
-        <Route path="leader" element={<Leader />} />
+const App: React.FC = () => {
+  const config = useSvConfig();
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route
+        errorElement={<ErrorRouterPage />}
+        element={
+          <Providers>
+            <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+          </Providers>
+        }
+      >
+        <Route path="/" element={<Root />}>
+          <Route index element={<Dso />} />
+          <Route path="dso" element={<Dso />} />
+          <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
+          <Route path="cc-price" element={<AmuletPrice />} />
+          <Route path="votes" element={<Voting />} />
+          <Route path="leader" element={<Leader />} />
+        </Route>
       </Route>
-    </Route>
-  )
-);
-
-const App: React.FC = () => (
-  <ErrorBoundary>
-    <ThemeProvider theme={theme}>
-      <HelmetProvider>
-        <Helmet>
-          <title>Super Validator Operations</title>
-          <meta name="description" content="Super Validator Operations" />
-          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
-        </Helmet>
-        <CssBaseline />
-        <RouterProvider router={router} />
-      </HelmetProvider>
-    </ThemeProvider>
-  </ErrorBoundary>
-);
+    )
+  );
+  return (
+    <ErrorBoundary>
+      <ThemeProvider theme={theme}>
+        <HelmetProvider>
+          <Helmet>
+            <title>Super Validator Operations</title>
+            <meta name="description" content="Super Validator Operations" />
+            <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+          </Helmet>
+          <CssBaseline />
+          <RouterProvider router={router} />
+        </HelmetProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

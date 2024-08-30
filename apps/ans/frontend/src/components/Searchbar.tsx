@@ -3,7 +3,7 @@
 import { Search } from '@mui/icons-material';
 import { InputBase, styled, InputBaseProps, InputAdornment } from '@mui/material';
 
-import { config } from '../utils/config';
+import { useAnsConfig } from '../utils';
 
 const SearchbarStyled = styled(InputBase)<InputBaseProps>(({ theme }) => ({
   border: `1px solid ${theme.palette.colors.neutral[15]}`,
@@ -15,20 +15,23 @@ const SearchbarStyled = styled(InputBase)<InputBaseProps>(({ theme }) => ({
   },
 }));
 
-const Searchbar: React.FC<InputBaseProps> = props => (
-  <SearchbarStyled
-    startAdornment={
-      <InputAdornment position="start">
-        <Search color="secondary" />
-      </InputAdornment>
-    }
-    endAdornment={
-      <InputAdornment position="end">
-        .unverified.{config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase()}
-      </InputAdornment>
-    }
-    {...props}
-  />
-);
+const Searchbar: React.FC<InputBaseProps> = props => {
+  const config = useAnsConfig();
+  return (
+    <SearchbarStyled
+      startAdornment={
+        <InputAdornment position="start">
+          <Search color="secondary" />
+        </InputAdornment>
+      }
+      endAdornment={
+        <InputAdornment position="end">
+          .unverified.{config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase()}
+        </InputAdornment>
+      }
+      {...props}
+    />
+  );
+};
 
 export default Searchbar;

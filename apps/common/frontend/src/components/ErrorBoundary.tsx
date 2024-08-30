@@ -61,6 +61,10 @@ class ErrorBoundary extends React.Component<IProps, IState> {
     this.setState(DEFAULT_STATE);
   };
 
+  static getDerivedStateFromError(error: Error): IState {
+    return getErrorState(error.toString());
+  }
+
   private promiseRejectionHandler = (event: PromiseRejectionEvent) => {
     console.error(
       'ErrorBoundary caught an unhandled promise rejection',
@@ -92,24 +96,18 @@ class ErrorBoundary extends React.Component<IProps, IState> {
   }
 
   render(): ReactNode {
-    let errorBanner = null;
-
     if (this.state.hasError) {
-      errorBanner = (
+      const errorBanner = (
         <ErrorBanner
           error={this.state.error}
           errorTime={this.state.errorTime}
           clearError={() => this.clearError()}
         />
       );
+      return <div>{errorBanner}</div>;
     }
 
-    return (
-      <div>
-        {errorBanner}
-        {this.props.children}
-      </div>
-    );
+    return <div>{this.props.children}</div>;
   }
 }
 

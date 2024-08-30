@@ -21,9 +21,10 @@ import Apps from './routes/Apps';
 import Authorize from './routes/Authorize';
 import AuthCheck from './routes/authCheck';
 import Root from './routes/root';
-import { config } from './utils/config';
+import { useAppManagerConfig } from './utils/config';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const config = useAppManagerConfig();
   const navigate = useNavigate();
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -54,29 +55,31 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route
-      errorElement={<ErrorRouterPage />}
-      element={
-        <Providers>
-          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
-        </Providers>
-      }
-    >
-      <Route path="/" element={<Root />}>
-        <Route index element={<Apps />} />
-        <Route path="authorize" element={<Authorize />} />
+const App: React.FC = () => {
+  const config = useAppManagerConfig();
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route
+        errorElement={<ErrorRouterPage />}
+        element={
+          <Providers>
+            <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+          </Providers>
+        }
+      >
+        <Route path="/" element={<Root />}>
+          <Route index element={<Apps />} />
+          <Route path="authorize" element={<Authorize />} />
+        </Route>
       </Route>
-    </Route>
-  )
-);
-
-const App: React.FC = () => (
-  <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <RouterProvider router={router} />
-  </ThemeProvider>
-);
+    )
+  );
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  );
+};
 
 export default App;

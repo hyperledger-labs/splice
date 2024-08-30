@@ -28,7 +28,7 @@ import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { SvVote } from '../../models/models';
-import { config } from '../../utils';
+import { useSvConfig } from '../../utils';
 
 interface VoteFormProps {
   vote?: SvVote;
@@ -216,6 +216,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
 };
 
 const VoteFormWithContexts: React.FC<VoteFormProps> = props => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <VoteForm {...props} />

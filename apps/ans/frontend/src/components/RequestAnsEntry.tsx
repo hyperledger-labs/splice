@@ -15,16 +15,13 @@ import { Box, Button, Stack, Typography, styled } from '@mui/material';
 import Searchbar from '../components/Searchbar';
 import { useRequestEntry, useLookupAnsEntryByName, useGetAnsRules } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
-import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
+import { toEntryNameSuffix, toFullEntryName, useAnsConfig } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
 
-const entryNameRegex = new RegExp(`^[a-z0-9_-]{1,${60 - ENTRY_NAME_SUFFIX.length}}$`);
-const isEntryNameValid = (name: string) => {
-  return entryNameRegex.test(name);
-};
-
 const RequestAnsEntry: React.FC = () => {
+  const config = useAnsConfig();
+  const ENTRY_NAME_SUFFIX = toEntryNameSuffix(config.spliceInstanceNames.nameServiceNameAcronym);
   const [entryName, setEntryName] = useState<string>('');
   const debounced = useDebouncedCallback(value => {
     setEntryName(value);
@@ -90,8 +87,15 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
   entryName,
   nameLookupStatus,
 }) => {
+  const config = useAnsConfig();
+  const ENTRY_NAME_SUFFIX = toEntryNameSuffix(config.spliceInstanceNames.nameServiceNameAcronym);
   const { mutateAsync: requestEntry } = useRequestEntry();
   const { data: ansRules } = useGetAnsRules();
+
+  const entryNameRegex = new RegExp(`^[a-z0-9_-]{1,${60 - ENTRY_NAME_SUFFIX.length}}$`);
+  const isEntryNameValid = (name: string) => {
+    return entryNameRegex.test(name);
+  };
 
   if (nameLookupStatus === 'loading' || !ansRules) {
     return <></>;

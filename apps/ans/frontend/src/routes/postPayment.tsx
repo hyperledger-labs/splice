@@ -9,9 +9,11 @@ import { Button, Stack, Typography } from '@mui/material';
 
 import { useLookupAnsEntryByName } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
-import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
+import { toEntryNameSuffix, toFullEntryName, useAnsConfig } from '../utils';
 
 export const PostPayment: React.FC = () => {
+  const config = useAnsConfig();
+  const ENTRY_NAME_SUFFIX = toEntryNameSuffix(config.spliceInstanceNames.nameServiceNameAcronym);
   const [searchParams] = useSearchParams();
   const entryName = searchParams.get('entryName') || '';
 
@@ -112,6 +114,7 @@ const AnsFailed: React.FC<{ errorMessage: string; errorDetails?: string }> = ({
 };
 
 const AnsReady: React.FC<AnsProps> = ({ fullEntryName }) => {
+  const config = useAnsConfig();
   return (
     <Stack
       spacing={20}
@@ -134,6 +137,7 @@ const AnsReady: React.FC<AnsProps> = ({ fullEntryName }) => {
 };
 
 const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
+  const config = useAnsConfig();
   const nsn = config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase();
   const isUnverified = fullEntryName.endsWith(`.unverified.${nsn}`);
   if (isUnverified) {
@@ -155,6 +159,7 @@ const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
 };
 
 const YourAnsEntriesButton: React.FC = () => {
+  const config = useAnsConfig();
   return (
     <Link to="/">
       <Button variant="pill" id="ans-entries-button">

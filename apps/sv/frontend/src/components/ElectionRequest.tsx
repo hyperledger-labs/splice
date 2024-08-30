@@ -13,7 +13,7 @@ import { ElectionRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRu
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useElectionContext, useDsoInfos } from '../contexts/SvContext';
-import { config } from '../utils';
+import { useSvConfig } from '../utils';
 import { Alerting, AlertState } from '../utils/Alerting';
 import RankingForm, { User } from '../utils/RankingForm';
 
@@ -152,6 +152,7 @@ const ElectionRequests: React.FC = () => {
 };
 
 const ElectionRequestWithContexts: React.FC = () => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <ElectionRequests />

@@ -24,10 +24,11 @@ import {
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import { config } from '../utils/config';
+import { useWalletConfig } from '../utils/config';
 import BftAnsField from './BftAnsField';
 
 const SendTransfer: React.FC = () => {
+  const config = useWalletConfig();
   const { createTransferOffer } = useWalletClient();
   const amuletPriceQuery = useAmuletPrice();
 

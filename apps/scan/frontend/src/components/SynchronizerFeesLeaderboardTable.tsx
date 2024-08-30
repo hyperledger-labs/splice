@@ -7,11 +7,11 @@ import { useGetTopValidatorsByPurchasedTraffic } from 'common-frontend/scan-api'
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
-import { config } from '../utils';
-
-const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
+import { useScanConfig } from '../utils';
 
 export const SynchronizerFeesLeaderboardTable: React.FC = () => {
+  const config = useScanConfig();
+  const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
   const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
 
   switch (topValidatorsQuery.status) {

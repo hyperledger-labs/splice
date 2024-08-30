@@ -8,9 +8,10 @@ import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { useAmuletPriceVotes } from '../../hooks/useAmuletPriceVotes';
-import { config } from '../../utils/config';
+import { useSvConfig } from '../../utils';
 
 const MedianAmuletPrice: React.FC = () => {
+  const config = useSvConfig();
   const amuletPriceVotesQuery = useAmuletPriceVotes();
   const amuletName = config.spliceInstanceNames.amuletName;
 

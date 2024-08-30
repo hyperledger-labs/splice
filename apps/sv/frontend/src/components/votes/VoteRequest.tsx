@@ -7,7 +7,7 @@ import { getUTCWithOffset } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   Box,
@@ -28,7 +28,7 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
-import { config } from '../../utils';
+import { useSvConfig } from '../../utils';
 import { Alerting, AlertState } from '../../utils/Alerting';
 import {
   isExpirationBeforeEffectiveDate,
@@ -119,38 +119,37 @@ const VoteRequest: React.FC = () => {
   ];
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
-
-  function max(time1: Dayjs, time2: Dayjs): Dayjs {
-    return time1 > time2 ? time1 : time2;
-  }
-
-  const chooseAction = (action: ActionFromForm) => {
-    setAction(action);
-    if (!actionFromFormIsError(action)) {
-      if (action.tag === 'ARC_AmuletRules') {
-        switch (action.value.amuletRulesAction.tag) {
-          case 'CRARC_AddFutureAmuletConfigSchedule': {
-            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
-              max(dayjs(), dayjs(action.value.amuletRulesAction.value.newScheduleItem._1))
-            );
-            return;
-          }
-          case 'CRARC_UpdateFutureAmuletConfigSchedule': {
-            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
-              max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleItem._1))
-            );
-            return;
-          }
-          case 'CRARC_RemoveFutureAmuletConfigSchedule': {
-            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
-              max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleTime))
-            );
-            return;
+  const chooseAction = useCallback(
+    (action: ActionFromForm) => {
+      setAction(action);
+      const max = (time1: Dayjs, time2: Dayjs) => (time1 > time2 ? time1 : time2);
+      if (!actionFromFormIsError(action)) {
+        if (action.tag === 'ARC_AmuletRules') {
+          switch (action.value.amuletRulesAction.tag) {
+            case 'CRARC_AddFutureAmuletConfigSchedule': {
+              setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+                max(dayjs(), dayjs(action.value.amuletRulesAction.value.newScheduleItem._1))
+              );
+              return;
+            }
+            case 'CRARC_UpdateFutureAmuletConfigSchedule': {
+              setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+                max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleItem._1))
+              );
+              return;
+            }
+            case 'CRARC_RemoveFutureAmuletConfigSchedule': {
+              setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+                max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleTime))
+              );
+              return;
+            }
           }
         }
       }
-    }
-  };
+    },
+    [setAction, setMaxDateTimeIfAddFutureAmuletConfigSchedule]
+  );
 
   function validateAction(action: ActionRequiringConfirmation) {
     if (action?.tag !== 'ARC_AmuletRules') {
@@ -354,6 +353,7 @@ const VoteRequest: React.FC = () => {
 };
 
 const VoteRequestWithContexts: React.FC = () => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <VoteRequest />

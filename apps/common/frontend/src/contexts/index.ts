@@ -10,3 +10,4 @@ export {
   useLedgerApiClient,
   PackageIdResolver,
 } from './LedgerApiContext';
+export { ConfigProvider, useConfig } from './ConfigContext';

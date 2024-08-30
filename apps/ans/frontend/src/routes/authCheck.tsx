@@ -4,7 +4,7 @@ import * as React from 'react';
 import { AuthConfig, TestAuthConfig, Login, useUserState } from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
-import { config } from '../utils';
+import { useAnsConfig } from '../utils';
 
 interface AuthCheckProps {
   authConfig: AuthConfig;
@@ -12,6 +12,7 @@ interface AuthCheckProps {
 }
 
 const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => {
+  const config = useAnsConfig();
   const { isAuthenticated } = useUserState();
 
   if (isAuthenticated) {

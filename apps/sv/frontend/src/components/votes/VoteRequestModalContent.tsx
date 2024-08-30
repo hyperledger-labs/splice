@@ -31,7 +31,7 @@ import { useDsoInfos } from '../../contexts/SvContext';
 import { useListVotes } from '../../hooks/useListVotes';
 import { useVoteRequest } from '../../hooks/useVoteRequest';
 import { SvVote } from '../../models/models';
-import { config } from '../../utils';
+import { useSvConfig } from '../../utils';
 import VoteForm from './VoteForm';
 import ActionView from './actions/views/ActionView';
 
@@ -276,6 +276,7 @@ const VoteRows: React.FC<{
 );
 
 const VoteRequestModalContentWithContexts: React.FC<VoteRequestModalProps> = props => {
+  const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <VoteRequestModalContent {...props} />
