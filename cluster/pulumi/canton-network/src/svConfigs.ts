@@ -1,7 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Output } from '@pulumi/pulumi';
 import { isDevNet, isMainNet, SvCometBftKeys, svCometBftKeysFromSecret } from 'cn-pulumi-common';
-import { cometbftRetainBlocks } from 'cn-pulumi-common/src/synchronizer/cometbftConfig';
+import { cometbftRetainBlocks } from 'cn-pulumi-common-sv';
 
 import { SweepConfig, sweepConfigFromEnv } from './validator';
 

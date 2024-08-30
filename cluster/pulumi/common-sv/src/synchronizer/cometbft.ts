@@ -1,7 +1,6 @@
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
-
 import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
@@ -15,8 +14,9 @@ import {
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
-} from '../.';
-import { CnChartVersion } from '../artifacts';
+} from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
+
 import { CometBftNodeConfig, CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync, stableCometBftChainId } from './cometbftConfig';
 

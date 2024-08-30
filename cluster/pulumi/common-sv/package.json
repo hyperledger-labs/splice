@@ -1,15 +1,9 @@
 {
-  "name": "canton-network-pulumi-deployment",
+  "name": "cn-pulumi-common-sv",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
-    "@kubernetes/client-node": "^0.18.1",
-    "@pulumi/random": "4.14.0",
-    "@types/auth0": "^3.3.2",
-    "auth0": "^3.4.0",
-    "cn-pulumi-common": "1.0.0",
-    "cn-pulumi-common-sv": "1.0.0",
-    "@google-cloud/storage": "^6.11.0"
+    "cn-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -20,9 +14,5 @@
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
-  },
-  "devDependencies": {
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
   }
 }

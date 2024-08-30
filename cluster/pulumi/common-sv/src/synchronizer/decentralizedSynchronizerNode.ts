@@ -2,7 +2,6 @@ import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Resource } from '@pulumi/pulumi';
 import { StaticCometBftConfigWithNodeName } from 'canton-network-pulumi-deployment/src/svConfigs';
-
 import {
   autoInitValues,
   defaultVersion,
@@ -13,9 +12,10 @@ import {
   LogLevel,
   sequencerResources,
   sequencerTokenExpirationTime,
-} from '../.';
-import { CnChartVersion } from '../artifacts';
-import { Postgres } from '../postgres';
+} from 'cn-pulumi-common';
+import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
+import { Postgres } from 'cn-pulumi-common/src/postgres';
+
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
 

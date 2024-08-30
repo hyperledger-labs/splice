@@ -2,22 +2,24 @@ import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
 import svConfigs from 'canton-network-pulumi-deployment/src/svConfigs';
 import {
+  autoInitValues,
   ChartValues,
   CnInput,
-  ExactNamespace,
+  config,
   DecentralizedSynchronizerMigrationConfig,
-  REPO_ROOT,
-  installSpliceRunbookHelmChart,
+  ExactNamespace,
   installMigrationIdSpecificComponent,
+  installSpliceRunbookHelmChart,
   loadYamlFromFile,
+  REPO_ROOT,
   sequencerResources,
   sequencerTokenExpirationTime,
-  config,
-  autoInitValues,
 } from 'cn-pulumi-common';
-import { CometBftNodeConfigs } from 'cn-pulumi-common/src/synchronizer/cometBftNodeConfigs';
-import { installCometBftNode } from 'cn-pulumi-common/src/synchronizer/cometbft';
-import { cometbftRetainBlocks } from 'cn-pulumi-common/src/synchronizer/cometbftConfig';
+import {
+  CometBftNodeConfigs,
+  cometbftRetainBlocks,
+  installCometBftNode,
+} from 'cn-pulumi-common-sv';
 
 import { installCometbftKeys } from './cometbftKeys';
 import { installPostgres } from './postgres';

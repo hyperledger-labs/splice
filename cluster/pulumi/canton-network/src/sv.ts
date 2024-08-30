@@ -44,8 +44,8 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
+import { DecentralizedSynchronizerNode } from '../../common-sv/src/synchronizer/decentralizedSynchronizerNode';
 import { Postgres } from '../../common/src/postgres';
-import { DecentralizedSynchronizerNode } from '../../common/src/synchronizer/decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
 import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';

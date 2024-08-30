@@ -24,6 +24,7 @@
     },
     "workspaces": [
         "common",
+        "common-sv",
         "canton-network",
         "gcp",
         "infra",

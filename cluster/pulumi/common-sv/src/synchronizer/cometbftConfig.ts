@@ -1,4 +1,4 @@
-import { config } from '../config';
+import { config } from 'cn-pulumi-common/src/config';
 
 const enableCometbftPruning = config.envFlag('ENABLE_COMETBFT_PRUNING', true);
 export const cometbftRetainBlocks = enableCometbftPruning
