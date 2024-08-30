@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import * as _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -39,6 +38,7 @@ import {
   autoInitValues,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
+import _ from 'lodash';
 
 import {
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -146,7 +146,7 @@ type ValidatorConfig = {
   nodeIdentifier: string;
 };
 
-async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Release> {
+async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.helm.v3.Release> {
   const {
     xns,
     onboardingSecret,
@@ -158,13 +158,15 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     backupConfigSecret,
     backupConfig,
     topupConfig,
-  } = config;
+  } = validatorConfig;
 
+  // TODO(#14507): Remove the override once ciperiodic has been bumped to 0.2.0
+  const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
   const postgresValues: ChartValues = _.merge(
     loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
     ),
-    { db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined } }
+    { db: { volumeSize: postgresPvcSizeOverride || (clusterSmallDisk ? '240Gi' : undefined) } }
   );
   const postgres = installSpliceRunbookHelmChart(
     xns,
@@ -201,7 +203,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       postgresName: 'postgres',
     },
     enablePostgresMetrics: true,
-    ...autoInitValues('cn-participant', defaultVersion, config.nodeIdentifier),
+    ...autoInitValues('cn-participant', defaultVersion, validatorConfig.nodeIdentifier),
   };
 
   const participant = installSpliceRunbookHelmChart(
@@ -247,7 +249,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       {
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
-        YOUR_VALIDATOR_NAME: config.nodeIdentifier,
+        YOUR_VALIDATOR_NAME: validatorConfig.nodeIdentifier,
       }
     ),
   };
