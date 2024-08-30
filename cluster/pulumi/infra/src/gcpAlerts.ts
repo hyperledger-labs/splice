@@ -33,54 +33,48 @@ export function installGcpLoggingAlerts(
     filter: `severity>=WARNING
 resource.type="k8s_container"
 resource.labels.cluster_name="${CLUSTER_NAME}"
-resource.labels.namespace_name=~"sv.*|validator.*|splitwell"
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
+resource.labels.namespace_name=~"sv|validator|splitwell"
+-(resource.labels.container_name=~"participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
 -- https://github.com/DACH-NY/canton-network-node/issues/10475
--(resource.labels.container_name="cometbft" AND jsonPayload.err="error adding vote")
--(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopping peer for error")
--(resource.labels.container_name="cometbft" AND (jsonPayload.error="already stopped" OR jsonPayload.err="already stopped"))
--(resource.labels.container_name="cometbft" AND jsonPayload.err=~"use of closed network connection")
--(resource.labels.container_name="cometbft" AND jsonPayload._msg="Stopped accept routine, as transport is closed")
--(resource.labels.container_name="cometbft" AND jsonPayload._msg="Failed to write PacketMsg")
--(resource.labels.container_name="cometbft" AND jsonPayload._msg="Connection failed @ sendRoutine")
+-(resource.labels.container_name="cometbft" AND
+  (   jsonPayload.err=~"\\Aerror adding vote\\z|\\Aalready stopped\\z|use of closed network connection"
+   OR jsonPayload._msg=~"\\A(Stopping peer for error|Stopped accept routine, as transport is closed|Failed to write PacketMsg|Connection failed @ sendRoutine)\\z"
+   OR jsonPayload.error="already stopped"
+   OR textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'"
+   OR (jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")))
 -- execution context overload
--jsonPayload.message=~"Task runner canton-env-ec is .* overloaded.*"
+-jsonPayload.message=~"Task runner canton-env-ec is .* overloaded"
 -- on startup
--textPayload=~"Picked up JAVA_TOOL_OPTIONS:.*"
--resource.labels.container_name="ans-web-ui"
--resource.labels.container_name="wallet-web-ui"
--resource.labels.container_name="scan-web-ui"
--resource.labels.container_name="sv-web-ui"
--resource.labels.container_name="splitwell-web-ui"
--(resource.labels.container_name="cometbft" AND textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'")
+-textPayload=~"Picked up JAVA_TOOL_OPTIONS:"
+-- \\A and \\z anchor a search (=~) at beginning/end of string, respectively
+-- regex is significantly faster than OR; gcp docs themselves recommend
+-- regex-based factoring
+-resource.labels.container_name=~"\\A(ans|wallet|scan|sv|splitwell)-web-ui\\z"
 -- sequencer down
--(resource.labels.namespace_name=~"validator.*|splitwell" AND resource.labels.container_name=~".*participant" AND jsonPayload.message=~".*SEQUENCER_SUBSCRIPTION_LOST.*|Request failed for sequencer.*|Submission timed out.*|Response message for request .* timed out .*|periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
+-(resource.labels.namespace_name=~"validator|splitwell"
+  AND resource.labels.container_name=~"participant"
+  AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
--UnknownHostException
--"Late processing (or clock skew) of batch"
--UnresolvedAddressException
--(resource.labels.container_name="sequencer-pg" AND ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
--(resource.labels.container_name="cometbft" AND jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*")
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*")
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients")
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"channel.*shutdown did not complete gracefully in allotted")
--(resource.labels.container_name=~".*participant" AND jsonPayload.message=~"LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages")
--(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants")
--(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message")
--(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash")
--(resource.labels.container_name="mediator" AND jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash")
--(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:.*" AND jsonPayload.message=~".*Authorization Failed.*")
--(jsonPayload.level="error" AND jsonPayload.msg=~".*/readyz")
+-jsonPayload.message=~"UnknownHostException"
+-(resource.labels.container_name="participant|mediator" AND jsonPayload.message=~"Late processing (or clock skew) of batch")
+-(resource.labels.container_name="sequencer" AND jsonPayload.stack_trace=~"UnresolvedAddressException")
+-(resource.labels.container_name="sequencer-pg" AND
+  ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
+-(resource.labels.container_name=~"participant" AND
+  jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has (missing|extra) recipients|LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients|channel.*shutdown did not complete gracefully in allotted|LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages")
+-(resource.labels.container_name="mediator" AND
+  jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*(Reason: (Missing root hash message for informee participants|Superfluous root hash message)|Received a (mediator|confirmation) response.*with an invalid root hash)")
+-(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:" AND jsonPayload.message=~"Authorization Failed")
+-(jsonPayload.level="error" AND jsonPayload.msg=~"/readyz")
 -- The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
 -jsonPayload.message="The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response."
 -- istio-proxy is spammy with warnings
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 -resource.labels.container_name="postgres"
--(resource.labels.container_name=~"postgres.*" AND resource.labels.namespace_name="multi-validator")
+-(resource.labels.container_name=~"postgres" AND resource.labels.namespace_name="multi-validator")
 ${conditionalString(
   enableChaosMesh,
-  '-(resource.labels.namespace_name="multi-validator" AND "SEQUENCER_SUBSCRIPTION_LOST")'
+  '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
 )}`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
