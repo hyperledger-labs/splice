@@ -258,6 +258,7 @@ class SvDsoAutomationService(
       new ReceiveSvRewardCouponTrigger(
         triggerContext,
         dsoStore,
+        participantAdminConnection,
         connection,
         config.extraBeneficiaries,
       )

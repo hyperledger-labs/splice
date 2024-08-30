@@ -24,6 +24,7 @@ import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
   ListNamespaceDelegationResult,
   ListOwnerToKeyMappingResult,
+  ListVettedPackagesResult,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -462,6 +463,25 @@ abstract class TopologyAdminConnection(
       ),
       filterNamespace = participantId.namespace.filterString,
     )
+
+  def listVettedPackages(
+      participantId: ParticipantId,
+      domainId: DomainId,
+  )(implicit tc: TraceContext): Future[Seq[ListVettedPackagesResult]] = {
+    runCmd(
+      TopologyAdminCommands.Read.ListVettedPackages(
+        BaseQuery(
+          filterStore = TopologyStoreId.DomainStore(domainId).filterName,
+          proposals = false,
+          timeQuery = TimeQuery.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterParticipant = participantId.filterString,
+      )
+    )
+  }
 
   def proposeMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,

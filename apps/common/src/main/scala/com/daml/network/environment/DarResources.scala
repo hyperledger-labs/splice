@@ -159,6 +159,9 @@ object DarResources {
   def lookupPackageId(packageId: String): Option[DarResource] =
     pkgIdToDarResource.get(packageId)
 
+  def getDarResources(packageIds: Seq[String]): Seq[DarResource] =
+    packageIds.flatMap(lookupPackageId)
+
   def lookupPackageMetadata(name: PackageName, version: PackageVersion): Option[DarResource] =
     pkgMetadataToDarResource.get((name, version))
 
@@ -172,6 +175,10 @@ final case class PackageResource(
     bootstrap: DarResource, // Used during bootstrapping or testing where we can assume a fixed package id.
     others: Seq[DarResource], // Other DARs for the same package
 ) {
+  def getPackageIdWithVersion(version: String): Option[String] = {
+    all.find(_.metadata.version.toString() == version).map(_.packageId)
+  }
+
   def all = bootstrap +: others
 }
 

@@ -4,26 +4,34 @@
 package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
+import cats.implicits.toTraverseOps
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
+import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.environment.SpliceLedgerConnection
+import com.daml.network.environment.{
+  DarResources,
+  ParticipantAdminConnection,
+  SpliceLedgerConnection,
+}
 import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.store.MiningRoundsStore.OpenMiningRoundContract
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.AssignedContract
+import com.daml.network.util.{AmuletConfigSchedule, AssignedContract}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -31,6 +39,7 @@ import scala.math.Ordering.Implicits.*
 class ReceiveSvRewardCouponTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
+    participantAdminConnection: ParticipantAdminConnection,
     spliceLedgerConnection: SpliceLedgerConnection,
     extraBeneficiaries: Seq[BeneficiaryConfig],
 )(implicit
@@ -47,10 +56,61 @@ class ReceiveSvRewardCouponTrigger(
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[ReceiveSvRewardCouponTrigger.Task]] = {
-    retrieveNextRoundToClaim().value.map(_.toList)
+    for {
+      dsoRules <- store.getDsoRules()
+      amuletRules <- store.getAmuletRules()
+      packages = AmuletConfigSchedule(amuletRules)
+        .getConfigAsOf(context.clock.now)
+        .packageConfig
+      svLatestVettedPackages = Seq(
+        DarResources.amulet.getPackageIdWithVersion(packages.amulet)
+      )
+      beneficiariesWithLatestVettedPackages <- extraBeneficiaries.filterA { beneficiary =>
+        participantAdminConnection
+          .getPartyToParticipant(
+            dsoRules.domain,
+            beneficiary.beneficiary,
+          )
+          .flatMap(partyToParticipant =>
+            isVettingLatestPackages(
+              partyToParticipant.mapping.participantIds,
+              svLatestVettedPackages.flatMap(_.toList),
+            )
+          )
+      }
+      result <- retrieveNextRoundToClaim(beneficiariesWithLatestVettedPackages).value.map(_.toList)
+    } yield {
+      val beneficiariesWithoutLatestPackages =
+        extraBeneficiaries.diff(beneficiariesWithLatestVettedPackages)
+      if (beneficiariesWithoutLatestPackages.isEmpty) {
+        logger.info(s"All beneficiaries vetted the latest packages.")
+      } else {
+        logger.warn(
+          s"Beneficiaries did not vet the latest packages: $beneficiariesWithoutLatestPackages"
+        )
+      }
+      result
+    }
   }
 
-  private def retrieveNextRoundToClaim()(implicit
+  private def isVettingLatestPackages(
+      participantIds: Seq[ParticipantId],
+      approvedVettedPackages: Seq[String],
+  )(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    for {
+      dsoRules <- store.getDsoRules()
+      vettedPackages <- participantIds.traverse { pId =>
+        participantAdminConnection.listVettedPackages(pId, dsoRules.domain)
+      }
+    } yield {
+      val vettedPackagesPackageIds = vettedPackages.flatMap(_.flatMap(_.item.packageIds))
+      approvedVettedPackages.diff(vettedPackagesPackageIds).isEmpty
+    }
+  }
+
+  private def retrieveNextRoundToClaim(beneficiaries: Seq[BeneficiaryConfig])(implicit
       tc: TraceContext
   ): OptionT[Future, ReceiveSvRewardCouponTrigger.Task] = {
     for {
@@ -75,6 +135,7 @@ class ReceiveSvRewardCouponTrigger(
       svInfo.svRewardWeight,
       rewardState,
       firstOpenNotClaimed,
+      beneficiaries,
     )
   }
 
@@ -86,7 +147,13 @@ class ReceiveSvRewardCouponTrigger(
   override protected def completeTask(task: ReceiveSvRewardCouponTrigger.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val ReceiveSvRewardCouponTrigger.Task(dsoRules, svRewardWeight, rewardState, unclaimedRound) =
+    val ReceiveSvRewardCouponTrigger.Task(
+      dsoRules,
+      svRewardWeight,
+      rewardState,
+      unclaimedRound,
+      beneficiaries,
+    ) =
       task
     val lastReceivedForOpt = svLastReceivedFor(rewardState.payload)
     lastReceivedForOpt match {
@@ -103,7 +170,7 @@ class ReceiveSvRewardCouponTrigger(
           )
     }
     val weightDistribution =
-      SvUtil.weightDistributionForSv(svRewardWeight, extraBeneficiaries, svParty)(logger, tc)
+      SvUtil.weightDistributionForSv(svRewardWeight, beneficiaries, svParty)(logger, tc)
     spliceLedgerConnection
       .submit(
         actAs = Seq(svParty),
@@ -134,7 +201,7 @@ class ReceiveSvRewardCouponTrigger(
   override protected def isStaleTask(
       task: ReceiveSvRewardCouponTrigger.Task
   )(implicit tc: TraceContext): Future[Boolean] = {
-    val nextRound = retrieveNextRoundToClaim()
+    val nextRound = retrieveNextRoundToClaim(task.beneficiaries)
     nextRound.forall(_ != task)
   }
 
@@ -147,6 +214,7 @@ object ReceiveSvRewardCouponTrigger {
       svRewardWeight: Long,
       rewardState: AssignedContract[SvRewardState.ContractId, SvRewardState],
       round: OpenMiningRoundContract,
+      beneficiaries: Seq[BeneficiaryConfig],
   ) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
     import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId

@@ -1,7 +1,9 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.splice.amulet.SvRewardCoupon
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.environment.DarResources
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
@@ -10,14 +12,16 @@ import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.BeneficiaryConfig
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.SpliceUtil.defaultIssuanceCurve
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.TransferTxLogEntry
 import com.daml.network.wallet.store.TxLogEntry.TransferTransactionSubtype
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
+import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
 
@@ -25,7 +29,8 @@ class SvTimeBasedRewardCouponIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil
     with WalletTestUtil
-    with WalletTxLogTestUtil {
+    with WalletTxLogTestUtil
+    with TriggerTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
@@ -221,7 +226,104 @@ class SvTimeBasedRewardCouponIntegrationTest
           )
         }
       }
+
+      Seq(sv1Backend, sv4Backend).foreach { sv =>
+        sv.dsoAutomation
+          .trigger[ReceiveSvRewardCouponTrigger]
+          .resume()
+      }
+
     }
+  }
+
+  "filter out beneficiaries that did not vet the latest packages" in { implicit env =>
+    val dso = sv1Backend.getDsoInfo().dsoParty
+
+    def getSvRewardCoupon(party: String) =
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(SvRewardCoupon.COMPANION)(
+          dso,
+          _ => true,
+        )
+        .filter(_.data.beneficiary.contains(party))
+
+    val latestAmuletDarHash = DarResources.amulet_current.darHash.toHexString
+    val aliceParticipantId =
+      aliceValidatorBackend.appState.participantAdminConnection.getParticipantId().futureValue
+
+    actAndCheck(
+      "Unvet the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash,
+      aliceValidatorBackend.appState.participantAdminConnection
+        .unVetDar(
+          latestAmuletDarHash
+        )
+        .futureValue,
+    )(
+      "Alice's participant unvetted the latest package with hash: " + latestAmuletDarHash,
+      _ => {
+        DarResources
+          .getDarResources(
+            aliceValidatorBackend.appState.participantAdminConnection
+              .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+              .futureValue
+              .flatMap(_.item.packageIds)
+          )
+          .map(_.darHash.toHexString) should not contain latestAmuletDarHash
+      },
+    )
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      within = {
+
+        eventually() {
+          clue("No SvRewardCoupon should be issued to Alice's participant") {
+            advanceRoundsByOneTick
+            val openRounds = eventually() {
+              val openRounds = sv1ScanBackend
+                .getOpenAndIssuingMiningRounds()
+                ._1
+                .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+              openRounds should not be empty
+              openRounds
+            }
+            val aliceRewards = getSvRewardCoupon("alice")
+            val sv1Rewards = getSvRewardCoupon("digital-asset-2")
+            sv1Rewards.map(_.data.round.number) should contain atLeastOneElementOf openRounds.map(
+              _.payload.round.number
+            )
+            aliceRewards.map(_.data.round.number) should contain noElementsOf openRounds.map(
+              _.payload.round.number
+            )
+          }
+        }
+      },
+      lines =>
+        forAtLeast(1, lines) {
+          _.message should include("Beneficiaries did not vet the latest packages")
+        },
+    )
+
+    actAndCheck(
+      "Vet back the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash, {
+        aliceValidatorBackend.appState.participantAdminConnection
+          .vetDar(latestAmuletDarHash)
+          .futureValue
+      },
+    )(
+      "Alice's participant vetted the latest package with hash: " + latestAmuletDarHash,
+      _ => {
+        DarResources
+          .getDarResources(
+            aliceValidatorBackend.appState.participantAdminConnection
+              .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+              .futureValue
+              .flatMap(_.item.packageIds)
+          )
+          .map(_.darHash.toHexString) should contain(
+          latestAmuletDarHash
+        )
+      },
+    )
+
   }
 
 }
