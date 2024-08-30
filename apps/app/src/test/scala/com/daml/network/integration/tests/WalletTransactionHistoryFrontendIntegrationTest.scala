@@ -75,7 +75,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         val (_, txs) = actAndCheck(
           "Transactions are done", {
-            // alice's directory - also taps 5 CC
+            // alice's directory - also taps 5 Amulet
             createAnsEntry(
               aliceAnsExternalClient,
               aliceEntryName,
@@ -150,7 +150,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
             matchTransaction(ansCreation)(
               amuletPrice = 2,
               expectedAction = "Sent",
-              expectedSubtype = "CNS Entry Initial Payment Collected",
+              expectedSubtype = s"${ansAcronym.toUpperCase()} Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
               expectedAmountAmulet = BigDecimal(0), // 0 USD
             )

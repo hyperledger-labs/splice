@@ -45,7 +45,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
         )
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {
-            // alice's directory - also taps 5 CC
+            // alice's directory - also taps 5 Amulet
             browseToAliceWallet(aliceDamlUser)
           },
         )(
@@ -112,8 +112,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              "CNS Entry Initial Payment Collected"
-            else "CNS Entry Renewal Payment Collected",
+              s"${ansAcronym.toUpperCase()} Entry Initial Payment Collected"
+            else s"${ansAcronym.toUpperCase()} Entry Renewal Payment Collected",
           expectedPartyDescription = Some(s"$entryForAns $entryForAns"),
           expectedAmountAmulet = BigDecimal(0), // 0 USD
         )
