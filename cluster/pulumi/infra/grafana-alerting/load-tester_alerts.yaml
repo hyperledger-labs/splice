@@ -38,7 +38,7 @@ groups:
                 uid: prometheus
               disableTextWrap: false
               editorMode: builder
-              expr: sum(k6_http_reqs_total{expected_response="false"})
+              expr: sum(k6_http_reqs_total{expected_response="false"}) or on() vector(0)
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
