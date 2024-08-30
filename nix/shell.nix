@@ -63,6 +63,7 @@ in pkgs.mkShell {
     python3Packages.sphinx-copybutton
     python3Packages.pycryptodome
     python3Packages.pyyaml
+    python3Packages.pycryptodome
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
