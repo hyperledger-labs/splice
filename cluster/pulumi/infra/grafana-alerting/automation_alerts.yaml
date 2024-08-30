@@ -7,7 +7,7 @@ groups:
     rules:
       - uid: fe73c0e7-dcb3-4975-a7d1-04ed8da087be
         title: Automation Failures
-        condition: failures
+        condition: threshold
         data:
           - refId: total
             relativeTimeRange:
@@ -105,7 +105,7 @@ groups:
           __panelId__: "14"
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "failure_pct" }}% failures in the last 10 minutes.
           severity: |-
-            {{- if (gt $values.failures.Value 50.0) -}}
+            {{- if (gt $values.failure_pct.Value 50.0) -}}
             critical
             {{- else -}}
             warning
