@@ -3259,6 +3259,11 @@ jobs:
       - checkout_with_retry
       - set_pr_target_branch
       - run:
+          name: Checkout trigger-previews.sh from main
+          command: |
+            git fetch
+            git checkout origin/main -- .circleci/trigger-previews.sh
+      - run:
           name: Trigger previews
           command: |
             .circleci/trigger-previews.sh "set_previews"
