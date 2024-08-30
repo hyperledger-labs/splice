@@ -7,6 +7,7 @@ let
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
+
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -61,6 +62,8 @@ in pkgs.mkShell {
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
     python3Packages.pyyaml
+    python3Packages.regex
+    python3Packages.polib
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
@@ -70,6 +73,7 @@ in pkgs.mkShell {
     selenium-server-standalone
     shellcheck
     sphinx
+    sphinx-lint
     tmux
     toxiproxy
     unzip
