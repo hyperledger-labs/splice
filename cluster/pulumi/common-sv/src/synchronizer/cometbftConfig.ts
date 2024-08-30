@@ -1,3 +1,4 @@
+import { Output } from '@pulumi/pulumi';
 import { config } from 'cn-pulumi-common/src/config';
 
 const enableCometbftPruning = config.envFlag('ENABLE_COMETBFT_PRUNING', true);
@@ -7,3 +8,19 @@ export const cometbftRetainBlocks = enableCometbftPruning
 
 export const disableCometBftStateSync = config.envFlag('DISABLE_COMETBFT_STATE_SYNC', false);
 export const stableCometBftChainId = config.envFlag('COMETBFT_STABLE_CHAIN_ID', false);
+
+export type StaticCometBftConfig = {
+  privateKey?: Output<string> | string;
+  validator?: {
+    keyAddress: Output<string> | string;
+    privateKey: Output<string> | string;
+    publicKey: Output<string> | string;
+  };
+  nodeIndex: number;
+  retainBlocks: number;
+  id: string;
+};
+
+export interface StaticCometBftConfigWithNodeName extends StaticCometBftConfig {
+  nodeName: string;
+}

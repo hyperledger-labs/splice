@@ -2572,6 +2572,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
+        "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -2592,6 +2593,7 @@
         },
         "persistence": {
           "databaseName": "participant_3",
+          "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -3683,6 +3685,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
+        "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -3703,6 +3706,7 @@
         },
         "persistence": {
           "databaseName": "participant_3",
+          "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -4760,6 +4764,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
+        "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -4780,6 +4785,7 @@
         },
         "persistence": {
           "databaseName": "participant_3",
+          "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -5837,6 +5843,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "disableAutoInit": true,
+        "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -5857,6 +5864,7 @@
         },
         "persistence": {
           "databaseName": "participant_3",
+          "port": 5432,
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"

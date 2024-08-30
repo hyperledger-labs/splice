@@ -40,8 +40,8 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
-  autoInitValues,
 } from 'cn-pulumi-common';
+import { installSvParticipant } from 'cn-pulumi-common-sv';
 import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
@@ -195,7 +195,6 @@ async function installSvAndValidator(
     topupConfig,
     auth0Client,
     imagePullDeps,
-    loopback,
     backupConfigSecret,
     backupConfig,
     svKey,
@@ -211,7 +210,8 @@ async function installSvAndValidator(
     imagePullDeps
   );
 
-  const svNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['sv'];
+  const auth0Config = auth0Client.getCfg();
+  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
   if (!svNameSpaceAuth0Clients) {
     throw new Error('No SV namespace in auth0 config');
   }
@@ -237,43 +237,20 @@ async function installSvAndValidator(
   const participant = installMigrationIdSpecificComponent(
     decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
-      const participantValues: ChartValues = {
-        ...loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
-          {
-            MIGRATION_ID: migrationId.toString(),
-            OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-          }
-        ),
-        metrics: {
-          enable: true,
-          migration: {
-            id: migrationId,
-            active: isActive,
-          },
-        },
-      };
-
-      const participantValuesWithSpecifiedAud: ChartValues = {
-        ...participantValues,
-        ...persistenceForPostgres(participantPg, participantValues),
-        auth: {
-          ...participantValues.auth,
-          targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
-        },
-        ...autoInitValues('cn-participant', version, onboardingName),
-      };
-
-      return installSpliceRunbookHelmChart(
+      return installSvParticipant(
         xns,
-        `participant-${migrationId}`,
-        'cn-participant',
-        participantValuesWithSpecifiedAud,
+        migrationId,
+        auth0Config,
+        isActive,
+        participantPg,
+        'INFO',
         version,
+        onboardingName,
+        undefined,
         {
-          dependsOn: imagePullDeps
-            .concat([participantPg, svAppSecret, svKeySecret_])
-            .concat(loopback !== null ? loopback : []),
+          // TODO(#14507) - remove alias once latest release is 0.2.0
+          aliases: [{ name: `participant-${migrationId}` }],
+          dependsOn: [svKeySecret_],
         }
       );
     }
@@ -286,7 +263,7 @@ async function installSvAndValidator(
     {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       YOUR_SV_NAME: onboardingName,
-      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
       YOUR_CONTACT_POINT: daContactPoint,
@@ -342,7 +319,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
-      audience: auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      audience: auth0Config.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -416,7 +393,7 @@ async function installSvAndValidator(
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
-      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
       TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       YOUR_CONTACT_POINT: daContactPoint,
     }),
@@ -440,8 +417,8 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
-      audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      ledgerApiAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 

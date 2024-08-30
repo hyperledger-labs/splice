@@ -1,9 +1,7 @@
 import { Lifted, OutputInstance } from '@pulumi/pulumi';
-import {
-  StaticCometBftConfig,
-  StaticCometBftConfigWithNodeName,
-} from 'canton-network-pulumi-deployment/src/svConfigs';
 import { CLUSTER_HOSTNAME } from 'cn-pulumi-common/src/utils';
+
+import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './cometbftConfig';
 
 export interface CometBftNodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {
   istioPort: number;

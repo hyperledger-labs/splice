@@ -622,144 +622,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
-      "compat": "true",
-      "name": "participant-0",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
-      },
-      "timeout": 480,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "targetAudience": "https://ledger_api.example.com"
-        },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
-        "enableHealthProbes": true,
-        "enablePostgresMetrics": true,
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": false,
-            "id": 0
-          }
-        },
-        "nodeIdentifier": "DA-Helm-Test-Node",
-        "persistence": {
-          "databaseName": "participant_0",
-          "host": "participant-pg.sv.svc.cluster.local",
-          "port": 5432,
-          "postgresName": "participant-pg",
-          "schema": "participant",
-          "secretName": "participant-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.1.17"
-    },
-    "name": "participant-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "cn-participant",
-      "compat": "true",
-      "name": "participant-1",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
-      },
-      "timeout": 480,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "targetAudience": "https://ledger_api.example.com"
-        },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
-        "enableHealthProbes": true,
-        "enablePostgresMetrics": true,
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": true,
-            "id": 1
-          }
-        },
-        "nodeIdentifier": "DA-Helm-Test-Node",
-        "persistence": {
-          "databaseName": "participant_1",
-          "host": "participant-pg.sv.svc.cluster.local",
-          "port": 5432,
-          "postgresName": "participant-pg",
-          "schema": "participant",
-          "secretName": "participant-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.1.17"
-    },
-    "name": "participant-1",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "cn-scan",
       "compat": "true",
       "name": "scan",
@@ -1387,6 +1249,162 @@
       "version": "0.1.17"
     },
     "name": "sv-mediator-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-participant",
+      "compat": "true",
+      "name": "participant-0",
+      "namespace": "sv",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "artie"
+      },
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://ledger_api.example.com"
+        },
+        "cluster": {
+          "dnsName": "test.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "test.global.canton.network.digitalasset.com",
+          "name": "cn-testnet"
+        },
+        "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "INFO",
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": false,
+            "id": 0
+          }
+        },
+        "nodeIdentifier": "DA-Helm-Test-Node",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "participant-pg.sv.svc.cluster.local",
+          "port": 5432,
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secret"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.17"
+    },
+    "name": "sv-participant-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-participant",
+      "compat": "true",
+      "name": "participant-1",
+      "namespace": "sv",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "artie"
+      },
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://ledger_api.example.com"
+        },
+        "cluster": {
+          "dnsName": "test.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "test.global.canton.network.digitalasset.com",
+          "name": "cn-testnet"
+        },
+        "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "logLevel": "INFO",
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 1
+          }
+        },
+        "nodeIdentifier": "DA-Helm-Test-Node",
+        "persistence": {
+          "databaseName": "participant_1",
+          "host": "participant-pg.sv.svc.cluster.local",
+          "port": 5432,
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secret"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.17"
+    },
+    "name": "sv-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

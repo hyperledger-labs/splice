@@ -4,8 +4,9 @@ import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
+  ApprovedSvIdentity,
+  appsAffinityAndTolerations,
   Auth0Client,
-  auth0UserNameEnvVarSource,
   BackupConfig,
   BackupLocation,
   BootstrappingDumpConfig,
@@ -14,40 +15,40 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   CnInput,
+  daContactPoint,
+  DecentralizedSynchronizerMigrationConfig,
   defaultVersion,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
-  DecentralizedSynchronizerMigrationConfig,
   initialSynchronizerFeesConfig,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
-  installSpliceHelmChart,
   installMigrationIdSpecificComponent,
+  installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
   PersistenceConfig,
   sanitizedForPostgres,
+  spliceInstanceNames,
+  SV_APP_HELM_CHART_TIMEOUT_SEC,
   SvIdKey,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
-  ApprovedSvIdentity,
-  SV_APP_HELM_CHART_TIMEOUT_SEC,
-  config,
-  daContactPoint,
-  spliceInstanceNames,
 } from 'cn-pulumi-common';
-import { appsAffinityAndTolerations } from 'cn-pulumi-common';
+import {
+  DecentralizedSynchronizerNode,
+  StaticCometBftConfigWithNodeName,
+} from 'cn-pulumi-common-sv';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { DecentralizedSynchronizerNode } from '../../common-sv/src/synchronizer/decentralizedSynchronizerNode';
+import { installCantonComponents } from '../../common-sv/src/canton';
 import { Postgres } from '../../common/src/postgres';
-import { installParticipant } from './participant';
-import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
+import { StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
@@ -441,41 +442,19 @@ function installMigrationIdSpecificComponents(
         sequencerDb = sequencerPostgres;
         mediatorDb = mediatorPostgres;
       }
-      const logLevel =
-        config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG') ||
-        (config.envFlag('SPLICE_DEPLOYMENT_SINGLE_SV_DEBUG') &&
-          svConfig.onboardingName !== svConfigs[0].onboardingName)
-          ? 'INFO'
-          : 'DEBUG';
-
-      const participant = installParticipant(
+      return installCantonComponents(
         xns,
-        `participant-${migrationId}`,
-        participantDb,
-        auth0UserNameEnvVarSource('sv'),
-        svConfig.onboardingName,
+        migrationId,
+        svConfig,
+        {
+          participant: participantDb,
+          mediator: mediatorDb,
+          sequencer: sequencerDb,
+        },
         version,
-        svConfig.auth0Client.getCfg(),
-        migrationId,
-        isActive,
-        logLevel
+        decentralizedSynchronizerMigrationConfig,
+        cometbft
       );
-      const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(
-        migrationId,
-        xns,
-        sequencerDb,
-        mediatorDb,
-        cometbft,
-        isActive,
-        decentralizedSynchronizerMigrationConfig.isRunningMigration(),
-        svConfig.onboardingName,
-        logLevel,
-        version
-      );
-      return {
-        decentralizedSynchronizer: decentralizedSynchronizerNode,
-        participant: participant,
-      };
     }
   );
 }

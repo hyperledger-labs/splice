@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Resource } from '@pulumi/pulumi';
-import { StaticCometBftConfigWithNodeName } from 'canton-network-pulumi-deployment/src/svConfigs';
 import {
   autoInitValues,
   defaultVersion,
@@ -18,6 +17,7 @@ import { Postgres } from 'cn-pulumi-common/src/postgres';
 
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
+import { StaticCometBftConfigWithNodeName } from './cometbftConfig';
 
 export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
