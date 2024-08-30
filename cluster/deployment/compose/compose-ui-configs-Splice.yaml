@@ -1,0 +1,15 @@
+x-ui-config:
+  &ui-config
+    environment:
+      - CN_APP_UI_NETWORK_NAME=Splice
+      - CN_APP_UI_NETWORK_FAVICON_URL=https://www.hyperledger.org/hubfs/hyperledgerfavicon.png
+      - CN_APP_UI_AMULET_NAME=Amulet
+      - CN_APP_UI_AMULET_NAME_ACRONYM=AMT
+      - CN_APP_UI_NAME_SERVICE_NAME=Amulet Name Service
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=ANS
+
+services:
+  wallet-web-ui:
+      <<: *ui-config
+  ans-web-ui:
+      <<: *ui-config

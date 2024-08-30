@@ -74,6 +74,9 @@
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
+          wait_for_sv: false
+          with_docker: true
           requires:
             - artifacts_push
             - set_scratchnet

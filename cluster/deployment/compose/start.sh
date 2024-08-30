@@ -21,17 +21,18 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> [-c <scan_address>]"
+  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>]"
   echo "  -a: Use this flag to enable authentication"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
+  echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
 
   echo ""
   echo "Testing flags:"
   echo "The following flags are usually used only for testing:"
   echo "  -b: Disable BFT reads&writes and trust a single SV."
   echo "  -c <scan_address>: The full URL of a Scan app. If not provided, it will be derived from the sponsor SV address."
-  echo "  -q <sequencer_address>: The full URL of the sequencer. If not provided. Must be provided if BFT reads&writes are disabled."
+  echo "  -q <sequencer_address>: The full URL of the sequencer. Must be provided if BFT reads&writes are disabled."
 }
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -42,7 +43,8 @@ SPONSOR_SV_ADDRESS=""
 SCAN_ADDRESS=""
 ONBOARDING_SECRET=""
 SEQUENCER_ADDRESS=""
-while getopts 'has:c:t:o:nbq:' arg; do
+network_name=""
+while getopts 'has:c:t:o:n:bq:' arg; do
   case ${arg} in
     h)
       usage
@@ -65,6 +67,9 @@ while getopts 'has:c:t:o:nbq:' arg; do
       ;;
     b)
       trust_single=1
+      ;;
+    n)
+      network_name="${OPTARG}"
       ;;
     ?)
       usage
@@ -108,8 +113,8 @@ export SCAN_ADDRESS
 export SEQUENCER_ADDRESS
 export MIGRATION_ID=0
 # TODO(#14303): release tag should be injected by the release pipeline
-IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
-export IMAGE_TAG
+# IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
+# export IMAGE_TAG
 
 extra_compose_files=()
 if [ $auth -ne 1 ]; then
@@ -118,4 +123,16 @@ fi
 if [ $trust_single -eq 1 ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-trust-single.yaml")
 fi
-docker compose -f "${script_dir}/compose.yaml" -f "${script_dir}/compose-ui-configs.yaml" "${extra_compose_files[@]}" up -d
+if [ -n "${network_name}" ]; then
+  # TODO(#14303): we take a network_name argument, but the name "onvpn" is hardcoded in the compose-onvpn-network.yaml file.
+  # I don't think there's a way to parameterize it, so we should either auto-generate that, or at least parse it and confirm that
+  # it declares the same name as the network_name argument.
+  extra_compose_files+=("-f" "${script_dir}/compose-onvpn-network.yaml")
+  export DOCKER_NETWORK="${network_name}"
+fi
+if [ "${ENABLE_CN_INSTANCE_NAMES:-}" == "true" ]; then
+  extra_compose_files+=("-f" "${script_dir}/compose-ui-configs-CN.yaml")
+else
+  extra_compose_files+=("-f" "${script_dir}/compose-ui-configs-Splice.yaml")
+fi
+docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d

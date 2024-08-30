@@ -31,8 +31,7 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - splice_validator
-
+      - ${DOCKER_NETWORK:-splice_validator}
 
   participant:
     image: "${IMAGE_REPO}canton-participant:${IMAGE_TAG}"
@@ -50,9 +49,8 @@ services:
       postgres-splice:
         condition: service_healthy
     restart: always
-
     networks:
-      - splice_validator
+      - ${DOCKER_NETWORK:-splice_validator}
 
   validator:
     image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
@@ -88,11 +86,13 @@ services:
                 }
               }
             }
-      - ADDITIONAL_CONFIG_APP_INSTANCES=canton.validator-apps.validator_backend.app-instances={}
+      - |
+        ADDITIONAL_CONFIG_APP_INSTANCES=
+          canton.validator-apps.validator_backend.app-instances={}
       - |
         ADDITIONAL_CONFIG_BFT_SCAN=
-            canton.validator-apps.validator_backend.scan-client.type = "bft"
-            canton.validator-apps.validator_backend.scan-client.seed-urls = [ "${SCAN_ADDRESS}" ]
+          canton.validator-apps.validator_backend.scan-client.type = "bft"
+          canton.validator-apps.validator_backend.scan-client.seed-urls = [ "${SCAN_ADDRESS}" ]
       - |
         ADDITIONAL_CONFIG_MIGRATION_ID=
             canton.validator-apps.validator_backend {
@@ -103,7 +103,7 @@ services:
         condition: service_healthy
     restart: always
     networks:
-      - splice_validator
+      - ${DOCKER_NETWORK:-splice_validator}
 
   wallet-web-ui:
     image: "${IMAGE_REPO}wallet-web-ui:${IMAGE_TAG}"
@@ -113,7 +113,7 @@ services:
       - CN_APP_UI_AUTH_URL=${AUTH_URL}
       - SPLICE_APP_UI_HTTP_URL=true
     networks:
-      - splice_validator
+      - ${DOCKER_NETWORK:-splice_validator}
 
   ans-web-ui:
     image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
@@ -122,9 +122,10 @@ services:
       - CN_APP_UI_AUTH_CLIENT_ID=${ANS_UI_CLIENT_ID}
       - CN_APP_UI_AUTH_URL=${AUTH_URL}
       - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost
+      - SPLICE_APP_UI_AUTH_URL=${AUTH_URL}
       - SPLICE_APP_UI_HTTP_URL=true
     networks:
-      - splice_validator
+      - ${DOCKER_NETWORK:-splice_validator}
 
   nginx:
     image: "nginx:${NGINX_VERSION}"
@@ -140,4 +141,4 @@ services:
       - validator
     restart: always
     networks:
-      - splice_validator
+      - ${DOCKER_NETWORK:-splice_validator}

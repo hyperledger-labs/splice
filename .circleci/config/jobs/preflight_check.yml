@@ -30,6 +30,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
+      with_docker:
+        type: boolean
+        default: false
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -113,6 +116,12 @@ jobs:
                   /tmp/vpn-scripts/restart-vpn.sh
             - get_cluster:
                 cluster: << parameters.cluster >>
+            - when:
+                condition: << parameters.with_docker >>
+                steps:
+                  - docker_login_internal
+                  - run_bash_command_in_nix:
+                      cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
             - execute_sbt_command:
                 pre_sbt_cmd: |
                   set -eou pipefail

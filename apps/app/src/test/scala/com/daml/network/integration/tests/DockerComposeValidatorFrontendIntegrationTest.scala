@@ -19,7 +19,11 @@ class DockerComposeValidatorFrontendIntegrationTest
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
   "docker-compose based validator works" in { implicit env =>
-    val ret = "scripts/compose-validator-for-integration-test.sh".!
+    val builder = new java.lang.ProcessBuilder("scripts/compose-validator-for-tests.sh", "-l")
+    builder
+      .environment()
+      .put("ENABLE_CN_INSTANCE_NAMES", "true")
+    val ret = builder.!
     if (ret != 0) {
       fail("Start script failed")
     }
@@ -66,13 +70,14 @@ class DockerComposeValidatorFrontendIntegrationTest
   "docker-compose based validator with auth works" in { _ =>
     val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
     val builder =
-      new java.lang.ProcessBuilder("scripts/compose-validator-for-integration-test.sh", "-a")
+      new java.lang.ProcessBuilder("scripts/compose-validator-for-tests.sh", "-l", "-a")
     builder
       .environment()
       .put(
         "GCP_CLUSTER_BASENAME",
         "cidaily",
       ) // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
+    builder.environment().put("ENABLE_CN_INSTANCE_NAMES", "true")
     val ret = builder.!
     if (ret != 0) {
       fail("Start script failed")

@@ -1400,6 +1400,8 @@ printTests := {
   def isDamlCiupgradeVote(name: String): Boolean = name contains "DamlCIUpgradeVote"
   def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
+  def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
   def isGlobalSoftMigrationTest(name: String): Boolean =
     name contains "DecentralizedSynchronizerSoftDomainMigration"
@@ -1447,6 +1449,11 @@ printTests := {
       "Fetch UI credentials from Auth0 and store them in a k8s secret",
       "test-full-class-names-auth0-credentials-preflight.log",
       (t: String) => isAuth0CredentialsPreflightIntegrationTest(t),
+    ),
+    (
+      "Docker Compose validator preflight test",
+      "test-full-class-names-docker-compose-validator-preflight.log",
+      (t: String) => isDockerComposeValidatorPreflightIntegrationTest(t),
     ),
     (
       "Preflight tests against core nodes",

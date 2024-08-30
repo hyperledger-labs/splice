@@ -45,13 +45,50 @@ function _export_auth0_env_vars {
   export VALIDATOR_AUTH_AUDIENCE
 }
 
+function _start_validator {
+
+  sv_from_docker=$1
+  sv_from_script=$2
+  scan=$3
+  sequencer=$4
+
+  extra_flags=()
+  if [ $auth -eq 1 ]; then
+    _export_auth0_env_vars
+    extra_flags+=("-a")
+  fi
+  if [ -n "$network_name" ]; then
+    extra_flags+=("-n" "$network_name")
+  fi
+
+  _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
+  secret=$(curl -sSfL -X POST "${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare")
+
+  _info "Starting validator"
+  "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+    -s "${sv_from_docker}" \
+    -c "${scan}" \
+    -q "${sequencer}" \
+    -o "$secret" \
+    -b \
+    "${extra_flags[@]}" \
+      >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
+
+}
+
 function usage {
-  echo "Usage: $0 [-a]"
-  echo "  -a: Use this flag to enable authentication"
+  echo "Usage: $0 [-a] [-l] [-d] [-n <network_name>]"
+  echo "  -a: Enable authentication"
+  echo "  -l: Start the validator against a local SV (for integration tests)"
+  echo "  -d: Use images from the DA-internal repository (default when using this script: use locally built images)"
+  echo "  -n: Use a specific docker network"
 }
 
 auth=0
-while getopts 'ha' arg; do
+local_sv=0
+da_repo=0
+network_name=""
+while getopts 'haldn:' arg; do
   case ${arg} in
     h)
       usage
@@ -60,6 +97,15 @@ while getopts 'ha' arg; do
     a)
       auth=1
       ;;
+    l)
+      local_sv=1
+      ;;
+    d)
+      da_repo=1
+      ;;
+    n)
+      network_name="${OPTARG}"
+      ;;
     ?)
       usage
       exit 1
@@ -67,29 +113,26 @@ while getopts 'ha' arg; do
   esac
 done
 
-docker_gateway=$(docker network inspect bridge -f "{{range .IPAM.Config}}{{.Gateway}}{{end}}")
+if [ $da_repo -eq 1 ]; then
+  export IMAGE_REPO=us-central1-docker.pkg.dev/da-cn-shared/cn-images/
+else
+  export IMAGE_REPO=""
+fi
 
-secret=$(curl -sSfL -X POST "http://127.0.0.1:5114/api/sv/v0/devnet/onboard/validator/prepare")
-
-IMAGE_REPO=""
-export IMAGE_REPO
 IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
 export IMAGE_TAG
 
-extra_flags=()
-if [ $auth -eq 1 ]; then
-  _export_auth0_env_vars
-  extra_flags+=("-a")
+if [ $local_sv -eq 1 ]; then
+  docker_gateway=$(docker network inspect bridge -f "{{range .IPAM.Config}}{{.Gateway}}{{end}}")
+  _start_validator "http://${docker_gateway}:5114" "http://127.0.0.1:5114" "http://${docker_gateway}:5012" "http://${docker_gateway}:5108"
+else
+  if [ -z "$GCP_CLUSTER_HOSTNAME" ]; then
+    _error_msg "GCP_CLUSTER_HOSTNAME is not set, please run from a cluster directory or set the variable manually."
+    exit 1
+  fi
+    # TODO(#14481): non-0 migration ID
+    _start_validator "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://scan.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sequencer-0.sv-2.$GCP_CLUSTER_HOSTNAME"
 fi
-
-"${REPO_ROOT}/cluster/deployment/compose/start.sh" \
-  -s "http://${docker_gateway}:5114" \
-  -c "http://${docker_gateway}:5012" \
-  -q "http://${docker_gateway}:5108" \
-  -o "$secret" \
-  -b \
-  "${extra_flags[@]}" \
-    >> "${REPO_ROOT}/log/compose.log" 2>&1
 
 for c in validator participant; do
   docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
