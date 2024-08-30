@@ -1,76 +1,77 @@
-x-init-db:
-  &init-db
-    image: "postgres:14"
-    depends_on:
-      - postgres
-    command: |
-      bash -c '
-        until errmsg=$(psql -h postgres --username=cnadmin --dbname=cantonnet -c "create database $$CREATE_DB" 2>&1); do
-          if [[ $$errmsg == *"already exists"* ]]; then
-            echo "Database $$CREATE_DB already exists. Done."
-            break
-          fi
-          echo "trying to create postgres database $$CREATE_DB, last error: $$errmsg";
-          sleep 2;
-        done
-        echo "All set, created database $$CREATE_DB."
-      '
+volumes:
+  postgres-splice:
+
+networks:
+  splice_validator:
+    driver: bridge
 
 services:
-  postgres:
-    image: "postgres:14"
+  postgres-splice:
+    image: "postgres:${SPLICE_POSTGRES_VERSION}"
     environment:
-      - POSTGRES_USER=cnadmin
-      - POSTGRES_PASSWORD=supersafe
-      - POSTGRES_DB=cantonnet
-      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_USER=${SPLICE_DB_USER}
+      - POSTGRES_PASSWORD=${SPLICE_DB_PASSWORD}
+      - POSTGRES_DB=postgres # not used by splice
+      # Any env vars starting with CREATE_DATABASE_ will be used to create a database
+      - CREATE_DATABASE_participant=participant-${MIGRATION_ID}
+      - CREATE_DATABASE_validator=validator
     volumes:
-      - type: bind
-        source: postgres-data
-        target: /var/lib/postgresql/data
+      - postgres-splice:/var/lib/postgresql/data
+      - ./postgres-entrypoint.sh:/postgres-entrypoint.sh
+    entrypoint: /postgres-entrypoint.sh
+    user: "postgres"
     command:
       - postgres
       - -c
       - max_connections=8000
-  participant-init:
-    << : *init-db
-    environment:
-    - PGPASSWORD=supersafe
-    - CREATE_DB="participant-${MIGRATION_ID}"
+    healthcheck:
+      test: "pg_isready -U ${SPLICE_DB_USER} -d postgres"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    networks:
+      - splice_validator
+
+
   participant:
     image: "${IMAGE_REPO}canton-participant:${IMAGE_TAG}"
-    env_file:
-      - auth-participant.env
-      # - disable-auth-participant.env # comment out to enable auth
     environment:
-      - CANTON_PARTICIPANT_POSTGRES_SERVER=postgres
+      - AUTH_JWKS_URL=${AUTH_JWKS_URL}
+      - AUTH_TARGET_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - CANTON_PARTICIPANT_ADMIN_USER_NAME=${LEDGER_API_ADMIN_USER}
+      - CANTON_PARTICIPANT_POSTGRES_SERVER=${SPLICE_DB_SERVER}
       - CANTON_PARTICIPANT_POSTGRES_SCHEMA=participant
-      - CANTON_PARTICIPANT_POSTGRES_USER=cnadmin
-      - CANTON_PARTICIPANT_POSTGRES_PASSWORD=supersafe
+      - CANTON_PARTICIPANT_POSTGRES_USER=${SPLICE_DB_USER}
+      - CANTON_PARTICIPANT_POSTGRES_PASSWORD=${SPLICE_DB_PASSWORD}
       - CANTON_PARTICIPANT_POSTGRES_DB=participant-${MIGRATION_ID}
-      - CANTON_PARTICIPANT_POSTGRES_PORT=5432
+      - CANTON_PARTICIPANT_POSTGRES_PORT=${SPLICE_DB_PORT}
     depends_on:
-      participant-init:
-        condition: service_completed_successfully
+      postgres-splice:
+        condition: service_healthy
     restart: always
-  validator-init:
-    << : *init-db
-    environment:
-    - PGPASSWORD=supersafe
-    - CREATE_DB=validator
+
+    networks:
+      - splice_validator
+
   validator:
     image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
-    env_file:
-      - auth-validator.env
     environment:
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_URL=${AUTH_WELLKNOWN_URL}
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID=${AUTH_CLIENT_ID}
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET}
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME=${LEDGER_API_ADMIN_USER}
+      - CN_APP_VALIDATOR_WALLET_USER_NAME=${WALLET_ADMIN_USER}
+      - CN_APP_VALIDATOR_AUTH_AUDIENCE=${VALIDATOR_AUTH_AUDIENCE}
+      - CN_APP_VALIDATOR_AUTH_JWKS_URL=${AUTH_JWKS_URL}
       - CN_APP_VALIDATOR_PARTICIPANT_ADDRESS=participant
       - CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS=${SPONSOR_SV_ADDRESS}
       - CN_APP_VALIDATOR_ONBOARDING_SECRET=${ONBOARDING_SECRET}
       - CN_APP_VALIDATOR_SCAN_ADDRESS=${SCAN_ADDRESS}
-      # TODO(#14303): make this configurable:
-      - CN_APP_VALIDATOR_PARTICIPANT_IDENTIFIER=da-composeValidator-1
-      - CN_APP_VALIDATOR_PARTY_HINT=da-composeValidator-1
-      - CN_APP_CONTACT_POINT=
+      - CN_APP_VALIDATOR_PARTICIPANT_IDENTIFIER=${PARTICIPANT_IDENTIFIER}
+      - CN_APP_VALIDATOR_PARTY_HINT=${PARTY_HINT}
+      - CN_APP_CONTACT_POINT=${CONTACT_POINT}
       - |
         ADDITIONAL_CONFIG_PERSISTENCE=
             canton.validator-apps.validator_backend.storage {
@@ -80,10 +81,10 @@ services:
                 properties = {
                   databaseName = validator
                   currentSchema = validator
-                  serverName = postgres
-                  portNumber = 5432
-                  user = cnadmin
-                  password = supersafe
+                  serverName = ${SPLICE_DB_SERVER}
+                  portNumber = ${SPLICE_DB_PORT}
+                  user = ${SPLICE_DB_USER}
+                  password = ${SPLICE_DB_PASSWORD}
                 }
               }
             }
@@ -98,27 +99,35 @@ services:
               domain-migration-id = ${MIGRATION_ID}
             }
     depends_on:
-      validator-init:
-        condition: service_completed_successfully
+      postgres-splice:
+        condition: service_healthy
     restart: always
+    networks:
+      - splice_validator
 
   wallet-web-ui:
     image: "${IMAGE_REPO}wallet-web-ui:${IMAGE_TAG}"
-    env_file:
-      - auth-wallet.env
     environment:
+      - CN_APP_UI_AUTH_AUDIENCE=${VALIDATOR_AUTH_AUDIENCE}
+      - CN_APP_UI_AUTH_CLIENT_ID=${WALLET_UI_CLIENT_ID}
+      - CN_APP_UI_AUTH_URL=${AUTH_URL}
       - SPLICE_APP_UI_HTTP_URL=true
+    networks:
+      - splice_validator
 
   ans-web-ui:
     image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
-    env_file:
-      - auth-ans.env
     environment:
+      - CN_APP_UI_AUTH_AUDIENCE=${VALIDATOR_AUTH_AUDIENCE}
+      - CN_APP_UI_AUTH_CLIENT_ID=${ANS_UI_CLIENT_ID}
+      - CN_APP_UI_AUTH_URL=${AUTH_URL}
       - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost
       - SPLICE_APP_UI_HTTP_URL=true
+    networks:
+      - splice_validator
 
   nginx:
-    image: nginx:1.27.0
+    image: "nginx:${NGINX_VERSION}"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     ports:
@@ -130,3 +139,5 @@ services:
       - wallet-web-ui
       - validator
     restart: always
+    networks:
+      - splice_validator

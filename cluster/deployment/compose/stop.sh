@@ -26,4 +26,4 @@ export IMAGE_TAG=""
 
 docker compose -f "$script_dir/compose.yaml" down
 
-_info "Validator stopped. Note that its data is persisted in ${script_dir}/postgres-data, and will be reused if started again."
+_info "Validator stopped. Note that its data is persisted in the postgres-splice volume, and will be reused if started again."
