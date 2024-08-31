@@ -7,7 +7,6 @@ import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironme
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import scala.concurrent.duration.*
 import scala.sys.process.*
 
 class DockerComposeValidatorPreflightIntegrationTest
@@ -22,14 +21,14 @@ class DockerComposeValidatorPreflightIntegrationTest
 
   "docker-compose based validator works against the deployed cluster" in { implicit env =>
     // Assumes a docker network `onvpn` exists, and is connected to the VPN
-    val ret = Seq("scripts/compose-validator-for-tests.sh", "-d", "-n", "onvpn").!
+    val ret = Seq("build-tools/splice-compose.sh", "start", "-d", "-n", "onvpn", "-w").!
     if (ret != 0) {
-      fail("Start script failed")
+      fail("Failed to start docker-compose validator")
     }
     try {
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        actAndCheck(5.minute)(
+        actAndCheck()(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(
@@ -39,7 +38,7 @@ class DockerComposeValidatorPreflightIntegrationTest
         tapAmulets(123.4)
       }
     } finally {
-      "cluster/deployment/compose/stop.sh" !
+      Seq("build-tools/splice-compose.sh", "stop", "-D", "-f") !
     }
   }
 }

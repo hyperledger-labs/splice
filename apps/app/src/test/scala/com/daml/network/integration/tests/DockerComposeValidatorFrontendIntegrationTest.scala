@@ -6,8 +6,9 @@ import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironme
 import com.daml.network.util.{AnsFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import scala.concurrent.duration.*
 import scala.sys.process.*
+
+import java.lang.ProcessBuilder
 
 class DockerComposeValidatorFrontendIntegrationTest
     extends FrontendIntegrationTest("alice-selfhosted")
@@ -19,18 +20,18 @@ class DockerComposeValidatorFrontendIntegrationTest
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
   "docker-compose based validator works" in { implicit env =>
-    val builder = new java.lang.ProcessBuilder("scripts/compose-validator-for-tests.sh", "-l")
+    val builder = new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-w")
     builder
       .environment()
       .put("ENABLE_CN_INSTANCE_NAMES", "true")
     val ret = builder.!
     if (ret != 0) {
-      fail("Start script failed")
+      fail("Failed to start docker-compose validator")
     }
     try {
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        actAndCheck(5.minute)(
+        actAndCheck()(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(
@@ -63,14 +64,14 @@ class DockerComposeValidatorFrontendIntegrationTest
         )
       }
     } finally {
-      "cluster/deployment/compose/stop.sh" !
+      Seq("build-tools/splice-compose.sh", "stop", "-D", "-f") !
     }
   }
 
   "docker-compose based validator with auth works" in { _ =>
     val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
     val builder =
-      new java.lang.ProcessBuilder("scripts/compose-validator-for-tests.sh", "-l", "-a")
+      new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-a", "-w")
     builder
       .environment()
       .put(
@@ -90,7 +91,6 @@ class DockerComposeValidatorFrontendIntegrationTest
           "admin@validator.com",
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith("da-composeValidator-1"),
-          5.minute,
         )
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
@@ -100,7 +100,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         )
       }
     } finally {
-      "cluster/deployment/compose/stop.sh" !
+      Seq("build-tools/splice-compose.sh", "stop", "-D", "-f") !
     }
   }
 }
