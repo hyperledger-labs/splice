@@ -251,28 +251,29 @@ class SvTimeBasedRewardCouponIntegrationTest
     val aliceParticipantId =
       aliceValidatorBackend.appState.participantAdminConnection.getParticipantId().futureValue
 
-    actAndCheck(
-      "Unvet the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash,
-      aliceValidatorBackend.appState.participantAdminConnection
-        .unVetDar(
-          latestAmuletDarHash
-        )
-        .futureValue,
-    )(
-      "Alice's participant unvetted the latest package with hash: " + latestAmuletDarHash,
-      _ => {
-        DarResources
-          .getDarResources(
-            aliceValidatorBackend.appState.participantAdminConnection
-              .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
-              .futureValue
-              .flatMap(_.item.packageIds)
-          )
-          .map(_.darHash.toHexString) should not contain latestAmuletDarHash
-      },
-    )
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       within = {
+
+        actAndCheck(
+          "Unvet the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash,
+          aliceValidatorBackend.appState.participantAdminConnection
+            .unVetDar(
+              latestAmuletDarHash
+            )
+            .futureValue,
+        )(
+          "Alice's participant unvetted the latest package with hash: " + latestAmuletDarHash,
+          _ => {
+            DarResources
+              .getDarResources(
+                aliceValidatorBackend.appState.participantAdminConnection
+                  .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+                  .futureValue
+                  .flatMap(_.item.packageIds)
+              )
+              .map(_.darHash.toHexString) should not contain latestAmuletDarHash
+          },
+        )
 
         eventually() {
           clue("No SvRewardCoupon should be issued to Alice's participant") {
