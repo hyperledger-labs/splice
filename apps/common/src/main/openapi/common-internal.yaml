@@ -140,3 +140,68 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
+    BatchListVotesByVoteRequestsRequest:
+      type: object
+      required:
+        - vote_request_contract_ids
+      properties:
+        vote_request_contract_ids:
+          type: array
+          items:
+            type: string
+
+    ListVoteRequestByTrackingCidResponse:
+      type: object
+      required:
+        - vote_requests
+      properties:
+        vote_requests:
+          type: array
+          items:
+            $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    LookupDsoRulesVoteRequestResponse:
+      type: object
+      required:
+        - dso_rules_vote_request
+      properties:
+        dso_rules_vote_request:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    ListDsoRulesVoteRequestsResponse:
+      type: object
+      required:
+        - dso_rules_vote_requests
+      properties:
+        dso_rules_vote_requests:
+          type: array
+          items:
+            $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    ListVoteResultsRequest:
+      type: object
+      required:
+        - limit
+      properties:
+        actionName:
+          type: string
+        accepted:
+          type: boolean
+        requester:
+          type: string
+        effectiveFrom:
+          type: string
+        effectiveTo:
+          type: string
+        limit:
+          type: integer
+
+    ListDsoRulesVoteResultsResponse:
+      type: object
+      required:
+        - dso_rules_vote_results
+      properties:
+        dso_rules_vote_results:
+          type: array
+          items:
+            type: object

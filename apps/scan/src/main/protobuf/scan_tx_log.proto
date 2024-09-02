@@ -6,6 +6,7 @@ syntax = "proto3";
 package com.daml.network.scan.store;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 import "scalapb/scalapb.proto";
 
 message PartyBalanceChange {
@@ -192,3 +193,10 @@ message ValidatorRewardTxLogEntry {
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
+message VoteRequestTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  google.protobuf.Struct result = 2 [(scalapb.field).type = "com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
+}

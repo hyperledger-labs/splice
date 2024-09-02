@@ -186,5 +186,26 @@ object TxLogStore {
       scalapb.TypeMapper[String, com.digitalasset.canton.topology.DomainId](DomainId.tryFromString)(
         _.toProtoPrimitive
       )
+
+    protected implicit val voteRequestResultType: scalapb.TypeMapper[
+      com.google.protobuf.struct.Struct,
+      com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult,
+    ] =
+      scalapb.TypeMapper[
+        com.google.protobuf.struct.Struct,
+        com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult,
+      ](x => {
+        val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
+        val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
+        com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult
+          .fromJson(string)
+      })(x => {
+        val string = x.toJson
+        val builder = com.google.protobuf.Struct.newBuilder()
+        com.google.protobuf.util.JsonFormat
+          .parser()
+          .merge(string, builder)
+        com.google.protobuf.struct.Struct.fromJavaProto(builder.build())
+      })
   }
 }

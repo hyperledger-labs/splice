@@ -25,7 +25,6 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  DsoRules_CloseVoteRequestResult,
   DsoRules_ConfirmSvOnboarding,
   VoteRequest,
 }
@@ -61,7 +60,8 @@ trait SvDsoStore
     extends AppStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
-    with MiningRoundsStore {
+    with MiningRoundsStore
+    with VotesStore {
   import SvDsoStore.{amuletRulesFollowers, dsoRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
@@ -76,17 +76,6 @@ trait SvDsoStore
   def key: SvStore.Key
 
   def domainMigrationId: Long
-
-  def listVoteRequestResults(
-      actionName: Option[String],
-      accepted: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
   def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
@@ -721,44 +710,11 @@ trait SvDsoStore
       .listContracts(splice.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
-  def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
-    Seq[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]
-  ] =
-    multiDomainAcsStore
-      .listContracts(splice.dsorules.VoteRequest.COMPANION, limit)
-      .map(_ map (_.contract))
-
   def lookupVoteByThisSvAndVoteRequestWithOffset(
       voteRequestCid: splice.dsorules.VoteRequest.ContractId
   )(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[splice.dsorules.Vote]]]
-
-  def lookupVoteRequest(contractId: splice.dsorules.VoteRequest.ContractId)(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]]
-
-  def getVoteRequest(contractId: splice.dsorules.VoteRequest.ContractId)(implicit
-      tc: TraceContext
-  ): Future[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]] = {
-    import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-    lookupVoteRequest(contractId).map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(show"Vote request not found for tracking-id $contractId")
-          .asRuntimeException()
-      )
-    )
-  }
-
-  def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ]
 
   def lookupVoteRequestByThisSvAndActionWithOffset(action: ActionRequiringConfirmation)(implicit
       tc: TraceContext

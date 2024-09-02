@@ -830,6 +830,79 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/voterequest:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listVoteRequestsByTrackingCid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/BatchListVotesByVoteRequestsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteRequestByTrackingCidResponse"
+  /v0/voterequests/{vote_request_contract_id}:
+    get:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "lookupDsoRulesVoteRequest"
+      parameters:
+        - name: "vote_request_contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/LookupDsoRulesVoteRequestResponse"
+  /v0/admin/sv/voterequests:
+    get:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listDsoRulesVoteRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteRequestsResponse"
+  /v0/admin/sv/voteresults:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listVoteRequestResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteResultsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:

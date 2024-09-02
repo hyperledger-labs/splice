@@ -1,7 +1,6 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.{
@@ -33,7 +32,6 @@ import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringcon
   SRARC_AddSv,
   SRARC_OffboardSv,
 }
-import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
 import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
@@ -53,7 +51,7 @@ import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvDecentralizedSynchronizerConfig, SvSynchronizerConfig}
-import com.daml.network.sv.history.DsoRulesCloseVoteRequest
+import com.daml.network.store.events.DsoRulesCloseVoteRequest
 import com.daml.network.sv.store.db.DbSvDsoStore
 import com.daml.network.sv.store.SvDsoStore.{IdleAnsSubscription, RoundCounterpartyBatch}
 import com.daml.network.sv.store.{SvDsoStore, SvStore}
@@ -74,7 +72,6 @@ import com.digitalasset.canton.util.MonadUtil
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -1128,18 +1125,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
   }
 
-  lazy val addUser666Action = new ARC_DsoRules(
-    new SRARC_AddSv(
-      new DsoRules_AddSv(
-        userParty(666).toProtoPrimitive,
-        "user666",
-        SvUtil.DefaultSV1Weight,
-        "user666ParticipantId",
-        new Round(1L),
-      )
-    )
-  )
-
   lazy val addUser667Action = new ARC_DsoRules(
     new SRARC_AddSv(
       new DsoRules_AddSv(
@@ -1689,50 +1674,6 @@ class DbSvDsoStoreTest
         result.value should be(Some(goodVote))
       }
     }
-  }
-
-  private def mkCloseVoteRequest(
-      requestId: VoteRequest.ContractId
-  ): DamlRecord = {
-    new DsoRules_CloseVoteRequest(
-      requestId,
-      Optional.empty(),
-    ).toValue
-  }
-
-  private def mkVoteRequestResult(
-      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest],
-      effectiveAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
-  ): DsoRules_CloseVoteRequestResult = new DsoRules_CloseVoteRequestResult(
-    voteRequestContract.payload,
-    Instant.now().truncatedTo(ChronoUnit.MICROS),
-    util.List.of(),
-    util.List.of(),
-    new VRO_Accepted(effectiveAt),
-  )
-
-  private def voteRequest(
-      requester: PartyId,
-      votes: Seq[Vote],
-      expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
-      action: ActionRequiringConfirmation = addUser666Action,
-  ) = {
-    val cid = new VoteRequest.ContractId(nextCid())
-    val template = new VoteRequest(
-      dsoParty.toProtoPrimitive,
-      requester.toProtoPrimitive,
-      action,
-      new Reason("https://www.example.com", ""),
-      expiry,
-      votes.map(e => (e.sv, e)).toMap.asJava,
-      Optional.of(cid),
-    )
-
-    contract(
-      VoteRequest.TEMPLATE_ID,
-      cid,
-      template,
-    )
   }
 
   override protected def cleanDb(storage: DbStorage): Future[?] =

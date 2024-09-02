@@ -4,6 +4,7 @@ import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
+  DamlRecord,
   ExercisedEvent,
   Identifier,
   ParticipantOffset,
@@ -43,9 +44,21 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.digitalasset.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.splice.dso.svstate.{SvRewardState, RewardState}
+import com.daml.network.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.history.{AppRewardCreate, AmuletCreate}
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
+import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
+import com.daml.network.codegen.java.splice.dsorules.{
+  ActionRequiringConfirmation,
+  DsoRules_AddSv,
+  DsoRules_CloseVoteRequest,
+  DsoRules_CloseVoteRequestResult,
+  Reason,
+  Vote,
+  VoteRequest,
+}
+import com.daml.network.history.{AmuletCreate, AppRewardCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
 import com.daml.network.store.db.TxLogRowData
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -57,6 +70,8 @@ import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
+import java.util
+import java.util.Optional
 import scala.concurrent.blocking
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -376,6 +391,62 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         rewardState,
       ),
     )
+
+  protected def mkVoteRequestResult(
+      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest],
+      effectiveAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
+  ): DsoRules_CloseVoteRequestResult = new DsoRules_CloseVoteRequestResult(
+    voteRequestContract.payload,
+    Instant.now().truncatedTo(ChronoUnit.MICROS),
+    util.List.of(),
+    util.List.of(),
+    new VRO_Accepted(effectiveAt),
+  )
+
+  protected def mkCloseVoteRequest(
+      requestId: VoteRequest.ContractId
+  ): DamlRecord = {
+    new DsoRules_CloseVoteRequest(
+      requestId,
+      Optional.empty(),
+    ).toValue
+  }
+
+  protected lazy val addUser666Action = new ARC_DsoRules(
+    new SRARC_AddSv(
+      new DsoRules_AddSv(
+        userParty(666).toProtoPrimitive,
+        "user666",
+        10_000L,
+        "user666ParticipantId",
+        new Round(1L),
+      )
+    )
+  )
+
+  protected def voteRequest(
+      requester: PartyId,
+      votes: Seq[Vote],
+      expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
+      action: ActionRequiringConfirmation = addUser666Action,
+  ) = {
+    val cid = new VoteRequest.ContractId(nextCid())
+    val template = new VoteRequest(
+      dsoParty.toProtoPrimitive,
+      requester.toProtoPrimitive,
+      action,
+      new Reason("https://www.example.com", ""),
+      expiry,
+      votes.map(e => (e.sv, e)).toMap.asJava,
+      Optional.of(cid),
+    )
+
+    contract(
+      VoteRequest.TEMPLATE_ID,
+      cid,
+      template,
+    )
+  }
 
   protected def toCreatedEvent(
       contract: Contract[?, ?],

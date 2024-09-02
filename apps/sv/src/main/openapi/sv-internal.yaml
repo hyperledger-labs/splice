@@ -267,7 +267,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListDsoRulesVoteRequestsResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteRequestsResponse"
   /v0/admin/sv/voteresults:
     post:
       tags: [ sv ]
@@ -278,14 +278,14 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/ListVoteResultsRequest"
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteResultsRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListDsoRulesVoteResultsResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
   /v0/admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [ sv ]
@@ -309,7 +309,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/LookupDsoRulesVoteRequestResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/LookupDsoRulesVoteRequestResponse"
   /v0/admin/sv/electionrequests/create:
     post:
       tags: [sv]
@@ -366,14 +366,14 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/BatchListVotesByVoteRequestsRequest"
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/BatchListVotesByVoteRequestsRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListVoteRequestByTrackingCidResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteRequestByTrackingCidResponse"
   /v0/admin/sv/voterequest/create:
     post:
       tags: [ sv ]
@@ -785,24 +785,6 @@ components:
         result:
           type: object
 
-    ListVoteResultsRequest:
-      type: object
-      required:
-        - limit
-      properties:
-        actionName:
-          type: string
-        accepted:
-          type: boolean
-        requester:
-          type: string
-        effectiveFrom:
-          type: string
-        effectiveTo:
-          type: string
-        limit:
-          type: integer
-
     CreateElectionRequest:
       type: object
       required:
@@ -845,44 +827,6 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
-    ListVoteRequestByTrackingCidResponse:
-      type: object
-      required:
-        - vote_requests
-      properties:
-        vote_requests:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
-    ListDsoRulesVoteRequestsResponse:
-      type: object
-      required:
-        - dso_rules_vote_requests
-      properties:
-        dso_rules_vote_requests:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
-    ListDsoRulesVoteResultsResponse:
-      type: object
-      required:
-        - dso_rules_vote_results
-      properties:
-        dso_rules_vote_results:
-          type: array
-          items:
-            type: object
-
-    LookupDsoRulesVoteRequestResponse:
-      type: object
-      required:
-        - dso_rules_vote_request
-      properties:
-        dso_rules_vote_request:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     CastVoteRequest:
       type: object
@@ -928,16 +872,6 @@ components:
       properties:
         amulet_price:
           type: string
-
-    BatchListVotesByVoteRequestsRequest:
-      type: object
-      required:
-        - vote_request_contract_ids
-      properties:
-        vote_request_contract_ids:
-          type: array
-          items:
-            type: string
 
     StartSvOnboardingRequest:
       type: object

@@ -14,11 +14,13 @@ import com.daml.network.store.{
   MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
+  VotesStore,
 }
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
+import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.util.{
   AmuletConfigSchedule,
   Contract,
@@ -52,7 +54,8 @@ trait ScanStore
     extends AppStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
-    with MiningRoundsStore {
+    with MiningRoundsStore
+    with VotesStore {
 
   def aggregate()(implicit
       tc: TraceContext
@@ -390,6 +393,17 @@ object ScanStore {
               contract,
               svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
             )
+        },
+        mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
+          ScanAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.voteBefore)),
+            voteActionRequiringConfirmation =
+              Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
+            voteRequesterName = Some(contract.payload.requester),
+            voteRequestTrackingCid =
+              Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
+          )
         },
       ),
     )

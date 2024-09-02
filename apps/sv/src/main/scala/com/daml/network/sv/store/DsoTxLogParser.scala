@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.store.TxLogStore
-import com.daml.network.sv.history.*
+import com.daml.network.store.events.DsoRulesCloseVoteRequest
 import com.daml.network.util.ExerciseNode
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId

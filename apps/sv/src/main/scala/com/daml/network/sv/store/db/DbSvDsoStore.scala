@@ -38,9 +38,9 @@ import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
 import com.daml.network.store.{
+  DbVotesStoreQueryBuilder,
   IngestionSummary,
   Limit,
-  LimitHelpers,
   MultiDomainAcsStore,
   TxLogStore,
 }
@@ -60,7 +60,7 @@ import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -107,8 +107,7 @@ class DbSvDsoStore(
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
-    with LimitHelpers
-    with NamedLogging {
+    with DbVotesStoreQueryBuilder {
 
   val dsoStoreMetrics = new DbSvDsoStoreMetrics(retryProvider.metricsFactory)
 
@@ -908,13 +907,13 @@ class DbSvDsoStore(
     for {
       result <- storage
         .querySingle(
-          selectFromAcsTable(
+          lookupVoteRequestQuery(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
-                       and vote_request_tracking_cid = $voteRequestCid """).toActionBuilder,
-          ).headOption,
+            "vote_request_tracking_cid",
+            voteRequestCid,
+          ),
           "lookupVoteRequest",
         )
         .value
@@ -927,17 +926,16 @@ class DbSvDsoStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = waitUntilAcsIngested {
-    val voteRequestTrackingCidsSql = inClause(trackingCids)
     for {
       result <- storage
         .query(
-          selectFromAcsTable(
-            DsoTables.acsTableName,
-            storeId,
-            domainMigrationId,
-            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
-                          and vote_request_tracking_cid in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
-            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          listVoteRequestsByTrackingCidQuery(
+            acsTableName = DsoTables.acsTableName,
+            storeId = storeId,
+            domainMigrationId = domainMigrationId,
+            trackingCidColumnName = "vote_request_tracking_cid",
+            trackingCids = trackingCids,
+            limit = limit,
           ),
           "listVoteRequestsByTrackingCid",
         )
@@ -1262,45 +1260,23 @@ class DbSvDsoStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
-    val dbType = EntryType.VoteRequestTxLogEntry
-    val actionNameCondition = actionName match {
-      case Some(actionName) =>
-        sql"""and action_name like ${lengthLimited(s"%${lengthLimited(actionName)}%")}"""
-      case None => sql""""""
-    }
-    val executedCondition = accepted match {
-      case Some(accepted) => sql"""and accepted = ${accepted}"""
-      case None => sql""""""
-    }
-    val effectivenessCondition = (effectiveFrom, effectiveTo) match {
-      case (Some(effectiveFrom), Some(effectiveTo)) =>
-        sql"""and effective_at between ${lengthLimited(effectiveFrom)} and ${lengthLimited(
-            effectiveTo
-          )}"""
-      case (Some(effectiveFrom), None) =>
-        sql"""and effective_at > ${lengthLimited(effectiveFrom)}"""
-      case (None, Some(effectiveTo)) => sql"""and effective_at < ${lengthLimited(effectiveTo)}"""
-      case (None, None) => sql""""""
-    }
-    val requesterCondition = requester match {
-      case Some(requester) =>
-        sql"""and requester_name like ${lengthLimited(s"%${lengthLimited(requester)}%")}"""
-      case None => sql""""""
-    }
+    val query = listVoteRequestResultsQuery(
+      txLogTableName = DsoTables.txLogTableName,
+      storeId = storeId,
+      dbType = EntryType.VoteRequestTxLogEntry,
+      actionNameColumnName = "action_name",
+      acceptedColumnName = "accepted",
+      effectiveAtColumnName = "effective_at",
+      requesterNameColumnName = "requester_name",
+      actionName = actionName,
+      accepted = accepted,
+      requester = requester,
+      effectiveFrom = effectiveFrom,
+      effectiveTo = effectiveTo,
+      limit = limit,
+    )
     for {
-      rows <- storage.query(
-        selectFromTxLogTable(
-          DsoTables.txLogTableName,
-          storeId,
-          where = (sql"""entry_type = ${dbType} """
-            ++ actionNameCondition
-            ++ executedCondition
-            ++ requesterCondition
-            ++ effectivenessCondition).toActionBuilder,
-          orderLimit = sql"""order by effective_at desc limit ${sqlLimit(limit)}""",
-        ),
-        "listVoteRequestResults",
-      )
+      rows <- storage.query(query, "listVoteRequestResults")
       recentVoteResults = applyLimit("listVoteRequestResults", limit, rows)
         .map(
           txLogEntryFromRow[VoteRequestTxLogEntry](txLogConfig)

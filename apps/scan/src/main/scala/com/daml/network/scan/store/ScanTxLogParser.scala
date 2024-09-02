@@ -8,11 +8,16 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
 import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequest,
+  DsoRules_CloseVoteRequestResult,
+}
 import splice.wallet.subscriptions as sws
 import com.daml.network.codegen.java.splice.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
+import com.daml.network.store.events.DsoRulesCloseVoteRequest
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.SpliceUtil.dollarsToCC
 import com.daml.network.util.TransactionTreeExtensions.*
@@ -92,6 +97,8 @@ class ScanTxLogParser(
             throw new RuntimeException(
               s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
+          case DsoRulesCloseVoteRequest(node) =>
+            State.fromCloseVoteRequest(exercised.getEventId, node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -593,6 +600,20 @@ object ScanTxLogParser {
       )
 
       State(newEntry)
+    }
+
+    def fromCloseVoteRequest(
+        eventId: String,
+        node: ExerciseNode[DsoRules_CloseVoteRequest, DsoRules_CloseVoteRequestResult],
+    ): State = {
+      State(
+        immutable.Queue(
+          VoteRequestTxLogEntry(
+            eventId,
+            result = Some(node.result.value),
+          )
+        )
+      )
     }
   }
 

@@ -38,6 +38,7 @@ object TxLogEntry extends StoreErrors {
     val TransferTxLogEntry = String3.tryCreate("tra")
     val ValidatorRewardTxLogEntry = String3.tryCreate("vre")
     val SvRewardTxLogEntry = String3.tryCreate("sre")
+    val VoteRequestTxLogEntry = String3.tryCreate("vot")
     // The following entry types correspond to entries that were removed from `scan_tx_log.proto`
     // Those entries might still exist in databases, but we don't produce new ones and we don't read them.
     // The values are only kept for documentation purposes.
@@ -58,6 +59,7 @@ object TxLogEntry extends StoreErrors {
       case _: TransferTxLogEntry => EntryType.TransferTxLogEntry
       case _: ValidatorRewardTxLogEntry => EntryType.ValidatorRewardTxLogEntry
       case _: SvRewardTxLogEntry => EntryType.SvRewardTxLogEntry
+      case _: VoteRequestTxLogEntry => EntryType.VoteRequestTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -81,6 +83,7 @@ object TxLogEntry extends StoreErrors {
         case EntryType.TransferTxLogEntry => from[TransferTxLogEntry](json)
         case EntryType.ValidatorRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
         case EntryType.SvRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
+        case EntryType.VoteRequestTxLogEntry => from[VoteRequestTxLogEntry](json)
         case _ => throw txLogIsOfWrongType(entryType.str)
       }
     } catch {

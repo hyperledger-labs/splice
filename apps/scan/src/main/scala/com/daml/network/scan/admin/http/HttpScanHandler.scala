@@ -23,8 +23,10 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.{
   AcsRequest,
+  BatchListVotesByVoteRequestsRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
+  ListVoteResultsRequest,
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
@@ -37,10 +39,10 @@ import com.daml.network.util.{
   QualifiedName,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -58,7 +60,7 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   Mint,
   Transfer,
 }
-import com.daml.network.http.UrlValidator
+import com.daml.network.http.{HttpVotesHandler, UrlValidator}
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -69,7 +71,7 @@ class HttpScanHandler(
     svUserName: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    store: ScanStore,
+    protected val store: ScanStore,
     snapshotStore: AcsSnapshotStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
@@ -78,11 +80,11 @@ class HttpScanHandler(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    tracer: Tracer,
+    protected val tracer: Tracer,
 ) extends v0.ScanHandler[TraceContext]
-    with Spanning
-    with NamedLogging {
-  private val workflowId = this.getClass.getSimpleName
+    with HttpVotesHandler {
+  protected val workflowId = this.getClass.getSimpleName
+  protected val votesStore = store
 
   def getDsoPartyId(
       response: v0.ScanResource.GetDsoPartyIdResponse.type
@@ -1346,5 +1348,42 @@ class HttpScanHandler(
         )
       }
     }
+  }
+
+  override def listDsoRulesVoteRequests(
+      respond: ScanResource.ListDsoRulesVoteRequestsResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListDsoRulesVoteRequestsResponse] = {
+    this
+      .listDsoRulesVoteRequests(extracted, ec)
+      .map(ScanResource.ListDsoRulesVoteRequestsResponse.OK)
+  }
+
+  override def listVoteRequestResults(respond: ScanResource.ListVoteRequestResultsResponse.type)(
+      body: ListVoteResultsRequest
+  )(extracted: TraceContext): Future[ScanResource.ListVoteRequestResultsResponse] = {
+    implicit val tc: TraceContext = extracted
+    this.listVoteRequestResults(body).map(ScanResource.ListVoteRequestResultsResponse.OK)
+  }
+
+  override def listVoteRequestsByTrackingCid(
+      respond: ScanResource.ListVoteRequestsByTrackingCidResponse.type
+  )(body: BatchListVotesByVoteRequestsRequest)(
+      extracted: TraceContext
+  ): Future[ScanResource.ListVoteRequestsByTrackingCidResponse] = {
+    implicit val tc: TraceContext = extracted
+    this
+      .listVoteRequestsByTrackingCid(body)
+      .map(ScanResource.ListVoteRequestsByTrackingCidResponse.OK)
+  }
+
+  override def lookupDsoRulesVoteRequest(
+      respond: ScanResource.LookupDsoRulesVoteRequestResponse.type
+  )(voteRequestContractId: String)(
+      extracted: TraceContext
+  ): Future[ScanResource.LookupDsoRulesVoteRequestResponse] = {
+    implicit val tc: TraceContext = extracted
+    this
+      .lookupDsoRulesVoteRequest(voteRequestContractId)
+      .map(ScanResource.LookupDsoRulesVoteRequestResponse.OK)
   }
 }

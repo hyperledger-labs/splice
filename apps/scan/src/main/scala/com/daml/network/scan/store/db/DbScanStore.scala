@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
+import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -24,10 +25,11 @@ import com.daml.network.scan.store.{
   ScanTxLogParser,
   SortOrder,
   TxLogEntry,
+  VoteRequestTxLogEntry,
 }
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
-import com.daml.network.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
+import com.daml.network.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, TxLogStore}
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -44,7 +46,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.lifecycle.AsyncCloseable
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -79,7 +81,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       storeDescriptor = StoreDescriptor(
-        version = 1,
+        version = 1, // TODO (#13454): bump when it will backfill.
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
@@ -95,10 +97,9 @@ class DbScanStore(
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
-    with NamedLogging
-    with LimitHelpers
     with FlagCloseableAsync
-    with RetryProvider.Has {
+    with RetryProvider.Has
+    with DbVotesStoreQueryBuilder {
 
   import multiDomainAcsStore.waitUntilAcsIngested
   private val storeMetrics = new DbScanStoreMetrics(retryProvider.metricsFactory)
@@ -794,5 +795,79 @@ class DbScanStore(
           .value
       } yield row.map(assignedContractFromRow(companion)(_))
     }
+  }
+
+  override def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
+    val query = listVoteRequestResultsQuery(
+      txLogTableName = ScanTables.txLogTableName,
+      storeId = storeId,
+      dbType = EntryType.VoteRequestTxLogEntry,
+      actionNameColumnName = "vote_action_name",
+      acceptedColumnName = "vote_accepted",
+      effectiveAtColumnName = "vote_effective_at",
+      requesterNameColumnName = "vote_requester_name",
+      actionName = actionName,
+      accepted = accepted,
+      requester = requester,
+      effectiveFrom = effectiveFrom,
+      effectiveTo = effectiveTo,
+      limit = limit,
+    )
+    for {
+      rows <- storage.query(query, "listVoteRequestResults")
+      recentVoteResults = applyLimit("listVoteRequestResults", limit, rows)
+        .map(
+          txLogEntryFromRow[VoteRequestTxLogEntry](txLogConfig)
+        )
+        .map(_.result.getOrElse(throw txMissingField()))
+    } yield recentVoteResults
+  }
+
+  override def listVoteRequestsByTrackingCid(
+      trackingCids: Seq[VoteRequest.ContractId],
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = {
+    for {
+      result <- storage
+        .query(
+          listVoteRequestsByTrackingCidQuery(
+            acsTableName = ScanTables.acsTableName,
+            storeId = storeId,
+            domainMigrationId = domainMigrationId,
+            trackingCidColumnName = "vote_request_tracking_cid",
+            trackingCids = trackingCids,
+            limit = limit,
+          ),
+          "listVoteRequestsByTrackingCid",
+        )
+      records = applyLimit("listVoteRequestsByTrackingCid", limit, result)
+    } yield records
+      .map(contractFromRow(VoteRequest.COMPANION)(_))
+  }
+
+  override def lookupVoteRequest(voteRequestCid: VoteRequest.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] = {
+    for {
+      result <- storage
+        .querySingle(
+          lookupVoteRequestQuery(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            "vote_request_tracking_cid",
+            voteRequestCid,
+          ),
+          "lookupVoteRequest",
+        )
+        .value
+    } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
 }

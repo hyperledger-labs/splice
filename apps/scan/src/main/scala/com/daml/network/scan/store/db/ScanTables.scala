@@ -4,6 +4,12 @@
 package com.daml.network.scan.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.daml.network.codegen.java.splice.dsorules.{ActionRequiringConfirmation, VoteRequest}
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+  ARC_AmuletRules,
+  ARC_AnsEntryContext,
+  ARC_DsoRules,
+}
 import com.daml.network.scan.store.{
   AppRewardTxLogEntry,
   BalanceChangeTxLogEntry,
@@ -12,17 +18,19 @@ import com.daml.network.scan.store.{
   ExtraTrafficPurchaseTxLogEntry,
   MintTxLogEntry,
   OpenMiningRoundTxLogEntry,
+  SvRewardTxLogEntry,
   TapTxLogEntry,
   TransferTxLogEntry,
   TxLogEntry,
   ValidatorRewardTxLogEntry,
-  SvRewardTxLogEntry,
+  VoteRequestTxLogEntry,
 }
-import com.daml.network.store.StoreErrors
+import com.daml.network.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp
+import io.circe.Json
 
 object ScanTables extends AcsTables {
 
@@ -40,6 +48,9 @@ object ScanTables extends AcsTables {
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,
       svParty: Option[PartyId] = None,
+      voteActionRequiringConfirmation: Option[Json] = None,
+      voteRequesterName: Option[String] = None,
+      voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -53,6 +64,9 @@ object ScanTables extends AcsTables {
       "total_traffic_purchased" -> totalTrafficPurchased,
       "validator_license_rounds_collected" -> validatorLicenseRoundsCollected,
       "sv_party" -> svParty,
+      "vote_action_requiring_confirmation" -> voteActionRequiringConfirmation,
+      "vote_requester_name" -> voteRequesterName.map(lengthLimited),
+      "vote_request_tracking_cid" -> voteRequestTrackingCid,
     )
   }
 
@@ -67,6 +81,10 @@ object ScanTables extends AcsTables {
       extraTrafficPurchaseTrafficPurchase: Option[Long] = None,
       extraTrafficPurchaseCcSpent: Option[BigDecimal] = None,
       closedRoundEffectiveAt: Option[CantonTimestamp] = None,
+      voteActionName: Option[String] = None,
+      voteAccepted: Option[Boolean] = None,
+      voteRequesterName: Option[String] = None,
+      voteEffectiveAt: Option[String] = None,
   ) extends TxLogRowData {
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
@@ -80,6 +98,10 @@ object ScanTables extends AcsTables {
       "extra_traffic_purchase_traffic_purchased" -> extraTrafficPurchaseTrafficPurchase,
       "extra_traffic_purchase_cc_spent" -> extraTrafficPurchaseCcSpent,
       "closed_round_effective_at" -> closedRoundEffectiveAt,
+      "vote_action_name" -> voteActionName.map(lengthLimited),
+      "vote_accepted" -> voteAccepted,
+      "vote_requester_name" -> voteRequesterName.map(lengthLimited),
+      "vote_effective_at" -> voteEffectiveAt.map(lengthLimited),
     )
   }
 
@@ -154,8 +176,38 @@ object ScanTables extends AcsTables {
             entry = entry,
             round = Some(entry.round),
           )
+        case vr: VoteRequestTxLogEntry =>
+          val result = vr.result.getOrElse(throw txMissingField())
+          val parsedOutcome = VoteRequestOutcome.parse(result.outcome)
+          ScanTxLogRowData(
+            entry = vr,
+            voteActionName = Some(mapActionName(result.request.action)),
+            voteAccepted = Some(parsedOutcome match {
+              case _: Accepted => true
+              case _ => false
+            }),
+            voteRequesterName = Some(result.request.requester),
+            voteEffectiveAt = parsedOutcome.effectiveAt match {
+              case Some(effectiveAt) => Some(effectiveAt.toString)
+              case None => None
+            },
+          )
         case _ =>
           throw txEncodingFailed()
+      }
+    }
+
+    private def mapActionName(
+        action: ActionRequiringConfirmation
+    ): String = {
+      action match {
+        case arcDsoRules: ARC_DsoRules =>
+          arcDsoRules.dsoAction.getClass.getSimpleName
+        case arcAmuletRules: ARC_AmuletRules =>
+          arcAmuletRules.amuletRulesAction.getClass.getSimpleName
+        case arcAnsEntryContext: ARC_AnsEntryContext =>
+          arcAnsEntryContext.ansEntryContextAction.getClass.getSimpleName
+        case _ => ""
       }
     }
 

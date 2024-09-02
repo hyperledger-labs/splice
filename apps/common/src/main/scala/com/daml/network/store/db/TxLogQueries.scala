@@ -25,27 +25,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) =
-    (sql"""
-       select #${SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
-       from #$tableName
-       where store_id = $storeId and """ ++ where ++ sql" " ++
-      orderLimit).toActionBuilder
-      .as[TxLogQueries.SelectFromTxLogTableResult]
-
-  implicit val GetResultSelectFromTxLogTable: GetResult[TxLogQueries.SelectFromTxLogTableResult] =
-    GetResult { prs =>
-      import prs.*
-      (TxLogQueries.SelectFromTxLogTableResult.apply _).tupled(
-        (
-          <<[Int],
-          <<[Long],
-          <<[String],
-          <<[DomainId],
-          <<[String3],
-          <<[String],
-        )
-      )
-    }
+    TxLogQueries.selectFromTxLogTable(tableName, storeId, where, orderLimit)
 
   /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
     */
@@ -114,6 +94,21 @@ object TxLogQueries {
   )
 
   object SelectFromTxLogTableResult {
+    implicit val GetResultSelectFromTxLogTable: GetResult[TxLogQueries.SelectFromTxLogTableResult] =
+      GetResult { prs =>
+        import prs.*
+        (TxLogQueries.SelectFromTxLogTableResult.apply _).tupled(
+          (
+            <<[Int],
+            <<[Long],
+            <<[String],
+            <<[DomainId],
+            <<[String3],
+            <<[String],
+          )
+        )
+      }
+
     def sqlColumnsCommaSeparated(qualifier: String = "") =
       s"""${qualifier}store_id,
           ${qualifier}entry_number,
@@ -127,5 +122,21 @@ object TxLogQueries {
       offset: String,
       row: Option[SelectFromTxLogTableResult],
   )
+
+  /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
+    *                   This is fine, as all calls to this method should use static string constants.
+    */
+  def selectFromTxLogTable(
+      tableName: String,
+      storeId: Int,
+      where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
+  ) =
+    (sql"""
+       select #${SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
+       from #$tableName
+       where store_id = $storeId and """ ++ where ++ sql" " ++
+      orderLimit).toActionBuilder
+      .as[TxLogQueries.SelectFromTxLogTableResult]
 
 }

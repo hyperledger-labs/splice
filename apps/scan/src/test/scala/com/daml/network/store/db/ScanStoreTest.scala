@@ -23,6 +23,7 @@ import com.daml.network.codegen.java.splice.{
 }
 import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
 import com.daml.network.migration.DomainMigrationInfo
@@ -38,6 +39,7 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.store.events.DsoRulesCloseVoteRequest
 import com.daml.network.util.SpliceUtil.damlDecimal
 import com.daml.network.util.{
   Contract,
@@ -1129,6 +1131,131 @@ abstract class ScanStoreTest
           nextPageAscending should be(firstPageDescending.reverse)
         }
       }
+    }
+
+    "votes" should {
+
+      "listVoteRequestResults" should {
+
+        "list all past VoteRequestResult" in {
+          for {
+            store <- mkStore()
+            voteRequestContract = voteRequest(
+              requester = userParty(1),
+              votes = (1 to 4)
+                .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+            )
+            _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
+            result = mkVoteRequestResult(voteRequestContract)
+            _ <- dummyDomain.exercise(
+              contract = dsoRules(party = dsoParty),
+              interfaceId = Some(DsoRules.TEMPLATE_ID),
+              choiceName = DsoRulesCloseVoteRequest.choice.name,
+              mkCloseVoteRequest(
+                voteRequestContract.contractId
+              ),
+              result.toValue,
+            )(
+              store.multiDomainAcsStore
+            )
+          } yield {
+            store
+              .listVoteRequestResults(
+                Some("AddSv"),
+                Some(true),
+                None,
+                None,
+                None,
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+              .toList
+              .loneElement shouldBe result
+            store
+              .listVoteRequestResults(
+                Some("SRARC_AddSv"),
+                Some(false),
+                None,
+                None,
+                None,
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+              .toList
+              .size shouldBe (0)
+            store
+              .listVoteRequestResults(
+                None,
+                None,
+                None,
+                None,
+                None,
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+              .toList
+              .size shouldBe (1)
+            store
+              .listVoteRequestResults(
+                None,
+                None,
+                None,
+                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
+                None,
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+              .toList
+              .size shouldBe (0)
+            store
+              .listVoteRequestResults(
+                None,
+                None,
+                None,
+                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
+                None,
+                PageLimit.tryCreate(1),
+              )
+              .futureValue
+              .toList
+              .size shouldBe (1)
+          }
+        }
+      }
+
+      "listVoteRequestsByTrackingCid" should {
+
+        "return all votes by their VoteRequest contract ids" in {
+          val goodVotes = (1 to 3).map(n =>
+            Seq(n, n + 3)
+              .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+          )
+          val badVotes = (1 to 3).map(n =>
+            Seq(n)
+              .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+          )
+          val goodVoteRequests =
+            (1 to 3).map(n =>
+              voteRequest(
+                requester = userParty(n),
+                votes = goodVotes(n - 1),
+              )
+            )
+          val badVoteRequests =
+            (4 to 6).map(n => voteRequest(requester = userParty(n), votes = badVotes(n - 4)))
+          for {
+            store <- mkStore()
+            _ <- MonadUtil.sequentialTraverse(goodVoteRequests ++ badVoteRequests)(
+              dummyDomain.create(_)(store.multiDomainAcsStore)
+            )
+            result <- store.listVoteRequestsByTrackingCid(goodVoteRequests.map(_.contractId))
+            votes = result.flatMap(_.payload.votes.values().asScala)
+          } yield {
+            votes should contain theSameElementsAs (goodVotes.flatten)
+          }
+        }
+      }
+
     }
   }
 
