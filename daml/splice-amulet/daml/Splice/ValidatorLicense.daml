@@ -22,6 +22,10 @@ data ValidatorLicense_ReceiveFaucetCouponResult = ValidatorLicense_ReceiveFaucet
     licenseCid : ContractId ValidatorLicense
     couponCid : ContractId ValidatorFaucetCoupon
 
+data ValidatorLicense_RecordValidatorLivenessActivityResult = ValidatorLicense_RecordValidatorLivenessActivityResult with
+    licenseCid : ContractId ValidatorLicense
+    couponCid : ContractId ValidatorLivenessActivityRecord
+
 data ValidatorLicense_WithdrawResult = ValidatorLicense_WithdrawResult
 
 data ValidatorLicense_CancelResult = ValidatorLicense_CancelResult
@@ -33,6 +37,8 @@ data ValidatorLicense_ReportActiveResult = ValidatorLicense_ReportActiveResult w
   licenseCid : ContractId ValidatorLicense
 
 data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResult
+
+data ValidatorLivenessActivityRecord_DsoExpireResult = ValidatorLivenessActivityRecord_DsoExpireResult
 
 data ValidatorLicenseMetadata = ValidatorLicenseMetadata
   with
@@ -63,6 +69,8 @@ template ValidatorLicense with
         openRoundCid : ContractId OpenMiningRound
       controller validator
       do
+        -- TODO:(#14499) error out this choice.
+        -- error $ "ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead."
         now <- getTime
         openRound <- fetchReferenceData (ForDso with dso) openRoundCid
         require "OpenRound is open" (openRound.opensAt <= now)
@@ -88,6 +96,38 @@ template ValidatorLicense with
           round = openRound.round
 
         return ValidatorLicense_ReceiveFaucetCouponResult with ..
+
+    -- We expect the wallet of the validator to call this choice automatically.
+    choice ValidatorLicense_RecordValidatorLivenessActivity : ValidatorLicense_RecordValidatorLivenessActivityResult
+      with
+        openRoundCid : ContractId OpenMiningRound
+      controller validator
+      do
+        now <- getTime
+        openRound <- fetchReferenceData (ForDso with dso) openRoundCid
+        require "OpenRound is open" (openRound.opensAt <= now)
+
+        newFaucetState <- case faucetState of
+          None -> return $ Some FaucetState with
+            firstReceivedFor = openRound.round
+            lastReceivedFor = openRound.round
+            numCouponsMissed = 0
+
+          Some state -> do
+            require "Not yet received" (state.lastReceivedFor < openRound.round)
+            return $ Some FaucetState with
+              firstReceivedFor = state.firstReceivedFor
+              lastReceivedFor = openRound.round
+              numCouponsMissed = state.numCouponsMissed + (openRound.round.number - state.lastReceivedFor.number - 1)
+
+        licenseCid <- create this with faucetState = newFaucetState; lastActiveAt = Some now
+
+        couponCid <- create ValidatorLivenessActivityRecord with
+          dso
+          validator
+          round = openRound.round
+
+        return ValidatorLicense_RecordValidatorLivenessActivityResult with ..
 
     choice ValidatorLicense_Withdraw : ValidatorLicense_WithdrawResult
       with
@@ -177,11 +217,34 @@ template ValidatorFaucetCoupon with
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return ValidatorFaucetCoupon_DsoExpireResult
 
+-- It is a copy of the ValidatorFaucetCoupon template with the only difference being that the validator is an observer instead of signatory.
+-- This is to allow to expire the coupon without the validator's involvement.
+template ValidatorLivenessActivityRecord with
+    dso : Party
+    validator : Party
+    round : Round
+  where
+    signatory dso
+    observer validator
+
+    choice ValidatorLivenessActivityRecord_DsoExpire : ValidatorLivenessActivityRecord_DsoExpireResult
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller dso
+      do
+         -- Expiry requires proof of the record's round being closed, as all rounds advance on their own time.
+         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+         return ValidatorLivenessActivityRecord_DsoExpireResult
+
+
 -- instances
 ------------
 
 instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
   contractGroupId ValidatorFaucetCoupon{..} = ForOwner with dso; owner = validator
+
+instance HasCheckedFetch ValidatorLivenessActivityRecord ForOwner where
+  contractGroupId ValidatorLivenessActivityRecord{..} = ForOwner with dso; owner = validator
 
 instance HasCheckedFetch ValidatorLicense ForDso where
   contractGroupId ValidatorLicense{..} = ForDso with dso

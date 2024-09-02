@@ -34,7 +34,7 @@ testAmuletBurn = do
 
   -- there are two open rounds, draw on these coupons
   drawOnAllValidatorFaucets app
-  coupons <- query @ValidatorFaucetCoupon app.dso
+  coupons <- query @ValidatorLivenessActivityRecord app.dso
   [3, 4] === sort (map (._2.round.number) coupons)
 
   runAmuletDepositBots app

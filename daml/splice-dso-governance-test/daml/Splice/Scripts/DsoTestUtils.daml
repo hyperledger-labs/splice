@@ -235,6 +235,7 @@ runNextIssuanceD app amuletPrice = do
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
@@ -242,7 +243,7 @@ runNextIssuanceD app amuletPrice = do
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
-          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons)
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
 
     -- create issuing mining round
     submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with

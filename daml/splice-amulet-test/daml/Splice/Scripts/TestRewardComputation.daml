@@ -45,7 +45,7 @@ testRewardComputation = do
     round = Round 0
 
   drawOnAllValidatorFaucets app
-  [(validatorFaucetCoupon, _)] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
+  [(validatorActivityRecord, _)] <- queryFilter @ValidatorLivenessActivityRecord aliceValidator.primaryParty (\c -> c.round.number == 0)
 
   -- assume provider1 operates SV node 1 and provider2 operates SV node 2
   -- alice owns 99.99% of the stake in provider1, and a 10% stake in provider2
@@ -116,7 +116,7 @@ testRewardComputation = do
           InputAppRewardCoupon appCoupon1,
           InputAppRewardCoupon appCoupon2,
           InputValidatorRewardCoupon validatorCoupon1,
-          mkInputValidatorFaucetCoupon validatorFaucetCoupon,
+          InputValidatorLivenessActivityRecord validatorActivityRecord,
           InputSvRewardCoupon svRewardAlice1,
           InputSvRewardCoupon svRewardAlice2
         ]

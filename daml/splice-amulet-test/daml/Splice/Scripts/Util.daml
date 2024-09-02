@@ -241,6 +241,7 @@ runNextIssuanceInternal app amuletPrice = do
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
@@ -248,7 +249,7 @@ runNextIssuanceInternal app amuletPrice = do
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
-          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons)
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
 
     -- create issuing mining round
     submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with
@@ -385,7 +386,7 @@ drawOnAllValidatorFaucets app = do
       (\l -> optional True (\state -> state.lastReceivedFor < openRound._2.round) l.faucetState)
     forA_ licenses $ \(lcid, l) ->
       -- submitMulti as the OpenMiningRound would be disclosed using explicit disclosure
-      submitMulti [l.validator] [app.dso] $ exerciseCmd lcid ValidatorLicense_ReceiveFaucetCoupon with
+      submitMulti [l.validator] [app.dso] $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
         openRoundCid = openRound._1
 
 -- | Deposit all amulets together with new issuances into a single amulet.
@@ -415,6 +416,9 @@ runAmuletDepositBots app = do
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && c.validator == user
 
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.validator == user
+
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && c.beneficiary == user
 
@@ -432,6 +436,7 @@ runAmuletDepositBots app = do
               map (InputAppRewardCoupon . fst) appRewardCoupons ++
               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
               map (mkInputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
+              map (InputValidatorLivenessActivityRecord . fst) validatorLivenessActivityRecords ++
               map (InputSvRewardCoupon . fst) svRewardCoupons ++
               amulets
           outputs = []
