@@ -41,7 +41,8 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
    OR jsonPayload._msg=~"\\A(Stopping peer for error|Stopped accept routine, as transport is closed|Failed to write PacketMsg|Connection failed @ sendRoutine)\\z"
    OR jsonPayload.error="already stopped"
    OR textPayload="cp: not replacing '/cometbft/data/priv_validator_state.json'"
-   OR (jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")))
+   OR (jsonPayload._msg="Error stopping connection" AND jsonPayload.err="already stopped")
+   OR jsonPayload._msg="Error adding peer to new bucket"))
 -- execution context overload
 -jsonPayload.message=~"Task runner canton-env-ec is .* overloaded"
 -- on startup
