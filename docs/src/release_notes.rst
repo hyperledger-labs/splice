@@ -32,6 +32,9 @@ Upcoming
 
 * SV and validator apps
 
+  * Add a note about avoiding installing third-party Daml apps on SV nodes in the SV operations documentation,
+    as that may compromise the :ref:`security of the SV node <sv_security_notice>`.
+
   * Remove support for deprecated ``bootstrapTXs`` field on node identity dumps. Node identity dumps taken on a 0.1.2 snapshot or earlier version are no longer supported.
 
   * Fix a rare race condition where the SV app uses the wrong
