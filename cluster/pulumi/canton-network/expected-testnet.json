@@ -1809,6 +1809,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_0_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -1829,6 +1830,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_0_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -1901,6 +1903,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_1_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -1921,6 +1924,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_1_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }

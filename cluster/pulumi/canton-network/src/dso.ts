@@ -17,10 +17,11 @@ import {
   approvedSvIdentities,
 } from 'cn-pulumi-common';
 import { StaticCometBftConfigWithNodeName } from 'cn-pulumi-common-sv';
+import { SequencerPruningConfig, StaticSvConfig } from 'cn-pulumi-common-sv/src/config';
 import _ from 'lodash';
 
-import { InstalledSv, SequencerPruningConfig, SvOnboarding, installSvNode } from './sv';
-import svConfigs, { StaticSvConfig } from './svConfigs';
+import { InstalledSv, SvOnboarding, installSvNode } from './sv';
+import svConfigs from './svConfigs';
 
 interface DsoArgs {
   dsoSize: number;

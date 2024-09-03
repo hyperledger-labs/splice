@@ -4,12 +4,8 @@ import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
-  ApprovedSvIdentity,
   appsAffinityAndTolerations,
-  Auth0Client,
   BackupConfig,
-  BackupLocation,
-  BootstrappingDumpConfig,
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
@@ -20,7 +16,6 @@ import {
   defaultVersion,
   ExactNamespace,
   exactNamespace,
-  ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
   initialSynchronizerFeesConfig,
   installAuth0Secret,
@@ -36,19 +31,18 @@ import {
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   SvIdKey,
   validatorOnboardingSecretName,
-  ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 import {
   DecentralizedSynchronizerNode,
+  installCantonComponents,
   StaticCometBftConfigWithNodeName,
 } from 'cn-pulumi-common-sv';
+import { SvConfig } from 'cn-pulumi-common-sv/src/config';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { installCantonComponents } from '../../common-sv/src/canton';
 import { Postgres } from '../../common/src/postgres';
-import { StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
@@ -93,33 +87,6 @@ export type SvOnboarding =
       sponsorRelease: pulumi.Resource;
       sponsorApiUrl: string;
     };
-
-export type SequencerPruningConfig = {
-  enabled: boolean;
-  pruningInterval?: string;
-  retentionPeriod?: string;
-};
-
-export interface SvConfig extends StaticSvConfig {
-  isFirstSv: boolean;
-  auth0Client: Auth0Client;
-  nodeConfigs: {
-    sv1: StaticCometBftConfigWithNodeName;
-    peers: StaticCometBftConfigWithNodeName[];
-  };
-  onboarding: SvOnboarding;
-  approvedSvIdentities: ApprovedSvIdentity[];
-  expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
-  isDevNet: boolean;
-  periodicBackupConfig?: BackupConfig;
-  identitiesBackupLocation: BackupLocation;
-  bootstrappingDumpConfig?: BootstrappingDumpConfig;
-  topupConfig?: ValidatorTopupConfig;
-  sequencerPruningConfig: SequencerPruningConfig;
-  splitPostgresInstances: boolean;
-  disableOnboardingParticipantPromotionDelay: boolean;
-  onboardingPollingInterval?: string;
-}
 
 type InstalledMigrationSpecificSv = {
   decentralizedSynchronizer: DecentralizedSynchronizerNode;
@@ -445,7 +412,12 @@ function installMigrationIdSpecificComponents(
       return installCantonComponents(
         xns,
         migrationId,
-        svConfig,
+        svConfig.auth0Client,
+        {
+          onboardingName: svConfig.onboardingName,
+          isFirstSv: svConfig.isFirstSv,
+          isCoreSv: true,
+        },
         {
           participant: participantDb,
           mediator: mediatorDb,

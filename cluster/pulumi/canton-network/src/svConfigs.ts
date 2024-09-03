@@ -1,20 +1,9 @@
 import * as pulumi from '@pulumi/pulumi';
 import { isDevNet, isMainNet, SvCometBftKeys, svCometBftKeysFromSecret } from 'cn-pulumi-common';
-import { cometbftRetainBlocks, StaticCometBftConfig } from 'cn-pulumi-common-sv';
+import { cometbftRetainBlocks } from 'cn-pulumi-common-sv';
+import { StaticSvConfig } from 'cn-pulumi-common-sv/src/config';
 
-import { SweepConfig, sweepConfigFromEnv } from './validator';
-
-export interface StaticSvConfig {
-  nodeName: string;
-  ingressName: string;
-  onboardingName: string;
-  validatorWalletUser: string;
-  auth0ValidatorAppName: string;
-  auth0SvAppName: string;
-  cometBft: StaticCometBftConfig;
-  onboardingPollingInterval?: string;
-  sweep?: SweepConfig;
-}
+import { sweepConfigFromEnv } from './validator';
 
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
   ? [svCometBftKeysFromSecret('sv1-cometbft-keys')]

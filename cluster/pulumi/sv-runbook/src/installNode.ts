@@ -14,7 +14,6 @@ import {
   imagePullSecretByNamespaceName,
   installSpliceRunbookHelmChart,
   installSpliceRunbookHelmChartByNamespaceName,
-  installMigrationIdSpecificComponent,
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
@@ -41,12 +40,11 @@ import {
   daContactPoint,
   spliceInstanceNames,
 } from 'cn-pulumi-common';
-import { installSvParticipant } from 'cn-pulumi-common-sv';
 import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
-import { installDecentralizedSynchronizerNode } from './decentralizedSynchronizer';
+import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
 
 if (!isDevNet) {
@@ -203,13 +201,6 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
   } = config;
 
-  const decentralizedSynchronizer = installDecentralizedSynchronizerNode(
-    xns,
-    onboardingName,
-    decentralizedSynchronizerMigrationConfig,
-    imagePullDeps
-  );
-
   const auth0Config = auth0Client.getCfg();
   const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
   if (!svNameSpaceAuth0Clients) {
@@ -226,35 +217,13 @@ async function installSvAndValidator(
     svUiClientId
   );
   const svKeySecret_ = svKeySecret(xns, svKey);
-
-  const participantPg = installPostgres(
+  const canton = installCanton(
     xns,
-    `participant-pg`,
-    'participant-pg-secret',
-    'postgres-values-participant.yaml'
-  );
-
-  const participant = installMigrationIdSpecificComponent(
+    auth0Client,
+    onboardingName,
     decentralizedSynchronizerMigrationConfig,
-    (migrationId, isActive, version) => {
-      return installSvParticipant(
-        xns,
-        migrationId,
-        auth0Config,
-        isActive,
-        participantPg,
-        'INFO',
-        version,
-        onboardingName,
-        undefined,
-        {
-          // TODO(#14507) - remove alias once latest release is 0.2.0
-          aliases: [{ name: `participant-${migrationId}` }],
-          dependsOn: [svKeySecret_],
-        }
-      );
-    }
-  ).activeComponent;
+    imagePullDeps.concat(svKeySecret_)
+  );
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
@@ -352,7 +321,7 @@ async function installSvAndValidator(
     defaultVersion,
     {
       dependsOn: imagePullDeps
-        .concat([participant, decentralizedSynchronizer])
+        .concat([canton.participant, canton.decentralizedSynchronizer])
         .concat([svAppSecret, svAppUISecret, appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
     },
@@ -386,7 +355,7 @@ async function installSvAndValidator(
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     defaultVersion,
-    { dependsOn: imagePullDeps.concat([sv, participant, svAppSecret, appsPg]) }
+    { dependsOn: imagePullDeps.concat([sv, canton.participant, svAppSecret, appsPg]) }
   );
 
   const validatorValues = {
@@ -445,7 +414,7 @@ async function installSvAndValidator(
     defaultVersion,
     {
       dependsOn: imagePullDeps
-        .concat([sv, participant])
+        .concat([sv, canton.participant])
         .concat([svValidatorAppSecret, svValidatorUISecret])
         .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])

@@ -1,40 +1,34 @@
-import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
 import svConfigs from 'canton-network-pulumi-deployment/src/svConfigs';
 import {
-  autoInitValues,
-  ChartValues,
+  Auth0Client,
   CnInput,
-  config,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
   installMigrationIdSpecificComponent,
-  installSpliceRunbookHelmChart,
-  loadYamlFromFile,
-  REPO_ROOT,
-  sequencerResources,
-  sequencerTokenExpirationTime,
 } from 'cn-pulumi-common';
 import {
-  CometBftNodeConfigs,
   cometbftRetainBlocks,
-  installCometBftNode,
+  DecentralizedSynchronizerNode,
+  installCantonComponents,
 } from 'cn-pulumi-common-sv';
 
 import { installCometbftKeys } from './cometbftKeys';
 import { installPostgres } from './postgres';
 
-export function installDecentralizedSynchronizerNode(
+export function installCanton(
   svNamespace: ExactNamespace,
+  auth0Client: Auth0Client,
   onboardingName: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
-): k8s.helm.v3.Release {
-  const logLevel =
-    config.envFlag('SPLICE_DEPLOYMENT_SINGLE_SV_DEBUG') ||
-    config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG')
-      ? 'INFO'
-      : 'DEBUG';
+): { decentralizedSynchronizer: DecentralizedSynchronizerNode; participant: Resource } {
+  const participantPg = installPostgres(
+    svNamespace,
+    `participant-pg`,
+    'participant-pg-secret',
+    'postgres-values-participant.yaml'
+  );
 
   const sequencerPg = installPostgres(
     svNamespace,
@@ -53,81 +47,41 @@ export function installDecentralizedSynchronizerNode(
 
   return installMigrationIdSpecificComponent(
     decentralizedSynchronizerMigrationConfig,
-    (migrationId, isActive, version) => {
+    (migrationId, _, version) => {
       const sv1Conf = svConfigs.find(config => config.nodeName === 'sv-1')!;
-      const cometbft = installCometBftNode(
+      return installCantonComponents(
         svNamespace,
-        onboardingName,
-        new CometBftNodeConfigs(migrationId, {
-          self: {
-            nodeIndex: 0,
-            nodeName: onboardingName,
-            retainBlocks: cometbftRetainBlocks,
-            id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
-          },
-          sv1: {
-            ...sv1Conf?.cometBft,
-            nodeName: sv1Conf.nodeName,
-          },
-          peers: [],
-        }),
         migrationId,
-        isActive,
-        decentralizedSynchronizerMigrationConfig.isRunningMigration(),
-        logLevel.toLowerCase(),
+        auth0Client,
+        {
+          onboardingName,
+          isFirstSv: false,
+          isCoreSv: false,
+        },
+        {
+          participant: participantPg,
+          mediator: mediatorPg,
+          sequencer: sequencerPg,
+        },
         version,
-        undefined,
+        decentralizedSynchronizerMigrationConfig,
+        {
+          nodeConfigs: {
+            self: {
+              nodeIndex: 0,
+              nodeName: onboardingName,
+              retainBlocks: cometbftRetainBlocks,
+              id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
+            },
+            sv1: {
+              ...sv1Conf?.cometBft,
+              nodeName: sv1Conf.nodeName,
+            },
+            peers: [],
+          },
+        },
         {
           dependsOn: dependencies,
-        }
-      );
-      const decentralizedSynchronizerValues: ChartValues = {
-        ...loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
-          {
-            MIGRATION_ID: migrationId.toString(),
-          }
-        ),
-        metrics: {
-          enable: true,
-          migration: {
-            id: migrationId,
-            active: isActive,
-          },
-        },
-      };
-
-      return installSpliceRunbookHelmChart(
-        svNamespace,
-        `global-domain-${migrationId}`,
-        'cn-global-domain',
-        {
-          ...decentralizedSynchronizerValues,
-          sequencer: {
-            ...decentralizedSynchronizerValues.sequencer,
-            ...sequencerResources,
-            tokenExpirationTime: sequencerTokenExpirationTime,
-            persistence: {
-              ...decentralizedSynchronizerValues.sequencer.persistence,
-              host: sequencerPg.address,
-              postgresName: sequencerPg.instanceName,
-            },
-          },
-          mediator: {
-            ...decentralizedSynchronizerValues.mediator,
-            persistence: {
-              ...decentralizedSynchronizerValues.mediator.persistence,
-              host: mediatorPg.address,
-              postgresName: mediatorPg.instanceName,
-            },
-          },
-          enablePostgresMetrics: true,
-          logLevel: logLevel,
-          ...autoInitValues('cn-global-domain', version, onboardingName),
-        },
-        version,
-        {
-          dependsOn: dependencies.concat([cometbft.release, sequencerPg, mediatorPg]),
         }
       );
     }

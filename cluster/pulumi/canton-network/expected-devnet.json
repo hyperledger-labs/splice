@@ -2316,6 +2316,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -2336,6 +2337,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_3_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -3429,6 +3431,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -3449,6 +3452,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_3_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -4508,6 +4512,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -4528,6 +4533,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_3_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }
@@ -5587,6 +5593,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "global_domain_3_mediator",
+            "port": 5432,
             "postgresName": "mediator-pg",
             "secretName": "mediator-pg-secrets"
           }
@@ -5607,6 +5614,7 @@
           },
           "persistence": {
             "databaseName": "global_domain_3_sequencer",
+            "port": 5432,
             "postgresName": "sequencer-pg",
             "secretName": "sequencer-pg-secrets"
           }

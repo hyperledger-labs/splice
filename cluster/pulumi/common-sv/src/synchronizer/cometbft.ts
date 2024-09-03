@@ -132,7 +132,7 @@ export function installCometBftNode(
     {
       ...opts,
       dependsOn: (opts?.dependsOn || []).concat(syncSource && stateSyncEnabled ? syncSource : []),
-      aliases: [{ name: `global-domain-${migrationId}-cometbft` }],
+      aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
     }
   );
