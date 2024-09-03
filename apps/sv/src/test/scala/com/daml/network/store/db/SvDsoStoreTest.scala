@@ -114,7 +114,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    lookupTests("lookupDsoRulesWithOffset")(dsoRules())(_.lookupDsoRulesWithOffset())
+    lookupTests("lookupDsoRulesWithOffset")(dsoRules())(_.lookupDsoRulesWithStateWithOffset())
     lookupTests("lookupAmuletRulesWithOffset")(amuletRules())(_.lookupAmuletRulesWithOffset())
     lookupTests("lookupAnsRulesWithOffset")(ansRules())(
       _.lookupAnsRulesWithOffset()

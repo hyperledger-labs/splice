@@ -357,6 +357,7 @@ class SvDsoAutomationService(
         connection,
         cometBft,
         localSynchronizerNode.map(_.mediatorAdminConnection),
+        extraSynchronizerNodes,
         participantAdminConnection,
       )
     )

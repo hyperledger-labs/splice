@@ -150,7 +150,8 @@ class ScanFrontendTimeBasedIntegrationTest
               }
             contract should be(
               Some(
-                dsoInfo.dsoRules.payload.asObject.valueOrFail("This is definitely an object.")
+                dsoInfo.dsoRules.contract.payload.asObject
+                  .valueOrFail("This is definitely an object.")
               )
             )
           },

@@ -80,7 +80,7 @@ trait ScanStore
     ]
   ]
 
-  private def getAmuletRulesWithState()(implicit
+  def getAmuletRulesWithState()(implicit
       tc: TraceContext
   ): Future[
     ContractWithState[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
@@ -100,7 +100,7 @@ trait ScanStore
       f: splice.dso.svstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
-      dsoRules <- getDsoRules()
+      dsoRules <- getDsoRulesWithState()
       nodeStates <- Future.traverse(dsoRules.payload.svs.asScala.keys) { svPartyId =>
         getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
       }

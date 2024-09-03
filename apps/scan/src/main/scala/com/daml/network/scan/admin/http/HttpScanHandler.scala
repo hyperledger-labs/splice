@@ -102,17 +102,17 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
       for {
         latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-        amuletRules <- store.getAmuletRules()
-        rulesAndStates <- store.getDsoRulesWithSvNodeStates()
+        amuletRules <- store.getAmuletRulesWithState()
+        rulesAndStates <- store.getDsoRulesWithStateWithSvNodeStates()
         dsoRules = rulesAndStates.dsoRules
       } yield definitions.GetDsoInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         dsoPartyId = store.key.dsoParty.toProtoPrimitive,
         votingThreshold = Thresholds.requiredNumVotes(dsoRules),
-        latestMiningRound = latestOpenMiningRound.contract.toHttp,
+        latestMiningRound = latestOpenMiningRound.toContractWithState.toHttp,
         amuletRules = amuletRules.toHttp,
-        dsoRules = dsoRules.contract.toHttp,
+        dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
       )
     }

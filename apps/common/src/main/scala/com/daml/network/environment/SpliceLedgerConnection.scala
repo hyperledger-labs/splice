@@ -739,7 +739,6 @@ class SpliceLedgerConnection(
   ) {
     private type DedupNotSpecifiedYet = CmdId =:= Any
     private type DomainIdRequired = DomId <:< DomainId
-    private type DomainIdDisallowed = DomId <:< Unit
 
     private[this] def copy[CmdId0, DomId0](
         commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
@@ -780,9 +779,8 @@ class SpliceLedgerConnection(
         domainId: DomainId,
         disclosedContracts: DisclosedContracts = DisclosedContracts(),
     )(implicit
-        noDomIdYet: DomainIdDisallowed,
         // if you statically know you have NE, use withDisclosedContracts instead
-        notNE: disclosedContracts.type <:!< DisclosedContracts.NE,
+        notNE: disclosedContracts.type <:!< DisclosedContracts.NE
     ): submit[C, CmdId, DomainId] =
       copy(
         domainId = domainId,

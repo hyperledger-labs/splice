@@ -125,20 +125,17 @@ components:
         # Threshold required to pass vote requests
         voting_threshold:
           type: integer
-        # Contract ID of the OpenMiningRound contract of the latest Mining Round
         latest_mining_round:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract ID of the AmuletRules contract associated with the DSO
+          $ref: "#/components/schemas/ContractWithState"
         amulet_rules:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract IDs of the DsoRules contract associated with the DSO
+          $ref: "#/components/schemas/ContractWithState"
         dso_rules:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+          $ref: "#/components/schemas/ContractWithState"
         # States the SVs' nodes
         sv_node_states:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/ContractWithState"
 
     BatchListVotesByVoteRequestsRequest:
       type: object

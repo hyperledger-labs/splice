@@ -88,21 +88,21 @@ class ScanIntegrationTest
         scan.svNodeStates should be(svNodeStates.map(_._2.toHttp))
     }
     // sanity checks
-    scan.dsoRules.contractId should be(
+    scan.dsoRules.contract.contractId should be(
       sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(DsoRules.COMPANION)(dsoParty)
         .loneElement
         .id
         .contractId
     )
-    scan.amuletRules.contractId should be(
+    scan.amuletRules.contract.contractId should be(
       sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(AmuletRules.COMPANION)(dsoParty)
         .loneElement
         .id
         .contractId
     )
-    scan.svNodeStates.map(_.contractId) should be(
+    scan.svNodeStates.map(_.contract.contractId) should be(
       sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(SvNodeState.COMPANION)(dsoParty)
         .map(_.id.contractId)

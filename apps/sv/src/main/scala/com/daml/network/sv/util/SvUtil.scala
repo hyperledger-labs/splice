@@ -21,7 +21,7 @@ import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
 import com.daml.network.codegen.java.splice.dsorules.DsoRulesConfig
 import com.daml.network.codegen.java.splice.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.SequencerAdminConnection
+import com.daml.network.environment.{MediatorAdminConnection, SequencerAdminConnection}
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SynchronizerNode}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{BeneficiaryConfig, SvScanConfig}
@@ -315,6 +315,22 @@ object SvUtil {
         primarySequencerAdminConnection.getOrElse(
           throw Status.FAILED_PRECONDITION
             .withDescription("No sequencer admin connection configured for SV App")
+            .asRuntimeException()
+        )
+    }
+
+  // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
+  def getMediatorAdminConnection(
+      domainId: DomainId,
+      primaryMediatorAdminConnection: Option[MediatorAdminConnection],
+      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
+  ): MediatorAdminConnection =
+    extraSynchronizerNodes.get(domainId.uid.identifier.str) match {
+      case Some(synchronizer) => synchronizer.mediatorAdminConnection
+      case None =>
+        primaryMediatorAdminConnection.getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription("No mediator admin connection configured for SV App")
             .asRuntimeException()
         )
     }

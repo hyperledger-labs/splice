@@ -65,6 +65,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -1340,13 +1341,23 @@ class DbSvDsoStore(
 
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[SvNodeState.ContractId, SvNodeState]]] =
+  ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
   override def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
-    lookupContractBySvParty(SvStatusReport.COMPANION, svPartyId)
+    lookupContractBySvParty(SvStatusReport.COMPANION, svPartyId).map(
+      _.map(c =>
+        c.toAssignedContract.getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Could not convert SvStatusReport ${c.contractId} to AssignedContract as it has state ${c.state}"
+            )
+            .asRuntimeException
+        )
+      )
+    )
 
   override def lookupSvRewardState(svName: String)(implicit
       tc: TraceContext
@@ -1378,7 +1389,7 @@ class DbSvDsoStore(
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Option[AssignedContract[TCId, T]]] = {
+  ): Future[Option[ContractWithState[TCId, T]]] = {
     val templateId = companionClass.typeId(companion)
     waitUntilAcsIngested {
       for {
@@ -1396,7 +1407,7 @@ class DbSvDsoStore(
             s"lookupContractBySvParty[$templateId]",
           )
           .value
-      } yield row.map(assignedContractFromRow(companion)(_))
+      } yield row.map(contractWithStateFromRow(companion)(_))
     }
   }
 

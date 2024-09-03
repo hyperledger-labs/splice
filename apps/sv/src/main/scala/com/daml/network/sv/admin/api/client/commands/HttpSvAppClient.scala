@@ -19,7 +19,7 @@ import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
@@ -38,10 +38,10 @@ object HttpSvAppClient {
       svParty: PartyId,
       dsoParty: PartyId,
       votingThreshold: BigInt,
-      latestMiningRound: Contract[OpenMiningRound.ContractId, OpenMiningRound],
-      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
-      dsoRules: Contract[DsoRules.ContractId, DsoRules],
-      svNodeStates: Map[PartyId, Contract[SvNodeState.ContractId, SvNodeState]],
+      latestMiningRound: ContractWithState[OpenMiningRound.ContractId, OpenMiningRound],
+      amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
+      dsoRules: ContractWithState[DsoRules.ContractId, DsoRules],
+      svNodeStates: Map[PartyId, ContractWithState[SvNodeState.ContractId, SvNodeState]],
   )
 
   sealed trait SvOnboardingStatus
@@ -206,14 +206,20 @@ object HttpSvAppClient {
         for {
           svPartyId <- Codec.decode(Codec.Party)(svPartyId)
           dsoPartyId <- Codec.decode(Codec.Party)(dsoPartyId)
-          latestMiningRound <- Contract
+          latestMiningRound <- ContractWithState
             .fromHttp(OpenMiningRound.COMPANION)(latestMiningRound)
             .leftMap(_.toString)
-          amuletRules <- Contract.fromHttp(AmuletRules.COMPANION)(amuletRules).left.map(_.toString)
-          dsoRules <- Contract.fromHttp(DsoRules.COMPANION)(dsoRules).left.map(_.toString)
+          amuletRules <- ContractWithState
+            .fromHttp(AmuletRules.COMPANION)(amuletRules)
+            .left
+            .map(_.toString)
+          dsoRules <- ContractWithState.fromHttp(DsoRules.COMPANION)(dsoRules).left.map(_.toString)
           svNodeStates <- svNodeStates.traverse { co =>
             for {
-              nodeState <- Contract.fromHttp(SvNodeState.COMPANION)(co).left.map(_.toString)
+              nodeState <- ContractWithState
+                .fromHttp(SvNodeState.COMPANION)(co)
+                .left
+                .map(_.toString)
               partyId <- Codec.decode(Codec.Party)(nodeState.payload.sv)
             } yield partyId -> nodeState
           }

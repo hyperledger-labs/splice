@@ -30,13 +30,7 @@ import com.daml.network.scan.store.{
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
 import com.daml.network.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, TxLogStore}
-import com.daml.network.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.caching.CaffeineCache
 import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -766,7 +760,7 @@ class DbScanStore(
 
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[SvNodeState.ContractId, SvNodeState]]] =
+  ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
   private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
@@ -775,7 +769,7 @@ class DbScanStore(
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Option[AssignedContract[TCId, T]]] = {
+  ): Future[Option[ContractWithState[TCId, T]]] = {
     val templateId = companionClass.typeId(companion)
     waitUntilAcsIngested {
       for {
@@ -793,7 +787,7 @@ class DbScanStore(
             s"lookupContractBySvParty[$templateId]",
           )
           .value
-      } yield row.map(assignedContractFromRow(companion)(_))
+      } yield row.map(contractWithStateFromRow(companion)(_))
     }
   }
 

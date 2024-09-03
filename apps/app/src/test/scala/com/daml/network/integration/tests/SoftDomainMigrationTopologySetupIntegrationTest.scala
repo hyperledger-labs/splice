@@ -48,7 +48,12 @@ import com.daml.network.util.{
 }
 import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.daml.network.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
@@ -124,6 +129,12 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
             _.withResumedTrigger[AmuletConfigReassignmentTrigger]
               .withResumedTrigger[AssignTrigger]
+              .withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+              .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
+          )(conf),
+        (_, conf) =>
+          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+            _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
           )(conf),
         (_, conf) =>
           // At least for now we test the impact of soft domain migrations on an app
@@ -413,6 +424,14 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       forAll(issuingRounds) { round =>
         round.state shouldBe ContractState.Assigned(newDomainId)
       }
+    }
+
+    clue("Round can be advanced") {
+      advanceRoundsByOneTickViaAutomation
+    }
+    eventually() {
+      sv1ScanBackend.getAmuletRules().state shouldBe ContractState.Assigned(newDomainId)
+      sv1ScanBackend.getDsoInfo().dsoRules.domainId.value shouldBe newDomainId.toProtoPrimitive
     }
 
     p2pTransfer(

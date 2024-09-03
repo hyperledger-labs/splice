@@ -95,4 +95,7 @@ Instrument daml.cache.* has recorded multiple values for the same attributes
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 
+# TODO(#13301) Handle in-flight contracts without logging warnings
+Cannot read contract.*AssignedContract, it is in flight.*SoftDomainMigrationTopologySetupIntegrationTest
+
 # Make sure to have a trailing newline

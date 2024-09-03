@@ -10,15 +10,16 @@ import com.daml.network.environment.{
   MediatorAdminConnection,
   ParticipantAdminConnection,
 }
+import com.daml.network.sv.ExtraSynchronizerNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import cats.syntax.traverse.*
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.digitalasset.canton.data.CantonTimestamp
 
 /** A trigger that regularly submits the status report of the SV to the DSO. */
 class SubmitSvStatusReportTrigger(
@@ -27,7 +28,8 @@ class SubmitSvStatusReportTrigger(
     store: SvDsoStore,
     ledgerApiConnection: SpliceLedgerConnection,
     cometBft: Option[CometBftNode],
-    mediatorAdminConnection: Option[MediatorAdminConnection],
+    mediatorAdminConnectionO: Option[MediatorAdminConnection],
+    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -47,12 +49,15 @@ class SubmitSvStatusReportTrigger(
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
+      mediatorAdminConnection = SvUtil.getMediatorAdminConnection(
+        dsoRules.domain,
+        mediatorAdminConnectionO,
+        extraSynchronizerNodes,
+      )
       // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
-      mediatorSynchronizerTimeLb <- mediatorAdminConnection.traverse(
-        _.getDomainTimeLowerBound(
-          dsoRules.domain,
-          maxDomainTimeLag = context.config.pollingInterval,
-        )
+      mediatorSynchronizerTimeLb <- mediatorAdminConnection.getDomainTimeLowerBound(
+        dsoRules.domain,
+        maxDomainTimeLag = context.config.pollingInterval,
       )
       participantSynchronizerTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
         dsoRules.domain,
@@ -64,7 +69,7 @@ class SubmitSvStatusReportTrigger(
         // Production deployments always define all of these values, which is why we don't embed the 'Option' value
         // into the status report. We'll only see the magic default values in our tests.
         cometBftHeight.getOrElse[Long](-1L),
-        mediatorSynchronizerTimeLb.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
+        mediatorSynchronizerTimeLb.timestamp.toInstant,
         participantSynchronizerTimeLb.timestamp.toInstant,
         openMiningRounds.newest.payload.round,
       )

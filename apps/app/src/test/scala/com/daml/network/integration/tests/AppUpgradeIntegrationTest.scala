@@ -307,7 +307,7 @@ class AppUpgradeIntegrationTest
             "observing AmuletRules with new package id",
             _ => {
               val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
-              newAmuletRules.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
+              newAmuletRules.contract.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
             },
           )
 

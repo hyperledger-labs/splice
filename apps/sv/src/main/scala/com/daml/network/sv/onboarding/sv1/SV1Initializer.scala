@@ -37,7 +37,7 @@ import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNod
 import com.daml.network.sv.onboarding.sv1.SV1Initializer.bootstrapTransactionOrdering
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{ContractWithState, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.DomainTimeTrackerConfig
@@ -508,7 +508,7 @@ class SV1Initializer(
           participantAdminConnection.getParticipantId(),
           localSynchronizerNode.sequencerAdminConnection.listSequencerTrafficControlState(),
           dsoStore.lookupAmuletRules(),
-          dsoStore.lookupDsoRulesWithOffset(),
+          dsoStore.lookupDsoRulesWithStateWithOffset(),
         ).tupled
         _ <- dsoRules match {
           case QueryResult(offset, None) =>
@@ -590,7 +590,7 @@ class SV1Initializer(
                     .yieldUnit()
                 } yield ()
             }
-          case QueryResult(_, Some(AssignedContract(dsoRules, _))) =>
+          case QueryResult(_, Some(ContractWithState(dsoRules, _))) =>
             amuletRules match {
               case Some(amuletRules) =>
                 if (dsoRules.payload.svs.keySet.contains(svParty.toProtoPrimitive)) {

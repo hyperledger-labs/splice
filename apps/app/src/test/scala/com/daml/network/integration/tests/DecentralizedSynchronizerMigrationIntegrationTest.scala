@@ -972,9 +972,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )
                 .valueOrFail(s"Snapshot was just taken but not returned.")
 
-              snapshot.createdEvents.map(_.contractId) should contain(dsoInfo.dsoRules.contractId)
               snapshot.createdEvents.map(_.contractId) should contain(
-                dsoInfo.amuletRules.contractId
+                dsoInfo.dsoRules.contract.contractId
+              )
+              snapshot.createdEvents.map(_.contractId) should contain(
+                dsoInfo.amuletRules.contract.contractId
               )
               snapshot.createdEvents.map(_.contractId) should contain(
                 ansRules.contractId.contractId
