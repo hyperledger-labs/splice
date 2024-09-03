@@ -21,7 +21,7 @@ import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/';
 import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvState';
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
-export interface SvUiState {
+export interface DsoInfo {
   svUser: string;
   svPartyId: string;
   dsoPartyId: string;
@@ -31,7 +31,7 @@ export interface SvUiState {
   nodeStates: Contract<SvNodeState>[];
 }
 
-function encodeSvUiState(uiState: SvUiState): unknown {
+function encodeSvUiState(uiState: DsoInfo): unknown {
   return {
     ...uiState,
     amuletRules: Contract.encode(AmuletRules, uiState.amuletRules),
@@ -69,7 +69,7 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
 function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
-const GeneralInformationView: React.FC<{ dsoInfo: SvUiState }> = ({ dsoInfo }) => {
+const GeneralInformationView: React.FC<{ dsoInfo: DsoInfo }> = ({ dsoInfo }) => {
   let cs: { key: string; value: string }[] = [];
   dsoInfo.dsoRules.payload.svs.forEach((value, key) => cs.push(createRow(key, value.name)));
   const svInfos = [
@@ -218,7 +218,7 @@ function tabProps(info: string) {
   };
 }
 interface DsoViewPrettyJSONProps {
-  dsoInfoQuery: UseQueryResult<SvUiState>;
+  dsoInfoQuery: UseQueryResult<DsoInfo>;
   cometBftNodeDebugQuery?: UseQueryResult<CometBftNodeDumpOrErrorResponse>;
   sequencerStatusQuery?: UseQueryResult<NodeStatus>;
   mediatorStatusQuery?: UseQueryResult<NodeStatus>;

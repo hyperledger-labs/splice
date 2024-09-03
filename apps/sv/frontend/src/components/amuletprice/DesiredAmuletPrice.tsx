@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DateDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
+import {
+  AmountDisplay,
+  DateDisplay,
+  Loading,
+  PartyId,
+  SvClientProvider,
+  AmuletPriceVote,
+} from 'common-frontend';
 import React, { useCallback, useState } from 'react';
 
 import EditIcon from '@mui/icons-material/Edit';
@@ -25,7 +32,6 @@ import { Numeric, Optional, Party } from '@daml/types';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { useAmuletPriceVotes } from '../../hooks/useAmuletPriceVotes';
-import { AmuletPriceVote } from '../../models/models';
 import { useSvConfig } from '../../utils';
 
 const DesiredAmuletPrice: React.FC = () => {

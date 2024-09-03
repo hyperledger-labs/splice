@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { useScanClient } from 'common-frontend/scan-api';
 
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
 
-import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
-
 export const useVoteRequest = (
   contractId: ContractId<VoteRequest>
 ): UseQueryResult<Contract<VoteRequest>> => {
-  const { lookupDsoRulesVoteRequest } = useSvAdminClient();
+  const scanClient = useScanClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listDsoRulesVoteRequests', contractId],
-    queryFn: async () => (await lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
+    queryFn: async () =>
+      (await scanClient.lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
   });
 };

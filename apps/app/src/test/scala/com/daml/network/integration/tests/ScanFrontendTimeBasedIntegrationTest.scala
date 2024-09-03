@@ -1,13 +1,18 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.util.*
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.JsonObject
+import spray.json.DefaultJsonProtocol.StringJsonFormat
 
 import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
@@ -20,7 +25,8 @@ class ScanFrontendTimeBasedIntegrationTest
     with WalletFrontendTestUtil
     with TimeTestUtil
     with SynchronizerFeesTestUtil
-    with TriggerTestUtil {
+    with TriggerTestUtil
+    with VotesFrontendTestUtil {
 
   val amuletPrice = 2
 
@@ -515,6 +521,73 @@ class ScanFrontendTimeBasedIntegrationTest
               splitwellValidatorBackend.getValidatorPartyId().toProtoPrimitive,
               bobValidatorWalletParty,
             ).map(party => s"$party 0 0 0 0")
+          },
+        )
+      }
+    }
+
+    "see the votes" in { implicit env =>
+      val dsoInfo = sv1Backend.getDsoInfo()
+      val amuletRules = dsoInfo.amuletRules
+
+      val newMaxNumInputs =
+        amuletRules.payload.configSchedule.initialValue.transferConfig.maxNumInputs.toInt + 1
+      val mockVoteAction = new ARC_AmuletRules(
+        new CRARC_AddFutureAmuletConfigSchedule(
+          new AmuletRules_AddFutureAmuletConfigSchedule(
+            new com.daml.network.codegen.java.da.types.Tuple2(
+              getLedgerTime.toInstant.plusSeconds(
+                defaultTickDuration.minusSeconds(1).duration.toSeconds
+              ),
+              SpliceUtil.defaultAmuletConfig(
+                NonNegativeFiniteDuration.tryFromDuration(
+                  scala.concurrent.duration.Duration.fromNanos(
+                    amuletRules.payload.configSchedule.initialValue.tickDuration.microseconds * 1000
+                  )
+                ),
+                newMaxNumInputs,
+                decentralizedSynchronizerId,
+              ),
+            )
+          )
+        )
+      )
+
+      // only 1 SV in this test suite, so the vote is approved
+      sv1Backend.createVoteRequest(
+        dsoInfo.svParty.toProtoPrimitive,
+        mockVoteAction,
+        "url",
+        "Testing Testingaton",
+        dsoInfo.dsoRules.payload.config.voteRequestTimeout,
+      )
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan UI for votes",
+          go to s"http://localhost:$scanUIPort/governance",
+        )(
+          "See the vote as executed",
+          _ => {
+            closeVoteModalsIfOpen
+
+            click on "tab-panel-executed"
+            val rows = getAllVoteRows("sv-vote-results-executed-table-body")
+
+            forExactly(1, rows) { reviewButton =>
+              closeVoteModalsIfOpen
+              reviewButton.underlying.click()
+
+              inside(find(id("pretty-json"))) { case Some(json) =>
+                spray.json
+                  .JsonParser(json.text)
+                  .asJsObject("transferConfig")
+                  .fields("transferConfig")
+                  .asJsObject
+                  .fields("maxNumInputs")
+                  .convertTo[String] should be(newMaxNumInputs.toString)
+              }
+            }
           },
         )
       }

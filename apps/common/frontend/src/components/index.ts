@@ -8,7 +8,7 @@ import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
 import DisableConditionally from './DisableConditionally';
-import DsoViewPrettyJSON, { SvUiState } from './Dso';
+import DsoViewPrettyJSON, { DsoInfo } from './Dso';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
 import ErrorRouterPage from './ErrorRouterPage';
@@ -21,6 +21,13 @@ import PartyId from './PartyId';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
 import { TransferButton, SubscriptionButton } from './WalletButtons';
+import {
+  VotesHooksContext,
+  BaseVotesHooks,
+  VotesHooks,
+  useVotesHooks,
+  ListVoteRequests,
+} from './votes';
 
 export {
   AmountDisplay,
@@ -50,5 +57,10 @@ export {
   TransferButton,
   SubscriptionButton,
   DsoViewPrettyJSON,
-  SvUiState,
+  DsoInfo,
+  VotesHooksContext,
+  BaseVotesHooks,
+  VotesHooks,
+  useVotesHooks,
+  ListVoteRequests,
 };

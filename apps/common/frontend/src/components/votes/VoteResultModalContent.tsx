@@ -6,7 +6,7 @@ import { CardContent, Stack, Typography } from '@mui/material';
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
-import ActionView from './actions/views/ActionView';
+import ActionView from './ActionView';
 
 interface VoteRequestModalProps {
   action?: ActionRequiringConfirmation;

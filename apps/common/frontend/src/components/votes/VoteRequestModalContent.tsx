@@ -1,12 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import {
-  CopyableTypography,
-  DateDisplay,
-  Loading,
-  PartyId,
-  SvClientProvider,
-} from 'common-frontend';
+import { useVotesHooks } from 'common-frontend';
+import { CopyableTypography, DateDisplay, Loading, PartyId, SvVote } from 'common-frontend';
 import React, { ReactElement, useCallback, useEffect } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -27,26 +22,26 @@ import {
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId, Party } from '@daml/types';
 
-import { useDsoInfos } from '../../contexts/SvContext';
-import { useListVotes } from '../../hooks/useListVotes';
-import { useVoteRequest } from '../../hooks/useVoteRequest';
-import { SvVote } from '../../models/models';
-import { useSvConfig } from '../../utils';
-import VoteForm from './VoteForm';
-import ActionView from './actions/views/ActionView';
+import ActionView from './ActionView';
 
 interface VoteRequestModalProps {
-  voteRequestContractId?: ContractId<VoteRequest>;
+  voteRequestContractId: ContractId<VoteRequest>;
   handleClose: () => void;
+  voteForm?: (
+    voteRequestContractId: ContractId<VoteRequest>,
+    currentSvVote: SvVote | undefined
+  ) => React.ReactNode;
 }
 
 const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
+  voteForm,
 }) => {
-  const voteRequestQuery = useVoteRequest(voteRequestContractId);
+  const votesHooks = useVotesHooks();
+  const voteRequestQuery = votesHooks.useVoteRequest(voteRequestContractId);
 
-  const votesQuery = useListVotes(voteRequestContractId ? [voteRequestContractId] : []);
+  const votesQuery = votesHooks.useListVotes([voteRequestContractId]);
 
   // allVotes being empty means that the vote request has been executed, as the initiator of the request must vote on his proposition. Therefore, we can close the modal.
   useEffect(() => {
@@ -55,7 +50,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
     }
   }, [votesQuery, handleClose]);
 
-  const dsoInfosQuery = useDsoInfos();
+  const dsoInfosQuery = votesHooks.useDsoInfos();
   const svPartyId = dsoInfosQuery.data?.svPartyId;
 
   const getMemberName = useCallback(
@@ -116,13 +111,11 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
                     <Typography variant="h6">Contract Id</Typography>
                   </TableCell>
                   <TableCell>
-                    {voteRequestContractId && (
-                      <CopyableTypography
-                        variant="body2"
-                        id={'vote-request-modal-content-contract-id'}
-                        text={voteRequestContractId}
-                      />
-                    )}
+                    <CopyableTypography
+                      variant="body2"
+                      id={'vote-request-modal-content-contract-id'}
+                      text={voteRequestContractId}
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -186,11 +179,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
             </Table>
           </TableContainer>
         </Stack>
-        <Stack>
-          {voteRequestContractId && (
-            <VoteForm vote={curSvVote} voteRequestCid={voteRequestContractId} />
-          )}
-        </Stack>
+        {voteForm && <Stack>{voteForm(voteRequestContractId, curSvVote)}</Stack>}
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Votes</Typography>
           <TableContainer>
@@ -275,13 +264,4 @@ const VoteRows: React.FC<{
   </>
 );
 
-const VoteRequestModalContentWithContexts: React.FC<VoteRequestModalProps> = props => {
-  const config = useSvConfig();
-  return (
-    <SvClientProvider url={config.services.sv.url}>
-      <VoteRequestModalContent {...props} />
-    </SvClientProvider>
-  );
-};
-
-export default VoteRequestModalContentWithContexts;
+export default VoteRequestModalContent;

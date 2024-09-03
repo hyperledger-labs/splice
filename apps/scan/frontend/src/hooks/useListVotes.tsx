@@ -4,12 +4,11 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 // TODO(#7675) - do we need this model?
 import { SvVote } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { useScanClient } from 'common-frontend/scan-api';
 
 import * as damlTypes from '@daml/types';
 import { Vote, VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
-
-import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
 function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
   const allVotes: Vote[] = [];
@@ -18,7 +17,7 @@ function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
 }
 
 export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> => {
-  const { listVoteRequestsByTrackingCid } = useSvAdminClient();
+  const scanClient = useScanClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listVoteRequestsByTrackingCid', contractIds],
@@ -26,8 +25,10 @@ export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryRe
       if (contractIds.length === 0) {
         return [];
       }
-      const { vote_requests } = await listVoteRequestsByTrackingCid(contractIds);
-      const requests = vote_requests.map(v => Contract.decodeOpenAPI(v, VoteRequest));
+      const response = await scanClient.listVoteRequestsByTrackingCid({
+        vote_request_contract_ids: contractIds,
+      });
+      const requests = response.vote_requests.map(v => Contract.decodeOpenAPI(v, VoteRequest));
       return requests.flatMap(vr =>
         getVoteStatus(vr.payload.votes).map(vote => {
           return {

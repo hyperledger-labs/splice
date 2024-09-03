@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DateDisplay, Loading, PartyId } from 'common-frontend';
+import { DateDisplay, Loading, PartyId, useVotesHooks } from 'common-frontend';
 import React from 'react';
 
 import {
@@ -19,10 +19,9 @@ import {
   DsoRulesConfig,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
-import { useDsoInfos } from '../../../../contexts/SvContext';
-
 const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action }) => {
-  const dsoInfosQuery = useDsoInfos();
+  const votesHooks = useVotesHooks();
+  const dsoInfosQuery = votesHooks.useDsoInfos();
 
   if (dsoInfosQuery.isLoading) {
     return <Loading />;

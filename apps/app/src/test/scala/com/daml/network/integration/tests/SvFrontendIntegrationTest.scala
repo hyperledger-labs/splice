@@ -29,7 +29,8 @@ class SvFrontendIntegrationTest
     with SvTestUtil
     with SvFrontendTestUtil
     with FrontendLoginUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with VotesFrontendTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
@@ -999,8 +1000,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the new vote request",
               _ => {
-                // if the modal was open due to a previous eventually-call, close it
-                scala.util.Try(click on "vote-request-modal-close-button")
+                closeVoteModalsIfOpen
                 click on "tab-panel-in-progress"
 
                 val rows = getAllVoteRows("sv-voting-in-progress-table-body")
@@ -1552,24 +1552,6 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
-  }
-
-  def getAllVoteRows(tableBodyId: String)(implicit webDriver: WebDriverType) = {
-    def tableBody = find(id(tableBodyId))
-    inside(tableBody) { case Some(tb) =>
-      val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-      if (rows.size < 5) {
-        rows
-      } else {
-        tb
-          .findChildElement(className("MuiSelect-select"))
-          .valueOrFail("Could not find 'Rows per page' input")
-          .underlying
-          .click()
-        webDriver.findElement(By.xpath("//li[@data-value='25']")).click()
-        tb.findAllChildElements(className("vote-row-action")).toSeq
-      }
-    }
   }
 
   private def svAmuletPriceShouldMatch(

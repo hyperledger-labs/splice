@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { useSvClient, SvUiState } from 'common-frontend';
+import { useSvClient, DsoInfo } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
@@ -10,7 +10,7 @@ import { ElectionRequest, DsoRules } from '@daml.js/splice-dso-governance/lib/Sp
 
 import { useSvAdminClient } from './SvAdminServiceContext';
 
-export const useDsoInfos = (): UseQueryResult<SvUiState> => {
+export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   const { getDsoInfo } = useSvClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,

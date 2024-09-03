@@ -35,7 +35,7 @@ import {
   isScheduleDateTimeValid,
   VoteRequestValidity,
 } from '../../utils/validations';
-import ListVoteRequests from './ListVoteRequests';
+import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
@@ -357,7 +357,7 @@ const VoteRequestWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
       <VoteRequest />
-      <ListVoteRequests />
+      <SvListVoteRequests />
     </SvClientProvider>
   );
 };

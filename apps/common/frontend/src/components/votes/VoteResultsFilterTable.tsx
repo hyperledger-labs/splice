@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { useVotesHooks } from 'common-frontend';
 import { CopyableTypography, DateDisplay, Loading } from 'common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -23,8 +24,6 @@ import {
   Vote,
   DsoRules_CloseVoteRequestResult,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
-
-import { useListVoteRequestResult } from '../../hooks/useListVoteRequests';
 
 dayjs.extend(utc);
 
@@ -73,12 +72,21 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   effectiveTo,
   validityColumnName,
 }) => {
+  const votesHooks = useVotesHooks();
+
   const [queryOptions, setQueryOptions] = useState<VoteResultQueryOptions>({
     accepted: accepted,
     effectiveTo: effectiveTo,
     effectiveFrom: effectiveFrom,
   });
-  const voteResultsQuery = useListVoteRequestResult(queryOptions, QUERY_LIMIT);
+  const voteResultsQuery = votesHooks.useListVoteRequestResult(
+    QUERY_LIMIT,
+    queryOptions.actionName,
+    queryOptions.requester,
+    queryOptions.effectiveFrom,
+    queryOptions.effectiveTo,
+    queryOptions.accepted
+  );
 
   const [rows, setRows] = useState<VoteRequestResultRow[]>([]);
 

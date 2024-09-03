@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Loading, SvClientProvider } from 'common-frontend';
+import { Loading, SvVote } from 'common-frontend';
+import { useVotesHooks } from 'common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -26,10 +27,6 @@ import {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 
-import { useDsoInfos } from '../../contexts/SvContext';
-import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
-import { useListVotes } from '../../hooks/useListVotes';
-import { useSvConfig } from '../../utils';
 import { ListVoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
@@ -65,7 +62,19 @@ const TabPanel = (props: TabPanelProps) => {
   );
 };
 
-const ListVoteRequests: React.FC = () => {
+interface ListVoteRequestsProps {
+  showActionNeeded: boolean;
+  voteForm?: (
+    voteRequestContractId: ContractId<VoteRequest>,
+    currentSvVote: SvVote | undefined
+  ) => React.ReactNode;
+}
+
+export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
+  showActionNeeded,
+  voteForm,
+}) => {
+  const votesHooks = useVotesHooks();
   const [value, setValue] = React.useState(0);
   const [now, setNow] = useState<string>(dayjs().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'));
 
@@ -81,13 +90,13 @@ const ListVoteRequests: React.FC = () => {
     setValue(newValue);
   };
 
-  const listVoteRequestsQuery = useListDsoRulesVoteRequests();
+  const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
     : [];
-  const votesQuery = useListVotes(voteRequestIds);
-  const dsoInfosQuery = useDsoInfos();
+  const votesQuery = votesHooks.useListVotes(voteRequestIds);
+  const dsoInfosQuery = votesHooks.useDsoInfos();
 
   const [voteRequestContractId, setVoteRequestContractId] = useState<
     ContractId<VoteRequest> | undefined
@@ -177,41 +186,53 @@ const ListVoteRequests: React.FC = () => {
     return 'Action tag not defined.';
   }
 
-  return (
-    <Stack>
-      <Typography mt={4} variant="h4">
-        Vote Requests
-      </Typography>
-      <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={value} onChange={handleChange} aria-label="json tabs">
-          <Tab
-            label="Action Needed"
-            {...tabProps('action-needed')}
-            id={'tab-panel-action-needed'}
-          />
-          <Tab label="In Progress" {...tabProps('in-progress')} id={'tab-panel-in-progress'} />
-          <Tab label="Planned" {...tabProps('planned')} id={'tab-panel-planned'} />
-          <Tab label="Executed" {...tabProps('executed')} id={'tab-panel-executed'} />
-          <Tab label="Rejected" {...tabProps('rejected')} id={'tab-panel-rejected'} />
-        </Tabs>
-      </Box>
-      <TabPanel value={value} index={0}>
-        <ListVoteRequestsFilterTable
-          voteRequests={voteRequestsNotVoted}
-          getAction={getAction}
-          openModalWithVoteRequest={openModalWithVoteRequest}
-          tableBodyId={'sv-voting-action-needed-table-body'}
+  const tabsToTabPanel = (
+    showActionNeeded
+      ? [
+          [
+            () => (
+              <Tab
+                key={'action-needed'}
+                label="Action Needed"
+                {...tabProps('action-needed')}
+                id={'tab-panel-action-needed'}
+              />
+            ),
+            () => (
+              <ListVoteRequestsFilterTable
+                voteRequests={voteRequestsNotVoted}
+                getAction={getAction}
+                openModalWithVoteRequest={openModalWithVoteRequest}
+                tableBodyId={'sv-voting-action-needed-table-body'}
+              />
+            ),
+          ],
+        ]
+      : []
+  ).concat([
+    [
+      () => (
+        <Tab
+          key={'in-progress'}
+          label="In Progress"
+          {...tabProps('in-progress')}
+          id={'tab-panel-in-progress'}
         />
-      </TabPanel>
-      <TabPanel value={value} index={1}>
+      ),
+      () => (
         <ListVoteRequestsFilterTable
           voteRequests={voteRequestsVoted}
           getAction={getAction}
           openModalWithVoteRequest={openModalWithVoteRequest}
           tableBodyId={'sv-voting-in-progress-table-body'}
         />
-      </TabPanel>
-      <TabPanel value={value} index={2}>
+      ),
+    ],
+    [
+      () => (
+        <Tab key={'planned'} label="Planned" {...tabProps('planned')} id={'tab-panel-planned'} />
+      ),
+      () => (
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-planned-table-body'}
@@ -221,8 +242,18 @@ const ListVoteRequests: React.FC = () => {
           accepted
           effectiveFrom={now}
         />
-      </TabPanel>
-      <TabPanel value={value} index={3}>
+      ),
+    ],
+    [
+      () => (
+        <Tab
+          key={'executed'}
+          label="Executed"
+          {...tabProps('executed')}
+          id={'tab-panel-executed'}
+        />
+      ),
+      () => (
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-executed-table-body'}
@@ -230,8 +261,18 @@ const ListVoteRequests: React.FC = () => {
           openModalWithVoteResult={openModalWithVoteResult}
           accepted
         />
-      </TabPanel>
-      <TabPanel value={value} index={4}>
+      ),
+    ],
+    [
+      () => (
+        <Tab
+          key={'rejected'}
+          label="Rejected"
+          {...tabProps('rejected')}
+          id={'tab-panel-rejected'}
+        />
+      ),
+      () => (
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-rejected-table-body'}
@@ -240,7 +281,25 @@ const ListVoteRequests: React.FC = () => {
           validityColumnName={'Rejected At'}
           accepted={false}
         />
-      </TabPanel>
+      ),
+    ],
+  ]);
+
+  return (
+    <Stack>
+      <Typography mt={4} variant="h4">
+        Vote Requests
+      </Typography>
+      <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={value} onChange={handleChange} aria-label="json tabs">
+          {tabsToTabPanel.map(([tab, _]) => tab())}
+        </Tabs>
+      </Box>
+      {tabsToTabPanel.map(([_, tabPanel], index) => (
+        <TabPanel value={value} index={index} key={index}>
+          {tabPanel()}
+        </TabPanel>
+      ))}
       <Modal
         open={isVoteRequestModalOpen}
         onClose={handleClose}
@@ -260,10 +319,13 @@ const ListVoteRequests: React.FC = () => {
                     </IconButton>
                   }
                 />
-                <VoteRequestModalContent
-                  voteRequestContractId={voteRequestContractId}
-                  handleClose={handleClose}
-                />
+                {voteRequestContractId && (
+                  <VoteRequestModalContent
+                    voteRequestContractId={voteRequestContractId}
+                    handleClose={handleClose}
+                    voteForm={voteForm}
+                  />
+                )}
               </Card>
             </Container>
           </ClickAwayListener>
@@ -297,14 +359,3 @@ const ListVoteRequests: React.FC = () => {
     </Stack>
   );
 };
-
-const ListVoteRequestsWithContexts: React.FC = () => {
-  const config = useSvConfig();
-  return (
-    <SvClientProvider url={config.services.sv.url}>
-      <ListVoteRequests />
-    </SvClientProvider>
-  );
-};
-
-export default ListVoteRequestsWithContexts;

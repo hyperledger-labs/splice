@@ -17,6 +17,7 @@ import {
 import { CssBaseline } from '@mui/material';
 import { ThemeProvider } from '@mui/material';
 
+import ScanListVoteRequests from './components/votes/ScanListVoteRequests';
 import Activity from './routes/activity';
 import AppLeaderboard from './routes/appLeaderboard';
 import SynchronizerFeesLeaderboard from './routes/domainFeesLeaderboard';
@@ -58,6 +59,7 @@ const router = createBrowserRouter(
         <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
       <Route path="/dso" element={<DsoWithContexts />} />
+      <Route path="/governance" element={<ScanListVoteRequests />} />
     </Route>
   )
 );
