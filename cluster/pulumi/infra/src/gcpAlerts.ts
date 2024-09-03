@@ -73,6 +73,8 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 -resource.labels.container_name="postgres"
 -(resource.labels.container_name=~"postgres" AND resource.labels.namespace_name="multi-validator")
+-- TODO(#14570): Remove this once we have improved our sv onboarding logic
+-(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
