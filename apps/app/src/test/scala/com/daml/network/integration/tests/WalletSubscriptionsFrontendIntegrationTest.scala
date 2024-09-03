@@ -73,7 +73,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"${ansAcronym.toUpperCase()} entry: \"$aliceEntryName\"",
+              expectedDescription = s"ANS entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -164,7 +164,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText(s"${ansAcronym.toUpperCase()} entry: \"$newlyPurchasedName\"")
+              .text should matchText(s"ANS entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -198,7 +198,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"${ansAcronym.toUpperCase()} entry: \"$newlyPurchasedName\"",
+              expectedDescription = s"ANS entry: \"$newlyPurchasedName\"",
             )
           },
         )

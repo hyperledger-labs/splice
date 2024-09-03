@@ -10,9 +10,9 @@ import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@m
 import { useScanConfig } from '../utils';
 
 export const SynchronizerFeesLeaderboardTable: React.FC = () => {
+  const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
   const config = useScanConfig();
   const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
-  const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
 
   switch (topValidatorsQuery.status) {
     case 'loading':
@@ -67,12 +67,14 @@ const ValidatorRow: React.FC<{
     lastPurchasedInRound: number;
   };
 }> = ({ validator }) => {
+  const config = useScanConfig();
+  const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
   const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } =
     validator;
   return (
     <TableRow
       className="synchronizer-fees-leaderboard-row"
-      data-selenium-text={`${name} ${numPurchases} ${totalTrafficPurchased} ${totalCcSpent} CC ${lastPurchasedInRound}`}
+      data-selenium-text={`${name} ${numPurchases} ${totalTrafficPurchased} ${totalCcSpent} ${amuletNameAcronym} ${lastPurchasedInRound}`}
     >
       <TableCell>{name}</TableCell>
       <TableCell align="right">{numPurchases}</TableCell>

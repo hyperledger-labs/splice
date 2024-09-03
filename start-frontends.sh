@@ -18,7 +18,7 @@ function tmux_cmd() {
   tmux send-keys -t "$t" "nix develop path:nix" C-m
   tmux send-keys -t "$t" "cd $wd" C-m
   tmux send-keys -t "$t" "$cmd" C-m
-  tmux_window=$((tmux_window+1))
+  tmux_window=$((tmux_window + 1))
 }
 
 function start_frontend() {
@@ -27,7 +27,6 @@ function start_frontend() {
   local user=$3
   local node_name=$4
   local test_auth=$5
-  local use_cn_namings="${6:-1}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -42,28 +41,14 @@ function start_frontend() {
 
   local splice_instance_names="{
   spliceInstanceNames: {
-    networkName: 'Ecilps',
+    networkName: 'Splice',
     networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
-    amuletName: 'Teluma',
-    amuletNameAcronym: 'TLM',
-    nameServiceName: 'Teluma Name Service',
-    nameServiceNameAcronym: 'TNS',
+    amuletName: 'Amulet',
+    amuletNameAcronym: 'AMT',
+    nameServiceName: 'Amulet Name Service',
+    nameServiceNameAcronym: 'ANS',
   }
 }"
-
-  # TODO(#13480): remove the prod config after making all tests work in all UIs
-  if [ "$use_cn_namings" == "1" ]; then
-    splice_instance_names="{
-    spliceInstanceNames: {
-      networkName: 'Canton Network',
-      networkFaviconUrl: 'https://www.canton.network/hubfs/cn-favicon-05%201-1.png',
-      amuletName: 'Canton Coin',
-      amuletNameAcronym: 'CC',
-      nameServiceName: 'Canton Name Service',
-      nameServiceNameAcronym: 'CNS',
-    }
-  }"
-  fi
 
   jsonnet \
     --tla-str clusterProtocol="http" \
@@ -75,17 +60,17 @@ function start_frontend() {
     --tla-str port="$port" \
     --tla-code spliceInstanceNames="$splice_instance_names" \
     "$REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
-    > "$config_file"
+    >"$config_file"
 
   # This is the URL the frontend talks to which is then rewritten using th vite proxy to the actual url of the backend
-  JSON_API_URL=$(jq -r '.services.jsonApiBackend.url' < "$config_file")
+  JSON_API_URL=$(jq -r '.services.jsonApiBackend.url' <"$config_file")
 
   local log_file="${LOG_DIR}/npm-${app}-${user}.log"
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "trap \"rm -f ${config_file}\" EXIT"
 
-  tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
+  tmux send-keys -t "${tmux_session}:$((tmux_window - 1))" \
     "BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL VITE_SPLICE_CONFIG=\"\$(cat $config_file)\" \
     npm start 2>&1 | tee -a $log_file" C-m
 }
@@ -170,15 +155,14 @@ function wait_for_workspace_build() {
   tmux_cmd "$workspace" "$REPO_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$workspace.log"
 
   local count=0
-  while [ ! -f "$REPO_ROOT/apps/$index" ]
-  do
-      echo "Waiting for $workspace to start..."
-      sleep 1
-      count=$(( ++count ))
-      if [ "$count" -ge "100" ]; then
-        echo "Failure to start $workspace, exiting"
-        exit 1
-      fi
+  while [ ! -f "$REPO_ROOT/apps/$index" ]; do
+    echo "Waiting for $workspace to start..."
+    sleep 1
+    count=$((++count))
+    if [ "$count" -ge "100" ]; then
+      echo "Failure to start $workspace, exiting"
+      exit 1
+    fi
   done
 }
 
@@ -196,45 +180,45 @@ function start_local_frontends() {
     validator_for_bob="alice"
   fi
 
-  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address> <use_cn_namings>
+  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
 
   # Wallet
-  start_frontend   wallet    3000 alice   "alice"              $enable_test_auth 1
-  start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth 1
-  start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth 1
+  start_frontend wallet 3000 alice "alice" $enable_test_auth
+  start_frontend wallet 3001 bob $validator_for_bob $enable_test_auth
+  start_frontend wallet 3011 sv1 "sv1" $enable_test_auth
 
   # ANS
-  start_frontend   ans       3100 alice   "alice"              $enable_test_auth 1
+  start_frontend ans 3100 alice "alice" $enable_test_auth
 
   # SV
-  start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth 1
+  start_frontend sv 3211 sv1 "sv1" $enable_test_auth
 
   if [ $two_svs -eq 1 ]; then
-    start_frontend sv 3212 sv2 "sv2" $enable_test_auth 1
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
   fi
 
   if [ $four_svs -eq 1 ]; then
-    start_frontend sv 3212 sv2 "sv2" $enable_test_auth 1
-    start_frontend sv 3213 sv3 "sv3" $enable_test_auth 1
-    start_frontend sv 3214 sv4 "sv4" $enable_test_auth 1
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
+    start_frontend sv 3213 sv3 "sv3" $enable_test_auth
+    start_frontend sv 3214 sv4 "sv4" $enable_test_auth
   fi
 
   # Scan
-  start_frontend   scan      3311 scan    "scan"               "false" 1
+  start_frontend scan 3311 scan "scan" "false"
 
   # Splitwell
   if [ $app_manager -eq 1 ]; then
-      start_frontend   splitwell 3420 splitwell "splitwell"        $enable_test_auth 0
+    start_frontend splitwell 3420 splitwell "splitwell" $enable_test_auth
   else
-      start_frontend   splitwell 3400 alice   "alice"              $enable_test_auth 0
-      start_frontend   splitwell 3401 bob     $validator_for_bob   $enable_test_auth 0
-      start_frontend   splitwell 3402 charlie "alice"              $enable_test_auth 0
+    start_frontend splitwell 3400 alice "alice" $enable_test_auth
+    start_frontend splitwell 3401 bob $validator_for_bob $enable_test_auth
+    start_frontend splitwell 3402 charlie "alice" $enable_test_auth
   fi
 
   # App manager
   if [ $app_manager -eq 1 ]; then
-    start_frontend   app-manager 3500 alice     "alice"              $enable_test_auth 1
-    start_frontend   app-manager 3520 splitwell "splitwell"          $enable_test_auth 1
+    start_frontend app-manager 3500 alice "alice" $enable_test_auth
+    start_frontend app-manager 3520 splitwell "splitwell" $enable_test_auth
   fi
 
 }

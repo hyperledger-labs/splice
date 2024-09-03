@@ -13,8 +13,7 @@ type RateDisplayProps = {
 
 const RateDisplay: React.FC<RateDisplayProps> = props => {
   var { base, quote, amuletPrice } = props;
-  //TODO(#13480): remove this fallback once we have a proper config in all apps
-  var amuletAcronym = window.splice_config.spliceInstanceNames?.amuletNameAcronym || 'CC';
+  var amuletAcronym = window.splice_config.spliceInstanceNames?.amuletNameAcronym;
   var amount, rate;
   switch (true) {
     case base === 'AmuletUnit' && quote === 'USDUnit':

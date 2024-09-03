@@ -70,7 +70,7 @@ def ensureAnsEntry(
   }
 }
 
-val ansAcronym = "cns"
+val ansAcronym = sv1Scan.getSpliceInstanceNames().nameServiceNameAcronym.toLowerCase()
 
 ensureAnsEntry(
   aliceUserParty,

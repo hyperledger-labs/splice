@@ -20,7 +20,10 @@ import {
   splitwellProviderPartyId,
 } from './mocks/constants';
 import { makeAcceptedGroupInvite, makeBalanceUpdate, makeGroupInvite } from './mocks/templates';
+import { config } from './setup/config';
 import { server } from './setup/setup';
+
+const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
 
 const AppWithConfig = () => {
   return (
@@ -189,21 +192,21 @@ describe('alice can', () => {
       within(balanceUpdatesList[0]).findByText('alice.unverified.tns')
     ).resolves.toBeDefined();
     await expect(
-      within(balanceUpdatesList[0]).findByText('paid 30.0 TLM for expenses')
+      within(balanceUpdatesList[0]).findByText(`paid 30.0 ${amuletNameAcronym} for expenses`)
     ).resolves.toBeDefined();
 
     await expect(
       within(balanceUpdatesList[1]).findByText('bob.unverified.tns')
     ).resolves.toBeDefined();
     await expect(
-      within(balanceUpdatesList[1]).findByText('sent 40.0 TLM to')
+      within(balanceUpdatesList[1]).findByText(`sent 40.0 ${amuletNameAcronym} to`)
     ).resolves.toBeDefined();
 
     await expect(
       within(balanceUpdatesList[2]).findByText('alice.unverified.tns')
     ).resolves.toBeDefined();
     await expect(
-      within(balanceUpdatesList[2]).findByText('paid 15.0 TLM for dinner')
+      within(balanceUpdatesList[2]).findByText(`paid 15.0 ${amuletNameAcronym} for dinner`)
     ).resolves.toBeDefined();
   });
 });

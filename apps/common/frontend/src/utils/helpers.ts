@@ -34,8 +34,7 @@ export function sameAssignedContracts<T>(
 export const unitStringToCurrency = (unit: string): string => {
   switch (unit) {
     case 'AMULETUNIT':
-      //TODO(#13480): remove this fallback once we have a proper config in all apps
-      return window.splice_config.spliceInstanceNames?.amuletNameAcronym || 'CC';
+      return window.splice_config.spliceInstanceNames?.amuletNameAcronym;
     case 'USDUNIT':
       return 'USD';
     case 'EXTUNIT':

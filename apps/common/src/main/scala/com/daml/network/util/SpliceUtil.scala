@@ -314,7 +314,7 @@ object SpliceUtil {
     damlDecimal(entryFee),
 
     // Description prefix
-    "CNS entry: ",
+    "ANS entry: ",
   )
 
   private def defaultDecentralizedSynchronizerConfig(

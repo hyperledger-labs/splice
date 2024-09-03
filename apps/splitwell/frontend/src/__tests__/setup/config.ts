@@ -19,12 +19,12 @@ const config = {
   //     token_scope: 'daml_ledger_api',
   //   },
   spliceInstanceNames: {
-    networkName: 'Ecilps',
-    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
     amuletName: 'Teluma',
     amuletNameAcronym: 'TLM',
     nameServiceName: 'Teluma Name Service',
     nameServiceNameAcronym: 'TNS',
+    networkFaviconUrl: 'https://www.hyperledger.org/hubfs/hyperledgerfavicon.png',
+    networkName: 'Ecilps',
   },
   services: {
     wallet: {

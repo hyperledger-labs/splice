@@ -21,9 +21,6 @@ class DockerComposeValidatorFrontendIntegrationTest
 
   "docker-compose based validator works" in { implicit env =>
     val builder = new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-w")
-    builder
-      .environment()
-      .put("ENABLE_CN_INSTANCE_NAMES", "true")
     val ret = builder.!
     if (ret != 0) {
       fail("Failed to start docker-compose validator")
@@ -53,7 +50,8 @@ class DockerComposeValidatorFrontendIntegrationTest
           _ => seleniumText(find(id("logged-in-user"))) should not be "",
         )
         tapAmulets(123.4)
-        val ansName = s"alice_${(new scala.util.Random).nextInt().toHexString}.unverified.cns"
+        val ansName =
+          s"alice_${(new scala.util.Random).nextInt().toHexString}.unverified.$ansAcronym"
         reserveAnsNameFor(
           () => login(80, "alice", "ans.localhost"),
           ansName,
@@ -78,7 +76,6 @@ class DockerComposeValidatorFrontendIntegrationTest
         "GCP_CLUSTER_BASENAME",
         "cidaily",
       ) // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
-    builder.environment().put("ENABLE_CN_INSTANCE_NAMES", "true")
     val ret = builder.!
     if (ret != 0) {
       fail("Start script failed")

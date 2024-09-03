@@ -240,7 +240,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
             transactionRow
               .childElement(className("tx-amount-cc"))
               .text,
-            unit = spliceInstanceNames.amuletNameAcronym,
+            unit = amuletNameAcronym,
           )
         )
       } else None
