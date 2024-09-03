@@ -84,9 +84,7 @@ class UpdateHistory(
     new MultiDomainAcsStore.IngestionSink {
       override def ingestionFilter: IngestionFilter = IngestionFilter(
         primaryParty = updateStreamParty,
-        // Note: the template ids only determine which create events should include data
-        // for explicit contract disclosure. We don't store that data in the update history.
-        templateIds = Set.empty,
+        includeCreatedEventBlob = false,
       )
 
       // TODO(#12780): This can be removed eventually

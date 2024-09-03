@@ -30,7 +30,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
       val handled = rawHandled.view.map(t => PackageQualifiedName(t.TEMPLATE_ID)).toSet
 
       "handle every listened-to contract type not handled elsewhere" in {
-        filtered.ingestionFilter.templateIds should contain allElementsOf handled
+        filtered.templateIds should contain allElementsOf handled
       }
 
       "either handle or not handle each template" in {
@@ -72,7 +72,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
     "list all unhandled contracts" in {
       filtersAndMoveLists
         .flatMap { case (label, filter, _) =>
-          (filter.ingestionFilter.templateIds diff allHandled diff knownNotHandled.keySet).view
+          (filter.templateIds diff allHandled diff knownNotHandled.keySet).view
             .map(label -> _)
         }
         .groupMap(_._2)(
@@ -83,7 +83,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
     "list every potential handler of each unhandled contract" in {
       filtersAndMoveLists
         .flatMap { case (label, filter, _) =>
-          (filter.ingestionFilter.templateIds intersect knownNotHandled.keySet).view
+          (filter.templateIds intersect knownNotHandled.keySet).view
             .map(label -> _)
         }
         .groupMap(_._2)(_._1.getClass.getSimpleName)
