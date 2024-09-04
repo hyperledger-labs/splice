@@ -67,6 +67,16 @@ testUnclaimedRewards_withCoupons = do
     validator = provider1Validator.primaryParty
     round = Round 0
 
+  validatorLivenessActivityRecord1 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = alice.primaryParty
+    round = Round 0
+
+  validatorLivenessActivityRecord2 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = provider1Validator.primaryParty
+    round = Round 0
+
   svRewardCoupon1 <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
     dso = app.dso
     sv = provider2.primaryParty
@@ -85,6 +95,7 @@ testUnclaimedRewards_withCoupons = do
         5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
         3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
         2.3 * issuanceConfig_0_0p5.validatorRewardCap +
+        2.0 * getValidatorFaucetCap issuanceConfig_0_0p5 +
         2.0 * getValidatorFaucetCap issuanceConfig_0_0p5 +
         10.0 * issuing.issuancePerSvRewardCoupon
   mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
@@ -107,6 +118,7 @@ testUnclaimedRewards_withCoupons = do
         appCouponCids = [appCoupon1, appCoupon2]
         svRewardCouponCids = [svRewardCoupon1]
         optValidatorFaucetCouponCids = Some [validatorFaucet1, validatorFaucet2]
+        optValidatorLivenessActivityRecordCids = Some [validatorLivenessActivityRecord1, validatorLivenessActivityRecord2]
   submitExerciseAmuletRulesByKey app [app.dso] [] collect
 
   -- check that the addition is done correctly

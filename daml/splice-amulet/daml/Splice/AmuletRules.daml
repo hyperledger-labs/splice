@@ -430,6 +430,7 @@ template AmuletRules
         appCouponCids : [ContractId AppRewardCoupon]
         svRewardCouponCids : [ContractId SvRewardCoupon]
         optValidatorFaucetCouponCids : Optional [ContractId ValidatorFaucetCoupon]
+        optValidatorLivenessActivityRecordCids : Optional [ContractId ValidatorLivenessActivityRecord]
       controller dso
       do
         -- retrieve round
@@ -447,6 +448,12 @@ template AmuletRules
           exercise validatorFaucetCouponCid ValidatorFaucetCoupon_DsoExpire with closedRoundCid
 
         let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
+
+        -- expire validator liveness activity records and compute their unclaimed rewards
+        forA_ (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
+          exercise validatorLivenessActivityRecordCid  ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+
+        let numValidatorLivenessActivityRecords = optional 0.0 (intToDecimal . length) optValidatorLivenessActivityRecordCids
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -466,7 +473,7 @@ template AmuletRules
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              numValidatorFaucetCoupons * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
+              (numValidatorFaucetCoupons + numValidatorLivenessActivityRecords) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon

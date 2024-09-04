@@ -194,6 +194,7 @@ runNextIssuanceD app amuletPrice = do
       appRewards <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == miningRound.round)
       svRewards <- queryFilter @SvRewardCoupon app.dso (\r -> r.round == miningRound.round)
       validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\r -> r.round == miningRound.round)
+      validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\r -> r.round == miningRound.round)
       dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
         DsoRules_ClaimExpiredRewards with
           amuletRulesCid = amuletRulesCid
@@ -203,6 +204,7 @@ runNextIssuanceD app amuletPrice = do
             appCouponCids = map fst appRewards
             svRewardCouponCids = map fst svRewards
             optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
+            optValidatorLivenessActivityRecordCids = Some (map fst validatorLivenessActivityRecords)
 
       -- the closed round
       confirmAWC_MiningRound_Archive app

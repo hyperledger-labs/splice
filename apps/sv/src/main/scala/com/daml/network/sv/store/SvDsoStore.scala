@@ -253,7 +253,23 @@ trait SvDsoStore
     ]]
   ]
 
+  def listValidatorLivenessActivityRecordsOnDomain(
+      round: Long,
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId,
+      splice.validatorlicense.ValidatorLivenessActivityRecord,
+    ]]
+  ]
+
   def countValidatorFaucetCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+  )(implicit tc: TraceContext): Future[Long]
+
+  def countValidatorLivenessActivityRecordsOnDomain(
       round: Long,
       domainId: DomainId,
   )(implicit tc: TraceContext): Future[Long]
@@ -265,6 +281,17 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[
     Seq[SvDsoStore.RoundCounterpartyBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
+  ]
+
+  def listValidatorLivenessActivityRecordsGroupedByCounterparty(
+      domain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[SvDsoStore.RoundCounterpartyBatch[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
+    ]]
   ]
 
   def listSvRewardCouponsOnDomain(
@@ -345,12 +372,17 @@ trait SvDsoStore
             totalCouponsLimit = totalCouponsLimit,
           )
         else Future.successful(Seq.empty)
+      validatorLivenessActivityRecordGroups <-
+        listValidatorLivenessActivityRecordsGroupedByCounterparty(
+          domain,
+          totalCouponsLimit = totalCouponsLimit,
+        )
       svRewardCouponGroups <- listSvRewardCouponsGroupedByCounterparty(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
       roundNumbers =
-        (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ svRewardCouponGroups)
+        (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ validatorLivenessActivityRecordGroups ++ svRewardCouponGroups)
           .map(_.roundNumber)
           .toSet
       closedRounds <- listClosedRounds(roundNumbers, domain, totalCouponsLimit)
@@ -364,6 +396,7 @@ trait SvDsoStore
           appCoupons = batch,
           svRewardCoupons = Seq.empty,
           validatorFaucets = Seq.empty,
+          validatorLivenessActivityRecords = Seq.empty,
         )
     } ++
       filterRoundCounterpartyBatch(validatorRewardGroups, closedRoundMap).map {
@@ -375,6 +408,7 @@ trait SvDsoStore
             appCoupons = Seq.empty,
             svRewardCoupons = Seq.empty,
             validatorFaucets = Seq.empty,
+            validatorLivenessActivityRecords = Seq.empty,
           )
       } ++ filterRoundCounterpartyBatch(validatorFaucetGroups, closedRoundMap).map {
         case (closedRound, batch) =>
@@ -385,6 +419,18 @@ trait SvDsoStore
             appCoupons = Seq.empty,
             svRewardCoupons = Seq.empty,
             validatorFaucets = batch,
+            validatorLivenessActivityRecords = Seq.empty,
+          )
+      } ++ filterRoundCounterpartyBatch(validatorLivenessActivityRecordGroups, closedRoundMap).map {
+        case (closedRound, batch) =>
+          ExpiredRewardCouponsBatch(
+            closedRoundCid = closedRound.contractId,
+            closedRoundNumber = closedRound.payload.round.number,
+            validatorCoupons = Seq.empty,
+            appCoupons = Seq.empty,
+            svRewardCoupons = Seq.empty,
+            validatorFaucets = Seq.empty,
+            validatorLivenessActivityRecords = batch,
           )
       } ++ filterRoundCounterpartyBatch(svRewardCouponGroups, closedRoundMap).map {
         case (closedRound, batch) =>
@@ -395,6 +441,7 @@ trait SvDsoStore
             appCoupons = Seq.empty,
             svRewardCoupons = batch,
             validatorFaucets = Seq.empty,
+            validatorLivenessActivityRecords = Seq.empty,
           )
       }
   }
@@ -448,13 +495,16 @@ trait SvDsoStore
             domain,
             PageLimit.tryCreate(1),
           )
+          validatorLivenessActivityRecords <- listValidatorLivenessActivityRecordsOnDomain(
+            round.payload.round.number,
+            domain,
+            PageLimit.tryCreate(1),
+          )
           svRewardCoupons <- listSvRewardCouponsOnDomain(
             round.payload.round.number,
             domain,
             PageLimit.tryCreate(1),
           )
-          // Note: We ignore validator faucet coupons because we cannot run
-          // expiry automation for them because they have the owner as a signatory.
           action = new ARC_AmuletRules(
             new CRARC_MiningRound_Archive(
               new AmuletRules_MiningRound_Archive(
@@ -468,7 +518,7 @@ trait SvDsoStore
             // archivable if ...
             if (
               // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && svRewardCoupons.isEmpty &&
+              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorLivenessActivityRecords.isEmpty && svRewardCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
             ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
@@ -1281,6 +1331,9 @@ case class ExpiredRewardCouponsBatch(
     appCoupons: Seq[splice.amulet.AppRewardCoupon.ContractId],
     svRewardCoupons: Seq[splice.amulet.SvRewardCoupon.ContractId],
     validatorFaucets: Seq[splice.validatorlicense.ValidatorFaucetCoupon.ContractId],
+    validatorLivenessActivityRecords: Seq[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
+    ],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
@@ -1290,6 +1343,9 @@ case class ExpiredRewardCouponsBatch(
       customParam(inst => s"appCoupons: ${inst.appCoupons}"),
       customParam(inst => s"svRewardCoupons: ${inst.svRewardCoupons}"),
       customParam(inst => s"validatorFaucetCoupons: ${inst.validatorFaucets}"),
+      customParam(inst =>
+        s"validatorLivenessActivityRecords: ${inst.validatorLivenessActivityRecords}"
+      ),
     )
 }
 

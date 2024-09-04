@@ -47,7 +47,7 @@ class ExpireRewardCouponsTrigger(
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
       tc: TraceContext
   ): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
-    expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons
+    expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons ++ expiredRewardsTask.validatorLivenessActivityRecords
   )
 
   override def completeTaskAsDsoDelegate(
@@ -83,6 +83,7 @@ class ExpireRewardCouponsTrigger(
             Seq.empty.asJava,
             Seq.empty.asJava,
             None.toJava,
+            None.toJava,
           ),
         )
       )
@@ -97,10 +98,26 @@ class ExpireRewardCouponsTrigger(
             Seq.empty.asJava,
             Seq.empty.asJava,
             Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
+            None.toJava,
           ),
         )
       )
     ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
+    val validatorLivenessActivityRecordCmd = Seq(
+      dsoRules.exercise(
+        _.exerciseDsoRules_ClaimExpiredRewards(
+          amuletRules.contractId,
+          new AmuletRules_ClaimExpiredRewards(
+            expiredRewardsTask.closedRoundCid,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            Seq.empty.asJava,
+            None.toJava,
+            Some(expiredRewardsTask.validatorLivenessActivityRecords.asJava).toJava,
+          ),
+        )
+      )
+    ).filter(_ => expiredRewardsTask.validatorLivenessActivityRecords.nonEmpty)
     val appRewardCmd = Seq(
       dsoRules.exercise(
         _.exerciseDsoRules_ClaimExpiredRewards(
@@ -110,6 +127,7 @@ class ExpireRewardCouponsTrigger(
             Seq.empty.asJava,
             expiredRewardsTask.appCoupons.asJava,
             Seq.empty.asJava,
+            None.toJava,
             None.toJava,
           ),
         )
@@ -125,11 +143,18 @@ class ExpireRewardCouponsTrigger(
             Seq.empty.asJava,
             expiredRewardsTask.svRewardCoupons.asJava,
             None.toJava,
+            None.toJava,
           ),
         )
       )
     ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)
-    val cmds = Seq(validatorRewardCmd, appRewardCmd, svRewardCmd, validatorFaucetCmd).flatten
+    val cmds = Seq(
+      validatorRewardCmd,
+      appRewardCmd,
+      svRewardCmd,
+      validatorFaucetCmd,
+      validatorLivenessActivityRecordCmd,
+    ).flatten
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>

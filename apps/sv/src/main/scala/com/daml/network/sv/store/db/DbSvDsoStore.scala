@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, Summarizin
 import com.daml.network.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,
   ValidatorLicense,
+  ValidatorLivenessActivityRecord,
 }
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
 import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
@@ -296,6 +297,17 @@ class DbSvDsoStore(
   ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] =
     listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, domainId, limit)
 
+  override def listValidatorLivenessActivityRecordsOnDomain(
+      round: Long,
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[ValidatorLivenessActivityRecord.ContractId, ValidatorLivenessActivityRecord]]
+  ] =
+    listRewardCouponsOnDomain(ValidatorLivenessActivityRecord.COMPANION, round, domainId, limit)
+
   override def listSvRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] =
@@ -306,6 +318,15 @@ class DbSvDsoStore(
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
     ValidatorFaucetCoupon.COMPANION.TEMPLATE_ID,
+    round,
+    domainId,
+  ).map(_.headOption.flatten.getOrElse(0L))
+
+  override def countValidatorLivenessActivityRecordsOnDomain(round: Long, domainId: DomainId)(
+      implicit tc: TraceContext
+  ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
+    sql"select count(*)",
+    ValidatorLivenessActivityRecord.COMPANION.TEMPLATE_ID,
     round,
     domainId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -402,6 +423,18 @@ class DbSvDsoStore(
   ): Future[Seq[RoundCounterpartyBatch[ValidatorFaucetCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
       ValidatorFaucetCoupon.COMPANION,
+      domain,
+      totalCouponsLimit,
+    )
+
+  override def listValidatorLivenessActivityRecordsGroupedByCounterparty(
+      domain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[RoundCounterpartyBatch[ValidatorLivenessActivityRecord.ContractId]]] =
+    listCouponsGroupedByCounterparty(
+      ValidatorLivenessActivityRecord.COMPANION,
       domain,
       totalCouponsLimit,
     )
