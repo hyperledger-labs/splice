@@ -728,6 +728,7 @@ function defaultAlertSubstitutions(alert: string): string {
 }
 
 function createGrafanaAlerting(namespace: Input<string>) {
+  const loadGeneratorEnabled = config.envFlag('K6_ENABLE_LOAD_GENERATOR');
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
     {
@@ -748,12 +749,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 ),
               }
             : {}),
+          ...(loadGeneratorEnabled
+            ? {
+                'load-tester_alerts.yaml': readGrafanaAlertingFile(
+                  'load-tester_alerts.yaml'
+                ).replace('$LOAD_TESTER_MIN_RATE', LOAD_TESTER_MIN_RATE),
+              }
+            : {}),
           ...{
             'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
-            'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml').replace(
-              '$LOAD_TESTER_MIN_RATE',
-              LOAD_TESTER_MIN_RATE
-            ),
             'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
               .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
