@@ -477,7 +477,7 @@ class ScanFrontendTimeBasedIntegrationTest
         ) {
           eventually() {
             aliceValidatorWalletClient
-              .listValidatorFaucetCoupons() should have length openRounds.length.toLong
+              .listValidatorLivenessActivityRecords() should have length openRounds.length.toLong
           }
         }
       }
@@ -485,7 +485,7 @@ class ScanFrontendTimeBasedIntegrationTest
       openRounds.foreach(_ => advanceRoundsByOneTick)
       advanceRoundsByOneTick
       eventually() {
-        aliceValidatorWalletClient.listValidatorFaucetCoupons() should have length 0
+        aliceValidatorWalletClient.listValidatorLivenessActivityRecords() should have length 0
       }
 
       withFrontEnd("scan-ui") { implicit webDriver =>

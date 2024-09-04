@@ -460,6 +460,22 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/validator-liveness-activity-records:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorLivenessActivityRecords"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorLivenessActivityRecordsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/wallet/sv-reward-coupons:
     get:
       tags: [wallet]
@@ -764,6 +780,17 @@ components:
         - validator_faucet_coupons
       properties:
         validator_faucet_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorLivenessActivityRecordsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - validator_liveness_activity_records
+      properties:
+        validator_liveness_activity_records:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

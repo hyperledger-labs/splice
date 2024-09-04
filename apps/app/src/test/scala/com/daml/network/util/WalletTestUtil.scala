@@ -1054,7 +1054,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     )
   }
 
-  def ensureValidatorFaucetCouponReceivedForCurrentRound(
+  def ensureValidatorLivenessActivityRecordReceivedForCurrentRound(
       scanBackend: ScanAppBackendReference,
       walletClient: WalletAppClientReference,
   ): Assertion = {
@@ -1068,20 +1068,20 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         .round
         .number
     (walletClient
-      .listValidatorFaucetCoupons()
+      .listValidatorLivenessActivityRecords()
       .map(_.payload.round.number) should contain(currentRound))
       .withClue(
-        s"Wallet: ${walletClient.name} did not receive a ValidatorFaucetCoupon for round $currentRound."
+        s"Wallet: ${walletClient.name} did not receive a ValidatorLivenessActivityRecord for round $currentRound."
       )
   }
 
-  def ensureNoValidatorFaucetCouponExistsForRound(
+  def ensureNoValidatorLivenessActivityRecordExistsForRound(
       round: Long,
       walletClient: WalletAppClientReference,
   ): Assertion = {
     inside(
       walletClient
-        .listValidatorFaucetCoupons()
+        .listValidatorLivenessActivityRecords()
     ) { case coupons =>
       coupons.map(_.payload.round.number) should not(contain(round))
     }

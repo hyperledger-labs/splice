@@ -71,7 +71,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
               val currentRound =
                 sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.head.contract.payload.round.number
               aliceValidatorWalletClient
-                .listValidatorFaucetCoupons()
+                .listValidatorLivenessActivityRecords()
                 .map(_.payload.round.number) should contain(currentRound)
             }
             advanceRoundsByOneTick
@@ -114,7 +114,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
             splitwellWalletClient.listAppRewardCoupons() should be(empty)
             aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
             aliceValidatorWalletClient
-              .listValidatorFaucetCoupons()
+              .listValidatorLivenessActivityRecords()
               .filter(_.payload.round.number < 2) should be(empty)
             logger.info(
               s"Unlocked: ${aliceValidatorStartBalance.unlockedQty}; apps: ${aliceAppCoupons

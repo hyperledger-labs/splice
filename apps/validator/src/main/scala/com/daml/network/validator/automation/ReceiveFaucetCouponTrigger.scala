@@ -12,7 +12,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority}
+import com.daml.network.environment.{CommandPriority, PackageIdResolver, SpliceLedgerConnection}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.{AssignedContract, ContractWithState}
 import com.daml.network.validator.store.ValidatorStore
@@ -105,12 +105,24 @@ class ReceiveFaucetCouponTrigger(
           clock,
         )
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
+      amuletRules <- scanConnection.getAmuletRulesWithState()
       outcome <- spliceLedgerConnection
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),
-          license
-            .exercise(_.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)),
+          if (
+            PackageIdResolver
+              .supportsValidatorLivenessActivityRecord(clock.now, amuletRules.payload)
+          )
+            license.exercise(
+              _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
+                unclaimedRound.contractId
+              )
+            )
+          else
+            license.exercise(
+              _.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)
+            ),
           priority = commandPriority,
         )
         .noDedup

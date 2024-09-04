@@ -246,6 +246,17 @@ class HttpWalletHandler(
     )
   }
 
+  override def listValidatorLivenessActivityRecords(
+      respond: v0.WalletResource.ListValidatorLivenessActivityRecordsResponse.type
+  )()(tuser: TracedUser): Future[v0.WalletResource.ListValidatorLivenessActivityRecordsResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    listContracts(
+      validatorLicenseCodegen.ValidatorLivenessActivityRecord.COMPANION,
+      user,
+      d0.ListValidatorLivenessActivityRecordsResponse(_),
+    )
+  }
+
   override def listSvRewardCoupons(respond: v0.WalletResource.ListSvRewardCouponsResponse.type)()(
       tUser: TracedUser
   ): Future[v0.WalletResource.ListSvRewardCouponsResponse] = {

@@ -401,6 +401,20 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.ListValidatorFaucetCoupons)
     }
 
+  @Help.Summary("List validator liveness activity records")
+  @Help.Description(
+    "List all open validator liveness activity records for the configured user based on the active ValidatorRights"
+  )
+  def listValidatorLivenessActivityRecords(): Seq[
+    Contract[
+      validatorLicenseCodegen.ValidatorLivenessActivityRecord.ContractId,
+      validatorLicenseCodegen.ValidatorLivenessActivityRecord,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListValidatorLivenessActivityRecords)
+    }
+
   @Help.Summary("List SV reward coupons")
   @Help.Description(
     "List all open SV Reward coupons issued the authenticated SV user"

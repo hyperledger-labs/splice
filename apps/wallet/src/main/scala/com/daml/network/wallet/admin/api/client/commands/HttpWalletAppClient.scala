@@ -846,6 +846,36 @@ object HttpWalletAppClient {
     }
   }
 
+  case object ListValidatorLivenessActivityRecords
+      extends InternalBaseCommand[
+        http.ListValidatorLivenessActivityRecordsResponse,
+        Seq[
+          Contract[
+            validatorLicenseCodegen.ValidatorLivenessActivityRecord.ContractId,
+            validatorLicenseCodegen.ValidatorLivenessActivityRecord,
+          ]
+        ],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListValidatorLivenessActivityRecordsResponse] =
+      client.listValidatorLivenessActivityRecords(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListValidatorLivenessActivityRecordsResponse.OK(response) =>
+      response.validatorLivenessActivityRecords
+        .traverse(req =>
+          Contract.fromHttp(validatorLicenseCodegen.ValidatorLivenessActivityRecord.COMPANION)(req)
+        )
+        .leftMap(_.toString)
+    }
+  }
+
   case object ListSvRewardCoupons
       extends InternalBaseCommand[
         http.ListSvRewardCouponsResponse,

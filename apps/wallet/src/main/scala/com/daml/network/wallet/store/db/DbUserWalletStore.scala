@@ -186,6 +186,24 @@ class DbUserWalletStore(
     limit,
   )
 
+  def listSortedLivenessActivityRecords(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorLivenessActivityRecord.ContractId,
+          validatorCodegen.ValidatorLivenessActivityRecord,
+        ],
+        BigDecimal,
+    )
+  ]] = listSortedRewardCoupons(
+    validatorCodegen.ValidatorLivenessActivityRecord.COMPANION,
+    issuingRoundsMap,
+    _.optIssuancePerValidatorFaucetCoupon.toScala.map(BigDecimal(_)),
+    limit,
+  )
+
   override def listSortedSvRewardCoupons(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
       limit: Limit,

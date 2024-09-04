@@ -58,9 +58,9 @@ class WalletRewardsTimeBasedIntegrationTest
         aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
         aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         bobValidatorWalletClient
-          .listValidatorFaucetCoupons() should have size openRounds.size.toLong
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
         aliceValidatorWalletClient
-          .listValidatorFaucetCoupons() should have size openRounds.size.toLong
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
       }
 
       // avoid messing with the computation of balance
@@ -79,7 +79,9 @@ class WalletRewardsTimeBasedIntegrationTest
 
       eventually()(bobValidatorWalletClient.listAppRewardCoupons() should have size 0)
       eventually()(bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0)
-      eventually()(bobValidatorWalletClient.listValidatorFaucetCoupons() should have size 0)
+      eventually()(
+        bobValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+      )
 
       val newBalance = bobValidatorWalletClient.balance().unlockedQty
 

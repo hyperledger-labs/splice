@@ -271,4 +271,14 @@ object PackageIdResolver {
       PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
     dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_7.metadata.version
   }
+
+  def supportsValidatorLivenessActivityRecord(
+      now: CantonTimestamp,
+      amuletRules: AmuletRules,
+  ): Boolean = {
+    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
+    val amuletVersion =
+      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
+    amuletVersion >= DarResources.amulet_0_1_5.metadata.version
+  }
 }

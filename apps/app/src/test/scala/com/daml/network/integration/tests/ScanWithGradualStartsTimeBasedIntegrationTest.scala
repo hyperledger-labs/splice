@@ -76,11 +76,14 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
             // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
           }
         }
-        clue("Ensure ValidatorFaucetCoupons are received") {
+        clue("Ensure ValidatorLivenessActivityRecord are received") {
           eventually() {
             Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
               walletClient =>
-                ensureValidatorFaucetCouponReceivedForCurrentRound(sv1ScanBackend, walletClient)
+                ensureValidatorLivenessActivityRecordReceivedForCurrentRound(
+                  sv1ScanBackend,
+                  walletClient,
+                )
             }
           }
         }
@@ -102,11 +105,11 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
               }
             }
           }
-          clue("Ensure ValidatorFaucetCoupons are redeemed") {
+          clue("Ensure ValidatorLivenessActivityRecords are redeemed") {
             eventually() {
               Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
                 walletClient =>
-                  ensureNoValidatorFaucetCouponExistsForRound(
+                  ensureNoValidatorLivenessActivityRecordExistsForRound(
                     roundForWhichCouponsAreNowRedeemed,
                     walletClient,
                   )
@@ -123,7 +126,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       }
     }
 
-    val validatorFaucetAmount = 2.85
+    val validatorLivenessActivityRecordAmount = 2.85
     clue("Aggregated total amulet balance on both scan apps should match") {
       val svRewardPerRound =
         BigDecimal(
@@ -141,9 +144,11 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
           (
             3L,
-            // validator faucets: SV1, Alice, Bob
-            walletUsdToAmulet(26.0 + validatorFaucetAmount * 3 - smallAmount) + svRewardPerRound,
-            walletUsdToAmulet(26.0 + validatorFaucetAmount * 3) + svRewardPerRound,
+            // validator liveness activity record: SV1, Alice, Bob
+            walletUsdToAmulet(
+              26.0 + validatorLivenessActivityRecordAmount * 3 - smallAmount
+            ) + svRewardPerRound,
+            walletUsdToAmulet(26.0 + validatorLivenessActivityRecordAmount * 3) + svRewardPerRound,
           ),
         )
       ) { (round, floor, ceil) =>
@@ -161,8 +166,8 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           (2L, BigDecimal(0), BigDecimal(0)),
           (
             3L,
-            walletUsdToAmulet(validatorFaucetAmount * 3 - smallAmount),
-            walletUsdToAmulet(validatorFaucetAmount * 3),
+            walletUsdToAmulet(validatorLivenessActivityRecordAmount * 3 - smallAmount),
+            walletUsdToAmulet(validatorLivenessActivityRecordAmount * 3),
           ),
         )
       ) { (round, floor, ceil) =>

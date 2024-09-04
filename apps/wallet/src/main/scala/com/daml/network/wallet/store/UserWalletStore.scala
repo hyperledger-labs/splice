@@ -270,6 +270,22 @@ trait UserWalletStore extends AppStore with NamedLogging {
     )
   ]]
 
+  /** Returns the validator activity records sorted by their round in ascending order and their value in descending order.
+    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
+    */
+  def listSortedLivenessActivityRecords(
+      issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorLivenessActivityRecord.ContractId,
+          validatorCodegen.ValidatorLivenessActivityRecord,
+        ],
+        BigDecimal,
+    )
+  ]]
+
   /** Returns the SV reward coupons sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */

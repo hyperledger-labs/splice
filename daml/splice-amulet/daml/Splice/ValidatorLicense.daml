@@ -69,33 +69,7 @@ template ValidatorLicense with
         openRoundCid : ContractId OpenMiningRound
       controller validator
       do
-        -- TODO:(#14499) error out this choice.
-        -- error $ "ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead."
-        now <- getTime
-        openRound <- fetchReferenceData (ForDso with dso) openRoundCid
-        require "OpenRound is open" (openRound.opensAt <= now)
-
-        newFaucetState <- case faucetState of
-          None -> return $ Some FaucetState with
-            firstReceivedFor = openRound.round
-            lastReceivedFor = openRound.round
-            numCouponsMissed = 0
-
-          Some state -> do
-            require "Not yet received" (state.lastReceivedFor < openRound.round)
-            return $ Some FaucetState with
-              firstReceivedFor = state.firstReceivedFor
-              lastReceivedFor = openRound.round
-              numCouponsMissed = state.numCouponsMissed + (openRound.round.number - state.lastReceivedFor.number - 1)
-
-        licenseCid <- create this with faucetState = newFaucetState; lastActiveAt = Some now
-
-        couponCid <- create ValidatorFaucetCoupon with
-          dso
-          validator
-          round = openRound.round
-
-        return ValidatorLicense_ReceiveFaucetCouponResult with ..
+        error $ "ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead."
 
     -- We expect the wallet of the validator to call this choice automatically.
     choice ValidatorLicense_RecordValidatorLivenessActivity : ValidatorLicense_RecordValidatorLivenessActivityResult

@@ -9,9 +9,10 @@ import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.amulet.ValidatorRight
 import com.daml.network.codegen.java.splice.amuletrules.transferinput.{
   ExtTransferInput,
-  InputAppRewardCoupon,
   InputAmulet,
+  InputAppRewardCoupon,
   InputSvRewardCoupon,
+  InputValidatorLivenessActivityRecord,
   InputValidatorRewardCoupon,
 }
 import com.daml.network.codegen.java.splice.amuletrules.{
@@ -23,8 +24,8 @@ import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.splice.wallet.install.{
-  WalletAppInstall_ExecuteBatchResult,
   WalletAppInstall,
+  WalletAppInstall_ExecuteBatchResult,
   amuletoperation,
 }
 import com.daml.network.codegen.java.splice.wallet.{
@@ -34,11 +35,11 @@ import com.daml.network.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{SpliceLedgerConnection, CommandPriority, RetryProvider}
+import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{AssignedContract, SpliceUtil, DisclosedContracts, HasHealth}
+import com.daml.network.util.{AssignedContract, DisclosedContracts, HasHealth, SpliceUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -525,6 +526,11 @@ class TreasuryService(
         maxNumInputs,
         issuingRoundsMap,
       )
+      (validatorLivenessActivityRecordsAmuletQuantity, validatorActivityRecordsInputs) <-
+        getValidatorLivenessActivityRecordsAndQuantity(
+          maxNumInputs,
+          issuingRoundsMap,
+        )
       (appRewardsTotalAmuletQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
         maxNumInputs,
         issuingRoundsMap,
@@ -537,7 +543,8 @@ class TreasuryService(
       val createFeeCc = SpliceUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
-          appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity + svRewardsTotalAmuletQuantity,
+          appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity +
+            validatorLivenessActivityRecordsAmuletQuantity + svRewardsTotalAmuletQuantity,
           amuletInputsAndQuantity,
           createFeeCc,
         )
@@ -550,13 +557,16 @@ class TreasuryService(
           validatorRewardInputs,
           appRewardInputs,
           validatorFaucetInputs,
+          validatorActivityRecordsInputs,
           svRewardInputs,
           numTapOperations,
         )
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs
             .map(_._1)
-            .toSet ++ validatorFaucetInputs.map(_._1).toSet ++ svRewardInputs.map(_._1).toSet
+            .toSet ++ validatorFaucetInputs.map(_._1).toSet ++ validatorActivityRecordsInputs
+            .map(_._1)
+            .toSet ++ svRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
           openRound.contractId,
           openIssuingRounds.view
@@ -608,11 +618,14 @@ class TreasuryService(
       validatorRewardInputs: Seq[(Round, BigDecimal, InputValidatorRewardCoupon)],
       appRewardInputs: Seq[(Round, BigDecimal, InputAppRewardCoupon)],
       validatorFaucetInputs: Seq[(Round, BigDecimal, ExtTransferInput)],
+      validatorActivityRecordsInputs: Seq[
+        (Round, BigDecimal, InputValidatorLivenessActivityRecord)
+      ],
       svRewardCouponInputs: Seq[(Round, BigDecimal, InputSvRewardCoupon)],
       numTapOperations: Int,
   ): Seq[TransferInput] = {
     val sortedRewardInputs =
-      (validatorRewardInputs ++ appRewardInputs ++ validatorFaucetInputs ++ svRewardCouponInputs)
+      (validatorRewardInputs ++ appRewardInputs ++ validatorFaucetInputs ++ validatorActivityRecordsInputs ++ svRewardCouponInputs)
         .sorted(
           // prioritize the soonest-to-expire, most-valuable rewards.
           Ordering[(Long, BigDecimal)].on((rw: (Round, BigDecimal, _)) => (rw._1.number, -rw._2))
@@ -702,6 +715,32 @@ class TreasuryService(
         )
       )
     } yield (validatorFaucetsAmuletQuantity, validatorFaucetsInputs)
+  }
+
+  private def getValidatorLivenessActivityRecordsAndQuantity(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+  )(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputValidatorLivenessActivityRecord)])] = {
+    for {
+      validatorLivenessActivityRecordsInputs <- userStore.listSortedLivenessActivityRecords(
+        issuingRoundsMap,
+        PageLimit.tryCreate(maxNumInputs),
+      )
+      validatorLivenessActivityRecordsAmuletQuantity = validatorLivenessActivityRecordsInputs
+        .map(_._2)
+        .sum
+      validatorActivityRecordsInputs = validatorLivenessActivityRecordsInputs.map(rw =>
+        (
+          rw._1.payload.round,
+          rw._2,
+          new splice.amuletrules.transferinput.InputValidatorLivenessActivityRecord(
+            rw._1.contractId
+          ),
+        )
+      )
+    } yield (validatorLivenessActivityRecordsAmuletQuantity, validatorActivityRecordsInputs)
   }
 
   private def getSvRewardCouponsAndQuantity(
