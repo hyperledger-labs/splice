@@ -123,6 +123,7 @@ class TemplateQualifiedNames:
     validator_reward_coupon = "Splice.Amulet:ValidatorRewardCoupon"
     sv_reward_coupon = "Splice.Amulet:SvRewardCoupon"
     validator_faucet_coupon = "Splice.ValidatorLicense:ValidatorFaucetCoupon"
+    validator_activity_record = "Splice.ValidatorLicense:ValidatorLivenessActivityRecord"
     open_mining_round = "Splice.Round:OpenMiningRound"
     summarizing_mining_round = "Splice.Round:SummarizingMiningRound"
     issuing_mining_round = "Splice.Round:IssuingMiningRound"
@@ -279,6 +280,14 @@ class LfValue:
 
     # template ValidatorFaucetCoupon -> round
     def get_validator_faucet_round(self):
+        return self.__get_record_field("round").__get_round_number()
+
+    # template ValidatorLivenessActivityRecord -> validator
+    def get_validator_liveness_activity_record_validator(self):
+        return self.__get_record_field("validator").__get_party()
+
+    # template ValidatorLivenessActivityRecord -> round
+    def get_validator_liveness_activity_record_round(self):
         return self.__get_record_field("round").__get_round_number()
 
     # template ValidatorRewardCoupon -> user
@@ -801,6 +810,9 @@ class State:
                     cid = value.get_ext_transfer_input_validator_faucet_coupon()
                     #if cid:
                     #    self.claim_reward(cid)
+                    pass
+                case "InputValidatorLivenessActivityRecord":
+                    # self.claim_reward(value.get_contract_id())
                     pass
                 case _:
                     self._fail(f"Unexpected transfer input: {tag}")

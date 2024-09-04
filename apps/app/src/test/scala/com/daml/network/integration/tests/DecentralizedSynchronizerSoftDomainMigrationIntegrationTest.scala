@@ -479,6 +479,16 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         )
       )
 
+      createSampleAndEnsurePresence(
+        splice.validatorlicense.ValidatorLivenessActivityRecord.COMPANION
+      )(
+        new splice.validatorlicense.ValidatorLivenessActivityRecord(
+          dsoParty.toProtoPrimitive,
+          validator.toProtoPrimitive,
+          dummyRound,
+        )
+      )
+
       createSampleAndEnsurePresence(splice.amulet.SvRewardCoupon.COMPANION)(
         new splice.amulet.SvRewardCoupon(
           dsoParty.toProtoPrimitive,

@@ -457,6 +457,7 @@ object UserWalletStore {
       amuletCodegen.LockedAmulet.COMPANION,
       amuletCodegen.ValidatorRewardCoupon.COMPANION,
       validatorCodegen.ValidatorFaucetCoupon.COMPANION,
+      validatorCodegen.ValidatorLivenessActivityRecord.COMPANION,
       amuletCodegen.SvRewardCoupon.COMPANION,
       subsCodegen.Subscription.COMPANION,
       subsCodegen.SubscriptionRequest.COMPANION,
@@ -526,6 +527,12 @@ object UserWalletStore {
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
+          co.payload.dso == dso &&
+            co.payload.validator == endUser
+        )(co =>
+          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+        ),
+        mkFilter(validatorCodegen.ValidatorLivenessActivityRecord.COMPANION)(co =>
           co.payload.dso == dso &&
             co.payload.validator == endUser
         )(co =>

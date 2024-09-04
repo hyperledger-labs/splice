@@ -1125,6 +1125,15 @@ object SvDsoStore {
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
+      mkFilter(splice.validatorlicense.ValidatorLivenessActivityRecord.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
       mkFilter(splice.amulet.SvRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,

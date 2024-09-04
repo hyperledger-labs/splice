@@ -125,6 +125,7 @@ class TemplateQualifiedNames:
     validator_reward_coupon = "Splice.Amulet:ValidatorRewardCoupon"
     sv_reward_coupon = "Splice.Amulet:SvRewardCoupon"
     validator_faucet_coupon = "Splice.ValidatorLicense:ValidatorFaucetCoupon"
+    validator_liveness_activity_record = "Splice.ValidatorLicense:ValidatorLivenessActivityRecord"
     open_mining_round = "Splice.Round:OpenMiningRound"
     summarizing_mining_round = "Splice.Round:SummarizingMiningRound"
     issuing_mining_round = "Splice.Round:IssuingMiningRound"
@@ -143,6 +144,7 @@ class TemplateQualifiedNames:
             validator_reward_coupon,
             sv_reward_coupon,
             validator_faucet_coupon,
+            validator_liveness_activity_record,
             open_mining_round,
             summarizing_mining_round,
             issuing_mining_round,
@@ -159,6 +161,7 @@ class TemplateQualifiedNames:
             "splice-amulet:" + validator_reward_coupon,
             "splice-amulet:" + sv_reward_coupon,
             "splice-amulet:" + validator_faucet_coupon,
+            "splice-amulet:" + validator_liveness_activity_record,
             "splice-amulet:" + open_mining_round,
             "splice-amulet:" + summarizing_mining_round,
             "splice-amulet:" + issuing_mining_round,
@@ -739,12 +742,24 @@ class LfValue:
     def get_receive_validator_faucet_coupon_result_coupon_cid(self):
         return self.__get_record_field("couponCid").get_contract_id()
 
+    # data ValidatorLicense_RecordValidatorLivenessActivityResult -> livenessActivityRecord
+    def get_record_validator_liveness_activity_result_record_cid(self):
+        return self.__get_record_field("couponCid").get_contract_id()
+
     # template ValidatorFaucetCoupon -> validator
     def get_validator_faucet_validator(self):
         return self.__get_record_field("validator").__get_party()
 
     # template ValidatorFaucetCoupon -> round
     def get_validator_faucet_round(self):
+        return self.__get_record_field("round").__get_round_number()
+
+    # template ValidatorLivenessActivityRecord -> validator
+    def get_validator_liveness_activity_record_validator(self):
+        return self.__get_record_field("validator").__get_party()
+
+    # template ValidatorLivenessActivityRecord -> round
+    def get_validator_liveness_activity_record_round(self):
         return self.__get_record_field("round").__get_round_number()
 
     # template ValidatorRewardCoupon -> user
@@ -1212,6 +1227,7 @@ class TransferInputs:
         app_rewards,
         validator_rewards,
         validator_faucets,
+        validator_liveness_activity_records,
         sv_rewards,
         amulets,
         round_number,
@@ -1220,6 +1236,7 @@ class TransferInputs:
         self.app_rewards = app_rewards
         self.validator_rewards = validator_rewards
         self.validator_faucets = validator_faucets
+        self.validator_liveness_activity_records = validator_liveness_activity_records
         self.sv_rewards = sv_rewards
         self.amulets = amulets
         self.round_number = round_number
@@ -1320,6 +1337,20 @@ class TransferInputs:
         output += validator_faucet_outputs
         effective_inputs += validator_faucet_inputs
 
+        (
+            validator_liveness_activity_record_outputs,
+            validator_liveness_activity_record_inputs,
+            validator_liveness_activity_record_total_cc,
+            all_validator_liveness_activity_record,
+        ) = self.summarize_reward_type(
+            "validator_faucet_activity_record",
+            self.validator_liveness_activity_records,
+            lambda r: r.get_issuing_mining_round_issuance_per_validator_faucet(),
+            lambda r: DamlDecimal(1),  # records always have value 1
+        )
+        output += validator_liveness_activity_record_outputs
+        effective_inputs += validator_liveness_activity_record_inputs
+
         (sv_outputs, sv_inputs, sv_total_cc, all_sv_activity) = (
             self.summarize_reward_type(
                 "sv_activity_record",
@@ -1336,6 +1367,7 @@ class TransferInputs:
             + featured_total_cc
             + validator_total_cc
             + validator_faucet_total_cc
+            + validator_liveness_activity_record_total_cc
             + sv_total_cc
         )
 
@@ -1372,6 +1404,7 @@ class TransferInputs:
             + all_featured
             + all_validator
             + all_validator_faucet
+            + all_validator_liveness_activity_record
             + all_sv_activity
             + all_amulet
         )
@@ -1395,6 +1428,7 @@ class PerPartyState:
     featured_app_reward_coupons: dict
     validator_reward_coupons: list
     validator_faucet_coupons: list
+    validator_activity_record: list
 
     open_mining_round_numbers: list
 
@@ -1407,6 +1441,7 @@ class PerPartyState:
         self.featured_app_reward_coupons = {}
         self.validator_reward_coupons = {}
         self.validator_faucet_coupons = {}
+        self.validator_activity_records = {}
         self.open_mining_round_numbers = open_mining_round_numbers
 
     def __effective_amount__(self, amount, round_number):
@@ -1477,9 +1512,9 @@ class PerPartyState:
             ]
         if self.validator_reward_coupons:
             lines += [f"validator_activity_records: {self.validator_reward_coupons}"]
-        if self.validator_faucet_coupons:
+        if self.validator_faucet_coupons or self.validator_activity_records:
             lines += [
-                f"validator_liveness_activity_records: {self.validator_faucet_coupons}"
+                f"validator_liveness_activity_records: {self.validator_faucet_coupons | self.validator_activity_records} "
             ]
         return "\n".join(lines)
 
@@ -1606,6 +1641,9 @@ class State:
         validator_faucets = self.list_contracts(
             TemplateQualifiedNames.validator_faucet_coupon
         )
+        validator_activity_records = self.list_contracts(
+            TemplateQualifiedNames.validator_liveness_activity_record
+        )
         sv_rewards = self.list_contracts(TemplateQualifiedNames.sv_reward_coupon)
         open_mining_rounds = self.list_contracts(
             TemplateQualifiedNames.open_mining_round
@@ -1692,6 +1730,16 @@ class State:
                 round_number, 0
             )
             per_party_states[validator].validator_faucet_coupons[round_number] += 1
+        for validator_activity_record in validator_activity_records.values():
+            validator = validator_activity_record.payload.get_validator_liveness_activity_record_validator()
+            per_party_states.setdefault(
+                validator, PerPartyState(self.args, open_mining_round_numbers)
+            )
+            round_number = validator_activity_record.payload.get_validator_liveness_activity_record_round()
+            per_party_states[validator].validator_activity_records.setdefault(
+                round_number, 0
+            )
+            per_party_states[validator].validator_activity_records[round_number] += 1
         for sv_reward in sv_rewards.values():
             beneficiary = sv_reward.payload.get_sv_reward_coupon_beneficiary()
             per_party_states.setdefault(
@@ -1897,12 +1945,32 @@ class State:
 
         return HandleTransactionResult.for_open_round(round_number)
 
+    def handle_record_validator_liveness_activity_record(self, transaction, event):
+        coupon_cid = (
+            event.exercise_result.get_record_validator_liveness_activity_result_record_cid()
+        )
+        coupon = transaction.by_contract_id[coupon_cid]
+        self.active_contracts[coupon_cid] = coupon
+
+        round_number = coupon.payload.get_validator_liveness_activity_record_round()
+        validator = coupon.payload.get_validator_liveness_activity_record_validator()
+
+        self._txinfo(
+            transaction,
+            "ValidatorLivenessActivityRecord",
+            f"Validator liveness activity recorded in round {round_number} for validator {validator}",
+            parties=[validator],
+        )
+
+        return HandleTransactionResult.for_open_round(round_number)
+
     def handle_transfer_inputs(
         self, transaction, sender, transfer_round_number, inputs
     ):
         app_rewards = {}
         validator_rewards = {}
         validator_faucets = {}
+        validator_liveness_activity_records = {}
         sv_rewards = {}
         amulets = []
         for i in inputs:
@@ -1945,12 +2013,21 @@ class State:
                         validator_faucets.setdefault(round_number, []).append(
                             validator_faucet
                         )
+                case "InputValidatorLivenessActivityRecord":
+                    cid = value.get_contract_id()
+                    validator_liveness_activity_record = self.active_contracts[cid]
+                    round_number = validator_liveness_activity_record.payload.get_validator_liveness_activity_record_round()
+                    validator_liveness_activity_records.setdefault(round_number, []).append(
+                        validator_liveness_activity_record
+                    )
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
             app_rewards,
             validator_rewards,
             validator_faucets,
+            validator_liveness_activity_records,
             sv_rewards,
             amulets,
             transfer_round_number,
@@ -2775,6 +2852,20 @@ class State:
                                 f"  validator_liveness_record: validator: {validator}"
                             ]
                         del self.active_contracts[cid]
+                    case "ValidatorLivenessActivityRecord_DsoExpire":
+                        validator_liveness_activity_record = self.active_contracts[cid]
+                        rewards += [validator_liveness_activity_record]
+                        round = validator = (
+                            validator_liveness_activity_record.payload.get_validator_faucet_round()
+                        )
+                        validator = (
+                            validator_liveness_activity_record.payload.get_validator_faucet_validator()
+                        )
+                        if _party_enabled(self.args, validator):
+                            rewards_lines += [
+                                f"  validator_liveness_record: validator: {validator}"
+                            ]
+                        del self.active_contracts[cid]
                     case "AppRewardCoupon_DsoExpire":
                         app_reward_coupon = self.active_contracts[cid]
                         rewards += [app_reward_coupon]
@@ -2946,6 +3037,8 @@ class State:
                 return self.handle_receive_sv_reward_coupon(transaction, event)
             case "ValidatorLicense_ReceiveFaucetCoupon":
                 return self.handle_receive_validator_faucet_coupon(transaction, event)
+            case "ValidatorLicense_RecordValidatorLivenessActivity":
+                return self.handle_record_validator_liveness_activity_record(transaction, event)
             case "ValidatorLicense_UpdateMetadata":
                 return HandleTransactionResult.empty()
             case "ValidatorLicense_ReportActive":
