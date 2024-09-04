@@ -14,6 +14,7 @@ import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.util.MonadUtil
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -212,6 +213,28 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertList()
         _ <- assertIncompleteReassignments()
       } yield succeed
+    }
+    "paginate" in {
+      val contracts = (1 to 10).map(n => c(n))
+      implicit val store: S = mkStore()
+      def paginate(after: Option[Long], acc: Seq[C]): Future[Seq[C]] = {
+        store
+          .listContractsPaginated(AppRewardCoupon.COMPANION, after, PageLimit.tryCreate(1))
+          .flatMap { resultsPage =>
+            resultsPage.nextPageToken match {
+              case Some(nextPageToken) =>
+                paginate(Some(nextPageToken), acc ++ resultsPage.resultsInPage.map(_.contract))
+              case None =>
+                Future.successful(acc)
+            }
+          }
+      }
+      for {
+        _ <- acs()
+        _ <- store.ingestionSink.initialize()
+        _ <- MonadUtil.sequentialTraverse(contracts)(d1.create(_))
+        paginatedResults <- paginate(None, Seq.empty)
+      } yield paginatedResults.map(_.contractId) should be(contracts.map(_.contractId))
     }
     "throws if the store primary party is not a stakeholder of the created event" in {
       implicit val store = mkStore()

@@ -683,12 +683,13 @@ trait SvDsoStore
   ): Future[QueryResult[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]]]
 
   /** List all ValidatorLicenses */
-  def listValidatorLicenses(limit: Limit = Limit.DefaultLimit)(implicit
+  def listValidatorLicenses(limit: PageLimit, after: Option[Long])(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
+  ): Future[ResultsPage[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] = {
     multiDomainAcsStore
-      .listContracts(vl.ValidatorLicense.COMPANION, limit)
-      .map(_ map (_.contract))
+      .listContractsPaginated(vl.ValidatorLicense.COMPANION, after, limit)
+      .map(_.mapResultsInPage(_.contract))
+  }
 
   def listValidatorLicensePerValidator(validator: String, limit: Limit)(implicit
       tc: TraceContext

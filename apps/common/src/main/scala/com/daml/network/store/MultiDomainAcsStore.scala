@@ -136,6 +136,15 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   ): Future[Contract[TCid, T]] =
     orContractIdNotFound(lookupContractByIdOnDomain(companion)(domain, id))(companion, id)
 
+  def listContractsPaginated[C, TCid <: ContractId[_], T](
+      companion: C,
+      after: Option[Long],
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[ResultsPage[ContractWithState[TCid, T]]]
+
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit = Limit.DefaultLimit,

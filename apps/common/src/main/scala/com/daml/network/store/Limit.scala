@@ -49,6 +49,7 @@ object HardLimit {
   */
 case class PageLimit private (limit: Int) extends Limit
 object PageLimit {
+  val Max: PageLimit = new PageLimit(Limit.MaxPageSize)
   def apply(limit: Int): Either[String, PageLimit] = {
     Limit.validateLimit(limit).map(new PageLimit(_))
   }

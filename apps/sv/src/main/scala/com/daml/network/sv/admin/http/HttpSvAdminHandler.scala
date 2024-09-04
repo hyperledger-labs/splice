@@ -18,7 +18,7 @@ import com.daml.network.http.HttpVotesHandler
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
-import com.daml.network.store.AppStoreWithIngestion
+import com.daml.network.store.{AppStoreWithIngestion, PageLimit}
 import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -87,16 +87,22 @@ class HttpSvAdminHandler(
     }
   }
 
-  def listValidatorLicenses(
-      respond: v0.SvAdminResource.ListValidatorLicensesResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListValidatorLicensesResponse] = {
+  override def listValidatorLicenses(
+      respond: SvAdminResource.ListValidatorLicensesResponse.type
+  )(after: Option[Long], limit: Option[Int])(
+      tuser: TracedUser
+  ): Future[SvAdminResource.ListValidatorLicensesResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listValidatorLicenses") { _ => _ =>
       for {
-        validatorLicenses <- dsoStore.listValidatorLicenses()
+        resultsInPage <- dsoStore.listValidatorLicenses(
+          limit.fold(PageLimit.Max)(PageLimit.tryCreate),
+          after,
+        )
       } yield {
         definitions.ListValidatorLicensesResponse(
-          validatorLicenses.map(_.toHttp).toVector
+          resultsInPage.resultsInPage.map(_.toHttp).toVector,
+          resultsInPage.nextPageToken,
         )
       }
     }
