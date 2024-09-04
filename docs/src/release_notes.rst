@@ -127,6 +127,15 @@ Upcoming
       * ``CN_APP_UI_UNSAFE_SECRET``
       * ``CN_APP_UI_UNSAFE``
       * ``CN_APP_WALLET_REDIRECT``
+  * The Kubernetes secrets below have been renamed, replacing ``cn-`` with
+    ``splice-``:
+
+      * ``cn-app-*-ledger-api-auth``
+      * ``cn-app-cns-ui-auth``
+      * ``cn-app-sv-key``
+      * ``cn-app-sv-ui-auth``
+      * ``cn-app-validator-onboarding-validator``
+      * ``cn-app-wallet-ui-auth``
 
 * Documentation
 

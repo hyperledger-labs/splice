@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, config } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
 
 import { gitRepo } from '../flux';
 import { namespace } from '../namespace';

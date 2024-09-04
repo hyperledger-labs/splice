@@ -4,7 +4,7 @@ participantAddress: "participant"
 svSponsorAddress: "SPONSOR_SV_URL"
 onboardingSecretFrom:
   secretKeyRef:
-    name: cn-app-validator-onboarding-validator
+    name: splice-app-validator-onboarding-validator
     key: secret
     optional: false
 # Party ID hint for the validator operator party, should be of format <organization>-<function>-<enumerator>,

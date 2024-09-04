@@ -1,6 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'splice-pulumi-common';
 
 import { slackToken } from './alertings';
 

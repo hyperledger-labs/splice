@@ -1,5 +1,5 @@
 import { Output } from '@pulumi/pulumi';
-import { config } from 'cn-pulumi-common/src/config';
+import { config } from 'splice-pulumi-common/src/config';
 
 const enableCometbftPruning = config.envFlag('ENABLE_COMETBFT_PRUNING', true);
 export const cometbftRetainBlocks = enableCometbftPruning

@@ -8,7 +8,7 @@ import {
   BootstrappingDumpConfig,
   ExpectedValidatorOnboarding,
   ValidatorTopupConfig,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 import {
   StaticCometBftConfig,

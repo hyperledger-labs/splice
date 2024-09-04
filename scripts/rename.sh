@@ -713,8 +713,9 @@ function subcmd_cn_splice {
     "$GSR_ARGS"
 
   simple_rename '(?x)CN_(?=
-      APP_(?! # helm exclusions; simply excluding cluster/helm is not good enough
-              # because we want to also avoid altering their external references
+      APP_(?! # TODO (#14517) helm exclusions; simply excluding cluster/helm is
+              # not good enough because we want to also avoid altering their
+              # external references
               (?: \{\{\s[$]app\s\|\supper\s\}\} | [A-Z]+)_LEDGER_API_AUTH_
             | CONTACT_POINT
             | DARS
@@ -763,17 +764,19 @@ function subcmd_cn_splice {
             | VALIDATOR_SV_SPONSOR_ADDRESS
             | VALIDATOR_SV_VALIDATOR
             | VALIDATOR_WALLET_USER_NAME
-            # pulumi deployment conf
+            # TODO (#14617) pulumi deployment conf
             | SPLITWELL_PROVIDER_WALLET_USER_NAME
             | VALIDATOR_MIGRATION_ID
             | VALIDATOR_SCAN_URL
             | POSTGRES_(?:DATABASE_NAME|HOST|PORT|SCHEMA|USER)
+            # TODO (#13560) entrypoint
+            | LEGACY_PARTY_HINT
           )
     | ARTIFACTS_REPOSITORY
     | DEPLOY_
     | DEPLOYMENT_
-    # TODO (#14137 fails integration test) | INSTALL_(?:VALIDATOR1|SPLITWELL)
-    # TODO (#14137 pulumi conf) | PULUMI_LOAD_ENV_CONFIG_FILE
+    # TODO (#14619 fails integration test) | INSTALL_(?:VALIDATOR1|SPLITWELL)
+    # TODO (#14617 pulumi conf) | PULUMI_LOAD_ENV_CONFIG_FILE
   )///SPLICE_'
   simple_rename '\bCN(?=Postgres|CustomResourceOptions)///Splice'
   # TODO (#14137) transform lowercase
@@ -781,6 +784,31 @@ function subcmd_cn_splice {
   simple_rename '\bcnR(?=eplaceEqualDeep\b)///r'
   # AUTH0_CN_MANAGEMENT_API_CLIENT_ID
   # AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+  simple_rename '(?x)(\b|`)cn-(?=
+      app-
+    # TODO (#14618) node pool names | (?:apps|infra)-pool
+    | cluster-ingress-(?:full|sv)
+    | directory
+    | istio-fwd
+    | pulumi-common
+    # TODO (#13560) chart/gateway names
+    # | (?:apps|(?:public-)?http)-gateway
+    # | cluster-ingress-runbook
+    # | cluster-loopback-gateway
+    # | cometbft
+    # | docs
+    # | domain
+    # | global-domain
+    # | istio-gateway
+    # | load-tester
+    # | participant
+    # | postgres
+    # | scan
+    # | splitwell-(?:app|web-ui)
+    # | sv-node
+    # | util-lib
+    # | validator
+  )///\1splice-'
 }
 
 subcommand_whitelist[cn_module_splice]='Rename: CN Module prefix to Splice'

@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
+import _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -36,9 +37,8 @@ import {
   daContactPoint,
   spliceInstanceNames,
   autoInitValues,
-} from 'cn-pulumi-common';
-import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
-import _ from 'lodash';
+} from 'splice-pulumi-common';
+import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import {
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,

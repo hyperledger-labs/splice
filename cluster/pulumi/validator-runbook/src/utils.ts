@@ -1,4 +1,4 @@
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 export const VALIDATOR_NAMESPACE = config.optionalEnv('VALIDATOR_NAMESPACE') || 'validator';
 

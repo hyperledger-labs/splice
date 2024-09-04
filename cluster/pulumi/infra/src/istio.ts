@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
+import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
   defaultVersion,

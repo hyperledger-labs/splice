@@ -1,7 +1,12 @@
 import * as pulumi from '@pulumi/pulumi';
-import { isDevNet, isMainNet, SvCometBftKeys, svCometBftKeysFromSecret } from 'cn-pulumi-common';
-import { cometbftRetainBlocks } from 'cn-pulumi-common-sv';
-import { StaticSvConfig } from 'cn-pulumi-common-sv/src/config';
+import {
+  isDevNet,
+  isMainNet,
+  SvCometBftKeys,
+  svCometBftKeysFromSecret,
+} from 'splice-pulumi-common';
+import { cometbftRetainBlocks } from 'splice-pulumi-common-sv';
+import { StaticSvConfig } from 'splice-pulumi-common-sv/src/config';
 
 import { sweepConfigFromEnv } from './validator';
 

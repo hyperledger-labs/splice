@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, Auth0Fetch, infraStack, config } from 'cn-pulumi-common';
+import { Auth0ClusterConfig, Auth0Fetch, infraStack, config } from 'splice-pulumi-common';
 
 import { installNode } from './installNode';
 

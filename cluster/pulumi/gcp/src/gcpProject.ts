@@ -1,6 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 import { ServiceAccount } from './serviceAccount';

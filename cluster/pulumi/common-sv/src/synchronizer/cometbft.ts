@@ -14,8 +14,8 @@ import {
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
-} from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
+} from 'splice-pulumi-common';
+import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
 import { CometBftNodeConfig, CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync, stableCometBftChainId } from './cometbftConfig';

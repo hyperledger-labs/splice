@@ -1,6 +1,6 @@
-import { config, isDevNet, CLUSTER_HOSTNAME } from 'cn-pulumi-common';
-import { retry } from 'cn-pulumi-common/src/retries';
 import fetch from 'node-fetch';
+import { config, isDevNet, CLUSTER_HOSTNAME } from 'splice-pulumi-common';
+import { retry } from 'splice-pulumi-common/src/retries';
 
 export const SV_NAME = 'DA-Helm-Test-Node';
 export const SV_NAMESPACE = 'sv';

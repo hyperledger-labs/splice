@@ -130,7 +130,7 @@ Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the 
 
 .. code-block:: bash
 
-    kubectl create secret generic cn-app-validator-onboarding-validator \
+    kubectl create secret generic splice-app-validator-onboarding-validator \
         "--from-literal=secret=${VALIDATOR_SECRET}" \
         -n validator
 
@@ -306,7 +306,7 @@ The validator app backend requires the following secret.
 
 .. code-block:: bash
 
-    kubectl create --namespace validator secret generic cn-app-validator-ledger-api-auth \
+    kubectl create --namespace validator secret generic splice-app-validator-ledger-api-auth \
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
@@ -318,11 +318,11 @@ To setup the wallet and CNS UI, create the following two secrets.
 
 .. code-block:: bash
 
-    kubectl create --namespace validator secret generic cn-app-wallet-ui-auth \
+    kubectl create --namespace validator secret generic splice-app-wallet-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${WALLET_UI_CLIENT_ID}"
 
-    kubectl create --namespace validator secret generic cn-app-cns-ui-auth \
+    kubectl create --namespace validator secret generic splice-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
 

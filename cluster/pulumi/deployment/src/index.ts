@@ -1,4 +1,4 @@
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 import { createStackCR } from './stacks/stack';
 

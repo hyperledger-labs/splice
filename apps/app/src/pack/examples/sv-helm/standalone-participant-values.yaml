@@ -1,7 +1,7 @@
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user
-    name: cn-app-validator-ledger-api-auth
+    name: splice-app-validator-ledger-api-auth
     optional: false
 
 persistence:

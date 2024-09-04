@@ -21,8 +21,8 @@ import {
   REPO_ROOT,
   WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS,
   WASTED_TRAFFIC_ALERT_THRESHOLD_KB,
-} from 'cn-pulumi-common';
-import { infraAffinityAndTolerations } from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
+import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import {
   clusterIsBeingReset,

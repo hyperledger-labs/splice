@@ -29,13 +29,13 @@ spec:
           valueFrom:
             secretKeyRef:
               key: client-id
-              name: cn-app-splitwell-ui-auth
+              name: splice-app-splitwell-ui-auth
               optional: false
         - name: CN_APP_UI_AUTH_URL
           valueFrom:
             secretKeyRef:
               key: url
-              name: cn-app-splitwell-ui-auth
+              name: splice-app-splitwell-ui-auth
               optional: false
         - name: CN_APP_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}

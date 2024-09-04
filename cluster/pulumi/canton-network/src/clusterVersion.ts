@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
-import { config, defaultVersion, exactNamespace } from 'cn-pulumi-common';
 import exec from 'node:child_process';
+import { config, defaultVersion, exactNamespace } from 'splice-pulumi-common';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const ns = exactNamespace('cluster-version', true);

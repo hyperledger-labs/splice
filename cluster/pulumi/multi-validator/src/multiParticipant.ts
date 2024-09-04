@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence, numNodesPerInstance } from 'cn-pulumi-common';
+import { generatePortSequence, numNodesPerInstance } from 'splice-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 

@@ -31,15 +31,15 @@ import {
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   SvIdKey,
   validatorOnboardingSecretName,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 import {
   DecentralizedSynchronizerNode,
   installCantonComponents,
   StaticCometBftConfigWithNodeName,
-} from 'cn-pulumi-common-sv';
-import { SvConfig } from 'cn-pulumi-common-sv/src/config';
-import { jmxOptions } from 'cn-pulumi-common/src/jmx';
-import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
+} from 'splice-pulumi-common-sv';
+import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+import { jmxOptions } from 'splice-pulumi-common/src/jmx';
+import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';
@@ -49,7 +49,7 @@ export function installSvKeySecret(
   xns: ExactNamespace,
   keys: CnInput<SvIdKey>
 ): k8s.core.v1.Secret {
-  const secretName = 'cn-app-sv-key';
+  const secretName = 'splice-app-sv-key';
 
   const data = pulumi.output(keys).apply(ks => {
     return {
@@ -59,7 +59,7 @@ export function installSvKeySecret(
   });
 
   return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-key`,
+    `splice-app-${xns.logicalName}-key`,
     {
       metadata: {
         name: secretName,

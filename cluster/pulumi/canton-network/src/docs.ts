@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { defaultVersion, exactNamespace, installSpliceHelmChart } from 'cn-pulumi-common';
+import { defaultVersion, exactNamespace, installSpliceHelmChart } from 'splice-pulumi-common';
 
 export function installDocs(): pulumi.Resource {
   const xns = exactNamespace('docs');

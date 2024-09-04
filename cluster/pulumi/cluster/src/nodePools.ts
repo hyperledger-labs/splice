@@ -1,5 +1,5 @@
 import * as gcp from '@pulumi/gcp';
-import { GCP_PROJECT, config } from 'cn-pulumi-common';
+import { GCP_PROJECT, config } from 'splice-pulumi-common';
 
 export function installNodePools(): void {
   const clusterName = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;

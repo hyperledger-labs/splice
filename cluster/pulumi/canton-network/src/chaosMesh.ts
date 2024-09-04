@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
-import { GCP_PROJECT, infraAffinityAndTolerations } from 'cn-pulumi-common';
+import { GCP_PROJECT, infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 export type ChaosMeshArguments = {
   dependsOn: Resource[];

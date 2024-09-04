@@ -1338,7 +1338,7 @@ if the SV is the DSO founder, also the DSO party.
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user
-    name: cn-app-sv-ledger-api-auth
+    name: splice-app-sv-ledger-api-auth
     optional: false
 ```
 

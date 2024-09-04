@@ -1,3 +1,3 @@
-import { exactNamespace } from 'cn-pulumi-common';
+import { exactNamespace } from 'splice-pulumi-common';
 
 export const namespace = exactNamespace('operator');

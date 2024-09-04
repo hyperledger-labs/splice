@@ -6,7 +6,7 @@
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "cn-pulumi-common": "1.0.0",
+    "splice-pulumi-common": "1.0.0",
     "@pulumi/random": "4.14.0"
   },
   "scripts": {

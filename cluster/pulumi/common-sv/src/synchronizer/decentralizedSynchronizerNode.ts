@@ -16,9 +16,9 @@ import {
   sequencerResources,
   sequencerTokenExpirationTime,
   SpliceCustomResourceOptions,
-} from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
-import { Postgres } from 'cn-pulumi-common/src/postgres';
+} from 'splice-pulumi-common';
+import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+import { Postgres } from 'splice-pulumi-common/src/postgres';
 
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';

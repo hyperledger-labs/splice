@@ -307,7 +307,7 @@ export async function installAuth0Secret(
     'auth0-secret-' + xns.logicalName + '-' + clientName,
     {
       metadata: {
-        name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
+        name: 'splice-app-' + secretNameApp + '-ledger-api-auth',
         namespace: xns.ns.metadata.name,
       },
       stringData: secret,
@@ -345,7 +345,7 @@ export function installAuth0UiSecretWithClientId(
     'auth0-ui-secret-' + xns.logicalName + '-' + clientName,
     {
       metadata: {
-        name: 'cn-app-' + secretNameApp + '-ui-auth',
+        name: 'splice-app-' + secretNameApp + '-ui-auth',
         namespace: xns.ns.metadata.name,
       },
       stringData: {
@@ -378,7 +378,7 @@ export function auth0UserNameEnvVarSource(
   return {
     secretKeyRef: {
       key: 'ledger-api-user',
-      name: `cn-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-auth`,
+      name: `splice-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-auth`,
       optional: false,
     },
   };

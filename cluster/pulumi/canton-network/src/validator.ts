@@ -23,9 +23,9 @@ import {
   spliceInstanceNames,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
-} from 'cn-pulumi-common';
-import { jmxOptions } from 'cn-pulumi-common/src/jmx';
-import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
+} from 'splice-pulumi-common';
+import { jmxOptions } from 'splice-pulumi-common/src/jmx';
+import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import { PersistenceConfig } from '../../common';
 

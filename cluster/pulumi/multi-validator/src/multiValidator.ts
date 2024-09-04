@@ -5,7 +5,7 @@ import {
   daContactPoint,
   generatePortSequence,
   numNodesPerInstance,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 

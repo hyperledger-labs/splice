@@ -2,7 +2,7 @@
   "name": "cn-cluster",
   "main": "src/index.ts",
   "dependencies": {
-    "cn-pulumi-common": "1.0.0"
+    "splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

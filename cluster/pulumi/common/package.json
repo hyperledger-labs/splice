@@ -1,5 +1,5 @@
 {
-  "name": "cn-pulumi-common",
+  "name": "splice-pulumi-common",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {

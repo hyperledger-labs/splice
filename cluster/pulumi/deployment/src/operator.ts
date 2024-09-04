@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { config, infraAffinityAndTolerations } from 'cn-pulumi-common';
+import { config, infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import { namespace } from './namespace';
 import { Version } from './version';

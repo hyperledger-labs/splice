@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { CLUSTER_BASENAME, config } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
 
 import { namespace } from '../namespace';
 import { flux } from './flux';

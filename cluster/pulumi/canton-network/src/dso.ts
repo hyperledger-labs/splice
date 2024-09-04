@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -15,10 +16,9 @@ import {
   daSupportApprovedIdentities,
   config,
   approvedSvIdentities,
-} from 'cn-pulumi-common';
-import { StaticCometBftConfigWithNodeName } from 'cn-pulumi-common-sv';
-import { SequencerPruningConfig, StaticSvConfig } from 'cn-pulumi-common-sv/src/config';
-import _ from 'lodash';
+} from 'splice-pulumi-common';
+import { StaticCometBftConfigWithNodeName } from 'splice-pulumi-common-sv';
+import { SequencerPruningConfig, StaticSvConfig } from 'splice-pulumi-common-sv/src/config';
 
 import { InstalledSv, SvOnboarding, installSvNode } from './sv';
 import svConfigs from './svConfigs';

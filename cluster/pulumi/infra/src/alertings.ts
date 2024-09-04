@@ -1,4 +1,4 @@
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 export const enableAlerts =
   config.envFlag('GCP_CLUSTER_PROD_LIKE') || config.envFlag('ENABLE_ALERTS_FOR_TESTING');

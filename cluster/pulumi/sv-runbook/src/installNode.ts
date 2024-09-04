@@ -39,9 +39,9 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
-} from 'cn-pulumi-common';
-import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
-import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
+} from 'splice-pulumi-common';
+import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
+import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';

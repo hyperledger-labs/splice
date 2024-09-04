@@ -6,12 +6,12 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
   installMigrationIdSpecificComponent,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 import {
   cometbftRetainBlocks,
   DecentralizedSynchronizerNode,
   installCantonComponents,
-} from 'cn-pulumi-common-sv';
+} from 'splice-pulumi-common-sv';
 
 import { installCometbftKeys } from './cometbftKeys';
 import { installPostgres } from './postgres';

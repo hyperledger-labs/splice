@@ -1,4 +1,4 @@
-import { isDevNet } from 'cn-pulumi-common';
+import { isDevNet } from 'splice-pulumi-common';
 
 import { installNode } from './installNode';
 

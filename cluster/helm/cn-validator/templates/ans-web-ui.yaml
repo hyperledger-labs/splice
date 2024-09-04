@@ -32,13 +32,13 @@ spec:
           valueFrom:
             secretKeyRef:
               key: client-id
-              name: cn-app-cns-ui-auth
+              name: splice-app-cns-ui-auth
               optional: false
         - name: CN_APP_UI_AUTH_URL
           valueFrom:
             secretKeyRef:
               key: url
-              name: cn-app-cns-ui-auth
+              name: splice-app-cns-ui-auth
               optional: false
         - name: CN_APP_UI_AUTH_AUDIENCE
           value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}

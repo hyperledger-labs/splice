@@ -10,8 +10,8 @@ import {
   ExactNamespace,
   GCP_PROJECT,
   isMainNet,
-} from 'cn-pulumi-common';
-import { infraAffinityAndTolerations } from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
+import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import { gcpDnsProject } from './config';
 

@@ -5,8 +5,8 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   config,
-} from 'cn-pulumi-common';
-import { CloudPostgres, SplicePostgres } from 'cn-pulumi-common/src/postgres';
+} from 'splice-pulumi-common';
+import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
 const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
 

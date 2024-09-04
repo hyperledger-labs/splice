@@ -16,7 +16,7 @@ import {
   preApproveValidatorRunbook,
   ApprovedSvIdentity,
   nonDevNetNonSvValidatorTopupConfig,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';

@@ -11,9 +11,9 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   SpliceCustomResourceOptions,
-} from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
-import { Postgres } from 'cn-pulumi-common/src/postgres';
+} from 'splice-pulumi-common';
+import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+import { Postgres } from 'splice-pulumi-common/src/postgres';
 
 export function installSvParticipant(
   xns: ExactNamespace,

@@ -4,7 +4,7 @@ import {
   installLoopback,
   numInstances,
   defaultVersion,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';

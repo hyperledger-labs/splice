@@ -1,13 +1,13 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import _ from 'lodash';
 import {
   appsAffinityAndTolerations,
   config,
   jmxOptions,
   numNodesPerInstance,
-} from 'cn-pulumi-common';
-import { ServiceMonitor } from 'cn-pulumi-common/src/metrics';
-import _ from 'lodash';
+} from 'splice-pulumi-common';
+import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 export interface BaseMultiNodeArgs {
   namespace: k8s.core.v1.Namespace;

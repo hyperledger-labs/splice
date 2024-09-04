@@ -21,7 +21,7 @@ auth:
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user
-    name: cn-app-sv-ledger-api-auth
+    name: splice-app-sv-ledger-api-auth
     optional: false
 
 metrics:

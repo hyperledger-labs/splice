@@ -3,8 +3,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs/promises';
 import { Bucket, File, Storage } from '@google-cloud/storage';
-import { CnInput, ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
+import { CnInput, ExactNamespace, config } from 'splice-pulumi-common';
 
 export type GcpBucket = {
   projectId: string;
@@ -47,7 +47,7 @@ export function installBootstrapDataBucketSecret(
   bucket: GcpBucket
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-${bucket.secretName}`,
+    `splice-app-${xns.logicalName}-${bucket.secretName}`,
     {
       metadata: {
         name: bucket.secretName,
@@ -129,7 +129,7 @@ export function installParticipantIdentitiesSecret(
   secretName: string,
   content: CnInput<string>
 ): k8s.core.v1.Secret {
-  return new k8s.core.v1.Secret(`cn-app-${xns.logicalName}-${secretName}`, {
+  return new k8s.core.v1.Secret(`splice-app-${xns.logicalName}-${secretName}`, {
     metadata: {
       name: secretName,
       namespace: xns.logicalName,
@@ -141,7 +141,7 @@ export function installParticipantIdentitiesSecret(
   });
 }
 
-export const participantBootstrapDumpSecretName = 'cn-app-participant-bootstrap-dump';
+export const participantBootstrapDumpSecretName = 'splice-app-participant-bootstrap-dump';
 
 export type BootstrappingDumpConfig = {
   bucket: GcpBucket;

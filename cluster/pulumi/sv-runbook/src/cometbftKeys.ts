@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import { jsonStringify } from '@pulumi/pulumi';
-import { ExactNamespace, svCometBftKeysFromSecret } from 'cn-pulumi-common';
+import { ExactNamespace, svCometBftKeysFromSecret } from 'splice-pulumi-common';
 
 const svCometBftKeys = svCometBftKeysFromSecret('sv-cometbft-keys');
 

@@ -6,7 +6,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-validator-ledger-api-auth",
+        "name": "splice-app-validator-ledger-api-auth",
         "namespace": "validator"
       },
       "stringData": {
@@ -31,7 +31,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "splice-app-cns-ui-auth",
         "namespace": "validator"
       },
       "stringData": {
@@ -53,7 +53,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-wallet-ui-auth",
+        "name": "splice-app-wallet-ui-auth",
         "namespace": "validator"
       },
       "stringData": {
@@ -160,50 +160,6 @@
     "name": "cluster-ingress-validator",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "validator"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "postgres-secrets",
-        "namespace": "validator"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator-postgres-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -330,7 +286,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "cn-app-validator-ledger-api-auth",
+            "name": "splice-app-validator-ledger-api-auth",
             "optional": false
           }
         },
@@ -403,6 +359,50 @@
     "name": "postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-validator-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-validator-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,

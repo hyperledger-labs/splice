@@ -10,7 +10,7 @@ import {
   isDevNet,
   numInstances,
   numNodesPerInstance,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {

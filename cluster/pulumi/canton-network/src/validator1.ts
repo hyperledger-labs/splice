@@ -14,7 +14,7 @@ import {
   spliceInstanceNames,
   config,
   splitwellDarPath,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';

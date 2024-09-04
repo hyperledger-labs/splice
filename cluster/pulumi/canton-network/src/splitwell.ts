@@ -14,8 +14,8 @@ import {
   ValidatorTopupConfig,
   config,
   splitwellDarPath,
-} from 'cn-pulumi-common';
-import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
+} from 'splice-pulumi-common';
+import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';

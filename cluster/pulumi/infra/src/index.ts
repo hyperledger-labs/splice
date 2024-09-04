@@ -1,5 +1,5 @@
 // ensure the config is loaded and the ENV is overriden
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 import { clusterIsBeingReset, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';

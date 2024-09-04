@@ -1,6 +1,11 @@
 import * as auth0 from '@pulumi/auth0';
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0ClusterConfig, NamespaceToClientIdMapMap, config, isMainNet } from 'cn-pulumi-common';
+import {
+  Auth0ClusterConfig,
+  NamespaceToClientIdMapMap,
+  config,
+  isMainNet,
+} from 'splice-pulumi-common';
 
 function newUiApp(
   resourceName: string,

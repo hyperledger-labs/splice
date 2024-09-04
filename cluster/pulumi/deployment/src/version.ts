@@ -1,4 +1,4 @@
-import { config, defaultVersion } from 'cn-pulumi-common';
+import { config, defaultVersion } from 'splice-pulumi-common';
 
 const OPERATOR_IMAGE_VERSION = config.optionalEnv('OPERATOR_IMAGE_VERSION');
 

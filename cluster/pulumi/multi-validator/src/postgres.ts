@@ -5,7 +5,7 @@ import {
   ExactNamespace,
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
-} from 'cn-pulumi-common';
+} from 'splice-pulumi-common';
 
 export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.Release {
   const password = new random.RandomPassword(`${xns.logicalName}-${name}-passwd`, {

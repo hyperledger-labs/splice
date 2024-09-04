@@ -323,7 +323,7 @@ The following kubernetes secret will instruct the participant to create a servic
 
 .. code-block:: bash
 
-    kubectl create --namespace sv secret generic cn-app-sv-ledger-api-auth \
+    kubectl create --namespace sv secret generic splice-app-sv-ledger-api-auth \
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
@@ -335,7 +335,7 @@ The validator app backend requires the following secret.
 
 .. code-block:: bash
 
-    kubectl create --namespace sv secret generic cn-app-validator-ledger-api-auth \
+    kubectl create --namespace sv secret generic splice-app-validator-ledger-api-auth \
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
@@ -347,15 +347,15 @@ To setup the wallet, CNS and SV UI, create the following two secrets.
 
 .. code-block:: bash
 
-    kubectl create --namespace sv secret generic cn-app-wallet-ui-auth \
+    kubectl create --namespace sv secret generic splice-app-wallet-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${WALLET_UI_CLIENT_ID}"
 
-    kubectl create --namespace sv secret generic cn-app-sv-ui-auth \
+    kubectl create --namespace sv secret generic splice-app-sv-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${SV_UI_CLIENT_ID}"
 
-    kubectl create --namespace sv secret generic cn-app-cns-ui-auth \
+    kubectl create --namespace sv secret generic splice-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
 
@@ -580,7 +580,7 @@ identity.
 
 .. code-block:: bash
 
-    kubectl create secret --namespace sv generic cn-app-sv-key \
+    kubectl create secret --namespace sv generic splice-app-sv-key \
         --from-literal=public=YOUR_PUBLIC_KEY \
         --from-literal=private=YOUR_PRIVATE_KEY
 

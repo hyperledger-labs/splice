@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { config } from 'cn-pulumi-common';
+import { config } from 'splice-pulumi-common';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');
 export const clusterDnsName = config.requireEnv('GCP_CLUSTER_HOSTNAME');

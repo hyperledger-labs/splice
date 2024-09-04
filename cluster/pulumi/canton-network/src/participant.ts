@@ -14,8 +14,8 @@ import {
   LogLevel,
   DomainMigrationIndex,
   autoInitValues,
-} from 'cn-pulumi-common';
-import { CnChartVersion } from 'cn-pulumi-common/src/artifacts';
+} from 'splice-pulumi-common';
+import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
 import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';

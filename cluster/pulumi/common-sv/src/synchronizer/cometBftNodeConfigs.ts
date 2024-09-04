@@ -1,5 +1,5 @@
 import { Lifted, OutputInstance } from '@pulumi/pulumi';
-import { CLUSTER_HOSTNAME } from 'cn-pulumi-common/src/utils';
+import { CLUSTER_HOSTNAME } from 'splice-pulumi-common/src/utils';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './cometbftConfig';
 

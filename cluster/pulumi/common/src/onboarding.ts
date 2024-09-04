@@ -6,7 +6,7 @@ import { btoa, ExactNamespace } from './utils';
 export type ExpectedValidatorOnboarding = { name: string; expiresIn: string; secret: string };
 
 export const validatorOnboardingSecretName = (name: string): string =>
-  `cn-app-validator-onboarding-${name}`;
+  `splice-app-validator-onboarding-${name}`;
 
 export const preApproveValidatorRunbook = config.envFlag('PREAPPROVE_VALIDATOR_RUNBOOK');
 
@@ -17,7 +17,7 @@ export function installValidatorOnboardingSecret(
 ): k8s.core.v1.Secret {
   const secretName = validatorOnboardingSecretName(name);
   return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-validator-onboarding-${name}`,
+    `splice-app-${xns.logicalName}-validator-onboarding-${name}`,
     {
       metadata: {
         name: secretName,
