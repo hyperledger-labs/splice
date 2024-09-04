@@ -58,6 +58,7 @@ Upcoming
 
 * Dashboards
 
+  * Added a new "Synchronizer Fees (Validator View)" dashboard for validators to monitor their traffic purchases and consumption.
   * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
     This should should make it easier to diagnose connectivity problems between network peers.
 

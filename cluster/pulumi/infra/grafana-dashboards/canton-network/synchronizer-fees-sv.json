@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1751,
+  "id": 2028,
   "links": [],
   "panels": [
     {
@@ -76,7 +76,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -108,7 +109,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(type) (rate(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\", member=~\"$member\", type=~\".+\"}[$__rate_interval]))",
+          "expr": "sum by(type) (rate(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\", member=~\"$member\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -176,7 +177,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": [
           {
@@ -306,12 +308,13 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "decbytes"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 16
@@ -320,7 +323,7 @@
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -405,7 +408,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "decbytes"
         },
         "overrides": [
           {
@@ -423,16 +427,16 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 9,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 26
       },
       "id": 3,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -548,15 +552,16 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "decbytes"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
+        "h": 10,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 35
       },
       "id": 5,
       "options": {
@@ -653,7 +658,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 45
       },
       "id": 6,
       "options": {
@@ -726,14 +731,14 @@
       {
         "current": {
           "selected": false,
-          "text": "global-domain-3-sequencer",
-          "value": "global-domain-3-sequencer"
+          "text": "global-domain-0-sequencer",
+          "value": "global-domain-0-sequencer"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,job)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\"},job)",
         "hide": 0,
         "includeAll": false,
         "label": "Job",
@@ -742,7 +747,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,job)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\"},job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -766,7 +771,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
+        "definition": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\"},member)",
         "hide": 0,
         "includeAll": true,
         "label": "Member",
@@ -775,7 +780,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total,member)",
+          "query": "label_values(daml_sequencer_traffic_control_event_delivered_cost_total{namespace=\"$namespace\", job=\"$job\"},member)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -792,7 +797,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Synchronizer Fees",
+  "title": "Synchronizer Fees (SV View)",
   "uid": "fdnphvrryfq4gf",
   "version": 1,
   "weekStart": ""

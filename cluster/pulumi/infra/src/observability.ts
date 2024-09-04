@@ -389,6 +389,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             date_formats: {
               default_timezone: 'UTC',
             },
+            feature_toggles: {
+              addFieldFromCalculationStatFunctions: true,
+            },
             smtp: enableAlertEmailToSupportTeam
               ? {
                   enabled: true,
