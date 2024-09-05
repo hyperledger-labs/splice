@@ -142,6 +142,7 @@ export async function svAppSecrets(
 }
 
 export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.core.v1.Secret {
+  const logicalPulumiName = 'cn-app-sv-key';
   const secretName = 'splice-app-sv-key';
   const data = pulumi.output(keys).apply(ks => {
     return {
@@ -150,7 +151,7 @@ export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.cor
     };
   });
   return new k8s.core.v1.Secret(
-    secretName,
+    logicalPulumiName,
     {
       metadata: {
         name: secretName,
@@ -171,7 +172,7 @@ export function installPostgresPasswordSecret(
   secretName: string
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
-    `splice-app-${ns.logicalName}-${secretName}`,
+    `cn-app-${ns.logicalName}-${secretName}`,
     {
       metadata: {
         name: secretName,

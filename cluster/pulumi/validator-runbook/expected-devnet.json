@@ -165,6 +165,28 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s-imgpull-cluster-ingress",
@@ -359,28 +381,6 @@
     "name": "postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "postgres-secrets",
-        "namespace": "validator"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-validator-postgres-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,

@@ -222,6 +222,117 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "apps-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-apps-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
+          "public": "c3YtaWQtcHVibGljLWtleQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-mediator-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-participant-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-sequencer-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
           "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
         }
@@ -390,117 +501,6 @@
     "name": "scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "apps-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-apps-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
-          "public": "c3YtaWQtcHVibGljLWtleQ=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-mediator-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-participant-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-sequencer-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,

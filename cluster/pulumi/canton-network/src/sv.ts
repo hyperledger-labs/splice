@@ -59,7 +59,7 @@ export function installSvKeySecret(
   });
 
   return new k8s.core.v1.Secret(
-    `splice-app-${xns.logicalName}-key`,
+    `cn-app-${xns.logicalName}-key`,
     {
       metadata: {
         name: secretName,

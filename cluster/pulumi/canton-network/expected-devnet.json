@@ -638,6 +638,713 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sw-pg-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-sw-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-validator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-apps-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-apps-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-mediator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-sequencer-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-splitwell",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-validator-onboarding-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator1",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-validator-onboarding-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-apps-pg-secrets",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-cn-apps-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secrets",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-mediator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secrets",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-sequencer-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-apps-pg-secrets",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-cn-apps-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secrets",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-mediator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secrets",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-sequencer-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-apps-pg-secrets",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-cn-apps-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secrets",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-mediator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secrets",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-sequencer-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
     "custom": false,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
@@ -730,713 +1437,6 @@
     "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "splitwell"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-splitwell-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sw-pg-secrets",
-        "namespace": "splitwell"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-splitwell-sw-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "c3BsaXR3ZWxsc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator",
-        "namespace": "splitwell"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-splitwell-validator-onboarding-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "validator-pg-secrets",
-        "namespace": "splitwell"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-splitwell-validator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-apps-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-cn-apps-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-mediator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-sequencer-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "c3BsaXR3ZWxsc2VjcmV0"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-splitwell",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-validator-onboarding-splitwell",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator1",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-1-validator-onboarding-validator1",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-apps-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-cn-apps-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YyLWlkLXByaXZhdGUta2V5",
-          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-mediator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-sequencer-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-apps-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-cn-apps-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YzLWlkLXByaXZhdGUta2V5",
-          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-mediator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-sequencer-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-apps-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-cn-apps-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
-          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-mediator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-sequencer-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secrets",
-        "namespace": "validator1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-validator1-participant-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator",
-        "namespace": "validator1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-validator1-validator-onboarding-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "validator-pg-secrets",
-        "namespace": "validator1"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-validator1-validator-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
