@@ -351,7 +351,7 @@ class JoiningNodeInitializer(
           _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
             decentralizedSynchronizer
           )
-          _ = checkTrafficReconciliationTriggersStarted(dsoAutomationService)
+          _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
           _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
           _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
         } yield ()
@@ -450,12 +450,12 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def checkTrafficReconciliationTriggersStarted(service: SvDsoAutomationService): Unit = {
-    val unlimitedTrafficTrigger = service.trigger[SvOnboardingUnlimitedTrafficTrigger]
-    val trafficReconciliationTrigger =
-      service.trigger[ReconcileSequencerLimitWithMemberTrafficTrigger]
-    if (!unlimitedTrafficTrigger.isHealthy || !trafficReconciliationTrigger.isHealthy)
-      throw new RuntimeException("Traffic triggers not started")
+  private def checkTrafficReconciliationTriggersRegistered(
+      service: SvDsoAutomationService
+  ): Unit = {
+    // throws a RuntimeException if the trigger is not registered
+    service.trigger[SvOnboardingUnlimitedTrafficTrigger]: Unit
+    service.trigger[ReconcileSequencerLimitWithMemberTrafficTrigger]: Unit
   }
 
   private def waitForSvToObtainUnlimitedTraffic(
