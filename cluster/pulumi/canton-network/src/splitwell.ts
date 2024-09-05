@@ -108,7 +108,7 @@ export async function installSplitwell(
   const validator = await installValidatorApp({
     xns,
     extraDependsOn,
-    participant,
+    dependencies: [participant],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),

@@ -1,16 +1,18 @@
-import { Resource } from '@pulumi/pulumi';
+import { Output, Resource } from '@pulumi/pulumi';
 import svConfigs from 'canton-network-pulumi-deployment/src/svConfigs';
 import {
   Auth0Client,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
-  installMigrationIdSpecificComponent,
+  MigrationProvider,
 } from 'splice-pulumi-common';
 import {
+  CometBftNodeConfigs,
   cometbftRetainBlocks,
-  DecentralizedSynchronizerNode,
+  CrossStackDecentralizedSynchronizerNode,
   installCantonComponents,
+  InstalledMigrationSpecificSv,
 } from 'splice-pulumi-common-sv';
 
 import { installCometbftKeys } from './cometbftKeys';
@@ -22,7 +24,11 @@ export function installCanton(
   onboardingName: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
-): { decentralizedSynchronizer: DecentralizedSynchronizerNode; participant: Resource } {
+): InstalledMigrationSpecificSv {
+  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig
+    .allMigrationInfos()
+    .filter(migrationInfo => migrationInfo.provider === MigrationProvider.INTERNAL);
+  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.migrationId;
   const participantPg = installPostgres(
     svNamespace,
     `participant-pg`,
@@ -44,46 +50,59 @@ export function installCanton(
   );
 
   installCometbftKeys(svNamespace);
-
-  return installMigrationIdSpecificComponent(
-    decentralizedSynchronizerMigrationConfig,
-    (migrationId, _, version) => {
-      const sv1Conf = svConfigs.find(config => config.nodeName === 'sv-1')!;
-      return installCantonComponents(
+  const sv1Conf = svConfigs.find(config => config.nodeName === 'sv-1')!;
+  const nodeConfigs = {
+    self: {
+      nodeIndex: 0,
+      nodeName: onboardingName,
+      retainBlocks: cometbftRetainBlocks,
+      id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
+    },
+    sv1: {
+      ...sv1Conf?.cometBft,
+      nodeName: sv1Conf.nodeName,
+    },
+    peers: [],
+  };
+  const installedMigrations = migrationsContainedInStack.map(migration => {
+    return {
+      migration,
+      canton: installCantonComponents(
         svNamespace,
-        migrationId,
+        migration.migrationId,
         auth0Client,
         {
           onboardingName,
           isFirstSv: false,
           isCoreSv: false,
         },
+        decentralizedSynchronizerMigrationConfig,
+        {
+          nodeConfigs: nodeConfigs,
+        },
         {
           participant: participantPg,
           mediator: mediatorPg,
           sequencer: sequencerPg,
         },
-        version,
-        decentralizedSynchronizerMigrationConfig,
-        {
-          nodeConfigs: {
-            self: {
-              nodeIndex: 0,
-              nodeName: onboardingName,
-              retainBlocks: cometbftRetainBlocks,
-              id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
-            },
-            sv1: {
-              ...sv1Conf?.cometBft,
-              nodeName: sv1Conf.nodeName,
-            },
-            peers: [],
-          },
-        },
         {
           dependsOn: dependencies,
         }
-      );
+      ),
+    };
+  });
+  return (
+    installedMigrations.find(({ migration }) => {
+      return migration.migrationId === activeMigrationId;
+    })?.canton || {
+      decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
+        activeMigrationId,
+        new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
+      ),
+      participant: {
+        asDependencies: [],
+        internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
+      },
     }
-  ).activeComponent;
+  );
 }

@@ -52,7 +52,6 @@ type BasicValidatorConfig = {
   topupConfig?: ValidatorTopupConfig;
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
-  participant: pulumi.Resource;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
   scanAddress: Output<string> | string;
@@ -67,6 +66,7 @@ type BasicValidatorConfig = {
   sweep?: SweepConfig;
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
+  dependencies: pulumi.Resource[];
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -168,7 +168,8 @@ export async function installValidatorApp(
     !config.svValidator && config.onboardingSecret
       ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
       : [];
-  const dependsOn: CnInput<pulumi.Resource>[] = [config.xns.ns, config.participant]
+  const dependsOn: CnInput<pulumi.Resource>[] = config.dependencies
+    .concat([config.xns.ns])
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])

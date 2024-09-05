@@ -48,7 +48,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
 
   private readonly pgSvc: gcp.sql.DatabaseInstance;
 
-  constructor(xns: ExactNamespace, instanceName: string, alias: string, secretName: string) {
+  constructor(
+    xns: ExactNamespace,
+    instanceName: string,
+    alias: string,
+    secretName: string,
+    active: boolean = true
+  ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     const baseOpts = {
@@ -67,6 +73,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletionProtection: false,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
+          activationPolicy: active ? 'ALWAYS' : 'NEVER',
           databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
           backupConfiguration: {
             enabled: true,
@@ -209,12 +216,13 @@ export function installPostgres(
   xns: ExactNamespace,
   instanceName: string,
   alias: string,
-  uniqueSecretName = false
+  uniqueSecretName = false,
+  isActive: boolean = true
 ): Postgres {
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
   if (enableCloudSql) {
-    ret = new CloudPostgres(xns, instanceName, alias, secretName);
+    ret = new CloudPostgres(xns, instanceName, alias, secretName, isActive);
   } else {
     ret = new SplicePostgres(xns, instanceName, alias, secretName);
   }

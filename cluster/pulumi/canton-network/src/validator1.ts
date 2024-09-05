@@ -84,7 +84,7 @@ export async function installValidator1(
   const validator = await installValidatorApp({
     validatorWalletUser,
     xns,
-    participant,
+    dependencies: [participant],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     appDars: [splitwellDarPath],
     // TODO(#14199) Remove this with the next reset
