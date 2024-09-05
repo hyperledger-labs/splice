@@ -116,7 +116,7 @@ groups:
         isPaused: false
       - uid: adwt1yr5xuscge
         title: ACS snapshot taking too long
-        condition: latency
+        condition: too_long
         data:
           - refId: latency
             relativeTimeRange:
