@@ -20,8 +20,8 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
+import Delegate from './routes/delegate';
 import Dso from './routes/dso';
-import Leader from './routes/leader';
 import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
@@ -73,7 +73,7 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="cc-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
-          <Route path="leader" element={<Leader />} />
+          <Route path="delegate" element={<Delegate />} />
         </Route>
       </Route>
     )

@@ -6,7 +6,7 @@ import { Box } from '@mui/material';
 
 import ElectionRequest from '../components/ElectionRequest';
 
-const Leader: React.FC = () => {
+const Delegate: React.FC = () => {
   return (
     <Box>
       <ElectionRequest />
@@ -14,4 +14,4 @@ const Leader: React.FC = () => {
   );
 };
 
-export default Leader;
+export default Delegate;

@@ -96,13 +96,13 @@ const ElectionRequests: React.FC = () => {
         <TableBody>
           <TableRow>
             <TableCell>Epoch:</TableCell>
-            <TableCell id={'leader-election-epoch'}>
+            <TableCell id={'delegate-election-epoch'}>
               {dsoInfosQuery.data?.dsoRules.payload.epoch}
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Leader:</TableCell>
-            <TableCell id={'leader-election-current-leader'}>
+            <TableCell>Delegate:</TableCell>
+            <TableCell id={'delegate-election-current-delegate'}>
               {dsoInfosQuery.data?.dsoRules.payload.dsoDelegate}
             </TableCell>
           </TableRow>
@@ -137,7 +137,7 @@ const ElectionRequests: React.FC = () => {
         ]}
       >
         <Button
-          id={'submit-ranking-leader-election'}
+          id={'submit-ranking-delegate-election'}
           type={'submit'}
           size="large"
           onClick={() => {

@@ -1336,13 +1336,13 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the delegate election tab", {
-            go to s"http://localhost:$sv1UIPort/leader"
+            go to s"http://localhost:$sv1UIPort/delegate"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see a button for requesting a delegate election",
           _ => {
-            find(id("submit-ranking-leader-election")) should not be empty
+            find(id("submit-ranking-delegate-election")) should not be empty
           },
         )
 
@@ -1357,15 +1357,15 @@ class SvFrontendIntegrationTest
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           actAndCheck(
             "sv1 operator makes his own ranking for his delegate preference", {
-              click on "submit-ranking-leader-election"
+              click on "submit-ranking-delegate-election"
             },
           )(
             "The epoch advances by one and the delegate name is changed.",
             _ => {
-              find(id("leader-election-epoch")).value.text should include(
+              find(id("delegate-election-epoch")).value.text should include(
                 sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString
               )
-              find(id("leader-election-current-leader")).value.text should include(newLeader)
+              find(id("delegate-election-current-delegate")).value.text should include(newLeader)
             },
           ),
           entries => {

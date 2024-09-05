@@ -27,7 +27,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Information', path: 'dso' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
             { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'cc-price' },
-            { name: 'Leader Election', path: 'leader' },
+            { name: 'Delegate Election', path: 'delegate' },
             { name: 'Governance', path: 'votes' },
           ]}
         >
