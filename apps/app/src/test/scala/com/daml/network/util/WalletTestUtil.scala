@@ -212,11 +212,12 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
+      timeUntilSuccess: FiniteDuration = 20.seconds,
   ) = {
     val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
     val trackingId = UUID.randomUUID.toString
 
-    val (transferOfferId, _) = actAndCheck(
+    val (transferOfferId, _) = actAndCheck(timeUntilSuccess)(
       "create a transfer offer", {
         senderWallet.createTransferOffer(
           receiver,
@@ -240,7 +241,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       },
     )
 
-    actAndCheck(
+    actAndCheck(timeUntilSuccess)(
       "the transfer offer is accepted", {
         receiverWallet.acceptTransferOffer(transferOfferId)
       },
