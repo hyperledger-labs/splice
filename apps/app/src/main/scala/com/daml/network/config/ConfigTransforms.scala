@@ -271,7 +271,7 @@ object ConfigTransforms {
         c.domains.copy(global =
           c.domains.global.copy(buyExtraTraffic =
             c.domains.global.buyExtraTraffic
-              .copy(grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(10)))
+              .copy(grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(5)))
           )
         )
       )
