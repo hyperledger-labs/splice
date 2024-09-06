@@ -221,3 +221,183 @@ jobs:
           condition: << parameters.cancel_workflow_on_failure >>
           steps:
             - cancel_entire_workflow_if_this_job_failed
+
+  # TODO(#14303): Consider using backup&restore to split this job into two separate jobs,
+  # so that we make the dependencies such that the migration depends on onboarding of the
+  # validator to complete. At the moment, it's quick enough compared to the other things
+  # running in parallel that it doesn't seem to be a problem.
+  pre_migration_compose_validator:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      # Commit hash that will become the legacy version.
+      # If left empty then the latest commit on the branch will be used.
+      base_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      # TODO(#14646): since we're not backporting the docker-compose deployment, we need to deploy from
+      #       main using only images from the base version. For now this seems to work, hopefully
+      #       we will not break this. Once the base version includes the docker-compose validator,
+      #       we should deploy from the base version.
+      - when:
+          condition: << parameters.base_version >>
+          steps:
+            - run:
+                name: Find the image tag associated with << parameters.base_version >>
+                command: |
+                  echo "Checking out commit << parameters.base_version >>"
+                  git checkout << parameters.base_version >>
+                  echo $(build-tools/get-snapshot-version) > /tmp/base-version
+                  git checkout "$CIRCLE_SHA1"
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - docker_login_internal
+      - run_bash_command_in_nix:
+          cluster: << parameters.cluster >>
+          cmd_name: Wait for SV app to be responsive
+          cmd: |
+            succes=0
+            for i in {1..30}; do
+              if curl -m 10 -sfL https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/version; then
+                success=1
+                break
+              fi
+              echo -n "."
+              sleep 10
+            done
+            if [ $success -ne 1 ]; then
+              echo "Timeout waiting for sv app to be ready"
+              exit 1
+            fi
+      - run_bash_command_in_nix:
+          cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
+      - run_bash_command_in_nix:
+          cmd_name: Deploy the docker-compose validator
+          cluster: << parameters.cluster >>
+          cmd: |
+            # TODO(#14646): once we deploy from base_version we can remove the -t parameter
+            build-tools/splice-compose.sh start -d -w -n onvpn -t $(cat /tmp/base-version)
+          cmd_retry_count: << parameters.deploy_retry_count >>
+      - run_bash_command_in_nix:
+          cmd_name: Run pre-migration steps, and wait for a migration dump to be available
+          cmd: build-tools/splice-compose.sh test_before_migration
+      - run_bash_command_in_nix:
+          cmd_name: Stop the docker-compose validator
+          cmd: build-tools/splice-compose.sh stop
+      - run_bash_command_in_nix:
+          cmd_name: Persist the migration dump to a CCI workspace
+          cluster: << parameters.cluster >>
+          cmd: build-tools/splice-compose.sh dump_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+      - persist_to_workspace:
+          root: workspace
+          paths:
+            - domain-upgrade-dump.tar
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          # We need to dump the container logs again because the background process that continuously
+          # dumps them died with the end of the first run_bash_command above.
+          cmd_name: Store logs
+          when: on_fail
+          cmd: |
+            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
+            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+      - store_artifacts:
+          name: Store logs
+          path: log
+          destination: log
+
+  post_migration_compose_validator:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      # Commit hash that will become the active version.
+      # If left empty then the latest commit on the branch will be used.
+      upgrade_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - when:
+          condition: << parameters.upgrade_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.upgrade_version >>
+                command: |
+                  echo "Checking out commit << parameters.upgrade_version >>"
+                  git checkout << parameters.upgrade_version >>
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - attach_workspace:
+          at: workspace
+      - run_bash_command_in_nix:
+          cmd_name: Restore the migration dump into a docker volume
+          cmd: build-tools/splice-compose.sh restore_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+      - docker_login_internal
+      - run_bash_command_in_nix:
+          cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
+      - run_bash_command_in_nix:
+          cmd_name: Deploy the docker-compose validator
+          cluster: << parameters.cluster >>
+          cmd: |
+            if [ -z "<< parameters.upgrade_version >>" ]; then
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn
+            else
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -t << parameters.upgrade_version >>
+            fi
+          cmd_retry_count: << parameters.deploy_retry_count >>
+      - run_bash_command_in_nix:
+          cmd_name: Run post-migration steps
+          cmd: build-tools/splice-compose.sh test_after_migration
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          # We need to dump the container logs again because the background process that continuously
+          # dumps them died with the end of the first run_bash_command above.
+          cmd_name: Store logs
+          when: on_fail
+          cmd: |
+            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
+            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+      - store_artifacts:
+          name: Store logs
+          path: log
+          destination: log

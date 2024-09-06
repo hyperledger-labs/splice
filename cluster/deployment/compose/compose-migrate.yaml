@@ -1,0 +1,5 @@
+services:
+  validator:
+    environment:
+      - ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE=canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
+      - ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH=
