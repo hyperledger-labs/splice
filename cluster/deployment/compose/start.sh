@@ -21,13 +21,14 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>]"
+  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>]"
   echo "  -a: Use this flag to enable authentication"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
   echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
   echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
   echo "  -M: Use this flag when bumping the migration ID as part of a migration."
+  echo "  -p <party_hint>: The party hint to use for the validator operator, will also act as the participant identifier."
 
   echo ""
   echo "Testing flags:"
@@ -48,7 +49,8 @@ SEQUENCER_ADDRESS=""
 network_name=""
 migration_id=0
 migrating=0
-while getopts 'has:c:t:o:n:bq:m:M' arg; do
+party_hint=""
+while getopts 'has:c:t:o:n:bq:m:Mp:' arg; do
   case ${arg} in
     h)
       usage
@@ -81,6 +83,9 @@ while getopts 'has:c:t:o:n:bq:m:M' arg; do
     M)
       migrating=1
       ;;
+    p)
+      party_hint="${OPTARG}"
+      ;;
     ?)
       usage
       exit 1
@@ -106,6 +111,12 @@ if [ -z "${ONBOARDING_SECRET}" ]; then
   set -e
 fi
 
+if [ -z "${party_hint}" ]; then
+  _error_msg "Please provide the party hint"
+  usage
+  exit 1
+fi
+
 if [ -z "${SCAN_ADDRESS}" ]; then
   SCAN_ADDRESS=${SPONSOR_SV_ADDRESS//https:\/\/sv/https:\/\/scan}
   _info "SCAN address not provided, deriving it from the sponsor SV address: ${SCAN_ADDRESS}"
@@ -128,6 +139,9 @@ export SPONSOR_SV_ADDRESS
 export SCAN_ADDRESS
 export SEQUENCER_ADDRESS
 export MIGRATION_ID=${migration_id}
+export PARTICIPANT_IDENTIFIER=${party_hint}
+export PARTY_HINT=${party_hint}
+
 # TODO(#14303): release tag should be injected by the release pipeline
 # IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
 # export IMAGE_TAG

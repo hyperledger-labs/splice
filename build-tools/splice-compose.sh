@@ -80,6 +80,7 @@ function _start_validator {
     -o "${secret}" \
     -m "${migration_id}" \
     -b \
+    -p "da-composeValidator-1" \
     "${extra_flags[@]}" \
       >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
 }
