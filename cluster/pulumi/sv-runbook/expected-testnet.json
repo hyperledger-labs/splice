@@ -208,7 +208,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -441,7 +441,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "loopback",
     "provider": "",
@@ -519,7 +519,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "scan",
     "provider": "",
@@ -598,7 +598,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -755,7 +755,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-app",
     "provider": "",
@@ -859,7 +859,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-cometbft-global-domain-1",
     "provider": "",
@@ -954,7 +954,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
@@ -974,7 +973,6 @@
             "id": 1
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "sequencer": {
           "driver": {
             "host": "global-domain-1-cometbft-cometbft-rpc.sv.svc.cluster.local",
@@ -997,7 +995,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-global-domain-1",
     "provider": "",
@@ -1076,7 +1074,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1125,7 +1123,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1137,7 +1134,6 @@
             "id": 1
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1161,7 +1157,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-participant-1",
     "provider": "",
@@ -1238,7 +1234,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1315,7 +1311,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1429,7 +1425,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "validator",
     "provider": "",

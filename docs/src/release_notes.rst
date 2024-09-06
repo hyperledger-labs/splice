@@ -8,8 +8,15 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.2.0
+-----
+
+Note: This release must be applied through the `Synchronizer Upgrades with Downtime` procedure.
+
+* Canton
+
+  This release upgrades from Canton 3.0 to Canton 3.1. The primary change is a full redesign of the sequencer database
+  to only store each sequenced messages once instead of duplicating it for each recipient.
 
 * Daml
 
@@ -40,16 +47,6 @@ Upcoming
 
   * Remove support for deprecated ``bootstrapTXs`` field on node identity dumps. Node identity dumps taken on a 0.1.2 snapshot or earlier version are no longer supported.
 
-  * Fix a rare race condition where the SV app uses the wrong
-    timestamp to export the topology state on a hard domain migration
-    resulting in the sequencer failing to initialize after the
-    migration. We recommend upgrading before the next hard domain migration.
-
-  * Enable SV to retain pre-migration sequencer URLs in ``SvNodeState``. This is done through a new `migration.legacyId` configuration in the SV values.
-    If set, the SV will keep exposing its sequencer URL for that migration id.
-    Once you undeploy the old sequencer node, remove this option as well to stop Scan from advertising your old sequencer.
-    This allows validators that have been lagging behind to catchup easier.
-
 * Metrics: All the histograms default to using `native histograms <https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#exponential-histograms>`_.
 
    * Dashboards were also adjusted to use the PromQL functions for native histograms in all the queries
@@ -59,67 +56,23 @@ Upcoming
 * Dashboards
 
   * Added a new "Synchronizer Fees (Validator View)" dashboard for validators to monitor their traffic purchases and consumption.
-  * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
-    This should should make it easier to diagnose connectivity problems between network peers.
 
 * Wallet API
 
   * The ``list`` API in ``wallet-internal.yaml`` now exposes contracts
     as ``ContractWithState`` instead of just as a ``Contract``.
 
-* Wallet automation
-
-  * Fix an issue in the wallet sweep automation where it created
-    additional transfer offers even if there were already sufficient
-    transfer offers to cover the sweep.
-
-* Scan API
-
-  * Added the ``getUpdateById`` API in ``scan-internal.yaml``.
-    The ``getUpdateById`` API can be used to retrieve an update by its update ID.
-
-  * Modified ``listDsoSequencers`` Scan API to also expose pre migration sequencer urls, allowing pre-migration validators to catch up.
-
-* UI
-
-  * Gzip compression has been enabled for the Scan, Wallet, SV and CNS UIs.
-
 * Deployment
 
-  * Image versions in Helm charts are now pinned to digests for extra security
   * Removed the ``disableAutoInit`` value from the helm charts of Canton nodes. All Canton nodes will now always start
     with initialization disabled. SV and validator apps will take care of initializing the nodes as needed, using
     use the new ``nodeIdentifier`` helm chart value for the Canton node identifiers.
     The installing instructions for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>` have been updated accordingly.
-  * Updated the Cometbft Helm chart to not accept integer values for the `chainIdSuffix`.
-  * Added ``helm.sh/resource-policy: keep`` to validator and SV app domain migration PVCs
-    to ensure they don't accidentally get deleted by a ``helm uninstall``. You can
-    still fully delete them with a ``kubectl delete pvc``.
-  * `validatorPartyHint` is now mandatory for non-SV validators. For an existing validator, it must be set to the current party hint
-    (otherwise, the app will fail to start).
-    For new validators, it must be of format `<organization>-<function>-<enumerator>`, where `organization` and `function`
-    are alphanumeric, and `enumerator` is a number starting from 1.
   * `spliceInstanceNames` values are now mandatory for all Helm charts that deploy a frontend (``cn-scan``, ``cn-validator``, ``cn-sv-node``, and ``cn-splitwell-web-ui``).
     The correct values for them are published in the docs for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>`.
-  * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
-    Its content has been renamed accordingly as well.
   * The configuration variable `clusterUrl` was removed from all Helm charts except `splitwell-web-ui`.
-  * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
-    example has been updated to match, and this change must be made to your own copy.
   * Default Postgres PVC size for validators is configured as 50GiB in the new `postgres-values-validator-participant.yaml` examples file.
     Note also the change in the :ref:`validator installation docs <validator-helm-charts-install>` to use this file while installing the Postgres chart.
-  * For the Pulumi scripts, these environment variables have been renamed,
-    replacing ``CN`` with ``SPLICE``:
-
-      * ``CN_ARTIFACTS_REPOSITORY``
-      * ``CN_DEPLOYMENT_FLUX_REF``
-      * ``CN_DEPLOYMENT_NO_SV_DEBUG``
-      * ``CN_DEPLOYMENT_SINGLE_SV_DEBUG``
-      * ``CN_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS``
-      * ``CN_DEPLOY_MULTI_RUNBOOK``
-      * ``CN_DEPLOY_MULTI_VALIDATOR``
-      * ``CN_DEPLOY_SV_RUNBOOK``
-      * ``CN_DEPLOY_VALIDATOR_RUNBOOK``
   * For the Docker images, these input environment variables have been renamed,
     replacing ``CN`` with ``SPLICE``:
 
@@ -146,6 +99,89 @@ Upcoming
 
   * Added ``cn_wallet_unlocked_amulet_balance`` and ``cn_wallet_locked_amulet_balance`` metrics to expose the effective per party balance of locked and unlocked
     amulets.
+
+0.1.19
+--------
+
+
+* Fix the Docker image digest which was used for the ``ans-web-ui``
+  and accidentally was empty (thereby not pinning the image) in
+  0.1.18 due to a rename.
+
+* ``validatorPartyHint`` is now mandatory for non-SV validators. For an existing validator, it must be set to the current party hint
+  (otherwise, the app will fail to start).
+  For new validators, it must be of format ``<organization>-<function>-<enumerator>``, where ``organization`` and ``function``
+  are alphanumeric, and ``enumerator`` is a number starting from 1.
+
+* Fix an issue in the scan ACS snapshot functionality added in 0.1.18 for network bootstrapped just before 0:00.
+
+* Fix an issue in the ACS snapshot functionality added in 0.1.18 around hard domain migrations. This only affects a hard domain migration *to* 0.1.18 but not *from* 0.1.18.
+
+0.1.18
+--------
+
+* SV apps
+
+  * Fix a rare race condition where the SV app uses the wrong
+    timestamp to export the topology state on a hard domain migration
+    resulting in the sequencer failing to initialize after the
+    migration. We recommend upgrading before the next hard domain migration.
+
+  * Enable SV to retain pre-migration sequencer URLs in ``SvNodeState``. This is done through a new `migration.legacyId` configuration in the SV values.
+    If set, the SV will keep exposing its sequencer URL for that migration id.
+    Once you undeploy the old sequencer node, remove this option as well to stop Scan from advertising your old sequencer.
+    This allows validators that have been lagging behind to catchup easier.
+
+* Dashboards
+
+  * Added a new CometBFT Network Status dashboard that displays how much data is being exchanged with each peer on the CometBFT P2P network.
+    This should should make it easier to diagnose connectivity problems between network peers.
+
+* Scan API
+
+  * Added the ``getUpdateById`` API in ``scan-internal.yaml``.
+    The ``getUpdateById`` API can be used to retrieve an update by its update ID.
+
+  * Added the ``getAcsSnapshotAt``, ``getHoldingsStateAt`` and ``getHoldingsSummaryAt`` APIs in ``scan-internal.yaml``.
+    A snapshot of the active contract set (ACS) is now computed and stored periodically to serve these endpoints.
+
+  * Modified ``listDsoSequencers`` Scan API to also expose pre migration sequencer urls, allowing pre-migration validators to catch up.
+
+* UI
+
+  * Gzip compression has been enabled for the Scan, Wallet, SV and CNS UIs.
+
+* Deployment
+
+  * Updated the Cometbft Helm chart to not accept integer values for the `chainIdSuffix`.
+  * The ``disableAutoInit`` Helm value now defaults to ``true`` wherever it is used and must be explicitly set to ``false`` when onboarding fresh validators or SVs. The installing instructions for :ref:`validators <k8s_validator>` and :ref:`SVs <sv-helm>` have been updated accordingly.
+  * Added ``helm.sh/resource-policy: keep`` to validator and SV app domain migration PVCs
+    to ensure they don't accidentally get deleted by a ``helm uninstall``. You can
+    still fully delete them with a ``kubectl delete pvc``.
+  * `validatorPartyHint` is now mandatory for non-SV validators. For an existing validator, it should be set to the current party hint
+    (otherwise, the value will be ignored, and a warning will be printed to log).
+    For new validators, it should be of format `<organization>-<function>-<enumerator>`.
+  * In ``cometbft-values.yaml``, the top-level label ``founder`` is now ``sv1``.  The
+    example has been updated to match, and this change must be made to your own copy.
+  * The download link for the release bundle has changed to a new URL format: `<version>_splice-node.tar.gz`.
+    Its content has been renamed accordingly as well.
+
+* Documentation
+
+  * Simplified ``jq``-based data dump post-processing examples in disaster recovery documentation for :ref:`SVs <sv_restore>` and :ref:`validators <validator-backups>`.
+
+0.1.17
+--------
+
+* Wallet automation
+
+  * Fix an issue in the wallet sweep automation where it created
+    additional transfer offers even if there were already sufficient
+    transfer offers to cover the sweep.
+
+* Deployment
+
+  * Image versions in Helm charts are now pinned to digests for extra security
 
 0.1.16
 ------

@@ -208,7 +208,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -419,7 +419,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "loopback",
     "provider": "",
@@ -496,7 +496,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "scan",
     "provider": "",
@@ -736,7 +736,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-app",
     "provider": "",
@@ -840,7 +840,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-cometbft-global-domain-3",
     "provider": "",
@@ -975,7 +975,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
@@ -994,7 +993,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "sequencer": {
           "driver": {
             "host": "global-domain-3-cometbft-cometbft-rpc.sv.svc.cluster.local",
@@ -1016,7 +1014,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-global-domain-3",
     "provider": "",
@@ -1124,7 +1122,6 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1136,7 +1133,6 @@
             "id": 3
           }
         },
-        "nodeIdentifier": "DA-Helm-Test-Node",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1159,7 +1155,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "sv-participant-3",
     "provider": "",
@@ -1434,7 +1430,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "validator",
     "provider": "",

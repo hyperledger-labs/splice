@@ -155,7 +155,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -246,7 +246,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "loopback",
     "provider": "",
@@ -298,13 +298,11 @@
           "targetAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true
         },
-        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -327,7 +325,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "participant",
     "provider": "",
@@ -376,7 +374,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "postgres",
     "provider": "",
@@ -534,7 +532,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.1.19"
+      "version": "0.2.0"
     },
     "name": "validator",
     "provider": "",
