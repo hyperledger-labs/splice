@@ -63,16 +63,22 @@ function _start_validator {
   if [ -n "$network_name" ]; then
     extra_flags+=("-n" "$network_name")
   fi
+  if [ "$migrating" -eq 1 ]; then
+    extra_flags+=("-M")
+  fi
 
   _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
   secret=$(curl -sSfL -X POST "${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare")
+
+  mkdir -p "${REPO_ROOT}/log"
 
   _info "Starting validator"
   "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
     -s "${sv_from_docker}" \
     -c "${scan}" \
     -q "${sequencer}" \
-    -o "$secret" \
+    -o "${secret}" \
+    -m "${migration_id}" \
     -b \
     "${extra_flags[@]}" \
       >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
@@ -103,7 +109,10 @@ function subcmd_start {
   da_repo=0
   network_name=""
   wait=0
-  while getopts 'haldn:w' arg; do
+  migration_id=0
+  migrating=0
+  IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
+  while getopts 'haldn:m:Mwt:' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -121,8 +130,18 @@ function subcmd_start {
       n)
         network_name="${OPTARG}"
         ;;
+      m)
+        migration_id="${OPTARG}"
+        ;;
+      M)
+        migrating=1
+        ;;
       w)
         wait=1
+        ;;
+      t)
+        IMAGE_TAG="${OPTARG}"
+        da_repo=1
         ;;
       ?)
         subcmd_help
@@ -131,13 +150,17 @@ function subcmd_start {
     esac
   done
 
+  if [[ ! "${migration_id}" =~ ^[0-9]+$ ]]; then
+    _error_msg "Migration ID must be a non-negative integer"
+    exit 1
+  fi
+
   if [ $da_repo -eq 1 ]; then
     export IMAGE_REPO=us-central1-docker.pkg.dev/da-cn-shared/cn-images/
   else
     export IMAGE_REPO=""
   fi
 
-  IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
   export IMAGE_TAG
 
   if [ $local_sv -eq 1 ]; then
@@ -148,8 +171,7 @@ function subcmd_start {
       _error_msg "GCP_CLUSTER_HOSTNAME is not set, please run from a cluster directory or set the variable manually."
       exit 1
     fi
-      # TODO(#14481): non-0 migration ID
-      _start_validator "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://scan.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sequencer-0.sv-2.$GCP_CLUSTER_HOSTNAME"
+      _start_validator "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://scan.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sequencer-${migration_id}.sv-2.$GCP_CLUSTER_HOSTNAME"
   fi
 
   for c in validator participant; do
@@ -165,23 +187,26 @@ function subcmd_start {
 
     _info "Waiting for the validator to be ready"
     # shellcheck disable=SC2034
-    for i in {1..50}; do
+    for i in {1..300}; do
         curl -sf "${VALIDATOR_IP}:5003/api/validator/readyz" && break
         echo -n "."
         sleep 6
     done
-    curl -sf "${VALIDATOR_IP}:5003/api/validator/readyz" || _error "Validator is not ready after 5 minutes" || exit 1
+    curl -sf "${VALIDATOR_IP}:5003/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
 
     _info "Validator is ready"
   fi
 }
 function usage_start {
-  _info "    Options: [-a] [-l] [-d] [-n <network_name>]"
+  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w]"
   _info "      -a: Enable authentication"
   _info "      -l: Start the validator against a local SV (for integration tests). Default is against a cluster determined by GCP_CLUSTER_HOSTNAME"
   _info "      -d: Use images from the DA-internal repository (default: use locally built images)"
   _info "      -n: Use a specific docker network"
-
+  _info "      -m: Currently active Migration ID on the network"
+  _info "      -M: Use this flag when bumping the migration ID as part of a migration"
+  _info "      -w: Wait for the validator to be ready"
+  _info "      -t: Use a specific image tag (default: current snapshot). Implies -d"
 }
 
 subcommand_whitelist[stop]='stop a validator'
@@ -216,6 +241,7 @@ function subcmd_stop {
   if [ $delete_volumes -eq 1 ]; then
     _info "Deleting the volume data"
     docker volume rm compose_postgres-splice
+    docker volume rm compose_domain-upgrade-dump
   fi
 }
 function usage_stop {
@@ -224,19 +250,157 @@ function usage_stop {
   _info "      -f: When combined with -D, skips the confirmation prompt."
 }
 
+subcommand_whitelist[test_before_migration]='prepare the validator for the hard domain migration test'
+function subcmd_test_before_migration {
+
+  USER=alice
+
+  TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
+
+  _info "Onboarding $USER"
+  curl -sS 'http://wallet.localhost/api/validator/v0/register' \
+    -X 'POST' \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    -o /dev/null
+
+  _info "Confirming user status"
+  onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
+    -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
+  if [ "$onboarded" != "true" ]; then
+    _error "User is not onboarded"
+  fi
+
+  _info "Tap some amulet"
+  curl -sS 'http://wallet.localhost/api/validator/v0/wallet/tap' \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    --data-raw '{"amount":"100.0"}' \
+    -o /dev/null
+
+  _info "Check the balance"
+  balance=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/balance' \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' | jq -r '.effective_unlocked_qty')
+
+  _info "Balance is $balance"
+
+  _info "Waiting for domain migration dump to be created"
+  # wait (for up to an hour) for the log to report that the domain migration dump has been written
+  done=0
+  # shellcheck disable=SC2034
+  for i in {1..360}; do
+    echo -n "."
+    # We can't use the log file because the background process that dumped the log files died with the
+    # end of the previous bash step
+    if docker logs compose-validator-1 | grep -q "Wrote domain migration dump"; then
+      done=1
+      break
+    fi
+    sleep 10
+  done
+  if [ $done -eq 0 ]; then
+    _error "Timeout waiting for domain migration dump to be written"
+  fi
+  _info "Domain migration dump was written"
+
+  _info "Content of the domain migration dump directory:"
+  docker exec compose-validator-1 ls -l /domain-upgrade-dump
+}
+
+subcommand_whitelist[test_after_migration]='test the validator after the hard domain migration'
+function subcmd_test_after_migration {
+
+  USER=alice
+  TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
+
+  _info "Confirming user status"
+  onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
+    -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
+  if [ "$onboarded" != "true" ]; then
+    _error "User is not onboarded"
+  fi
+
+  _info "Check the balance"
+  balance=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/balance' \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' | jq -r '.effective_unlocked_qty')
+
+  if [ -z "$balance" ] || (( $(echo "$balance < 5000" | bc -l) )); then
+    _error "Balance is $balance, expected at least 5000"
+  else
+    _info "Balance is $balance"
+  fi
+}
+
+subcommand_whitelist[dump_volume]='dump a docker volume to a tarball'
+function subcmd_dump_volume {
+
+  if [ $# -lt 2 ]; then
+    _error "Usage: $SCRIPTNAME dump_volume <volume_name> <tarball_path>"
+  fi
+
+  volume_name=$1
+  tarball_path=$2
+
+  if [ -z "$(docker volume ls -q -f name="${volume_name}")" ]; then
+    _error "Volume $volume_name does not exist"
+  fi
+
+  mkdir -p "$(dirname "$tarball_path")"
+
+  tarball_dir=$(dirname "$(realpath "$tarball_path")")
+  tarball_name=$(basename "$tarball_path")
+
+  _info "Content of volume $volume_name:"
+  docker run --rm -v "${volume_name}:/volume" alpine sh -c "ls -l /volume"
+
+  _info "Dumping the volume $volume_name to $tarball_path"
+  docker run --rm -v "${volume_name}:/volume" -v "${tarball_dir}:/backup" alpine sh -c "tar -cf /backup/${tarball_name} -C /volume ."
+
+  _info "Volume $volume_name dumped to $tarball_dir/$tarball_name"
+  _info "tarball path:"
+  ls "$tarball_path"
+  _info "tarball contents:"
+  tar -tf "$tarball_path"
+}
+
+subcommand_whitelist[restore_volume]='restore a docker volume from a tarball'
+function subcmd_restore_volume {
+
+  if [ $# -lt 2 ]; then
+    _error "Usage: $SCRIPTNAME restore_volume <volume_name> <tarball_path>"
+  fi
+
+  volume_name=$1
+  tarball_path=$2
+
+  tarball_dir=$(dirname "$(realpath "$tarball_path")")
+  tarball_name=$(basename "$tarball_path")
+
+  _info "tarball path:"
+  ls "$tarball_path"
+  _info "tarball contents:"
+  tar -tf "$tarball_path"
+
+  docker run --rm -v "${volume_name}:/volume" -v "${tarball_dir}:/backup" alpine sh -c "tar -C /volume -xvf /backup/${tarball_name}"
+
+  _info "Content of volume $volume_name:"
+  docker run --rm -v "${volume_name}:/volume" alpine sh -c "ls -l /volume"
+}
+
 ################################
 ### Main
 ################################
 
-SUBCOMMAND_NAME="$1"
-shift
-
-if [ -z "${SUBCOMMAND_NAME-}" ]; then
+if [ $# -eq 0 ]; then
     subcmd_help
 
     _error  "Missing subcommand"
 fi
 
+SUBCOMMAND_NAME="$1"
+shift
 
 if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
     subcmd_help

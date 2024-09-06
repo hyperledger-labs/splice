@@ -26,6 +26,8 @@ function usage() {
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
   echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
+  echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
+  echo "  -M: Use this flag when bumping the migration ID as part of a migration."
 
   echo ""
   echo "Testing flags:"
@@ -44,7 +46,9 @@ SCAN_ADDRESS=""
 ONBOARDING_SECRET=""
 SEQUENCER_ADDRESS=""
 network_name=""
-while getopts 'has:c:t:o:n:bq:' arg; do
+migration_id=0
+migrating=0
+while getopts 'has:c:t:o:n:bq:m:M' arg; do
   case ${arg} in
     h)
       usage
@@ -70,6 +74,12 @@ while getopts 'has:c:t:o:n:bq:' arg; do
       ;;
     n)
       network_name="${OPTARG}"
+      ;;
+    m)
+      migration_id="${OPTARG}"
+      ;;
+    M)
+      migrating=1
       ;;
     ?)
       usage
@@ -107,11 +117,17 @@ if [ $trust_single -eq 1 ] && [ -z "${SEQUENCER_ADDRESS}" ]; then
   exit 1
 fi
 
+if [[ ! "${migration_id}" =~ ^[0-9]+$ ]]; then
+  _error_msg "Migration ID must be a non-negative integer"
+  usage
+  exit 1
+fi
+
 export ONBOARDING_SECRET
 export SPONSOR_SV_ADDRESS
 export SCAN_ADDRESS
 export SEQUENCER_ADDRESS
-export MIGRATION_ID=0
+export MIGRATION_ID=${migration_id}
 # TODO(#14303): release tag should be injected by the release pipeline
 # IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
 # export IMAGE_TAG
@@ -122,6 +138,9 @@ if [ $auth -ne 1 ]; then
 fi
 if [ $trust_single -eq 1 ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-trust-single.yaml")
+fi
+if [ $migrating -eq 1 ]; then
+  extra_compose_files+=("-f" "${script_dir}/compose-migrate.yaml")
 fi
 if [ -n "${network_name}" ]; then
   # TODO(#14303): we take a network_name argument, but the name "onvpn" is hardcoded in the compose-onvpn-network.yaml file.

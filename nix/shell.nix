@@ -59,11 +59,12 @@ in pkgs.mkShell {
                                              doCheck = false;
                                              doInstallCheck = false;
                                      }))
-    python3Packages.sphinx_rtd_theme
-    python3Packages.sphinx-copybutton
+    python3Packages.polib
+    python3Packages.pyjwt
     python3Packages.pyyaml
     python3Packages.regex
-    python3Packages.polib
+    python3Packages.sphinx_rtd_theme
+    python3Packages.sphinx-copybutton
     git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
