@@ -1,6 +1,5 @@
 volumes:
   postgres-splice:
-  domain-upgrade-dump:
 
 networks:
   splice_validator:
@@ -99,15 +98,12 @@ services:
             canton.validator-apps.validator_backend {
               domain-migration-id = ${MIGRATION_ID}
             }
-      - ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH=canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
     depends_on:
       postgres-splice:
         condition: service_healthy
     restart: always
     networks:
       - ${DOCKER_NETWORK:-splice_validator}
-    volumes:
-      - domain-upgrade-dump:/domain-upgrade-dump
 
   wallet-web-ui:
     image: "${IMAGE_REPO}wallet-web-ui:${IMAGE_TAG}"
