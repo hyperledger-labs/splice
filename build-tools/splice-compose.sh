@@ -240,8 +240,8 @@ function subcmd_stop {
   "$REPO_ROOT/cluster/deployment/compose/stop.sh"
   if [ $delete_volumes -eq 1 ]; then
     _info "Deleting the volume data"
-    docker volume rm compose_postgres-splice
-    docker volume rm compose_domain-upgrade-dump
+    docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
+    docker volume rm compose_domain-upgrade-dump > /dev/null 2>&1 || true
   fi
 }
 function usage_stop {
@@ -387,6 +387,55 @@ function subcmd_restore_volume {
 
   _info "Content of volume $volume_name:"
   docker run --rm -v "${volume_name}:/volume" alpine sh -c "ls -l /volume"
+}
+
+
+subcommand_whitelist[backup_node]='backup the validator node'
+function subcmd_backup_node {
+
+  if [ $# -lt 1 ]; then
+    _error "Usage: $SCRIPTNAME backup_node <backup_dir>"
+  fi
+
+  backup_dir=$1
+  mkdir -p "$backup_dir"
+
+  docker exec -i compose-postgres-splice-1 pg_dump -U cnadmin validator > "${backup_dir}"/validator-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+  active_participant_db=$(docker exec compose-participant-1 bash -c 'echo $CANTON_PARTICIPANT_POSTGRES_DB')
+  docker exec compose-postgres-splice-1 pg_dump -U cnadmin "${active_participant_db}" > "${backup_dir}"/"${active_participant_db}"-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+}
+
+subcommand_whitelist[restore_node]='restore the validator node'
+function subcmd_restore_node {
+
+  if [ $# -lt 3 ]; then
+    _error "Usage: $SCRIPTNAME restore_node <validator_backup_file> <participant_backup_file> <migration_id>"
+  fi
+
+  validator_backup_file=$1
+  participant_backup_file=$2
+  MIGRATION_ID=$3
+
+  export MIGRATION_ID
+  export IMAGE_TAG=
+  export ONBOARDING_SECRET=
+  export SCAN_ADDRESS=
+  export SPONSOR_SV_ADDRESS=
+  export TARGET_CLUSTER=
+  docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
+  docker compose -f "${REPO_ROOT}/cluster/deployment/compose/compose.yaml" up -d postgres-splice
+  _info "Waiting for postgres to be ready"
+  # shellcheck disable=SC2034
+  for i in {1..10}; do
+    docker exec compose-postgres-splice-1 pg_isready && break
+    sleep 6
+  done
+  if ( ! docker exec compose-postgres-splice-1 pg_isready ); then
+    _error "Postgres is not ready after 1 minute"
+  fi
+  docker exec -i compose-postgres-splice-1 psql -U cnadmin validator < "$validator_backup_file"
+  docker exec -i compose-postgres-splice-1 psql -U cnadmin participant-"$MIGRATION_ID" < "$participant_backup_file"
+  docker compose -f "${REPO_ROOT}/cluster/deployment/compose/compose.yaml" down
 }
 
 ################################

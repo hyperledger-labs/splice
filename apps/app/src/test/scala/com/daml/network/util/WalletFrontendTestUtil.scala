@@ -221,7 +221,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     click on "create-offer-submit-button"
   }
 
-  private def readTapFromRow(
+  def readTapFromRow(
       transactionRow: Element
   )(implicit env: SpliceTestConsoleEnvironment): Option[Tap] = {
     val date = readDateFromRow(transactionRow)
