@@ -321,7 +321,8 @@ async function installSvAndValidator(
     defaultVersion,
     {
       dependsOn: imagePullDeps
-        .concat([canton.participant, canton.decentralizedSynchronizer])
+        .concat(canton.participant.asDependencies)
+        .concat(canton.decentralizedSynchronizer.dependencies)
         .concat([svAppSecret, svAppUISecret, appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
     },
@@ -355,7 +356,11 @@ async function installSvAndValidator(
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     defaultVersion,
-    { dependsOn: imagePullDeps.concat([sv, canton.participant, svAppSecret, appsPg]) }
+    {
+      dependsOn: imagePullDeps
+        .concat(canton.participant.asDependencies)
+        .concat([sv, svAppSecret, appsPg]),
+    }
   );
 
   const validatorValues = {
@@ -414,8 +419,8 @@ async function installSvAndValidator(
     defaultVersion,
     {
       dependsOn: imagePullDeps
-        .concat([sv, canton.participant])
-        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat(canton.participant.asDependencies)
+        .concat([sv, svValidatorAppSecret, svValidatorUISecret])
         .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),

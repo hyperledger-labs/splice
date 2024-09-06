@@ -1,4 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   Auth0Config,
@@ -14,6 +15,11 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
+
+export interface SvParticipant {
+  readonly asDependencies: pulumi.Resource[];
+  readonly internalClusterAddress: pulumi.Output<string>;
+}
 
 export function installSvParticipant(
   xns: ExactNamespace,
