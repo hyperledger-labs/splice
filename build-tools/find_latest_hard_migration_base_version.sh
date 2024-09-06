@@ -8,5 +8,7 @@
 
 set -euo pipefail
 
-latest_release=$(cat "LATEST_RELEASE")
-echo "release-line-${latest_release}"
+# TODO(#14679) Switch this back to LATEST_RELEASE after mainnet upgraded
+# latest_release=$(cat "LATEST_RELEASE")
+# echo "release-line-${latest_release}"
+echo release-line-0.1.19
