@@ -189,9 +189,12 @@ export async function installCluster(
 
   const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
 
-  const nonSvComponentsDependencies = allSvs.flatMap(sv =>
-    [sv.scan, sv.svApp, sv.ingress].concat(sv.decentralizedSynchronizer.dependencies)
-  );
+  const nonSvComponentsDependencies = allSvs.flatMap(sv => [
+    sv.scan,
+    sv.svApp,
+    sv.decentralizedSynchronizer,
+    sv.ingress,
+  ]);
   let validator1;
 
   if (mustInstallValidator1) {

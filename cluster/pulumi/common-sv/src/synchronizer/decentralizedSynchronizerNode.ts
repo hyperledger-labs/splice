@@ -24,45 +24,7 @@ import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
 import { StaticCometBftConfigWithNodeName } from './cometbftConfig';
 
-export interface DecentralizedSynchronizerNode {
-  migrationId: number;
-  cometbftRpcServiceName: string;
-  readonly namespaceInternalSequencerAddress: string;
-  readonly namespaceInternalMediatorAddress: string;
-  readonly sv1InternalSequencerAddress: string;
-  readonly dependencies: pulumi.Resource[];
-}
-
-export class CrossStackDecentralizedSynchronizerNode implements DecentralizedSynchronizerNode {
-  name: string;
-  migrationId: number;
-  cometbftRpcServiceName: string;
-
-  constructor(migrationId: DomainMigrationIndex, cometbftNodeIdentifier: string) {
-    this.migrationId = migrationId;
-    this.name = 'global-domain-' + migrationId.toString();
-    this.cometbftRpcServiceName = `${cometbftNodeIdentifier}-cometbft-rpc`;
-  }
-
-  get namespaceInternalSequencerAddress(): string {
-    return `${this.name}-sequencer`;
-  }
-
-  get namespaceInternalMediatorAddress(): string {
-    return `${this.name}-mediator`;
-  }
-
-  get sv1InternalSequencerAddress(): string {
-    return `http://${this.namespaceInternalSequencerAddress}.sv-1:5008`;
-  }
-
-  readonly dependencies: Resource[] = [];
-}
-
-export class InStackDecentralizedSynchronizerNode
-  extends ComponentResource
-  implements DecentralizedSynchronizerNode
-{
+export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
   name: string;
   cometbft: {
@@ -70,8 +32,8 @@ export class InStackDecentralizedSynchronizerNode
     syncSource?: Release;
   };
   cometbftRpcServiceName: string;
+  active: boolean;
   version: CnChartVersion;
-  readonly dependencies: Resource[] = [this];
 
   constructor(
     migrationId: DomainMigrationIndex,
@@ -103,6 +65,7 @@ export class InStackDecentralizedSynchronizerNode
     const sanitizedName = sanitizedForPostgres(this.name);
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
+    this.active = active;
     this.version = version;
 
     const cometbftRelease = installCometBftNode(
@@ -171,7 +134,7 @@ export class InStackDecentralizedSynchronizerNode
             enable: true,
             migration: {
               id: migrationId,
-              active: active,
+              active: this.active,
             },
           },
           additionalJvmOptions: jmxOptions(),

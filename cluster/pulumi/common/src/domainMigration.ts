@@ -14,6 +14,7 @@ export class DecentralizedSynchronizerMigrationConfig {
   // indicates that during this run we are actually migrating from this id to the active migration ID
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
+  useNewDatabasesForMigration: boolean;
   activeDatabaseId?: DomainMigrationIndex;
 
   constructor(
@@ -21,12 +22,14 @@ export class DecentralizedSynchronizerMigrationConfig {
     legacy?: MigrationInfo,
     upgrade?: MigrationInfo,
     migratingFromActiveId?: DomainMigrationIndex,
+    migratingDatabasesToNewInstances?: boolean,
     activeDatabaseId?: DomainMigrationIndex
   ) {
     this.active = active;
     this.legacy = legacy;
     this.upgrade = upgrade;
     this.migratingFromActiveId = migratingFromActiveId;
+    this.useNewDatabasesForMigration = migratingDatabasesToNewInstances || false;
     this.activeDatabaseId = activeDatabaseId;
   }
 
@@ -36,20 +39,18 @@ export class DecentralizedSynchronizerMigrationConfig {
       new MigrationInfo(
         processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID')) ||
           DefaultMigrationId,
-        defaultVersion,
-        processMigrationProvider(config.optionalEnv('GLOBAL_DOMAIN_ACTIVE_MIGRATION_PROVIDER'))
+        defaultVersion
       ),
       MigrationInfo.fromEnv(
         config.optionalEnv('GLOBAL_DOMAIN_LEGACY_MIGRATION_ID'),
-        config.optionalEnv('GLOBAL_DOMAIN_LEGACY_VERSION'),
-        config.optionalEnv('GLOBAL_DOMAIN_LEGACY_MIGRATION_PROVIDER')
+        config.optionalEnv('GLOBAL_DOMAIN_LEGACY_VERSION')
       ),
       MigrationInfo.fromEnv(
         config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID'),
-        config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_VERSION'),
-        config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_MIGRATION_PROVIDER')
+        config.optionalEnv('GLOBAL_DOMAIN_UPGRADE_VERSION')
       ),
       processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID')),
+      config.envFlag('GLOBAL_DOMAIN_USE_SEPARATE_DATABASES'),
       processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_DATABASE_ACTIVE_ID'))
     );
   }
@@ -60,8 +61,12 @@ export class DecentralizedSynchronizerMigrationConfig {
       .concat(this.upgrade ? [this.upgrade] : []);
   }
 
-  isStillRunning(id: DomainMigrationIndex): boolean {
-    return this.allMigrationInfos().some(info => info.migrationId == id);
+  containsUpgrade(): boolean {
+    return this.upgrade != undefined;
+  }
+
+  isDefaultActive(): boolean {
+    return this.active.migrationId == DefaultMigrationId;
   }
 
   isRunningMigration(): boolean {
@@ -84,55 +89,22 @@ export class DecentralizedSynchronizerMigrationConfig {
   }
 }
 
-export enum MigrationProvider {
-  INTERNAL,
-  EXTERNAL,
-}
-
 class MigrationInfo {
   migrationId: DomainMigrationIndex;
   version: CnChartVersion;
-  provider: MigrationProvider;
 
-  constructor(
-    migrationId: DomainMigrationIndex,
-    version: CnChartVersion,
-    migrationProvider: MigrationProvider
-  ) {
+  constructor(migrationId: DomainMigrationIndex, version: CnChartVersion) {
     this.migrationId = migrationId;
     this.version = version;
-    this.provider = migrationProvider;
   }
 
-  static fromEnv(
-    maybeIdValue?: string,
-    maybeVersionValue?: string,
-    maybeMigrationProviderValue?: string
-  ): MigrationInfo | undefined {
+  static fromEnv(maybeIdValue?: string, maybeVersionValue?: string): MigrationInfo | undefined {
     const migrationId = processMigrationId(maybeIdValue);
-
     if (migrationId == undefined) {
       return undefined;
     } else {
-      return new MigrationInfo(
-        migrationId,
-        processVersion(maybeVersionValue),
-        processMigrationProvider(maybeMigrationProviderValue)
-      );
+      return new MigrationInfo(migrationId, processVersion(maybeVersionValue));
     }
-  }
-}
-
-function processMigrationProvider(maybeMigrationProviderValue?: string): MigrationProvider {
-  switch (maybeMigrationProviderValue) {
-    case 'internal':
-      return MigrationProvider.INTERNAL;
-    case 'external':
-      return MigrationProvider.EXTERNAL;
-    case undefined:
-      return MigrationProvider.INTERNAL;
-    default:
-      throw new Error(`Cannot process ${maybeMigrationProviderValue} as migration provider`);
   }
 }
 
@@ -157,8 +129,6 @@ function processVersion(maybeValue?: string): CnChartVersion {
 }
 
 export const DefaultMigrationId = 0;
-
-export type DomainMigrationIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export function installMigrationIdSpecificComponent<T>(
   decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
@@ -192,3 +162,5 @@ export function installMigrationIdSpecificComponent<T>(
         : undefined,
   };
 }
+
+export type DomainMigrationIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;

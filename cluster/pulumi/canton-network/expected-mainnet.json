@@ -345,7 +345,6 @@
       "deletionProtection": false,
       "region": "europe-west4",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -765,7 +764,6 @@
       "deletionProtection": false,
       "region": "europe-west4",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -908,7 +906,6 @@
       "deletionProtection": false,
       "region": "europe-west4",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1049,7 +1046,6 @@
       "deletionProtection": false,
       "region": "europe-west4",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true

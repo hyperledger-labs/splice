@@ -21,6 +21,7 @@ import {
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
+  installMigrationIdSpecificComponent,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
@@ -33,8 +34,8 @@ import {
 } from 'splice-pulumi-common';
 import {
   DecentralizedSynchronizerNode,
-  InstalledMigrationSpecificSv,
-  SvParticipant,
+  installCantonComponents,
+  StaticCometBftConfigWithNodeName,
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
@@ -42,7 +43,6 @@ import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
 import { Postgres } from '../../common/src/postgres';
-import { installCanton } from './canton';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
@@ -88,12 +88,17 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
+type InstalledMigrationSpecificSv = {
+  decentralizedSynchronizer: DecentralizedSynchronizerNode;
+  participant: Release;
+};
+
 export type InstalledSv = {
   validatorApp: Resource;
   svApp: Release;
   scan: Release;
   decentralizedSynchronizer: DecentralizedSynchronizerNode;
-  participant: SvParticipant;
+  participant: Release;
   ingress: Resource;
 };
 
@@ -186,7 +191,7 @@ export async function installSvNode(
 
   const appsPostgres =
     defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, true);
-  const canton = installCanton(
+  const activeMigrationComponents = installMigrationIdSpecificComponents(
     xns,
     decentralizedSynchronizerUpgradeConfig,
     defaultPostgres,
@@ -200,16 +205,16 @@ export async function installSvNode(
       sv1SvApp: sv1SvApp,
     },
     config
-  );
+  ).activeComponent;
 
   const svApp = installSvApp(
     decentralizedSynchronizerUpgradeConfig,
     config,
     xns,
     dependsOn,
-    appsPostgres,
-    canton.participant,
-    canton.decentralizedSynchronizer
+    activeMigrationComponents.participant,
+    activeMigrationComponents.decentralizedSynchronizer,
+    appsPostgres
   );
 
   const scan = installScan(
@@ -217,9 +222,9 @@ export async function installSvNode(
     config.isFirstSv,
     decentralizedSynchronizerUpgradeConfig,
     config.nodeName,
-    canton.decentralizedSynchronizer,
+    activeMigrationComponents.decentralizedSynchronizer,
     svApp,
-    canton.participant,
+    activeMigrationComponents.participant,
     appsPostgres
   );
 
@@ -229,7 +234,7 @@ export async function installSvNode(
     decentralizedSynchronizerUpgradeConfig,
     baseConfig,
     backupConfigSecret,
-    canton,
+    activeMigrationComponents,
     svApp,
     scan
   );
@@ -257,7 +262,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return { ...canton, validatorApp, svApp, scan, ingress };
+  return { ...activeMigrationComponents, validatorApp, svApp, scan, ingress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -298,7 +303,7 @@ async function installValidator(
       id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
     validatorWalletUser: svConfig.validatorWalletUser,
-    dependencies: sv.participant.asDependencies,
+    participant: sv.participant,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
     backupConfig:
@@ -311,7 +316,7 @@ async function installValidator(
     persistenceConfig: persistenceConfig(postgres, validatorDbName),
     extraDependsOn: [svApp, postgres, scan],
     svValidator: true,
-    participantAddress: sv.participant.internalClusterAddress,
+    participantAddress: sv.participant.name,
     decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
@@ -320,6 +325,110 @@ async function installValidator(
   });
 
   return validator;
+}
+
+function installMigrationIdSpecificComponents(
+  xns: ExactNamespace,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
+  defaultPostgres: Postgres | undefined,
+  cometbft: {
+    name: string;
+    onboardingName: string;
+    nodeConfigs: {
+      self: StaticCometBftConfigWithNodeName;
+      sv1: StaticCometBftConfigWithNodeName;
+      peers: StaticCometBftConfigWithNodeName[];
+    };
+    sv1SvApp?: Release;
+  },
+  svConfig: SvConfig
+) {
+  const databaseSuffix = decentralizedSynchronizerMigrationConfig.activeDatabaseId
+    ? `${decentralizedSynchronizerMigrationConfig.activeDatabaseId}-pg`
+    : 'pg';
+  const sequencerPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      `sequencer-${databaseSuffix}`,
+      `sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
+  const mediatorPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      `mediator-${databaseSuffix}`,
+      `mediator-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
+  const participantPostgres =
+    defaultPostgres ||
+    postgres.installPostgres(
+      xns,
+      `participant-${databaseSuffix}`,
+      `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      true
+    );
+  return installMigrationIdSpecificComponent(
+    decentralizedSynchronizerMigrationConfig,
+    (migrationId, isActive, version) => {
+      let participantDb = undefined,
+        sequencerDb = undefined,
+        mediatorDb = undefined;
+      if (
+        migrationId === decentralizedSynchronizerMigrationConfig.upgrade?.migrationId &&
+        decentralizedSynchronizerMigrationConfig.useNewDatabasesForMigration
+      ) {
+        participantDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `participant-${migrationId}-pg`,
+            `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+        sequencerDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `sequencer-${migrationId}-pg`,
+            `sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+        mediatorDb =
+          defaultPostgres ||
+          postgres.installPostgres(
+            xns,
+            `mediator-${migrationId}-pg`,
+            `mediator-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+            true
+          );
+      } else {
+        participantDb = participantPostgres;
+        sequencerDb = sequencerPostgres;
+        mediatorDb = mediatorPostgres;
+      }
+      return installCantonComponents(
+        xns,
+        migrationId,
+        svConfig.auth0Client,
+        {
+          onboardingName: svConfig.onboardingName,
+          isFirstSv: svConfig.isFirstSv,
+          isCoreSv: true,
+        },
+        {
+          participant: participantDb,
+          mediator: mediatorDb,
+          sequencer: sequencerDb,
+        },
+        version,
+        decentralizedSynchronizerMigrationConfig,
+        cometbft
+      );
+    }
+  );
 }
 
 function internalScanUrl(config: SvConfig): pulumi.Output<string> {
@@ -331,9 +440,9 @@ function installSvApp(
   config: SvConfig,
   xns: ExactNamespace,
   dependsOn: CnInput<Resource>[],
-  postgres: Postgres,
-  participant: SvParticipant,
-  decentralizedSynchronizer: DecentralizedSynchronizerNode
+  participant: Release,
+  decentralizedSynchronizer: DecentralizedSynchronizerNode,
+  postgres: Postgres
 ) {
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
@@ -391,7 +500,7 @@ function installSvApp(
     },
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
-    participantAddress: participant.internalClusterAddress,
+    participantAddress: participant.name,
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
     auth: {
@@ -415,10 +524,7 @@ function installSvApp(
     svValues,
     defaultVersion,
     {
-      dependsOn: dependsOn
-        .concat([postgres])
-        .concat(participant.asDependencies)
-        .concat(decentralizedSynchronizer.dependencies),
+      dependsOn: dependsOn.concat([participant, postgres, decentralizedSynchronizer]),
     },
     undefined,
     appsAffinityAndTolerations,
@@ -434,7 +540,7 @@ function installScan(
   nodename: string,
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: Release,
-  participant: SvParticipant,
+  participant: Release,
   postgres: Postgres
 ) {
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
@@ -449,7 +555,7 @@ function installScan(
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
-    participantAddress: participant.internalClusterAddress,
+    participantAddress: participant.name,
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
@@ -458,7 +564,7 @@ function installScan(
     clusterUrl: CLUSTER_HOSTNAME,
   };
   const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
-    dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
+    dependsOn: [svApp, decentralizedSynchronizerNode],
   });
   return scan;
 }

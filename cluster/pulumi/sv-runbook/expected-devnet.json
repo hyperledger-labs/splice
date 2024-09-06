@@ -530,7 +530,6 @@
       "deletionProtection": false,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1051,7 +1050,6 @@
       "deletionProtection": false,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1195,7 +1193,6 @@
       "deletionProtection": false,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1255,7 +1252,6 @@
       "deletionProtection": false,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true

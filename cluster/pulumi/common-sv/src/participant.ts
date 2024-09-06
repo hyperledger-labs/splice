@@ -1,11 +1,9 @@
 import * as k8s from '@pulumi/kubernetes';
-import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   Auth0Config,
   autoInitValues,
   ChartValues,
-  defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
@@ -14,12 +12,8 @@ import {
   REPO_ROOT,
   SpliceCustomResourceOptions,
 } from 'splice-pulumi-common';
+import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
-
-export interface SvParticipant {
-  readonly asDependencies: pulumi.Resource[];
-  readonly internalClusterAddress: pulumi.Output<string>;
-}
 
 export function installSvParticipant(
   xns: ExactNamespace,
@@ -28,6 +22,7 @@ export function installSvParticipant(
   isActive: boolean,
   db: Postgres,
   logLevel: string,
+  version: CnChartVersion,
   onboardingName: string,
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource,
   customOptions?: SpliceCustomResourceOptions
@@ -80,9 +75,9 @@ export function installSvParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('cn-participant', defaultVersion, onboardingName),
+      ...autoInitValues('cn-participant', version, onboardingName),
     },
-    defaultVersion,
+    version,
     {
       ...(customOptions || {}),
       dependsOn: (customOptions?.dependsOn || []).concat([db]),
