@@ -278,7 +278,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "docs-docs",
     "provider": "",
@@ -480,7 +480,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
@@ -614,7 +614,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-global-domain-0",
     "provider": "",
@@ -677,7 +677,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -730,7 +730,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -872,7 +872,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-participant-0",
     "provider": "",
@@ -1012,7 +1012,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1245,7 +1245,7 @@
           }
         ]
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1361,7 +1361,7 @@
           }
         }
       },
-      "version": "0.1.16"
+      "version": "0.1.17"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

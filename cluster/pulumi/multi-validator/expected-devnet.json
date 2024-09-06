@@ -2429,7 +2429,7 @@
                   },
                   {
                     "name": "CN_APP_LEGACY_PARTY_HINT",
-                    "value": "true"
+                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
@@ -2800,7 +2800,7 @@
                   },
                   {
                     "name": "CN_APP_LEGACY_PARTY_HINT",
-                    "value": "true"
+                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3171,7 +3171,7 @@
                   },
                   {
                     "name": "CN_APP_LEGACY_PARTY_HINT",
-                    "value": "true"
+                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3542,7 +3542,7 @@
                   },
                   {
                     "name": "CN_APP_LEGACY_PARTY_HINT",
-                    "value": "true"
+                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3913,7 +3913,7 @@
                   },
                   {
                     "name": "CN_APP_LEGACY_PARTY_HINT",
-                    "value": "true"
+                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
