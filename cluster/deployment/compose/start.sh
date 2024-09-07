@@ -25,6 +25,7 @@ function usage() {
   echo "  -a: Use this flag to enable authentication"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
+  echo "  -c <scan_address>: The full URL of a Scan app. If not provided, it will be derived from the sponsor SV address."
   echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
   echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
   echo "  -M: Use this flag when bumping the migration ID as part of a migration."
@@ -146,6 +147,20 @@ export PARTY_HINT=${party_hint}
 # IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
 # export IMAGE_TAG
 
+splice_instance_names=$(curl -sSL "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
+CN_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
+export CN_APP_UI_NETWORK_NAME
+CN_APP_UI_NETWORK_FAVICON_URL=$(echo "${splice_instance_names}" | jq -r '.network_favicon_url')
+export CN_APP_UI_NETWORK_FAVICON_URL
+CN_APP_UI_AMULET_NAME=$(echo "${splice_instance_names}" | jq -r '.amulet_name')
+export CN_APP_UI_AMULET_NAME
+CN_APP_UI_AMULET_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.amulet_name_acronym')
+export CN_APP_UI_AMULET_NAME_ACRONYM
+CN_APP_UI_NAME_SERVICE_NAME=$(echo "${splice_instance_names}" | jq -r '.name_service_name')
+export CN_APP_UI_NAME_SERVICE_NAME
+CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.name_service_name_acronym')
+export CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
+
 extra_compose_files=()
 if [ $auth -ne 1 ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-disable-auth.yaml")
@@ -162,10 +177,5 @@ if [ -n "${network_name}" ]; then
   # it declares the same name as the network_name argument.
   extra_compose_files+=("-f" "${script_dir}/compose-onvpn-network.yaml")
   export DOCKER_NETWORK="${network_name}"
-fi
-if [ "${ENABLE_CN_INSTANCE_NAMES:-}" == "true" ]; then
-  extra_compose_files+=("-f" "${script_dir}/compose-ui-configs-CN.yaml")
-else
-  extra_compose_files+=("-f" "${script_dir}/compose-ui-configs-Splice.yaml")
 fi
 docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d
