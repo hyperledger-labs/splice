@@ -9,6 +9,7 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
   CommandService,
   CommandSubmissionService,
 }
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.DefaultPorts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -165,6 +166,8 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
           // Command submissions are safe to retry - they are deduplicated by command ID
           case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.retry
           case _: CommandService.BaseCommand[?, ?, ?] => error.retry
+          // Package operations are idempotent so we can retry them
+          case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] => error.retry
           // Other commands might not be idempotent
           case _ => false
         }
