@@ -70,6 +70,11 @@ function _start_validator {
   _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
   secret=$(curl -sSfL -X POST "${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare")
 
+  # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
+  if ! curl -sLf "${scan}/api/scan/v0/splice-instance-names" > /dev/null; then
+    _info "Scan does not support the splice-instance-names endpoint, using hardcoded values"
+    export SPLICE_INSTANCE_NAMES='{"network_name":"Canton Network","network_favicon_url":"https://www.canton.network/hubfs/cn-favicon-05%201-1.png","amulet_name":"Canton Coin","amulet_name_acronym":"CC","name_service_name":"Canton Name Service","name_service_name_acronym":"CNS"}'
+  fi
   mkdir -p "${REPO_ROOT}/log"
 
   _info "Starting validator"

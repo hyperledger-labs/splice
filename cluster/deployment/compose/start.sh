@@ -147,7 +147,12 @@ export PARTY_HINT=${party_hint}
 # IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
 # export IMAGE_TAG
 
-splice_instance_names=$(curl -sSL "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
+if [ -z "${SPLICE_INSTANCE_NAMES:-}" ]; then
+  splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
+else
+  # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
+  splice_instance_names=${SPLICE_INSTANCE_NAMES}
+fi
 CN_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
 export CN_APP_UI_NETWORK_NAME
 CN_APP_UI_NETWORK_FAVICON_URL=$(echo "${splice_instance_names}" | jq -r '.network_favicon_url')
