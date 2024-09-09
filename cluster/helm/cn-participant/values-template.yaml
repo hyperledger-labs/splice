@@ -29,8 +29,6 @@ metrics:
   release: prometheus-grafana-monitoring
   interval: 30s
 
-disableAutoInit: true
-
 persistence:
   secretName: "postgres-secrets"
   databaseName: cantonnet_participant
