@@ -164,6 +164,7 @@ function subcmd_start {
   if [ $da_repo -eq 1 ]; then
     export IMAGE_REPO=us-central1-docker.pkg.dev/da-cn-shared/cn-images/
   else
+    # Locally built images (the default when using this script)
     export IMAGE_REPO=""
   fi
 
