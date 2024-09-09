@@ -21,15 +21,15 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 [-ab] -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>]"
-  echo "  -a: Use this flag to enable authentication"
+  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-a] [-b] [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>] [-m <migration_id>] [-M]"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
+  echo "  -p <party_hint>: The party hint to use for the validator operator, will also act as the participant identifier."
+  echo "  -a: Use this flag to enable authentication"
   echo "  -c <scan_address>: The full URL of a Scan app. If not provided, it will be derived from the sponsor SV address."
   echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
   echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
   echo "  -M: Use this flag when bumping the migration ID as part of a migration."
-  echo "  -p <party_hint>: The party hint to use for the validator operator, will also act as the participant identifier."
 
   echo ""
   echo "Testing flags:"

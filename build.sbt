@@ -1155,6 +1155,7 @@ lazy val bundleTask = {
       "network-health",
       "grafana-dashboards/docs",
     )
+    val dockerCompose = Seq("-r", "cluster/deployment/compose", "docker-compose")
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
@@ -1180,7 +1181,7 @@ lazy val bundleTask = {
 
     val committedDarFiles = getCommittedDarFiles
     val args: Seq[String] =
-      license ++ examples ++ testResources ++ transformConfig ++ dashboards ++
+      license ++ examples ++ testResources ++ transformConfig ++ dashboards ++ dockerCompose ++
         webUis.flatMap({ case ((source, _), name) =>
           Seq[String]("-r", source.toString, s"web-uis/$name")
         }) ++ dars.flatten.flatMap({ dar =>
