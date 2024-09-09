@@ -260,7 +260,7 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
           {/* TODO(#13480): remove this fallback once we have a proper config in all apps */}
           <Tab
             label={`${window.splice_config.spliceInstanceNames?.amuletName || 'Canton Coin'} Info`}
-            {...tabProps('cc-info')}
+            {...tabProps('amulet-info')}
           />
           {cometBftDebugTab && <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />}
           {sequencerStatusQuery && mediatorStatusQuery && (

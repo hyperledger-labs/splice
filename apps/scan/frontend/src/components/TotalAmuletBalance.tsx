@@ -24,7 +24,7 @@ export const TotalAmuletBalance: React.FC = () => {
     <AmountSummary
       title={title}
       amount={new BigNumber(totalAmuletBalanceQuery.data.total_balance)}
-      idCC="total-amulet-balance-cc"
+      idCC="total-amulet-balance-amulet"
       idUSD="total-amulet-balance-usd"
       amuletPrice={amuletPriceQuery.data}
     />

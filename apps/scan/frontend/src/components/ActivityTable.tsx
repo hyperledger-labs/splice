@@ -300,7 +300,7 @@ const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountAmulet,
   } else {
     return (
       <Stack direction="column">
-        <Typography className="tx-amount-cc">
+        <Typography className="tx-amount-amulet">
           <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
         </Typography>
         <Typography variant="caption" className="tx-amount-usd">
@@ -323,7 +323,7 @@ interface TransactionRewardProps {
 const ActivityRewardDisplay: React.FC<TransactionRewardProps> = ({ rewards }) => {
   const row = (type: string, label: string, amount: BigNumber) => [
     <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
-    <Typography key={`tx-reward-${type}-cc`} className={`tx-reward-${type}-cc`}>
+    <Typography key={`tx-reward-${type}-amulet`} className={`tx-reward-${type}-amulet`}>
       <AmountDisplay amount={amount} currency="AmuletUnit" />
     </Typography>,
   ];

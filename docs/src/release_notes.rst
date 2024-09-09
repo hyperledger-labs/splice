@@ -8,6 +8,11 @@
 Release Notes
 =============
 
+Upcoming
+--------
+* SV UI
+  * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
+
 0.2.0
 -----
 

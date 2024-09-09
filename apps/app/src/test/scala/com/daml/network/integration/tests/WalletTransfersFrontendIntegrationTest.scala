@@ -100,7 +100,9 @@ class WalletTransfersFrontendIntegrationTest
                 offerCard.childElement(className("transfer-offer-sender"))
               ) should matchText(expectedAns(aliceUserParty, aliceAnsName))
 
-              offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
+              offerCard
+                .childElement(className("transfer-offer-amulet-amount"))
+                .text should matchText(
                 s"+ $transferAmount $amuletNameAcronym"
               )
 
@@ -170,7 +172,7 @@ class WalletTransfersFrontendIntegrationTest
               s"Expires $expectedExpiry"
             )
 
-            offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
+            offerCard.childElement(className("transfer-offer-amulet-amount")).text should matchText(
               s"+ 1 $amuletNameAcronym"
             )
 

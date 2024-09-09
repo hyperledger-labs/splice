@@ -225,7 +225,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
           val round =
             Try(asOfRound.split(" ").last.toLong)
               .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
-          val totalAmuletBalanceSv = find(id("total-amulet-balance-cc")).value.text
+          val totalAmuletBalanceSv = find(id("total-amulet-balance-amulet")).value.text
           val totalAmuletBalanceSv1 = sv1ScanClient.getTotalAmuletBalance(round)
           parseAmountText(totalAmuletBalanceSv, amuletNameAcronym) shouldBe totalAmuletBalanceSv1
         }
