@@ -71,7 +71,7 @@ const App: React.FC = () => {
           <Route index element={<Dso />} />
           <Route path="dso" element={<Dso />} />
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
-          <Route path="amulet-price" element={<AmuletPrice />} />
+          <Route path="cc-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
           <Route path="delegate" element={<Delegate />} />
         </Route>

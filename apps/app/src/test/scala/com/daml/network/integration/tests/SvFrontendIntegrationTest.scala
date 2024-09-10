@@ -100,7 +100,7 @@ class SvFrontendIntegrationTest
             inside(find(id("information-tab-dso-info"))) { case Some(e) =>
               e.text shouldBe "DSO Info"
             }
-            inside(find(id("information-tab-amulet-info"))) { case Some(e) =>
+            inside(find(id("information-tab-cc-info"))) { case Some(e) =>
               e.text shouldBe s"$amuletName Info"
             }
             inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
@@ -207,7 +207,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the amulet price tab", {
-            go to s"http://localhost:$sv1UIPort/amulet-price"
+            go to s"http://localhost:$sv1UIPort/cc-price"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(

@@ -1167,34 +1167,6 @@ function subcmd_ui_rename_cn() {
   simple_rename "CANTON_NETWORK///SPLICE" "$frontend_only"
 }
 
-### UI cleanup - rename cc in css classes
-
-subcommand_whitelist[css_cc_cleanup]='Rename: Use amulet instead of cc in css symbols'
-function subcmd_css_cc_cleanup() {
-  assert_clean_working_dir
-
-  local ignore_unrelated="-e 'daml/**'"
-
-  simple_rename "create-offer-cc-amount///create-offer-amulet-amount"                 "$ignore_unrelated"
-  simple_rename "information-tab-cc-info///information-tab-amulet-info"               "$ignore_unrelated"
-  simple_rename "navlink-cc-price///navlink-amulet-price"                             "$ignore_unrelated"
-  simple_rename "outlined-amount-cc-helper-text///outlined-amount-amulet-helper-text" "$ignore_unrelated"
-  simple_rename "payment-total-cc///payment-total-amulet"                             "$ignore_unrelated"
-  simple_rename "total-amulet-balance-cc///total-amulet-balance-amulet"               "$ignore_unrelated"
-  simple_rename "total-rewards-cc///total-rewards-amulet"                             "$ignore_unrelated"
-  simple_rename "transfer-offer-cc-amount///transfer-offer-amulet-amount"             "$ignore_unrelated"
-  simple_rename "tx-amount-cc///tx-amount-amulet"                                     "$ignore_unrelated"
-  simple_rename "tx-reward-\${type}-cc///tx-reward-\${type}-amulet"                   "$ignore_unrelated"
-  simple_rename "tx-reward-app-cc///tx-reward-app-amulet"                             "$ignore_unrelated"
-  simple_rename "tx-reward-sv-cc///tx-reward-sv-amulet"                               "$ignore_unrelated"
-  simple_rename "tx-reward-validator-cc///tx-reward-validator-amulet"                 "$ignore_unrelated"
-  simple_rename "wallet-balance-cc///wallet-balance-amulet"                           "$ignore_unrelated"
-  simple_rename "cc-info///amulet-info"                                               "$ignore_unrelated"
-  simple_rename "cc-price///amulet-price"                                             "$ignore_unrelated"
-
-
-}
-
 #### No ANS and Amulet in Cluster
 
 subcommand_whitelist[cluster_ans_amulet]='Rename: remove ANS and Amulet in cluster and docs'

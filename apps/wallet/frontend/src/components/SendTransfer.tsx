@@ -108,7 +108,7 @@ const SendTransfer: React.FC = () => {
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <OutlinedInput
-                  id="create-offer-amulet-amount"
+                  id="create-offer-cc-amount"
                   type="text"
                   value={ccAmountText}
                   onChange={onCCAmountChange}
@@ -117,7 +117,7 @@ const SendTransfer: React.FC = () => {
                       {config.spliceInstanceNames.amuletNameAcronym}
                     </InputAdornment>
                   }
-                  aria-describedby="outlined-amount-amulet-helper-text"
+                  aria-describedby="outlined-amount-cc-helper-text"
                   error={BigNumber(ccAmountText).lte(0.0)}
                   inputProps={{
                     'aria-label': 'amount',

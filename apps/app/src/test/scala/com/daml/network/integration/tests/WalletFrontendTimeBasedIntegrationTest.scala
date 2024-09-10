@@ -129,7 +129,7 @@ class WalletFrontendTimeBasedIntegrationTest
         browseToAliceWallet(aliceDamlUser)
 
         eventually() {
-          val ccText = find(id("wallet-balance-amulet")).value.text.trim
+          val ccText = find(id("wallet-balance-cc")).value.text.trim
           val usdText = find(id("wallet-balance-usd")).value.text.trim
 
           ccText should not be "..."

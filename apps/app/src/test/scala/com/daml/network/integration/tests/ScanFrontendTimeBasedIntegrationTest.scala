@@ -131,7 +131,7 @@ class ScanFrontendTimeBasedIntegrationTest
           "The tabs 'DSO Info' and 'Canton Coin Info' are visible",
           _ => {
             findAll(id("information-tab-dso-info")).length shouldBe 1
-            findAll(id("information-tab-amulet-info")).length shouldBe 1
+            findAll(id("information-tab-cc-info")).length shouldBe 1
           },
         )
 
@@ -165,7 +165,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Click on Canton Coin Info", {
-            click on "information-tab-amulet-info"
+            click on "information-tab-cc-info"
           },
         )(
           "The Canton Coin info is visible",
@@ -448,7 +448,7 @@ class ScanFrontendTimeBasedIntegrationTest
         )(
           "See valid total amulet balance",
           _ => {
-            val totalText = seleniumText(find(id("total-amulet-balance-amulet")))
+            val totalText = seleniumText(find(id("total-amulet-balance-cc")))
             val totalBalance = sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)
             parseAmountText(totalText, amuletNameAcronym) shouldBe totalBalance
             val totalUsdText = seleniumText(find(id("total-amulet-balance-usd")))

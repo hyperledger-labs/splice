@@ -21,7 +21,7 @@ export const TotalRewards: React.FC = () => {
     <AmountSummary
       title="Total App & Validator Rewards"
       amount={new BigNumber(totalRewardsQuery.data.amount)}
-      idCC="total-rewards-amulet"
+      idCC="total-rewards-cc"
       idUSD="total-rewards-usd"
       amuletPrice={amuletPriceQuery.data}
     />

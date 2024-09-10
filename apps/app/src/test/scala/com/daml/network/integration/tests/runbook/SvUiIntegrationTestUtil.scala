@@ -62,7 +62,7 @@ trait SvUiIntegrationTestUtil extends TestCommon {
       clue("SVs 1-4 have placed a amulet price vote") {
         actAndCheck(
           "Opening amulet price tab",
-          click on "navlink-amulet-price",
+          click on "navlink-cc-price",
         )(
           s"We see that this SV and the other SVs have placed a amulet price vote",
           _ => {

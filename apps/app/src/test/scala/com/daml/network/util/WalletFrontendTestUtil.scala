@@ -67,7 +67,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       webDriverType: WebDriverType,
       env: SpliceTestConsoleEnvironment,
   ): Assertion = {
-    find(id("wallet-balance-amulet"))
+    find(id("wallet-balance-cc"))
       .valueOrFail("Couldn't find balance")
       .text should matchText(s"$balanceCC ${spliceInstanceNames.amuletNameAcronym}")
 
@@ -108,7 +108,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       ccAmount = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-balance-change"))
-          .childElement(className("tx-amount-amulet"))
+          .childElement(className("tx-amount-cc"))
           .text,
         unit = acronym,
       ),
@@ -123,7 +123,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       appRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-app-amulet"))
+          .findChildElement(className("tx-reward-app-cc"))
           .map(_.text)
           .getOrElse(s"0 $acronym"),
         unit = acronym,
@@ -131,7 +131,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       validatorRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-validator-amulet"))
+          .findChildElement(className("tx-reward-validator-cc"))
           .map(_.text)
           .getOrElse(s"0 $acronym"),
         unit = acronym,
@@ -139,7 +139,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       svRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
-          .findChildElement(className("tx-reward-sv-amulet"))
+          .findChildElement(className("tx-reward-sv-cc"))
           .map(_.text)
           .getOrElse(s"0 $acronym"),
         unit = acronym,
@@ -208,9 +208,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       receiver.toProtoPrimitive,
     )
 
-    click on "create-offer-amulet-amount"
-    numberField("create-offer-amulet-amount").value = ""
-    numberField("create-offer-amulet-amount").underlying.sendKeys(transferAmount.toString())
+    click on "create-offer-cc-amount"
+    numberField("create-offer-cc-amount").value = ""
+    numberField("create-offer-cc-amount").underlying.sendKeys(transferAmount.toString())
 
     click on "create-offer-expiration-days"
     singleSel("create-offer-expiration-days").value = expiryDays.toString
@@ -238,7 +238,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         Some(
           parseAmountText(
             transactionRow
-              .childElement(className("tx-amount-amulet"))
+              .childElement(className("tx-amount-cc"))
               .text,
             unit = amuletNameAcronym,
           )

@@ -285,7 +285,7 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
-            <Typography variant="h5" className="payment-total-amulet">
+            <Typography variant="h5" className="payment-total-cc">
               <AmountDisplay amount={totalAmulet} currency={'AmuletUnit'} />
             </Typography>
             <Typography variant="body2" className="payment-compute">

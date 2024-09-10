@@ -259,7 +259,7 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
           <Tab label="DSO Info" {...tabProps('dso-info')} />
           <Tab
             label={`${window.splice_config.spliceInstanceNames?.amuletName} Info`}
-            {...tabProps('amulet-info')}
+            {...tabProps('cc-info')}
           />
           {cometBftDebugTab && <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />}
           {sequencerStatusQuery && mediatorStatusQuery && (
