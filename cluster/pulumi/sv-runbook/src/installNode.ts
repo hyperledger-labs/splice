@@ -20,7 +20,6 @@ import {
   REPO_ROOT,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
-  svAppSecrets,
   svKeySecret,
   svKeyFromSecret,
   validatorSecrets,
@@ -46,6 +45,7 @@ import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
+import { svAppSecrets } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');

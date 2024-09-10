@@ -97,7 +97,7 @@ export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] 
   return imagePullSecretByNamespaceName(ns.logicalName);
 }
 
-function uiSecret(
+export function uiSecret(
   auth0Client: Auth0Client,
   ns: ExactNamespace,
   appName: string,
@@ -128,17 +128,6 @@ export function cnsUiSecret(
   clientId: string
 ): k8s.core.v1.Secret {
   return uiSecret(auth0Client, ns, 'cns', clientId);
-}
-
-export async function svAppSecrets(
-  ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  clientId: string
-): Promise<AppAndUiSecrets> {
-  return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', 'sv'),
-    uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
-  };
 }
 
 export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.core.v1.Secret {

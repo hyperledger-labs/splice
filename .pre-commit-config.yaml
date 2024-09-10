@@ -67,6 +67,12 @@ repos:
         entry: "make cluster/pulumi/validator-runbook/test"
         files: '^cluster/pulumi/validator-runbook/.*[.]ts$'
         pass_filenames: false
+      - id: pulumi_sv_canton
+        name: check pulumi sv-canton config
+        language: system
+        entry: "make cluster/pulumi/sv-canton/test"
+        files: '^cluster/pulumi/sv-canton/.*[.]ts$'
+        pass_filenames: false
       - id: circleci_config
         name: check circleci config is updated
         language: system

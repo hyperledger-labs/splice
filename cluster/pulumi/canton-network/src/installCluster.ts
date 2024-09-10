@@ -17,12 +17,12 @@ import {
   ApprovedSvIdentity,
   nonDevNetNonSvValidatorTopupConfig,
 } from 'splice-pulumi-common';
+import { getDsoSize } from 'splice-pulumi-common-sv';
 
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { Dso } from './dso';
 import { installSplitwell } from './splitwell';
-import svConfigs from './svConfigs';
 import { autoAcceptTransfersConfigFromEnv } from './validator';
 import { installValidator1 } from './validator1';
 
@@ -100,29 +100,6 @@ const standaloneValidatorOnboarding: ExpectedValidatorOnboarding | undefined =
 
 let periodicBackupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
-
-function getDsoSize(): number {
-  // If not devnet, enforce 1 sv
-  if (!isDevNet) {
-    return 1;
-  }
-
-  const maxDsoSize = svConfigs.length;
-  const dsoSize = +config.requireEnv(
-    'DSO_SIZE',
-    `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxDsoSize})`
-  );
-
-  if (dsoSize < 1) {
-    throw new Error('DSO_SIZE must be at least 1');
-  }
-
-  if (dsoSize > maxDsoSize) {
-    throw new Error(`DSO_SIZE must be at most ${maxDsoSize}`);
-  }
-
-  return dsoSize;
-}
 
 export async function installCluster(
   auth0Client: Auth0Client

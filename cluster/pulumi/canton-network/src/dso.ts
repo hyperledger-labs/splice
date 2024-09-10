@@ -17,11 +17,10 @@ import {
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
-import { StaticCometBftConfigWithNodeName } from 'splice-pulumi-common-sv';
+import { StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
 import { SequencerPruningConfig, StaticSvConfig } from 'splice-pulumi-common-sv/src/config';
 
 import { InstalledSv, SvOnboarding, installSvNode } from './sv';
-import svConfigs from './svConfigs';
 
 interface DsoArgs {
   dsoSize: number;

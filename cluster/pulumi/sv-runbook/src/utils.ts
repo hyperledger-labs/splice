@@ -1,9 +1,15 @@
 import fetch from 'node-fetch';
-import { config, isDevNet, CLUSTER_HOSTNAME } from 'splice-pulumi-common';
+import {
+  config,
+  CLUSTER_HOSTNAME,
+  ExactNamespace,
+  Auth0Client,
+  installAuth0Secret,
+  AppAndUiSecrets,
+  uiSecret,
+} from 'splice-pulumi-common';
+import { svRunbookConfig } from 'splice-pulumi-common-sv';
 import { retry } from 'splice-pulumi-common/src/retries';
-
-export const SV_NAME = 'DA-Helm-Test-Node';
-export const SV_NAMESPACE = 'sv';
 
 export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = config.envFlag(
   'DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
@@ -29,9 +35,13 @@ export async function getValidator1PartyId(): Promise<string> {
   });
 }
 
-// Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
-export const validatorWalletUserName = isDevNet
-  ? 'auth0|64b16b9ff7a0dfd00ea3704e'
-  : 'auth0|64553aa683015a9687d9cc2e';
-
-export const DEFAULT_AUDIENCE = 'https://canton.network.global';
+export async function svAppSecrets(
+  ns: ExactNamespace,
+  auth0Client: Auth0Client,
+  clientId: string
+): Promise<AppAndUiSecrets> {
+  return {
+    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', svRunbookConfig.auth0SvAppName),
+    uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
+  };
+}

@@ -201,6 +201,8 @@ function _resolve_pulumi_stack() {
     pulumi_project=$1
     if [[ $pulumi_project == "gcp" ]]; then
         pulumi_stack="$CLOUDSDK_CORE_PROJECT"
+    elif [[ $pulumi_project == "sv-canton" ]]; then
+        pulumi_stack="$pulumi_project.${SPLICE_SV}-migration-${SPLICE_MIGRATION_ID}.$GCP_CLUSTER_BASENAME"
     else
         pulumi_stack="$pulumi_project.$GCP_CLUSTER_BASENAME"
     fi

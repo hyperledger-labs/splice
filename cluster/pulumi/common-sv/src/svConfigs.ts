@@ -1,14 +1,14 @@
 import * as pulumi from '@pulumi/pulumi';
+import { sweepConfigFromEnv } from 'canton-network-pulumi-deployment/src/validator';
 import {
   isDevNet,
   isMainNet,
   SvCometBftKeys,
   svCometBftKeysFromSecret,
 } from 'splice-pulumi-common';
-import { cometbftRetainBlocks } from 'splice-pulumi-common-sv';
-import { StaticSvConfig } from 'splice-pulumi-common-sv/src/config';
 
-import { sweepConfigFromEnv } from './validator';
+import { StaticSvConfig } from './config';
+import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
   ? [svCometBftKeysFromSecret('sv1-cometbft-keys')]
@@ -32,7 +32,7 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
     ];
 // to generate new keys: https://cimain.network.canton.global/sv_operator/sv_helm.html#generating-your-cometbft-node-keys
 // TODO(#11109): rotate the non-mainNet keys as they have been exposed in github (once mechanism is in place)
-const svConfigs: StaticSvConfig[] = isMainNet
+export const svConfigs: StaticSvConfig[] = isMainNet
   ? [
       {
         // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
@@ -368,4 +368,21 @@ const svConfigs: StaticSvConfig[] = isMainNet
       },
     ];
 
-export default svConfigs;
+export const sv1Config: StaticSvConfig = svConfigs[0];
+
+export const svRunbookConfig: StaticSvConfig = {
+  onboardingName: 'DA-Helm-Test-Node',
+  nodeName: 'sv',
+  ingressName: 'sv',
+  auth0SvAppName: 'sv',
+  auth0ValidatorAppName: 'validator',
+  // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
+  validatorWalletUser: isDevNet
+    ? 'auth0|64b16b9ff7a0dfd00ea3704e'
+    : 'auth0|64553aa683015a9687d9cc2e',
+  cometBft: {
+    retainBlocks: cometbftRetainBlocks,
+    id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
+    nodeIndex: 0,
+  },
+};

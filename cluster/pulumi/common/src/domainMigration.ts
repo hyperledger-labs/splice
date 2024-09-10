@@ -136,7 +136,7 @@ function processMigrationProvider(maybeMigrationProviderValue?: string): Migrati
   }
 }
 
-function processMigrationId(maybeValue?: string): DomainMigrationIndex | undefined {
+export function processMigrationId(maybeValue?: string): DomainMigrationIndex | undefined {
   if (maybeValue == undefined) {
     return undefined;
   }

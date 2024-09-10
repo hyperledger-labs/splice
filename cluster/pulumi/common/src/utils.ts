@@ -112,15 +112,25 @@ export interface ExactNamespace {
   logicalName: string;
 }
 
-export function exactNamespace(name: string, withIstioInjection = false): ExactNamespace {
+export function exactNamespace(
+  name: string,
+  withIstioInjection = false,
+  retainOnDelete?: boolean
+): ExactNamespace {
   // Namespace with a fully specified name, exactly as it will
   // appear within Kubernetes. (No Pulumi suffix.)
-  const ns = new k8s.core.v1.Namespace(name, {
-    metadata: {
-      name,
-      labels: withIstioInjection ? { 'istio-injection': 'enabled' } : {},
+  const ns = new k8s.core.v1.Namespace(
+    name,
+    {
+      metadata: {
+        name,
+        labels: withIstioInjection ? { 'istio-injection': 'enabled' } : {},
+      },
     },
-  });
+    {
+      retainOnDelete: retainOnDelete,
+    }
+  );
 
   return { ns, logicalName: name };
 }
