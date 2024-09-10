@@ -31,6 +31,7 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         memory: '2G',
       },
     },
+    terminationGracePeriodSeconds: 600,
     image: {
       registry: 'us-central1-docker.pkg.dev',
       repository: 'da-cn-shared/cn-images/pulumi-kubernetes-operator',
