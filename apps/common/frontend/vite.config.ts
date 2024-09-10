@@ -25,5 +25,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       preserveSymlinks: true,
     },
+    test: {
+      setupFiles: ['./src/__tests__/setup/setup.ts'],
+      chaiConfig: {
+        truncateThreshold: 10000,
+      },
+    },
   });
 });

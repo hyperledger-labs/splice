@@ -231,6 +231,7 @@ function start_local_tests() {
   start_test splitwell
   start_test sv
   start_test wallet
+  start_test common
 }
 
 if [ $run_tests -eq 1 ]; then
