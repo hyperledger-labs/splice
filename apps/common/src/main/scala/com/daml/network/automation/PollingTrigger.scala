@@ -70,18 +70,16 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           val latencyTimer = metrics.latency.startAsync()
           waitForReadyToWork()
             .flatMap(_ => performWorkIfAvailable())
-            .andThen { case performedWork =>
+            .transform { performedWork =>
               MetricsContext.withExtraMetricLabels(("work_done", performedWork.toString)) { m =>
                 latencyTimer.stop()(m)
               }
 
-              blocking {
-                synchronized {
-                  assert(runningTaskFinishedVar.nonEmpty)
-                  runningTaskFinishedVar.foreach(_.success(()))
-                  runningTaskFinishedVar = None
-                }
-              }
+              assert(runningTaskFinishedVar.nonEmpty)
+              runningTaskFinishedVar.foreach(_.success(()))
+              runningTaskFinishedVar = None
+
+              performedWork
             }
         }
       }
@@ -218,15 +216,23 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var runningTaskFinishedVar: Option[Promise[Unit]] = None
 
-  override def pause(): Future[Unit] = blocking {
-    synchronized {
-      pausedVar = true
-      runningTaskFinishedVar.fold(Future.unit)(_.future)
+  override def pause(): Future[Unit] = {
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.debug("Pausing trigger.")
+      blocking {
+        synchronized {
+          pausedVar = true
+          runningTaskFinishedVar.fold(Future.unit)(_.future.map { _ =>
+            logger.debug("Trigger completely paused.")
+          })
+        }
+      }
     }
   }
 
   override def resume(): Unit = blocking {
     synchronized {
+      logger.debug("Resuming trigger.")(TraceContext.empty)
       pausedVar = false
     }
   }

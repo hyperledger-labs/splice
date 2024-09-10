@@ -1013,6 +1013,7 @@ class HttpScanHandler(
           // - this will only be used in tests
           // - wall clock tests must take manual snapshots anyway, because they can't wait
           // - simtime tests will advanceTime(N.hours)
+          _ = logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
           _ <- snapshotStore.insertNewSnapshot(lastSnapshot, snapshotTime)
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
