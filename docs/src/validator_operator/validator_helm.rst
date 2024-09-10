@@ -123,7 +123,7 @@ The onboarding secret is a one-time use secret that expires after 24 hours. If y
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-2.\ |cn_cluster|.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare
+     curl -X POST https://sv.sv-2.TARGET_CLUSTER.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare
 
 
 Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the namespace you created earlier. The value should be provided by the SV sponsoring the onboarding of your validator.
@@ -179,6 +179,9 @@ You might be required to whitelist a range of URLs on your OIDC provider, such a
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
 ``https://wallet.validator.YOUR_HOSTNAME`` (for the Wallet web UI) and
 ``https://cns.validator.YOUR_HOSTNAME`` (for the CNS web UI).
+
+``YOUR_HOSTNAME`` is a placeholder that you need to replace with the actual domain name or IP address of the server hosting your services.
+
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your Validator node's Canton participant.
 In :ref:`helm-validator-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -348,6 +351,7 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
@@ -356,8 +360,8 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator.
-  (This Scan instances will be used for obtaining additional Scan URLs for BFT Scan reads.)
+- Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, e.g., ``https://scan.sv-1.TARGET_CLUSTER.global.canton.network.sync.global``
+  (This Scan instance will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
@@ -374,7 +378,8 @@ This does mean that you depend on that single SV and if it is broken or maliciou
     :end-before: TRUSTED_SINGLE_SCAN_END
 
 If you want to configure to connect to the decentralized synchronizer via only a single trusted sequencer,
-you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
+you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer,
+e.g., ``https://sequencer-MIGRATION_ID.sv-1.TARGET_CLUSTER.global.canton.network.sync.global``.
 This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
@@ -386,7 +391,7 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-v
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
-  ``https://sv.sv-2.|cn_cluster|.global.canton.network.digitalasset.com``.
+  ``https://sv.sv-2.TARGET_CLUSTER.global.canton.network.sync.global``.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
@@ -602,6 +607,16 @@ Canton Name Service.
 .. image:: images/ans_home.png
   :width: 600
   :alt: After logged in into the CNS UI
+
+Configuring top-ups
+-------------------
+Optionally you may want to configure a validator's traffic top-up loop for non-production validators.
+To do so, uncomment and fill in the following section in the validator-values.yaml file:
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: CONFIGURING_TOPUP_START
+    :end-before: CONFIGURING_TOPUP_END
 
 Configuring sweeps and auto-accepts of transfer offers
 ------------------------------------------------------

@@ -29,6 +29,7 @@ auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 
+# CONFIGURING_TOPUP_START
 # Configuring a validator's traffic top-up loop
 #
 # enabled - set to false in order to disable automatic traffic top-ups.
@@ -44,6 +45,7 @@ auth:
 # - the available traffic amount drops below the configured top-up amount
 # - at least minTopupInterval has elapsed since the last one
 # - the validator has sufficient CC in its wallet to buy this much traffic (except on DevNet)
+# CONFIGURING_TOPUP_END
 topup:
   enabled: true
   targetThroughput: 20000
