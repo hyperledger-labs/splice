@@ -17,7 +17,7 @@ import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
-import com.digitalasset.canton.networking.grpc.GrpcError
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
@@ -161,16 +161,26 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
       }
 
       // In tests, we want to retry some commands to avoid flakiness
-      def commandRetryPolicy(command: GrpcAdminCommand[?, ?, ?])(error: GrpcError): Boolean =
-        command match {
+      def commandRetryPolicy(command: GrpcAdminCommand[?, ?, ?])(error: GrpcError): Boolean = {
+        val decodedCantonError = command match {
           // Command submissions are safe to retry - they are deduplicated by command ID
-          case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.retry
-          case _: CommandService.BaseCommand[?, ?, ?] => error.retry
+          case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.decodedCantonError
+          case _: CommandService.BaseCommand[?, ?, ?] => error.decodedCantonError
           // Package operations are idempotent so we can retry them
-          case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] => error.retry
+          case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] =>
+            error.decodedCantonError
           // Other commands might not be idempotent
-          case _ => false
+          case _ => None
         }
+        // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
+        // so for now we go for an ad-hoc logic here.
+        decodedCantonError.exists { err =>
+          err.code match {
+            case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true
+            case _ => err.isRetryable
+          }
+        }
+      }
 
       testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
       testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
