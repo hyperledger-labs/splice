@@ -1,7 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-FROM debian:buster-slim
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim
 
 WORKDIR /tmp
 ENV GCSPROXY_VERSION=0.3.1

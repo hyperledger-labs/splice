@@ -3,7 +3,7 @@
 
 ARG base_version
 
-FROM --platform=linux/amd64 canton:${base_version}
+FROM canton:${base_version}
 
 EXPOSE 5008
 EXPOSE 5009

@@ -213,6 +213,7 @@ commands:
         command: |
           set -euo pipefail
           git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+          uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
           sudo mkdir /nix
           sudo chown $USER /nix
     - restore_cache:
@@ -1303,6 +1304,16 @@ commands:
           event: fail
           custom: |
             { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+
+  # TODO(#14750): consider creating a custom image that already has this configured
+  docker_prep_build:
+    steps:
+      # enable containerd image store, to support multi-platform images (see https://docs.docker.com/desktop/containerd/)
+      - run:
+          name: Modify Docker Daemon Configuration
+          command: |
+            echo '{"features": {"containerd-snapshotter": true}}' | sudo tee /etc/docker/daemon.json
+            sudo systemctl restart docker
 
   docker_build:
     steps:
@@ -2858,6 +2869,7 @@ jobs:
                     circleci-agent step halt
                   fi
       - setup_sbt_test_job
+      - docker_prep_build
       # Used to pull docker images for cometbft
       - docker_login_artifactory
       - docker_pull_test_images
@@ -3046,6 +3058,7 @@ jobs:
          cmd_retry_count: 5 # Retry in case of dependency download errors
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
+      - docker_prep_build
       - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
@@ -3134,6 +3147,7 @@ jobs:
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
+      - docker_prep_build
       - docker_build
       - save_frontend_builds
       - cleanup_sbt_test_job
@@ -3533,6 +3547,45 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
+
+  # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
+  #               preflight there. We therefore for now only spin up the validator and check that
+  #               it succeeds.
+  deploy_arm_compose_validator:
+    machine:
+      image: ubuntu-2204:2024.01.1
+      resource_class: arm.large
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - docker_login_internal
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cluster: << parameters.cluster >>
+          cmd_name: Wait for SV app to be responsive
+          cmd: |
+            cncluster wait sv-1 sv-app
+      - run_bash_command_in_nix:
+          cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
+      - run_bash_command_in_nix:
+          cmd_name: Deploy the docker-compose validator
+          cluster: << parameters.cluster >>
+          cmd: |
+            build-tools/splice-compose.sh start -d -w -n onvpn
+          cmd_retry_count: 3
+      - store_artifacts:
+          name: Store logs
+          path: log
+          destination: log
 
   deploy_operator:
     circleci_ip_ranges: true
@@ -5658,6 +5711,7 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - deploy_arm_compose_validator
             - backup_cluster
       - restore_node:
           name: "restore_validator_node"
@@ -5708,6 +5762,15 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster
+      - deploy_arm_compose_validator:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster

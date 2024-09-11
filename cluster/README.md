@@ -102,6 +102,7 @@
   - [Security](#security)
   - [Chaos Mesh](#chaos-mesh)
   - [Maintenance Windows](#maintenance-windows)
+  - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1995,6 +1996,24 @@ gcloud container clusters update "${GCP_CLUSTER_NAME}" \
 ```
 
 A gcp alert triggers whenever an update starts.
+
+## Multi-architecture Docker Images
+
+When built locally using `make docker-build`, our images are built for running in k8s on amd64. When built from CI, they support also running on arm64.
+
+When modifying Dockerfiles, keep in mind that they need to support multi-arch. The main thing
+to keep in mind is the distinction between $BUILDPLATFORM (the architecture on which the `docker build` command is running, i.e. your machine, or the CCI docker_build job) and
+$TARGETPLATFORM (the architecture for which the image is built, i.e. on which the container
+will run). We utilize multi-stage builds (see https://docs.docker.com/build/building/multi-stage/) to support this distinction. Typically, all RUN commands in the Dockerfile
+will need to run in the context of $BUILDPLATFORM, i.e. in a stage that uses `--platform $BUILDPLATFORM` because they are executed at build time, and in the end copied over to a
+stage that builds the final image for $TARGETPLATFORM (the default for FROM if no
+`--platform` is specified).
+
+To build multi-arch images locally:
+- Enable containerd image store, per https://docs.docker.com/build/building/multi-platform/#enable-the-containerd-image-store.
+  Note that this hides any existing images, running containers, etc. but they are still there
+  and the step is reversible.
+- `export CI=1`, and build the images using `make docker-build -j`
 
 ## Onboarding
 

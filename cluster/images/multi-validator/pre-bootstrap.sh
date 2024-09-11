@@ -21,7 +21,7 @@ function request_onboarding_secret() {
 
         until [ $n -gt $MAX_RETRY ]; do
 
-            if SECRET=$(curl -sSfL -X POST "${ONBOARD_SECRET_URL}" 2> /dev/null); then
+            if SECRET=$(wget --post-data="" -q -O - "${ONBOARD_SECRET_URL}"); then
                 echo "$SECRET"
                 break
             else
