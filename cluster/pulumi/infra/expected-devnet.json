@@ -575,7 +575,7 @@
     "type": "gcp:compute/address:Address"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "projects/da-cn-devnet/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -611,7 +611,7 @@
     "type": "pulumi:providers:auth0"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "projects/da-cn-devnet/secrets/dns01-sa-key-secret/versions/1",
     "inputs": {},
     "name": "dns01-sa-key-secret",
@@ -2671,7 +2671,7 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"

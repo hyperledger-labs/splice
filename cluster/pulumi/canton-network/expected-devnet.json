@@ -1345,7 +1345,7 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -1429,7 +1429,7 @@
     "type": "canton:network:dso"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"

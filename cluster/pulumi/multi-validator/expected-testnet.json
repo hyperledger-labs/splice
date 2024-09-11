@@ -66,7 +66,7 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.test",
     "inputs": {
       "name": "organization/infra/infra.test"

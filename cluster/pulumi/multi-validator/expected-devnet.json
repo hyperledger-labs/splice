@@ -4221,7 +4221,7 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"

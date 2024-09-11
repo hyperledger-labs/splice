@@ -253,7 +253,7 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"

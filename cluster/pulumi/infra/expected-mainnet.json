@@ -520,7 +520,7 @@
     "type": "gcp:compute/address:Address"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "projects/da-cn-mainnet/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -544,7 +544,7 @@
     "type": "kubernetes:snapshot.storage.k8s.io/v1:VolumeSnapshotClass"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "projects/da-cn-mainnet/secrets/dns01-sa-key-secret/versions/1",
     "inputs": {},
     "name": "dns01-sa-key-secret",
@@ -2705,7 +2705,7 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
+    "custom": true,
     "id": "organization/infra/infra.main",
     "inputs": {
       "name": "organization/infra/infra.main"
