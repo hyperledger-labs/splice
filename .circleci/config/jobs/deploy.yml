@@ -40,6 +40,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -99,10 +103,9 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -164,6 +167,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -220,10 +227,9 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -353,6 +359,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
 
     steps:
       - checkout_with_retry
@@ -439,10 +449,9 @@ jobs:
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -557,8 +566,7 @@ jobs:
               cncluster activate
               # All CI-deployed clusters use split postgres instances per app, to support backups.
               export SPLIT_POSTGRES_INSTANCES=1
-              # TODO (#11584): remove this once there's a new base version.
-              export ENABLE_CLOUD_SQL=false
+            
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
 

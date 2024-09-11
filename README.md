@@ -58,6 +58,7 @@
     - [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
+    - [Testing cluster upgrades](#testing-cluster-upgrades)
   - [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
     - [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
     - [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
@@ -1034,6 +1035,11 @@ PRs/commits that include `[breaking]` in their commit message, or that bump the 
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
+
+### Testing cluster upgrades
+
+You can run upgrade tests like the ones in ciupgrade on CircleCI by running `cncluster cci_upgrade_test`.
+Check the `--help` for more options.
 
 ### Testing hard migrations
 

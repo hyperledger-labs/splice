@@ -160,7 +160,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     topupConfig,
   } = validatorConfig;
 
-  // TODO(#14507): Remove the override once ciperiodic has been bumped to 0.2.0
+  // TODO(#14679): Remove the override once ciperiodic has been bumped to 0.2.0
   const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
   const postgresValues: ChartValues = _.merge(
     loadYamlFromFile(

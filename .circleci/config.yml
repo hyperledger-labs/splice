@@ -31,7 +31,7 @@ parameters:
       [
         build,
         deploy-cidaily,
-        deploy-ciupgrade,
+        deploy-upgrade,
         deploy-ciperiodic-migration,
         determine-ciperiodic-migration-work,
         deploy-ciperiodic-sv-reonboard,
@@ -88,6 +88,10 @@ parameters:
   # The target version for hard migrations in the `deploy_ciperiodic_migration` job
   # Empty/default means "latest on branch"
   upgrade-version:
+    type: string
+    default: ""
+  # branch_filter parameter of wait_for_previous_pipeline
+  branch-filter:
     type: string
     default: ""
   # for jobs that require a migration-id to be specified
@@ -814,10 +818,7 @@ commands:
               . .envrc.vars
               if [[ "$TARGET_CLUSTER" != none ]]; then
                 . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
-                # TODO (#11584): this file should always exist starting on 0.1.9
-                if [ -f $REPO_ROOT/build-tools/lib/cluster.envrc.vars ]; then
-                  . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
-                fi
+                . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
                 echo "Using cluster hostname suffix: ${GCP_CLUSTER_HOSTNAME}"
               fi
 
@@ -1720,6 +1721,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -1779,10 +1784,9 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -1844,6 +1848,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -1900,10 +1908,9 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -2033,6 +2040,10 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
+      run_upgrade_workarounds:
+        type: boolean
+        default: false
 
     steps:
       - checkout_with_retry
@@ -2119,10 +2130,9 @@ jobs:
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
-            # TODO (#11584): remove this once there's a new base version.
-            if [[ << parameters.cluster >> == "ciupgrade" ]]; then
-                export ENABLE_CLOUD_SQL=false
-                export COMETBFT_STABLE_CHAIN_ID=true
+            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
+              # TODO (#14721): remove
+              export COMETBFT_STABLE_CHAIN_ID=true
             fi
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -2237,8 +2247,7 @@ jobs:
               cncluster activate
               # All CI-deployed clusters use split postgres instances per app, to support backups.
               export SPLIT_POSTGRES_INSTANCES=1
-              # TODO (#11584): remove this once there's a new base version.
-              export ENABLE_CLOUD_SQL=false
+            
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
 
@@ -3262,30 +3271,8 @@ jobs:
           command: |
             source .envrc.vars
 
-            run_partial_upgrade=""
-            if build-tools/changes-vs-base "$REPO_ROOT/cluster"; then
-              echo "Proceeding with partial upgrade."
-              run_partial_upgrade="true"
-            else
-              echo "Skipping cluster partial upgrade and preflights steps."
-              run_partial_upgrade="false"
-            fi
-
-            run_daml_upgrade=""
-            if build-tools/changes-vs-base "$REPO_ROOT/daml/dars.lock"; then
-              echo "Skipping cluster daml upgrade."
-              run_daml_upgrade="false"
-            else
-              echo "Proceeding with daml upgrade."
-              run_daml_upgrade="true"
-            fi
-
-            latest_base_version=$(build-tools/find_latest_base_version.sh)
-            curl --fail-with-body --request POST \
-              --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
-              --header "Circle-Token: ${CIRCLECI_TOKEN}" \
-              --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"run-partial-upgrade\": $run_partial_upgrade, \"run-daml-upgrade\": $run_daml_upgrade, \"base-version\": \"$latest_base_version\"}}"
+            # defaults for base-version, run-daml-upgrade and run-partial-upgrade are good for main-like branches
+            .circleci/launch-upgrade.sh --cluster ciupgrade --branch-filter-wait "^main|deployment/.*$|release-line.*"
 
   launch_ciperiodic_migration_workflow:
     docker:
@@ -4066,7 +4053,7 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      is_shared_cluster:
+      unlock_shared_cluster:
         type: boolean
         default: true
       silence_deployment_alerts:
@@ -4088,7 +4075,7 @@ jobs:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
-            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
             cncluster activate
@@ -4098,7 +4085,7 @@ jobs:
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
-            if [[ << parameters.is_shared_cluster >> == true ]]; then
+            if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
             else
               cncluster reset
@@ -5057,7 +5044,6 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          is_shared_cluster: false
           context:
             - canton-network-vpn
             - slack-context
@@ -5315,7 +5301,6 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
-          is_shared_cluster: false
           context:
             - canton-network-vpn
             - slack-context
@@ -5417,7 +5402,6 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
-          is_shared_cluster: false
           context:
             - canton-network-vpn
             - slack-context
@@ -5535,7 +5519,6 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
-          is_shared_cluster: false
           context:
             - canton-network-vpn
             - slack-context
@@ -5546,346 +5529,6 @@ workflows:
           cluster: "ciperiodic"
           requires:
             - preflight_sv_reonboard_check
-
-  deploy_ciupgrade:
-    # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
-    when:
-      equal: [ deploy-ciupgrade, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_ciupgrade"
-          wait_type: "wait_workflow"
-      - autoscaler_prevent_scaledown:
-          <<: *main-branch-only
-          cluster: "ciupgrade"
-          requires:
-            - wait_for_previous_pipeline
-      - reset_cluster:
-          # note that this reset is executed on the latest version to properly cleanup previous deploy_ciupgrade runs
-          name: reset_cluster
-          <<: *main-branch-only
-          cluster: "ciupgrade"
-          is_shared_cluster: false
-          silence_deployment_alerts: true
-          context:
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - deploy_cluster:
-          name: "deploy_cluster_for_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciupgrade"
-          reset_cluster: false # done in reset_cluster job
-          skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
-          update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
-          cancel_workflow_on_failure: true
-          deploy_version: << pipeline.parameters.base-version >>
-          requires:
-            - reset_cluster
-      - preflight_check:
-          name: "preflight_check_initial"
-          <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >>
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          wait_for_sv: false
-          requires:
-            - reset_cluster
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_upgrade"
-          reset_cluster: false
-          deploy_version: << pipeline.parameters.base-version >>
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciupgrade"
-          requires:
-            - deploy_cluster_for_upgrade
-      - preflight_sv_check:
-           name: "preflight_sv_check_initial"
-           <<: *main-branch-only
-           cluster_version: << pipeline.parameters.base-version >>
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "ciupgrade"
-           requires:
-             - deploy_cluster_for_upgrade
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_for_upgrade"
-          reset_cluster: false
-          deploy_version: << pipeline.parameters.base-version >>
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - deploy_cluster_for_upgrade
-      - preflight_validator_check:
-          name: "preflight_validator_initial"
-          <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >>
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - deploy_cluster_for_upgrade
-      - artifacts_push:
-          <<: *notify-fail
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - deploy_partial_upgrade:
-          name: "deploy_partial_upgrade"
-          cluster: "ciupgrade"
-          context:
-            - artifactory
-            - slack-context
-          <<: *main-branch-only
-          run: << pipeline.parameters.run-partial-upgrade >>
-          silence_deployment_alerts: true
-          requires:
-            - artifacts_push
-            - preflight_check_initial
-            - preflight_sv_check_initial
-            - preflight_validator_initial
-      - preflight_check:
-          name: "preflight_check_partial_upgrade"
-          <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          run: << pipeline.parameters.run-partial-upgrade >>
-          wait_for_sv: false
-          requires:
-            - deploy_partial_upgrade
-      - preflight_sv_check:
-          name: "preflight_sv_check_partial_upgrade"
-          <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          run: << pipeline.parameters.run-partial-upgrade >>
-          requires:
-            - deploy_partial_upgrade
-      - preflight_validator_check:
-          name: "preflight_validator_partial_upgrade"
-          <<: *main-branch-only
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          run: << pipeline.parameters.run-partial-upgrade >>
-          requires:
-            - deploy_partial_upgrade
-      - deploy_cluster:
-          name: "deploy_final_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciupgrade"
-          reset_cluster: false
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - preflight_check_partial_upgrade
-            - preflight_sv_check_partial_upgrade
-            - preflight_validator_partial_upgrade
-      - preflight_check:
-          name: "preflight_check_final_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
-          with_docker: true
-          wait_for_sv: false
-          requires:
-            - deploy_final_upgrade
-      - preflight_check:
-          name: "preflight_daml_upgrade"
-          <<: *main-branch-only
-          run: << pipeline.parameters.run-daml-upgrade >>
-          test_names_file: "test-daml-ciupgrade-vote.log"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          wait_for_sv: false
-          requires:
-            - preflight_check_final_upgrade
-      # the deployment of both SV runbook and validator runbook should be finished
-      # before the daml upgrade vote is effective
-      - deploy_sv_runbook:
-          name: "upgrade_sv_runbook_after_daml_upgrade"
-          reset_cluster: false
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciupgrade"
-          requires:
-            - preflight_daml_upgrade
-      - deploy_validator_runbook:
-          name: "upgrade_validator_runbook_after_daml_upgrade"
-          reset_cluster: false
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - preflight_daml_upgrade
-      - wait_for_daml_upgrade:
-          name: "wait_for_daml_upgrade"
-          <<: *main-branch-only
-          context:
-            - canton-network-vpn
-          run: << pipeline.parameters.run-daml-upgrade >>
-          cluster: "ciupgrade"
-          requires:
-            - preflight_daml_upgrade
-      - preflight_check:
-          name: "preflight_after_daml_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          wait_for_sv: false
-          requires:
-            - wait_for_daml_upgrade
-            - upgrade_sv_runbook_after_daml_upgrade
-            - upgrade_validator_runbook_after_daml_upgrade
-      - preflight_sv_check:
-          name: "preflight_sv_check_after_sv_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - wait_for_daml_upgrade
-            - upgrade_sv_runbook_after_daml_upgrade
-            - upgrade_validator_runbook_after_daml_upgrade
-      - preflight_validator_check:
-          name: "preflight_validator_runbook_after_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - wait_for_daml_upgrade
-            - upgrade_sv_runbook_after_daml_upgrade
-            - upgrade_validator_runbook_after_daml_upgrade
-      - deploy_sv_runbook:
-          name: "redeploy_sv_runbook_after_daml_upgrade"
-          # by resetting the SV runbook, it's as if a new SV was onboarded,
-          # thus testing that SVs joining after an upgrade also work
-          reset_cluster: true
-          silence_deployment_alerts: true
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciupgrade"
-          requires:
-            - wait_for_daml_upgrade
-            - preflight_sv_check_after_sv_upgrade
-            - preflight_validator_runbook_after_upgrade
-      - deploy_validator_runbook:
-          name: "redeploy_validator_runbook_after_daml_upgrade"
-          # by resetting the Validator runbook, it's as if a new Validator was onboarded,
-          # thus testing that Validators joining after an upgrade also work
-          reset_cluster: true
-          silence_deployment_alerts: true
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - wait_for_daml_upgrade
-            - preflight_sv_check_after_sv_upgrade
-            - preflight_validator_runbook_after_upgrade
-      - preflight_sv_check:
-          name: "preflight_sv_check_after_sv_redeploy"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - redeploy_sv_runbook_after_daml_upgrade
-      - preflight_validator_check:
-          name: "preflight_validator_runbook_after_redeploy"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciupgrade"
-          requires:
-            - redeploy_validator_runbook_after_daml_upgrade
-      - reset_cluster:
-          name: reset_cluster_after_upgrade
-          is_shared_cluster: false
-          <<: *main-branch-only
-          cluster: "ciupgrade"
-          context:
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_after_sv_redeploy
-            - preflight_validator_runbook_after_redeploy
-      - autoscaler_allow_scaledown:
-          <<: *main-branch-only
-          cluster: "ciupgrade"
-          requires:
-            - reset_cluster_after_upgrade
 
 
   auth0_user_cleanup:
@@ -6617,7 +6260,7 @@ workflows:
             - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
           cluster: << pipeline.parameters.cluster >>
-          is_shared_cluster: true
+          unlock_shared_cluster: true
           context:
             - canton-network-vpn
             - slack-context
@@ -6799,4 +6442,319 @@ workflows:
           context:
             - slack-context
             - canton-network-vpn
+
+  deploy_upgrade:
+    # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
+    when:
+      equal: [ deploy-upgrade, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_upgrade"
+          wait_type: "wait_workflow"
+          branch_filter: << pipeline.parameters.branch-filter >>
+      - autoscaler_prevent_scaledown:
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_previous_pipeline
+      - reset_cluster:
+          # note that this reset is executed on the latest version to properly cleanup previous deploy_ciupgrade runs
+          name: reset_cluster
+          cluster: << pipeline.parameters.cluster >>
+          unlock_shared_cluster: false
+          silence_deployment_alerts: true
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_cluster:
+          name: "deploy_cluster_for_upgrade"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          reset_cluster: false # done in reset_cluster job
+          skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
+          update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
+          cancel_workflow_on_failure: true
+          deploy_version: << pipeline.parameters.base-version >>
+          run_upgrade_workarounds: true
+          requires:
+            - reset_cluster
+      - preflight_check:
+          name: "preflight_check_initial"
+          cluster_version: << pipeline.parameters.base-version >>
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          wait_for_sv: false
+          requires:
+            - reset_cluster
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_upgrade"
+          reset_cluster: false
+          deploy_version: << pipeline.parameters.base-version >>
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          run_upgrade_workarounds: true
+          requires:
+            - deploy_cluster_for_upgrade
+      - preflight_sv_check:
+           name: "preflight_sv_check_initial"
+           cluster_version: << pipeline.parameters.base-version >>
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: << pipeline.parameters.cluster >>
+           requires:
+             - deploy_cluster_for_upgrade
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_upgrade"
+          reset_cluster: false
+          deploy_version: << pipeline.parameters.base-version >>
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          run_upgrade_workarounds: true
+          requires:
+            - deploy_cluster_for_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_initial"
+          cluster_version: << pipeline.parameters.base-version >>
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - deploy_cluster_for_upgrade
+      - artifacts_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_partial_upgrade:
+          name: "deploy_partial_upgrade"
+          cluster: << pipeline.parameters.cluster >>
+          context:
+            - artifactory
+            - slack-context
+          run: << pipeline.parameters.run-partial-upgrade >>
+          silence_deployment_alerts: true
+          requires:
+            - artifacts_push
+            - preflight_check_initial
+            - preflight_sv_check_initial
+            - preflight_validator_initial
+      - preflight_check:
+          name: "preflight_check_partial_upgrade"
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          run: << pipeline.parameters.run-partial-upgrade >>
+          wait_for_sv: false
+          requires:
+            - deploy_partial_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_partial_upgrade"
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          run: << pipeline.parameters.run-partial-upgrade >>
+          requires:
+            - deploy_partial_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_partial_upgrade"
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          run: << pipeline.parameters.run-partial-upgrade >>
+          requires:
+            - deploy_partial_upgrade
+      - deploy_cluster:
+          name: "deploy_final_upgrade"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          reset_cluster: false
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - preflight_check_partial_upgrade
+            - preflight_sv_check_partial_upgrade
+            - preflight_validator_partial_upgrade
+      - preflight_check:
+          name: "preflight_check_final_upgrade"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
+          with_docker: true
+          wait_for_sv: false
+          requires:
+            - deploy_final_upgrade
+      - preflight_check:
+          name: "preflight_daml_upgrade"
+          run: << pipeline.parameters.run-daml-upgrade >>
+          test_names_file: "test-daml-ciupgrade-vote.log"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          wait_for_sv: false
+          requires:
+            - preflight_check_final_upgrade
+      # the deployment of both SV runbook and validator runbook should be finished
+      # before the daml upgrade vote is effective
+      - deploy_sv_runbook:
+          name: "upgrade_sv_runbook_after_daml_upgrade"
+          reset_cluster: false
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - preflight_daml_upgrade
+      - deploy_validator_runbook:
+          name: "upgrade_validator_runbook_after_daml_upgrade"
+          reset_cluster: false
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - preflight_daml_upgrade
+      - wait_for_daml_upgrade:
+          name: "wait_for_daml_upgrade"
+          context:
+            - canton-network-vpn
+          run: << pipeline.parameters.run-daml-upgrade >>
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - preflight_daml_upgrade
+      - preflight_check:
+          name: "preflight_after_daml_upgrade"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          wait_for_sv: false
+          requires:
+            - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_after_sv_upgrade"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_runbook_after_upgrade"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_daml_upgrade
+            - upgrade_sv_runbook_after_daml_upgrade
+            - upgrade_validator_runbook_after_daml_upgrade
+      - deploy_sv_runbook:
+          name: "redeploy_sv_runbook_after_daml_upgrade"
+          # by resetting the SV runbook, it's as if a new SV was onboarded,
+          # thus testing that SVs joining after an upgrade also work
+          reset_cluster: true
+          silence_deployment_alerts: true
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_daml_upgrade
+            - preflight_sv_check_after_sv_upgrade
+            - preflight_validator_runbook_after_upgrade
+      - deploy_validator_runbook:
+          name: "redeploy_validator_runbook_after_daml_upgrade"
+          # by resetting the Validator runbook, it's as if a new Validator was onboarded,
+          # thus testing that Validators joining after an upgrade also work
+          reset_cluster: true
+          silence_deployment_alerts: true
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_daml_upgrade
+            - preflight_sv_check_after_sv_upgrade
+            - preflight_validator_runbook_after_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_after_sv_redeploy"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - redeploy_sv_runbook_after_daml_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_runbook_after_redeploy"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - redeploy_validator_runbook_after_daml_upgrade
+      - reset_cluster:
+          name: reset_cluster_after_upgrade
+          unlock_shared_cluster: true
+          cluster: << pipeline.parameters.cluster >>
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_after_sv_redeploy
+            - preflight_validator_runbook_after_redeploy
+      - autoscaler_allow_scaledown:
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - reset_cluster_after_upgrade
 

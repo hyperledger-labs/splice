@@ -18,7 +18,7 @@ import {
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
 import { CometBftNodeConfig, CometBftNodeConfigs } from './cometBftNodeConfigs';
-import { disableCometBftStateSync, stableCometBftChainId } from './cometbftConfig';
+import { disableCometBftStateSync } from './cometbftConfig';
 
 export type Cometbft = {
   rpcServiceName: string;
@@ -111,8 +111,7 @@ export function installCometBftNode(
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
             : `${CLUSTER_BASENAME}-${migrationId}`,
-        chainIdSuffix:
-          config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || (stableCometBftChainId ? '0' : ''),
+        chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
       },
       metrics: {
         enable: true,

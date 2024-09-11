@@ -225,7 +225,7 @@ workflow:
             - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
           cluster: << pipeline.parameters.cluster >>
-          is_shared_cluster: true
+          unlock_shared_cluster: true
           context:
             - canton-network-vpn
             - slack-context

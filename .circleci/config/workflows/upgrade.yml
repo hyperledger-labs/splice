@@ -1,28 +1,26 @@
 workflow:
-  deploy_ciupgrade:
+  deploy_upgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
     when:
-      equal: [ deploy-ciupgrade, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-upgrade, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciupgrade"
+          workflow_names: "deploy_upgrade"
           wait_type: "wait_workflow"
+          branch_filter: << pipeline.parameters.branch-filter >>
       - autoscaler_prevent_scaledown:
-          <<: *main-branch-only
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_previous_pipeline
       - reset_cluster:
           # note that this reset is executed on the latest version to properly cleanup previous deploy_ciupgrade runs
           name: reset_cluster
-          <<: *main-branch-only
-          cluster: "ciupgrade"
-          is_shared_cluster: false
+          cluster: << pipeline.parameters.cluster >>
+          unlock_shared_cluster: false
           silence_deployment_alerts: true
           context:
             - canton-network-vpn
@@ -31,27 +29,26 @@ workflow:
             - wait_for_previous_pipeline
       - deploy_cluster:
           name: "deploy_cluster_for_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           reset_cluster: false # done in reset_cluster job
           skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
+          run_upgrade_workarounds: true
           requires:
             - reset_cluster
       - preflight_check:
           name: "preflight_check_initial"
-          <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           wait_for_sv: false
           requires:
             - reset_cluster
@@ -59,50 +56,47 @@ workflow:
           name: "deploy_sv_runbook_for_upgrade"
           reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
+          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
            name: "preflight_sv_check_initial"
-           <<: *main-branch-only
            cluster_version: << pipeline.parameters.base-version >>
            context:
              - artifactory
              - canton-network-vpn
              - slack-context
-           cluster: "ciupgrade"
+           cluster: << pipeline.parameters.cluster >>
            requires:
              - deploy_cluster_for_upgrade
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
           reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
+          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_validator_check:
           name: "preflight_validator_initial"
-          <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
       - artifacts_push:
           <<: *notify-fail
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -110,11 +104,10 @@ workflow:
             - wait_for_previous_pipeline
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           context:
             - artifactory
             - slack-context
-          <<: *main-branch-only
           run: << pipeline.parameters.run-partial-upgrade >>
           silence_deployment_alerts: true
           requires:
@@ -124,51 +117,47 @@ workflow:
             - preflight_validator_initial
       - preflight_check:
           name: "preflight_check_partial_upgrade"
-          <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           run: << pipeline.parameters.run-partial-upgrade >>
           wait_for_sv: false
           requires:
             - deploy_partial_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_partial_upgrade"
-          <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           run: << pipeline.parameters.run-partial-upgrade >>
           requires:
             - deploy_partial_upgrade
       - preflight_validator_check:
           name: "preflight_validator_partial_upgrade"
-          <<: *main-branch-only
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false # we want to run the preflight in base version, but the version is reported as upgraded
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           run: << pipeline.parameters.run-partial-upgrade >>
           requires:
             - deploy_partial_upgrade
       - deploy_cluster:
           name: "deploy_final_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           reset_cluster: false
           update_deployment_branch: false
           cancel_workflow_on_failure: true
@@ -178,12 +167,11 @@ workflow:
             - preflight_validator_partial_upgrade
       - preflight_check:
           name: "preflight_check_final_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           with_docker: true
           wait_for_sv: false
@@ -191,14 +179,13 @@ workflow:
             - deploy_final_upgrade
       - preflight_check:
           name: "preflight_daml_upgrade"
-          <<: *main-branch-only
           run: << pipeline.parameters.run-daml-upgrade >>
           test_names_file: "test-daml-ciupgrade-vote.log"
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           wait_for_sv: false
           requires:
             - preflight_check_final_upgrade
@@ -207,41 +194,37 @@ workflow:
       - deploy_sv_runbook:
           name: "upgrade_sv_runbook_after_daml_upgrade"
           reset_cluster: false
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - preflight_daml_upgrade
       - deploy_validator_runbook:
           name: "upgrade_validator_runbook_after_daml_upgrade"
           reset_cluster: false
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - preflight_daml_upgrade
       - wait_for_daml_upgrade:
           name: "wait_for_daml_upgrade"
-          <<: *main-branch-only
           context:
             - canton-network-vpn
           run: << pipeline.parameters.run-daml-upgrade >>
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - preflight_daml_upgrade
       - preflight_check:
           name: "preflight_after_daml_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           wait_for_sv: false
           requires:
             - wait_for_daml_upgrade
@@ -249,24 +232,22 @@ workflow:
             - upgrade_validator_runbook_after_daml_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_daml_upgrade
             - upgrade_sv_runbook_after_daml_upgrade
             - upgrade_validator_runbook_after_daml_upgrade
       - preflight_validator_check:
           name: "preflight_validator_runbook_after_upgrade"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_daml_upgrade
             - upgrade_sv_runbook_after_daml_upgrade
@@ -277,12 +258,11 @@ workflow:
           # thus testing that SVs joining after an upgrade also work
           reset_cluster: true
           silence_deployment_alerts: true
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade
@@ -293,40 +273,36 @@ workflow:
           # thus testing that Validators joining after an upgrade also work
           reset_cluster: true
           silence_deployment_alerts: true
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade
             - preflight_validator_runbook_after_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_redeploy"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - redeploy_sv_runbook_after_daml_upgrade
       - preflight_validator_check:
           name: "preflight_validator_runbook_after_redeploy"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - redeploy_validator_runbook_after_daml_upgrade
       - reset_cluster:
           name: reset_cluster_after_upgrade
-          is_shared_cluster: false
-          <<: *main-branch-only
-          cluster: "ciupgrade"
+          unlock_shared_cluster: true
+          cluster: << pipeline.parameters.cluster >>
           context:
             - canton-network-vpn
             - slack-context
@@ -334,7 +310,6 @@ workflow:
             - preflight_sv_check_after_sv_redeploy
             - preflight_validator_runbook_after_redeploy
       - autoscaler_allow_scaledown:
-          <<: *main-branch-only
-          cluster: "ciupgrade"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - reset_cluster_after_upgrade

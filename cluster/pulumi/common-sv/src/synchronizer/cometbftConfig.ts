@@ -7,7 +7,6 @@ export const cometbftRetainBlocks = enableCometbftPruning
   : 0; // 0 implies retain all blocks
 
 export const disableCometBftStateSync = config.envFlag('DISABLE_COMETBFT_STATE_SYNC', false);
-export const stableCometBftChainId = config.envFlag('COMETBFT_STABLE_CHAIN_ID', false);
 
 export type StaticCometBftConfig = {
   privateKey?: Output<string> | string;

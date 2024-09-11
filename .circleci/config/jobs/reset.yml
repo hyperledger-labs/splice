@@ -4,7 +4,7 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      is_shared_cluster:
+      unlock_shared_cluster:
         type: boolean
         default: true
       silence_deployment_alerts:
@@ -26,7 +26,7 @@ jobs:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
-            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
             cncluster activate
@@ -36,7 +36,7 @@ jobs:
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
-            if [[ << parameters.is_shared_cluster >> == true ]]; then
+            if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
             else
               cncluster reset

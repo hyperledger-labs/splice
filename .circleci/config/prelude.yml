@@ -26,7 +26,7 @@ parameters:
       [
         build,
         deploy-cidaily,
-        deploy-ciupgrade,
+        deploy-upgrade,
         deploy-ciperiodic-migration,
         determine-ciperiodic-migration-work,
         deploy-ciperiodic-sv-reonboard,
@@ -83,6 +83,10 @@ parameters:
   # The target version for hard migrations in the `deploy_ciperiodic_migration` job
   # Empty/default means "latest on branch"
   upgrade-version:
+    type: string
+    default: ""
+  # branch_filter parameter of wait_for_previous_pipeline
+  branch-filter:
     type: string
     default: ""
   # for jobs that require a migration-id to be specified

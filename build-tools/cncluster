@@ -2985,6 +2985,15 @@ function subcmd_unprotect_all() {
   done
 }
 
+###
+
+subcommand_whitelist[cci_upgrade_test]='Launches a CircleCI upgrade test on the current cluster'
+
+function subcmd_cci_upgrade_test() {
+  cci_cluster_name=$(basename "$PWD")
+  "$REPO_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
+}
+
 ################################
 ### Main
 ################################
