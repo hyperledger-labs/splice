@@ -2630,7 +2630,7 @@
           ]
         }
       },
-      "version": "61.3.2"
+      "version": "62.6.0"
     },
     "name": "observability-metrics",
     "provider": "",
@@ -3841,9 +3841,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "bash prometheus-crd-update.sh 0.75.1"
+      "create": "bash prometheus-crd-update.sh 0.76.1"
     },
-    "name": "update-prometheus-crd-0.75.1",
+    "name": "update-prometheus-crd-0.76.1",
     "provider": "",
     "type": "command:local:Command"
   },
