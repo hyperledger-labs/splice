@@ -32,7 +32,7 @@ export class DecentralizedSynchronizerMigrationConfig {
 
   // TODO(#10074) read this from current deployment if available
   static fromEnv(): DecentralizedSynchronizerMigrationConfig {
-    return new DecentralizedSynchronizerMigrationConfig(
+    const decentralizedSynchronizerMigrationConfig = new DecentralizedSynchronizerMigrationConfig(
       new MigrationInfo(
         processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID')) ||
           DefaultMigrationId,
@@ -52,6 +52,16 @@ export class DecentralizedSynchronizerMigrationConfig {
       processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID')),
       processMigrationId(config.optionalEnv('GLOBAL_DOMAIN_DATABASE_ACTIVE_ID'))
     );
+    if (
+      decentralizedSynchronizerMigrationConfig.isRunningMigration() &&
+      decentralizedSynchronizerMigrationConfig.migratingFromActiveId ==
+        decentralizedSynchronizerMigrationConfig.active.migrationId
+    ) {
+      throw new Error(
+        `Cannot migrate from the active migration. ${JSON.stringify(decentralizedSynchronizerMigrationConfig)}`
+      );
+    }
+    return decentralizedSynchronizerMigrationConfig;
   }
 
   allMigrationInfos(): MigrationInfo[] {
