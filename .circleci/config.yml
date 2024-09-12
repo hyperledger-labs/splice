@@ -5735,9 +5735,11 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
+          use_published_artifacts: true
           deploy_retry_count: 0
           requires:
             - deploy_cluster
+            - publish_public_release
       - preflight_sv_check:
            <<: *main-branch-never
            context:
@@ -5745,10 +5747,8 @@ workflows:
              - canton-network-vpn
              - slack-context
            cluster: "user-selected-scratchnet"
-           use_published_artifacts: true
            requires:
              - deploy_cluster
-             - publish_public_release
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
