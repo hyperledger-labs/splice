@@ -80,6 +80,14 @@
           requires:
             - artifacts_push
             - set_scratchnet
+      - publish_public_release:
+          <<: *main-branch-only
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - preflight_check
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -138,8 +146,10 @@
              - canton-network-vpn
              - slack-context
            cluster: "user-selected-scratchnet"
+           use_published_artifacts: true
            requires:
              - deploy_cluster
+             - publish_public_release
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
