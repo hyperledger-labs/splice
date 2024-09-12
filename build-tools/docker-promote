@@ -14,8 +14,6 @@ fi
 
 [[ -z "${MAKE-}"  ]] && _error 'must be run from within make'
 
-docker pull "${fromImageTag}"
-docker tag "${fromImageTag}" "${toImageTag}"
-docker push "${toImageTag}"
+docker buildx imagetools create -t "${toImageTag}" "${fromImageTag}"
 
 echo "${toImageTag}" > target/docker.promote
