@@ -5681,8 +5681,7 @@ workflows:
             - artifacts_push
             - set_scratchnet
       - publish_public_release:
-          <<: *main-branch-only
-          <<: *notify-fail
+          <<: *main-branch-never
           context:
             - artifactory
             - slack-context
