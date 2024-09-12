@@ -104,7 +104,6 @@
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
-            - deploy_arm_compose_validator
             - backup_cluster
       - restore_node:
           name: "restore_validator_node"
@@ -155,15 +154,6 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "user-selected-scratchnet"
-          requires:
-            - deploy_cluster
-      - deploy_arm_compose_validator:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster

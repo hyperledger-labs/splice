@@ -3,6 +3,6 @@
 
 ARG base_version
 
-FROM splice-app:${base_version}
+FROM --platform=linux/amd64 splice-app:${base_version}
 
 COPY app.conf bootstrap.sc pre-bootstrap.sh health-check.sh /app/

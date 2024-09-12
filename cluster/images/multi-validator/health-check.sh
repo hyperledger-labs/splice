@@ -12,7 +12,7 @@ function check_endpoint() {
     local validator_admin_port=$(( base_port + 3 ))
 
     local status
-    status=$(wget --server-response --quiet "http://127.0.0.1:${validator_admin_port}/$endpoint" 2>&1 | awk 'NR==1{print $2}')
+    status=$(curl -w "%{http_code}" "http://127.0.0.1:${validator_admin_port}/$endpoint")
 
     if [[ "$status" != "200" ]];
     then

@@ -19,8 +19,7 @@ else
 
     until [ $n -gt $MAX_RETRY ]; do
 
-        # splice-app image does not currently have curl installed, so we use wget instead. See comment in splice-app/Dockerfile.
-        if SECRET=$(wget --post-data="" -q -O - "${ONBOARD_SECRET_URL}"); then
+        if SECRET=$(curl -sSfL -X POST "${ONBOARD_SECRET_URL}" 2> /dev/null); then
             export CN_APP_VALIDATOR_ONBOARDING_SECRET="$SECRET"
             break
         else

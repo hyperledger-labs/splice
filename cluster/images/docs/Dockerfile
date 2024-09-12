@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ARG base_version
-FROM splice-app:${base_version}
+FROM --platform=linux/amd64 splice-app:${base_version}
 
 FROM nginx:stable
 ARG version

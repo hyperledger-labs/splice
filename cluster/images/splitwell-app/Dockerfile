@@ -3,7 +3,7 @@
 
 ARG base_version
 
-FROM splice-app:${base_version}
+FROM --platform=linux/amd64 splice-app:${base_version}
 
 EXPOSE 5213
 EXPOSE 10013
