@@ -4344,11 +4344,6 @@ workflows:
             - slack-context
           requires:
             - artifacts_push
-      - bundle:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       - create_oss_pr:
           <<: *notify-fail
           context:
