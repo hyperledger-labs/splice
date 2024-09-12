@@ -6,6 +6,13 @@
 set -euo pipefail
 
 text="$1"
+# avoid sending notifications for scratch clusters
+if grep -q "cluster scratchnet" <<<"$text"
+then
+  echo "skipping slack notification for scratch cluster"
+  exit 0
+fi
+
 # The default channel is #team-canton-network-internal-ci
 channel="${2:-C05DT77QF5M}"
 
