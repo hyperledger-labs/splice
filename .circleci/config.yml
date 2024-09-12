@@ -1312,6 +1312,7 @@ commands:
                               --keep DOCKER_HOST \
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
+                              --keep PULUMI_VERSION \
                               --keep NO_PROXY"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
@@ -1511,7 +1512,6 @@ commands:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
-
 jobs:
 
   autoscaler_prevent_scaledown:
@@ -2734,12 +2734,10 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - run:
-          name: Verify config.yml is up to date with source.
-          command: |
-            source .envrc.vars
-            .circleci/build-config.sh --check
       - setup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: Verify config.yml is up to date with source.
+          cmd: .circleci/build-config.sh --check
       # Run the cheap checks before the sbt based ones to provide fast feedback
       - run_trailing_whitespace_check
       - run_daml_warts_check

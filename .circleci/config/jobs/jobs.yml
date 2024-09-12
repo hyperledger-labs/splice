@@ -9,12 +9,10 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - run:
-          name: Verify config.yml is up to date with source.
-          command: |
-            source .envrc.vars
-            .circleci/build-config.sh --check
       - setup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: Verify config.yml is up to date with source.
+          cmd: .circleci/build-config.sh --check
       # Run the cheap checks before the sbt based ones to provide fast feedback
       - run_trailing_whitespace_check
       - run_daml_warts_check

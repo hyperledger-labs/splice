@@ -1147,6 +1147,7 @@ commands:
                               --keep DOCKER_HOST \
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
+                              --keep PULUMI_VERSION \
                               --keep NO_PROXY"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
@@ -1346,4 +1347,3 @@ commands:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
-

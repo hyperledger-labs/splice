@@ -69,6 +69,3 @@ if [[ -z "$IGNORE_PRIVATE_ENVRC" ]]; then
         ARTIFACTORY_USER \
         ARTIFACTORY_PASSWORD
 fi
-
-pulumi_version=$(pulumi version)
-export PULUMI_VERSION="${pulumi_version:1}"
