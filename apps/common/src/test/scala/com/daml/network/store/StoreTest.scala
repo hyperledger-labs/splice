@@ -26,6 +26,7 @@ import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
+import com.daml.network.environment.{DarResource, DarResources}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -191,8 +192,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount: BigDecimal,
       createdAtRound: Long,
       ratePerRound: BigDecimal,
+      version: DarResource = DarResources.amulet_current,
   ) = {
-    val templateId = amuletCodegen.Amulet.TEMPLATE_ID
+    val templateId = new Identifier(
+      version.packageId,
+      amuletCodegen.Amulet.TEMPLATE_ID.getModuleName,
+      amuletCodegen.Amulet.TEMPLATE_ID.getEntityName,
+    )
     val template = new amuletCodegen.Amulet(
       dsoParty.toProtoPrimitive,
       owner.toProtoPrimitive,
@@ -214,8 +220,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount: BigDecimal,
       createdAtRound: Long,
       ratePerRound: BigDecimal,
+      version: DarResource = DarResources.amulet_current,
   ) = {
-    val templateId = amuletCodegen.LockedAmulet.TEMPLATE_ID
+    val templateId = new Identifier(
+      version.packageId,
+      amuletCodegen.LockedAmulet.TEMPLATE_ID.getModuleName,
+      amuletCodegen.LockedAmulet.TEMPLATE_ID.getEntityName,
+    )
     val amuletTemplate = amulet(owner, amount, createdAtRound, ratePerRound).payload
     val template = new amuletCodegen.LockedAmulet(
       amuletTemplate,

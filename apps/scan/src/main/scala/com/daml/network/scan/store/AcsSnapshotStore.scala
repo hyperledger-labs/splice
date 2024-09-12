@@ -341,9 +341,22 @@ object AcsSnapshotStore {
     def failedToDecode = throw io.grpc.Status.FAILED_PRECONDITION
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
-    if (createdEvent.getTemplateId == Amulet.TEMPLATE_ID) {
+    if (
+      PackageQualifiedName(createdEvent.getTemplateId) == PackageQualifiedName(Amulet.TEMPLATE_ID)
+    ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
+      if (
+        PackageQualifiedName(createdEvent.getTemplateId) != PackageQualifiedName(
+          LockedAmulet.TEMPLATE_ID
+        )
+      ) {
+        throw io.grpc.Status.INTERNAL
+          .withDescription(
+            s"Unexpected holding contract, expected either Amulet or LockedAmulet: $createdEvent"
+          )
+          .asRuntimeException()
+      }
       Left(
         Contract.fromCreatedEvent(LockedAmulet.COMPANION)(createdEvent).getOrElse(failedToDecode)
       )

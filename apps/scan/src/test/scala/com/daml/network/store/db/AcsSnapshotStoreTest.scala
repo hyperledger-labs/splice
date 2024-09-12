@@ -449,10 +449,13 @@ class AcsSnapshotStoreTest
         val wantedParty1 = providerParty(1)
         val wantedParty2 = providerParty(2)
         val ignoredParty = providerParty(3)
-        val amulet1 = amulet(wantedParty1, 10, 1L, 1.0)
+        // We include amulets and locked amulets in an older version
+        // as a regression test for #14758
+        val amulet1 = amulet(wantedParty1, 10, 1L, 1.0, version = DarResources.amulet_0_1_4)
         val amulet2 = amulet(wantedParty2, 20, 2L, 1.0)
         val ignoredAmulet = amulet(ignoredParty, 666, 1L, 1.0)
-        val lockedAmulet1 = lockedAmulet(wantedParty1, 30, 1L, 0.5)
+        val lockedAmulet1 =
+          lockedAmulet(wantedParty1, 30, 1L, 0.5, version = DarResources.amulet_0_1_4)
         val lockedAmulet2 = lockedAmulet(wantedParty2, 40, 2L, 0.5)
         val ignoredLocked = lockedAmulet(ignoredParty, 666, 1, 0.5)
         for {

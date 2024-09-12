@@ -4,15 +4,9 @@
 package com.daml.network.util
 
 import com.daml.network.util.QualifiedName
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract,
-  ContractCompanion,
-  ContractId,
-  InterfaceCompanion,
-}
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, InterfaceCompanion}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent as JavaCreatedEvent,
-  ExercisedEvent,
   Transaction as JavaTransaction,
   TransactionTree as JavaTransactionTree,
 }
@@ -44,13 +38,6 @@ object JavaDecodeUtil {
       a <- decodeCreated(companion)(JavaCreatedEvent.fromProto(created)).toList
     } yield a
   }
-
-  def decodeArchivedExercise[TCid](
-      companion: ContractCompanion[?, TCid, ?]
-  )(event: ExercisedEvent): Option[TCid] =
-    Option.when(event.getTemplateId == companion.TEMPLATE_ID && event.isConsuming)(
-      companion.toContractId(new ContractId((event.getContractId)))
-    )
 
   def treeToCreated(transaction: JavaTransactionTree): Seq[JavaCreatedEvent] =
     for {

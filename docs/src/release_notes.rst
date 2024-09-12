@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Scan
+
+  Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
+  splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
+
 0.2.0
 -----
 
