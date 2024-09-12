@@ -10,7 +10,7 @@ function get_digest() {
 
   img_name=$(get-docker-image-name "$img" --artifactory)
   # The docker image is multi-arch, but the digests are per architecture. We support amd64 clusters only, so pick that digest.
-  docker manifest inspect -v "$img_name" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
+  docker manifest inspect "$img_name" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
 }
 
 echo "imageDigests:"
