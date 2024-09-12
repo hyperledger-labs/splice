@@ -982,7 +982,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1111,7 +1111,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1171,7 +1171,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1381,7 +1381,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1799,7 +1799,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1940,7 +1940,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -2081,7 +2081,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -2812,7 +2812,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -2933,7 +2933,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
+      "deletionProtection": true,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",

@@ -70,7 +70,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       instanceLogicalName,
       {
         databaseVersion: 'POSTGRES_14',
-        deletionProtection: false,
+        deletionProtection: protectCloudSql,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           activationPolicy: active ? 'ALWAYS' : 'NEVER',
