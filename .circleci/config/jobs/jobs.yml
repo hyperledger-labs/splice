@@ -131,6 +131,7 @@ jobs:
                     circleci-agent step halt
                   fi
       - setup_sbt_test_job
+      - docker_prep_build
       # Used to pull docker images for cometbft
       - docker_login_artifactory
       - docker_pull_test_images
@@ -319,6 +320,7 @@ jobs:
          cmd_retry_count: 5 # Retry in case of dependency download errors
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
+      - docker_prep_build
       - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
@@ -407,6 +409,7 @@ jobs:
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
+      - docker_prep_build
       - docker_build
       - save_frontend_builds
       - cleanup_sbt_test_job
@@ -806,3 +809,42 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
+
+  # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
+  #               preflight there. We therefore for now only spin up the validator and check that
+  #               it succeeds.
+  deploy_arm_compose_validator:
+    machine:
+      image: ubuntu-2204:2024.01.1
+      resource_class: arm.large
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - docker_login_internal
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cluster: << parameters.cluster >>
+          cmd_name: Wait for SV app to be responsive
+          cmd: |
+            cncluster wait sv-1 sv-app
+      - run_bash_command_in_nix:
+          cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
+      - run_bash_command_in_nix:
+          cmd_name: Deploy the docker-compose validator
+          cluster: << parameters.cluster >>
+          cmd: |
+            build-tools/splice-compose.sh start -d -w -n onvpn
+          cmd_retry_count: 3
+      - store_artifacts:
+          name: Store logs
+          path: log
+          destination: log
