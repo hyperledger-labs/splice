@@ -10,24 +10,24 @@ import scala.concurrent.duration._
 
 println("Waiting for DSO initialization...")
 // We need to do this at the beginning, otherwise later commands can fail because AmuletRules is locked.n
-Seq(sv1, sv2, sv3, sv4).foreach(
+Seq(sv1, sv2).foreach(
   _.waitForInitialization(NonNegativeDuration.tryFromDuration(5.minute))
 )
 
 println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
-bobValidator.waitForInitialization()
 
 println("Waiting for scan initialization...")
 sv1Scan.waitForInitialization()
+
+println("Onboarding users...")
+val charlieValidator = aliceValidator
+val bobValidator = aliceValidator
 
 println("Uploading DAR files...")
 Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
   p.upload_dar_unless_exists("daml/splitwell/.daml/dist/splitwell-current.dar")
 }
-
-println("Onboarding users...")
-val charlieValidator = aliceValidator
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)
@@ -75,6 +75,7 @@ ensureAnsEntry(
   aliceAns,
   aliceWallet,
 )
+
 ensureAnsEntry(
   bobUserParty,
   s"bob.unverified.$ansAcronym",
@@ -83,6 +84,7 @@ ensureAnsEntry(
   bobAns,
   bobWallet,
 )
+
 ensureAnsEntry(
   charlieUserParty,
   s"charlie.unverified.$ansAcronym",

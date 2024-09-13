@@ -10,7 +10,7 @@ function usage() {
   echo "Flags:"
   echo "  -h          display this help message"
   echo "  -s          skip bundle"
-  echo "  -l          start backend with four super validators for local testing"
+  echo "  -l          start backend with two super validators for local testing"
 }
 
 skip_bundle=0
@@ -28,9 +28,9 @@ while getopts "hdap:c:wsbtfgl" arg; do
       echo "skip sbt --batch bundle"
       ;;
     l)
-      topology="simple-topology.conf"
+      topology="minimal-topology-2svs.conf"
       bootstrapScript="bootstrap.sc"
-      echo "deploying backend for sv2, sv3, and sv4"
+      echo "deploying backend for sv1 and sv2"
       ;;
     ?)
       usage
