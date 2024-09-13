@@ -294,20 +294,27 @@ async function auth0Secret(
   }
 }
 
+// TODO(#14778) Remove this type and the duplicated secrets
+// after mainnet upgrades to 0.2.0.
+export type SecretPrefix = 'cn' | 'splice';
+
 export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName: string
+  clientName: string,
+  prefix: SecretPrefix
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
   const secret = await auth0Secret(auth0Client, secrets, clientName);
 
+  const pulumiNamePrefix = prefix == 'splice' ? `${prefix}-` : '';
+
   return new k8s.core.v1.Secret(
-    'auth0-secret-' + xns.logicalName + '-' + clientName,
+    `${pulumiNamePrefix}auth0-secret-${xns.logicalName}-${clientName}`,
     {
       metadata: {
-        name: 'splice-app-' + secretNameApp + '-ledger-api-auth',
+        name: `${prefix}-app-${secretNameApp}-ledger-api-auth`,
         namespace: xns.ns.metadata.name,
       },
       stringData: secret,
@@ -331,7 +338,15 @@ export async function installAuth0UISecret(
   }
   const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
 
-  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
+  installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id, 'cn');
+  return installAuth0UiSecretWithClientId(
+    auth0Client,
+    xns,
+    secretNameApp,
+    clientName,
+    id,
+    'splice'
+  );
 }
 
 export function installAuth0UiSecretWithClientId(
@@ -339,13 +354,16 @@ export function installAuth0UiSecretWithClientId(
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string,
-  clientId: string | Promise<string>
+  clientId: string | Promise<string>,
+  prefix: SecretPrefix
 ): k8s.core.v1.Secret {
+  const pulumiNamePrefix = prefix == 'splice' ? `${prefix}-` : '';
+
   return new k8s.core.v1.Secret(
-    'auth0-ui-secret-' + xns.logicalName + '-' + clientName,
+    `${pulumiNamePrefix}auth0-ui-secret-${xns.logicalName}-${clientName}`,
     {
       metadata: {
-        name: 'splice-app-' + secretNameApp + '-ui-auth',
+        name: `${prefix}-app-${secretNameApp}-ui-auth`,
         namespace: xns.ns.metadata.name,
       },
       stringData: {

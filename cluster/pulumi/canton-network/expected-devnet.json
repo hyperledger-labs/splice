@@ -6,7 +6,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "splitwell"
       },
       "stringData": {
@@ -30,7 +30,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-splitwell-ledger-api-auth",
+        "name": "cn-app-splitwell-ledger-api-auth",
         "namespace": "splitwell"
       },
       "stringData": {
@@ -54,7 +54,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
+        "name": "cn-app-sv-ledger-api-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -78,7 +78,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -102,7 +102,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
+        "name": "cn-app-sv-ledger-api-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -126,7 +126,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -150,7 +150,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
+        "name": "cn-app-sv-ledger-api-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -174,7 +174,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -198,7 +198,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
+        "name": "cn-app-sv-ledger-api-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -222,7 +222,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -246,7 +246,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
+        "name": "cn-app-validator-ledger-api-auth",
         "namespace": "validator1"
       },
       "stringData": {
@@ -270,7 +270,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "splitwell"
       },
       "stringData": {
@@ -292,7 +292,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "splitwell"
       },
       "stringData": {
@@ -314,7 +314,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -336,7 +336,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ui-auth",
+        "name": "cn-app-sv-ui-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -358,7 +358,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -380,7 +380,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -402,7 +402,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ui-auth",
+        "name": "cn-app-sv-ui-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -424,7 +424,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -446,7 +446,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -468,7 +468,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ui-auth",
+        "name": "cn-app-sv-ui-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -490,7 +490,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -512,7 +512,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -534,7 +534,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-ui-auth",
+        "name": "cn-app-sv-ui-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -556,7 +556,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -578,7 +578,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-cns-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "validator1"
       },
       "stringData": {
@@ -600,7 +600,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-splitwell-ui-auth",
+        "name": "cn-app-splitwell-ui-auth",
         "namespace": "validator1"
       },
       "stringData": {
@@ -622,7 +622,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-wallet-ui-auth",
+        "name": "cn-app-wallet-ui-auth",
         "namespace": "validator1"
       },
       "stringData": {
@@ -937,7 +937,7 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-key",
+        "name": "cn-app-sv-key",
         "namespace": "sv-2"
       },
       "type": "Opaque"
@@ -1070,7 +1070,7 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-key",
+        "name": "cn-app-sv-key",
         "namespace": "sv-3"
       },
       "type": "Opaque"
@@ -1203,7 +1203,7 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-sv-key",
+        "name": "cn-app-sv-key",
         "namespace": "sv-4"
       },
       "type": "Opaque"
@@ -1437,6 +1437,713 @@
     "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-4-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "splitwell-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-splitwell-splitwell_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-splitwell-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "splitwell-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-1-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv1-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv1-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-1-sv1_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-2-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-2-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-2-sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv2-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv2-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-2-sv2_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-3-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-3-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-3-sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv3-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv3-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-3-sv3_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-4-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-4-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-4-sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv4-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv4-validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-4-sv4_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-validator1-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-splitwell-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "splitwell-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-splitwell-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-1-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-sv-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-1-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-2-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-2-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-2-sv-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-2-sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-2-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-2-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-3-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-3-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-3-sv-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-3-sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-3-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-3-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-4-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-4-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-4-sv-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-4-sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-4-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-sv-4-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-splitwell-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-splitwell-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,

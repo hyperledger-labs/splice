@@ -48,7 +48,8 @@ import { installValidatorApp, installValidatorSecrets } from './validator';
 export function installSvKeySecret(
   xns: ExactNamespace,
   keys: CnInput<SvIdKey>
-): k8s.core.v1.Secret {
+): k8s.core.v1.Secret[] {
+  const legacySecretName = 'cn-app-sv-key';
   const secretName = 'splice-app-sv-key';
 
   const data = pulumi.output(keys).apply(ks => {
@@ -58,20 +59,36 @@ export function installSvKeySecret(
     };
   });
 
-  return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-key`,
-    {
-      metadata: {
-        name: secretName,
-        namespace: xns.logicalName,
+  return [
+    new k8s.core.v1.Secret(
+      `cn-app-${xns.logicalName}-key`,
+      {
+        metadata: {
+          name: legacySecretName,
+          namespace: xns.logicalName,
+        },
+        type: 'Opaque',
+        data: data,
       },
-      type: 'Opaque',
-      data: data,
-    },
-    {
-      dependsOn: [xns.ns],
-    }
-  );
+      {
+        dependsOn: [xns.ns],
+      }
+    ),
+    new k8s.core.v1.Secret(
+      `splice-app-${xns.logicalName}-key`,
+      {
+        metadata: {
+          name: secretName,
+          namespace: xns.logicalName,
+        },
+        type: 'Opaque',
+        data: data,
+      },
+      {
+        dependsOn: [xns.ns],
+      }
+    ),
+  ];
 }
 
 export type SvOnboarding =
@@ -117,7 +134,14 @@ export async function installSvNode(
   );
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName),
+    await installAuth0Secret(
+      baseConfig.auth0Client,
+      xns,
+      'sv',
+      baseConfig.auth0SvAppName,
+      'splice'
+    ),
+    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName, 'cn'),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
@@ -162,7 +186,7 @@ export async function installSvNode(
     .concat(auth0UISecrets)
     .concat(
       config.onboarding.type == 'join-with-key'
-        ? [installSvKeySecret(xns, config.onboarding.keys)]
+        ? installSvKeySecret(xns, config.onboarding.keys)
         : []
     )
     .concat(

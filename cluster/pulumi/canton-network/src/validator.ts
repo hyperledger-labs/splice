@@ -42,6 +42,7 @@ export type ValidatorBackupConfig = {
 
 export type ValidatorSecrets = {
   validatorSecret: Secret;
+  legacyValidatorSecret?: Secret;
   wallet: Secret;
   cns: Secret;
   auth0Client: Auth0Client;
@@ -261,12 +262,14 @@ type ValidatorSecretsConfig = {
 export async function installValidatorSecrets(
   config: ValidatorSecretsConfig
 ): Promise<ValidatorSecrets> {
+  await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName, 'cn');
   return {
     validatorSecret: await installAuth0Secret(
       config.auth0Client,
       config.xns,
       'validator',
-      config.auth0AppName
+      config.auth0AppName,
+      'splice'
     ),
     wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
     cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),

@@ -101,9 +101,9 @@ export async function installSplitwell(
     sharedPostgres || postgres.installPostgres(xns, 'validator-pg', 'validator-pg', true);
   const validatorDbName = 'val_splitwell';
 
-  const extraDependsOn = dependsOn.concat([
-    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
-  ]);
+  const extraDependsOn = dependsOn
+    .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'splice'))
+    .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'cn'));
 
   const validator = await installValidatorApp({
     xns,
