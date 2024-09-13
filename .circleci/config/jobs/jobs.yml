@@ -534,6 +534,8 @@ jobs:
             else
               echo "Current commit is ${CIRCLE_SHA1}, latest base version is ${latest_base_version}."
             fi
+      - notify-cluster-fail:
+          cluster: "ciupgrade"
 
   launch_ciupgrade_workflow:
     docker:

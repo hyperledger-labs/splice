@@ -5,3 +5,4 @@ workflow:
     jobs:
       - launch_ciperiodic_migration_workflow:
           <<: *main-branch-only
+          context: slack-context

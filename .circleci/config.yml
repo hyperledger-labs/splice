@@ -3270,6 +3270,8 @@ jobs:
             else
               echo "Current commit is ${CIRCLE_SHA1}, latest base version is ${latest_base_version}."
             fi
+      - notify-cluster-fail:
+          cluster: "ciupgrade"
 
   launch_ciupgrade_workflow:
     docker:
@@ -5928,6 +5930,7 @@ workflows:
     jobs:
       - launch_ciperiodic_migration_workflow:
           <<: *main-branch-only
+          context: slack-context
 
   determine_ciupgrade_work:
     when:
@@ -5935,8 +5938,10 @@ workflows:
     jobs:
       - cancel_if_current_commit_is_base_version:
           <<: *main-branch-only
+          context: slack-context
       - launch_ciupgrade_workflow:
           <<: *main-branch-only
+          context: slack-context
           requires:
             - cancel_if_current_commit_is_base_version
 
