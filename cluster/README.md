@@ -103,6 +103,7 @@
   - [Chaos Mesh](#chaos-mesh)
   - [Maintenance Windows](#maintenance-windows)
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
+  - [Docker-compose](#docker-compose)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -2014,6 +2015,18 @@ To build multi-arch images locally:
   Note that this hides any existing images, running containers, etc. but they are still there
   and the step is reversible.
 - `export CI=1`, and build the images using `make docker-build -j`
+
+## Docker-Compose
+
+Similarly to `cncluster`, we have a `splice-compose.sh` script for development purposes of
+the docker-compose validator deployment.
+
+The most useful subcommand there is `splice-compose.sh start`. It should be run from a
+cluster deployment directory, and will spin up a docker-compose validator against that
+cluster. Logs from the validator and participant will be streamed to `logs/compose-validator.clog`
+and `logs/compose-participant.clog` resp.
+Use `splice-compose.sh stop` to stop it (and `splice-compose.sh stop -D` to completely
+nuke it, i.e. also delete its persistent data).
 
 ## Onboarding
 

@@ -45,7 +45,7 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 Technical Details
 -----------------
 
-The following section assumes that the validator node on the original synchronizer was deployed using the instructions in :ref:`k8s_validator`.
+The following section assumes that the validator node on the original synchronizer has already been deployed.
 
 .. _validator-upgrades-state:
 
@@ -65,7 +65,7 @@ For avoiding conflicts across migrations, we use the concept of a migration ID:
 
 - The migration ID is 0 during the initial bootstrapping of a network and incremented after each synchronizer upgrade with downtime.
 - The validator app is aware of the migration ID and uses it for ensuring the consistency of its internal stores and avoiding connections to nodes on the "wrong" synchronizer.
-- The validator Canton participant is **not** directly aware of the migration ID.
+- The validator Canton participant is **not** directly aware of the mirefgration ID.
   As part of :ref:`validator-upgrades-deploying`, the validator app will initialize a fresh participant
   (a fresh participant needs to be deployed to upgrade across non-backwards-compatible changes to the Canton software)
   based on the migration ID configured in the validator app.
@@ -96,8 +96,10 @@ In order for the migration to the new synchronizer to be safe and successful, it
 
 .. _validator-upgrades-deploying:
 
-Deploying the Validator App and Participant
-+++++++++++++++++++++++++++++++++++++++++++
+Deploying the Validator App and Participant (Kubernetes)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+This section refers to validators that have been deployed in Kubernetes using the instructions in :ref:`k8s_validator`.
 
 Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant,
 substituting the migration ID (``MIGRATION_ID``) with the target migration ID after the upgrade (typically the existing synchronizer's migration ID + 1).
@@ -112,3 +114,27 @@ While doing so, please note the following:
   whereas the validator app will reuse the existing state (see :ref:`validator-upgrades-state`).
 * Use ``helm upgrade`` in place of ``helm install`` for the ``participant`` and ``validator`` charts.
 * Please make sure that Helm chart deployments are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
+
+Deploying the validator App and Participant (Docker-Compose)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+This section refers to validators that have been deployed in Docker-Compose using the instructions in :ref:`compose_validator`.
+
+Once you confirmed that your validator is caught up, as explained above, confirm that a migration dump has been created using:
+
+.. code-block:: bash
+
+  docker compose logs validator | grep "Wrote domain migration dump"
+
+(For general reading about docker compose log retentaion and rotation, see `the docs <https://docs.docker.com/engine/logging/configure/>`_).
+
+If the migration dump has been created, proceed with the following steps:
+
+* Stop the validator, using ``./stop.sh``.
+* Restart the validator, while updating the migration ID in the `-m <migration ID>` argument,
+  and also including `-M` to instruct the validator to perform the actual migration
+  to the new migration ID. Note that `-M` is required only in the first startup after the migration,
+  to instruct the validator to perform the actual migration. Followup restarts should keep the
+  `-m <migration ID>`, but omit the `-M`.
+
+

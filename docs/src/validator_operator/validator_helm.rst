@@ -10,13 +10,6 @@ Kubernetes-Based Deployment of a Validator node
 
 This section describes how to deploy a standalone validator node in Kubernetes using Helm charts. The Helm charts deploy a validator node along with associated wallet and CNS UIs, and connect it to a target cluster.
 
-Digital Asset currently operates two Canton Network clusters: `TestNet` and `DevNet`. Both upgrade weekly. `DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled. Please use `DevNet` unless you have a specific reason not to.
-
-Note that there is not yet data retention from release to release in either
-`DevNet` or `TestNet`. This will change as the models and API's
-stabilize, but for now, each release should be a full release from
-scratch. No data should be retained when an environment is updated.
-
 .. _validator_prerequisites:
 
 Requirements

@@ -11,6 +11,8 @@ Release Notes
 Upcoming
 --------
 
+* Added support for a docker-compose based validator deployment.
+
 * Scan
 
   Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the

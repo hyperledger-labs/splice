@@ -12,10 +12,6 @@ This section describes deploying a Super Validator (SV) node in kubernetes using
 charts.  The Helm charts deploy a complete node and connect it to a
 target cluster.
 
-We currently operate two Canton Network clusters: `TestNet` and `DevNet`. Both usually upgrade weekly.
-`DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled.
-Please use `DevNet` unless you have a specific reason not to.
-
 Requirements
 ------------
 

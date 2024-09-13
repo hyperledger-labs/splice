@@ -30,11 +30,11 @@ function _export_auth0_env_vars {
   auth0 tenants use ${AUTH0_TENANT}
   auth0_app=$(auth0 apps ls -r --json 2> /dev/null | jq '.[] | select(.name == "Validator app backend")')
 
-  AUTH_CLIENT_SECRET=$(echo "$auth0_app" | jq -r '.client_secret')
-  export AUTH_CLIENT_SECRET
-  AUTH_CLIENT_ID=$(echo "$auth0_app" | jq -r '.client_id')
-  export AUTH_CLIENT_ID
-  LEDGER_API_ADMIN_USER="${AUTH_CLIENT_ID}@clients"
+  VALIDATOR_AUTH_CLIENT_SECRET=$(echo "$auth0_app" | jq -r '.client_secret')
+  export VALIDATOR_AUTH_CLIENT_SECRET
+  VALIDATOR_AUTH_CLIENT_ID=$(echo "$auth0_app" | jq -r '.client_id')
+  export VALIDATOR_AUTH_CLIENT_ID
+  LEDGER_API_ADMIN_USER="${VALIDATOR_AUTH_CLIENT_ID}@clients"
   export LEDGER_API_ADMIN_USER
   WALLET_UI_CLIENT_ID=$(auth0 apps ls -r --json 2> /dev/null | jq -r ".[] | select(.name == \"Wallet UI (Pulumi managed, $GCP_CLUSTER_BASENAME)\") | .client_id")
   export WALLET_UI_CLIENT_ID
@@ -186,20 +186,14 @@ function subcmd_start {
   done
 
   if [ $wait -eq 1 ]; then
-    _info "Waiting for the validator to start"
-    validator_network_name=$(docker inspect compose-validator-1 --format '{{range $net,$v := .NetworkSettings.Networks}}{{printf "%s" $net}}{{end}}')
-    _info "Getting the IP address of the compose-validator-1 container"
-    VALIDATOR_IP=$(docker inspect compose-validator-1 | jq -r ".[0].NetworkSettings.Networks.${validator_network_name}.IPAddress")
-    _info "The IP address of the compose-validator-1 container is ${VALIDATOR_IP}"
-
     _info "Waiting for the validator to be ready"
     # shellcheck disable=SC2034
     for i in {1..300}; do
-        curl -sf "${VALIDATOR_IP}:5003/api/validator/readyz" && break
+        curl -sf "wallet.localhost/api/validator/readyz" && break
         echo -n "."
         sleep 6
     done
-    curl -sf "${VALIDATOR_IP}:5003/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
+    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
 
     _info "Validator is ready"
   fi

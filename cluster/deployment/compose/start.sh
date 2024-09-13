@@ -101,15 +101,9 @@ if [ -z "${SPONSOR_SV_ADDRESS}" ]; then
 fi
 
 if [ -z "${ONBOARDING_SECRET}" ]; then
-  # TODO(#14303): remove this auto-fetch of secrets. It's convenient while developing, so for now we're keeping it,
-  # but to make the DevNet-MainNet gap smaller, we want to remove this.
-  _info "Onboarding secret not provided, trying to automatically fetch one from the sponsor SV (possible on DevNet only)"
-  set +e
-  if ! ONBOARDING_SECRET=$(curl -sSfL -X POST "${SPONSOR_SV_ADDRESS}/api/sv/v0/devnet/onboard/validator/prepare"); then
-    _error_msg "Failed to fetch onboarding secret from the sponsor SV automatically. If you are not on DevNet, please reach out to your sponsor SV and ask for an onboarding secret."
-    exit 1
-  fi
-  set -e
+  _error_msg "Please provide the onboarding secret"
+  usage
+  exit 1
 fi
 
 if [ -z "${party_hint}" ]; then

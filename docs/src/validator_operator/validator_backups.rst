@@ -31,6 +31,9 @@ Your identites may be fetched from your node through the following endpoint:
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app,
 as obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
 
+If you are using a docker-compose deployment, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
+If you are running the docker-compose deployment with no auth, you can use the utility Python script `token.py`
+to generate a token for the `curl` command by running ``python token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
 
 Backups of postgres instances
 +++++++++++++++++++++++++++++
@@ -47,6 +50,15 @@ taken either using tools like pgdump, or through snapshots of the underlying
 Persistent Volume. Similarly, if you are using Cloud-hosted Postgres, you can
 either use tools like pgdump or backup tools provided by the Cloud provider.
 
+If you are running a docker-compose deployment, you can run the following commands to backup
+the Postgres databases. This will create two dump files, one for the participant and one for
+the validator app.
+
+.. code-block:: bash
+
+  docker exec -i compose-postgres-splice-1 pg_dump -U cnadmin validator > "${backup_dir}"/validator-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+  active_participant_db=$(docker exec compose-participant-1 bash -c 'echo $CANTON_PARTICIPANT_POSTGRES_DB')
+  docker exec compose-postgres-splice-1 pg_dump -U cnadmin "${active_participant_db}" > "${backup_dir}"/"${active_participant_db}"-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
 
 Restoring a validator from backups
 ++++++++++++++++++++++++++++++++++
@@ -65,6 +77,24 @@ The following steps can be taken to restore a node from backups:
 
 **NOTE:** Currently, you have to manually re-onboard any users that were
 onboarded after the backup was taken.
+
+If you are running a docker-compose deployment, you can restore the Postgres databases as follows:
+
+#. Stop the validator and participant using ``./stop.sh``.
+
+#. Wipe out the existing database volume: ``docker volume rm compose_postgres-splice``.
+
+#. Start only the postgres container: ``docker compose up -d postgres-splice``
+
+#. Check whether postgres is ready with: ``docker exec compose-postgres-splice-1 pg_isready`` (rerun this command until it succeeds)
+
+#. Restore the validator database (assuming `validator_dump_file` contains the filename of the dump from which you wish to restore): ``docker exec -i compose-postgres-splice-1 psql -U cnadmin validator < $validator_dump_file``
+
+#. Restore the participant database (assuming `participant_dump_file` contains the filename of the dump from which you wish to restore, and `migration_id` contains the latest migration ID): ``docker exec -i compose-postgres-splice-1 psql -U cnadmin participant-$migration_id < $participant_dump_file``
+
+#. Stop the postgres instance: ``docker compose down``
+
+#. Start your validator as usual
 
 Disaster recovery from loss of the CometBFT storage layer of the global synchronizer
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -127,3 +157,16 @@ Migrating the Data:
 
 Please follow the instructions in the :ref:`Deploying the Validator App and Participant <validator-upgrades-deploying>` section
 to update the configuration of the validator app and participant to consume the migration dump file.
+
+For docker-compose validator deployments, the process is similar with the following modifications:
+
+#. For the endpoint for fetching the data dump, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
+
+#. If you are running your validator without auth, you can use the utility Python script `token.py`
+   to generate a token for the `curl` command by running ``python token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+
+#. Copy the dump file to the validator's docker volume using:
+
+.. code-block:: bash
+
+    docker run --rm -v "domain-upgrade-dump:/volume" -v "$(pwd):/backup" alpine sh -c "cp /backup/dump.json /volume/domain_migration_dump.json"

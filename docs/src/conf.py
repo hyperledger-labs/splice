@@ -138,6 +138,8 @@ rst_prolog = f"""
 .. |daml_sdk_version| replace:: {daml_sdk_version}
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
+.. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
+.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="cn-cluster">unknown_cluster</span>.global.canton.network.sync.global`
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
