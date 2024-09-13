@@ -102,4 +102,6 @@ in pkgs.mkShell {
 
   PROTOC = "${pkgs.protobuf}";
 
+  PULUMI_VERSION="${pkgs.pulumi-bin.version}";
+
 }
