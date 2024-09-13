@@ -8,15 +8,20 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.2.1
+-----
 
 * Added support for a docker-compose based validator deployment.
 
 * Scan
 
-  Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
-  splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
+  * Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
+    splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
+
+* Sequencer
+
+  * Fix a bug that prevented initialization during a hard domain migration if there was a proposal in the topology state
+    on the old migration id.
 
 0.2.0
 -----
