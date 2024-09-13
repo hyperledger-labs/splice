@@ -549,6 +549,8 @@ jobs:
 
             # defaults for base-version, run-daml-upgrade and run-partial-upgrade are good for main-like branches
             .circleci/launch-upgrade.sh --cluster ciupgrade --branch-filter-wait "^main|deployment/.*$|release-line.*"
+      - notify-cluster-fail:
+          cluster: "ciupgrade"
 
   launch_ciperiodic_migration_workflow:
     docker:
@@ -568,6 +570,8 @@ jobs:
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
               --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration\", \"base-version\": \"$latest_base_version\"}}"
+      - notify-cluster-fail:
+          cluster: "ciperiodic"
 
   wait_for_daml_upgrade:
     machine:
