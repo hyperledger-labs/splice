@@ -1455,7 +1455,13 @@ commands:
               export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
               # overwrite the use of internal DNS in the config file directly
               sed -i 's/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
-              cncluster pulumi << parameters.project >> preview --diff
+
+              if [ "<< parameters.project >>" == "sv-canton" ]; then
+                cncluster pulumi_preview_canton
+              else
+                cncluster pulumi << parameters.project >> preview --diff
+              fi
+
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi
@@ -2108,6 +2114,7 @@ jobs:
                   # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
                   # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
                   cncluster prefresh
+                  export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET="0,1"
 
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
@@ -2258,7 +2265,7 @@ jobs:
               cncluster activate
               # All CI-deployed clusters use split postgres instances per app, to support backups.
               export SPLIT_POSTGRES_INSTANCES=1
-            
+
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
 
@@ -4064,6 +4071,7 @@ jobs:
         type: boolean
     machine:
       image: ubuntu-2204:2024.01.1
+    resource_class: xlarge
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -4094,6 +4102,9 @@ jobs:
                 project: "infra"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
+                project: "sv-canton"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
                 project: "sv-runbook"
                 when_env: "SPLICE_DEPLOY_SV_RUNBOOK"
             - preview_pulumi:
@@ -4122,6 +4133,9 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      extra_migrations_reset:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -4135,13 +4149,25 @@ jobs:
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
+          cmd_name: "Install pulumi packages" #required for ts-node to reset sv-canton stacks
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
-            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
           cmd: |
             cncluster activate
+
+            if [[ <<parameters.extra_migrations_reset>> != "" ]]; then
+              export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET="<<parameters.extra_migrations_reset>>"
+            fi
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
@@ -5359,6 +5385,7 @@ workflows:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
           context:
             - canton-network-vpn
             - slack-context
@@ -6112,6 +6139,14 @@ workflows:
       - artifacts_push:
           context:
             - artifactory
+      - reset_cluster:
+          name: "reset_before_deploy"
+          cluster: << pipeline.parameters.cluster >>
+          extra_migrations_reset: "0,1"
+          unlock_shared_cluster: false
+          context:
+            - canton-network-vpn
+            - slack-context
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           context:
@@ -6123,6 +6158,7 @@ workflows:
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - artifacts_push
+            - reset_before_deploy
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
           context:
@@ -6331,6 +6367,7 @@ workflows:
             - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
           cluster: << pipeline.parameters.cluster >>
+          extra_migrations_reset: "0,1"
           unlock_shared_cluster: true
           context:
             - canton-network-vpn
@@ -6453,6 +6490,16 @@ workflows:
             - canton-network-vpn
           cluster: "cilr"
           deployment_only: false
+          requires:
+            - set_previews_cilr
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for CILR
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cilr"
+          deployment_only: true
           requires:
             - set_previews_cilr
       - preview_pulumi_changes:

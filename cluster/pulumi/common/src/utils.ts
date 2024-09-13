@@ -95,9 +95,6 @@ export const sequencerTokenExpirationTime: string | undefined = config.optionalE
 
 export const svOnboardingPollingInterval = config.optionalEnv('SV_ONBOARDING_POLLING_INTERVAL');
 
-// Refrence to upstream infrastructure stack.
-export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
-
 /// Kubernetes Namespace
 
 // There is no way to read the logical name off a Namespace.  Exactly
@@ -267,3 +264,5 @@ export const autoInitValues = (
 };
 
 export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
+
+export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);

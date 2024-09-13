@@ -99,7 +99,7 @@ export enum MigrationProvider {
   EXTERNAL,
 }
 
-class MigrationInfo {
+export class MigrationInfo {
   migrationId: DomainMigrationIndex;
   version: CnChartVersion;
   provider: MigrationProvider;
@@ -200,5 +200,16 @@ export function installMigrationIdSpecificComponent<T>(
             decentralizedSynchronizerUpgradeConfig.upgrade.version
           )
         : undefined,
+  };
+}
+
+export function externalMigrations(config: DecentralizedSynchronizerMigrationConfig): {
+  externalMigrations: MigrationInfo[];
+} {
+  const externalMigrations = config
+    .allMigrationInfos()
+    .filter(migration => migration.provider === MigrationProvider.EXTERNAL);
+  return {
+    externalMigrations,
   };
 }

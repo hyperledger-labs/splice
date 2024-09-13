@@ -61,7 +61,8 @@ Object.keys(env).forEach(key => {
 /*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
 export function createStackCR(
   name: string,
-  supportsResetOnSameCommit: boolean
+  supportsResetOnSameCommit: boolean,
+  extraEnvs: { [key: string]: string } = {}
 ): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
     name,
@@ -87,6 +88,17 @@ export function createStackCR(
                 value: CLUSTER_BASENAME,
               },
             },
+            ...Object.keys(extraEnvs).reduce<{
+              [key: string]: unknown;
+            }>((acc, key) => {
+              acc[key] = {
+                type: 'Literal',
+                literal: {
+                  value: extraEnvs[key],
+                },
+              };
+              return acc;
+            }, {}),
           },
           fluxSource: {
             sourceRef: {

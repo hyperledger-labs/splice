@@ -1290,7 +1290,13 @@ commands:
               export CN_PULUMI_LOAD_ENV_CONFIG_FILE="true"
               # overwrite the use of internal DNS in the config file directly
               sed -i 's/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true/SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=false/g' cluster/deployment/<<parameters.cluster>>/.envrc.vars
-              cncluster pulumi << parameters.project >> preview --diff
+
+              if [ "<< parameters.project >>" == "sv-canton" ]; then
+                cncluster pulumi_preview_canton
+              else
+                cncluster pulumi << parameters.project >> preview --diff
+              fi
+
             else
               echo "Skipping preview of << parameters.project >> on << parameters.cluster >>"
             fi

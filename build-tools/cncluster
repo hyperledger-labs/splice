@@ -873,6 +873,8 @@ function _cluster_reset() {
     bg_down_stack sv-runbook
     bg_down_stack validator-runbook
 
+    subcmd_pulumi_down_canton
+
     # Wait for all background jobs and capture their exit statuses
     for pid in "${pids[@]}"; do
       wait "$pid"
@@ -2361,8 +2363,6 @@ function subcmd_hard_domain_migration_prepare() {
     shift
   fi
 
-  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
-
   # this ensures we redeploy the pods on the old domain during the prepare step already
   # so the actual migrate step does not have to redeploy them and is therefore faster.
   export DISABLE_COMETBFT_STATE_SYNC="true"
@@ -2370,14 +2370,20 @@ function subcmd_hard_domain_migration_prepare() {
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
   export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
 
-  # pulumi will show a preview and ask us to confirm each deployment step
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_PROVIDER=external
 
+  # pulumi will show a preview and ask us to confirm each deployment step
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-    subcmd_pulumi canton-network up "$@"
+   subcmd_pulumi canton-network up "$@"
+   subcmd_pulumi_up_canton
   fi
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
     subcmd_pulumi sv-runbook up "$@"
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_up_canton
   fi
 }
 
@@ -2419,6 +2425,7 @@ function subcmd_hard_domain_migration_migrate() {
   fi
 
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_PROVIDER=external
   export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
@@ -2428,11 +2435,15 @@ function subcmd_hard_domain_migration_migrate() {
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
     subcmd_pulumi canton-network up "$@"
+    subcmd_pulumi_up_canton
     # We need to redeploy infra to update the `/version` endpoint
     subcmd_pulumi infra up "$@"
   fi
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_up_canton
     subcmd_pulumi sv-runbook up "$@"
   fi
 
@@ -2992,6 +3003,30 @@ subcommand_whitelist[cci_upgrade_test]='Launches a CircleCI upgrade test on the 
 function subcmd_cci_upgrade_test() {
   cci_cluster_name=$(basename "$PWD")
   "$REPO_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
+}
+
+###
+subcommand_whitelist[pulumi_preview_canton]="Preview the changes for the sv-canton migrations"
+
+function subcmd_pulumi_preview_canton() {
+  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run preview
+}
+
+###
+subcommand_whitelist[pulumi_down_canton]="Preview the changes for the sv-canton migrations"
+
+function subcmd_pulumi_down_canton() {
+  _info "Resetting sv-canton stacks"
+  export SPLICE_DEPLOY_SV_RUNBOOK=true
+  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run down
+}
+
+###
+subcommand_whitelist[pulumi_up_canton]="Up the sv-canton migrations"
+
+function subcmd_pulumi_up_canton() {
+  _info "Updating sv-canton stacks"
+  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run up
 }
 
 ################################

@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
-import { AuthenticationClient, ManagementClient } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
 
 import type {
   Auth0Client,
@@ -36,6 +36,7 @@ function addTimeSeconds(t: Date, seconds: number): Date {
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
   private auth0Cache: Auth0CacheMap | undefined;
+  private hasDiffsToSave = false;
 
   private k8sApi: CoreV1Api;
   private cfg: Auth0Config;
@@ -114,6 +115,11 @@ export class Auth0Fetch implements Auth0Client {
 
     if (!this.auth0Cache) {
       await pulumi.log.debug('No auth0 cache loaded in Auth0Fetch');
+      return;
+    }
+
+    if (!this.hasDiffsToSave) {
+      await pulumi.log.debug('No auth0 cache diffs to save');
       return;
     }
 
@@ -216,18 +222,23 @@ export class Auth0Fetch implements Auth0Client {
 
     const expiry = addTimeSeconds(now, expires_in);
 
-    if (this.auth0Cache && tokenResponse.access_token) {
-      await pulumi.log.debug(
-        'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
-      );
+    await this.cacheNewToken(clientId, expiry, tokenResponse);
 
+    return tokenResponse.access_token;
+  }
+
+  private async cacheNewToken(clientId: string, expiry: Date, tokenResponse: TokenResponse) {
+    await pulumi.log.debug(
+      'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
+    );
+
+    if (this.auth0Cache && tokenResponse.access_token) {
+      this.hasDiffsToSave = true;
       this.auth0Cache[clientId] = {
         accessToken: tokenResponse.access_token,
         expiry: expiry.toJSON(),
       };
     }
-
-    return tokenResponse.access_token;
   }
 }
 

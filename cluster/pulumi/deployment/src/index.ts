@@ -1,8 +1,9 @@
-import { config } from 'splice-pulumi-common';
+import { config, DeploySvRunbook } from 'splice-pulumi-common';
 
+import { installMigrationSpecificStacks } from './stacks/migration';
 import { createStackCR } from './stacks/stack';
 
-if (config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false)) {
+if (DeploySvRunbook) {
   createStackCR('sv-runbook', config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'));
 }
 if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
@@ -14,3 +15,5 @@ if (config.envFlag('SPLICE_DEPLOY_VALIDATOR_RUNBOOK', false)) {
 
 export const infraStack = createStackCR('infra', false);
 export const cantonNetworkStack = createStackCR('canton-network', false);
+
+installMigrationSpecificStacks();

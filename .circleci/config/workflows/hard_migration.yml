@@ -6,6 +6,14 @@ workflow:
       - artifacts_push:
           context:
             - artifactory
+      - reset_cluster:
+          name: "reset_before_deploy"
+          cluster: << pipeline.parameters.cluster >>
+          extra_migrations_reset: "0,1"
+          unlock_shared_cluster: false
+          context:
+            - canton-network-vpn
+            - slack-context
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           context:
@@ -17,6 +25,7 @@ workflow:
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - artifacts_push
+            - reset_before_deploy
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
           context:
@@ -225,6 +234,7 @@ workflow:
             - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
           cluster: << pipeline.parameters.cluster >>
+          extra_migrations_reset: "0,1"
           unlock_shared_cluster: true
           context:
             - canton-network-vpn

@@ -6,6 +6,7 @@ jobs:
         type: boolean
     machine:
       image: ubuntu-2204:2024.01.1
+    resource_class: xlarge
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -34,6 +35,9 @@ jobs:
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "infra"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "sv-canton"
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "sv-runbook"

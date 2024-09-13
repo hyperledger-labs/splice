@@ -250,6 +250,7 @@ workflow:
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
           context:
             - canton-network-vpn
             - slack-context

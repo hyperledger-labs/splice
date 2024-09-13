@@ -15,3 +15,4 @@ export * from './runbook-backup';
 export * from './secrets';
 export * from './spliceInstanceNames';
 export * from './utils';
+export * from './stackReferences';

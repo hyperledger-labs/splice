@@ -74,6 +74,16 @@ workflow:
           requires:
             - set_previews_cilr
       - preview_pulumi_changes:
+          name: Preview operator pulumi changes for CILR
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cilr"
+          deployment_only: true
+          requires:
+            - set_previews_cilr
+      - preview_pulumi_changes:
           name: Preview operator pulumi changes for DevNet
           context:
             - artifactory

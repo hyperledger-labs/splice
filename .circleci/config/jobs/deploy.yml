@@ -416,6 +416,7 @@ jobs:
                   # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
                   # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
                   cncluster prefresh
+                  export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET="0,1"
 
                   if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                     # silence specific alerts that may fire due to reset downtime
@@ -566,7 +567,7 @@ jobs:
               cncluster activate
               # All CI-deployed clusters use split postgres instances per app, to support backups.
               export SPLIT_POSTGRES_INSTANCES=1
-            
+
               images="/tmp/ciupgrade.json"
               cncluster export_to "$images"
 
