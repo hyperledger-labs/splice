@@ -1,0 +1,15 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if ! (env-bool "CI"); then
+  exit 0
+fi
+
+if ! docker system info -f json | jq .DriverStatus | grep -q "containerd.snapshotter"; then
+  _error "Docker is not using containerd image store, and will fail building multi-arch images. Please make sure your workflow includes the docker_prep_build command"
+  exit 1
+fi
