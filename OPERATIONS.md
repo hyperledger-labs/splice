@@ -28,6 +28,18 @@ canton-network up`) it is ok to pair to the point where you start the
 command and then start pairing again once it finishes (successful or
 unsuccessful) instead of waiting together for it to finish.
 
+### Request PAM
+
+You need to request privileged access to be able to interact with production clusters in a more invasive way.
+Not doing so can lead to weird error messages - see `TODO(#14764)`.
+Your access request needs to get approved by another CN engineer or by DA support; luckily you are already pairing with another CN engineer (see previous section)!
+For more information on privileged access management (PAM) for production GCP resources please refer to the [DA-wide documentation](https://digitalasset.atlassian.net/wiki/spaces/IS/pages/3430809601/Privileged+Access+Management+PAM+for+Production+GCP+resources) on the topic.
+The folders that are relevant for us are [CN-DEVNET](https://console.cloud.google.com/iam-admin/pam/grants/my?folder=98574387291) and [CN-MAINNET](https://console.cloud.google.com/iam-admin/pam/grants/my?folder=113800715154).
+
+You can also use `cncluster request_pam` from the target cluster directory to request a 4 hour grant for that cluster.
+The command will ask you for a reason and open the GCP PAM UI in your browser at the end of a successful run,
+so that you can check the status of your request there.
+
 ### Prefer Pulumi over kubectl edit
 
 It can often be tempting to quickly fix an issue with a `kubectl
