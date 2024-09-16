@@ -66,6 +66,12 @@ function _start_validator {
   if [ "$migrating" -eq 1 ]; then
     extra_flags+=("-M")
   fi
+  if [ -n "$restore_identities_dump" ]; then
+    extra_flags+=("-i" "$restore_identities_dump")
+  fi
+  if [ -n "$participant_id" ]; then
+    extra_flags+=("-P" "$participant_id")
+  fi
 
   _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
   secret=$(curl -sSfL -X POST "${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare")
@@ -118,7 +124,9 @@ function subcmd_start {
   migration_id=0
   migrating=0
   IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
-  while getopts 'haldn:m:Mwt:' arg; do
+  restore_identities_dump=""
+  participant_id=""
+  while getopts 'haldn:m:Mwt:i:P:' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -148,6 +156,12 @@ function subcmd_start {
       t)
         IMAGE_TAG="${OPTARG}"
         da_repo=1
+        ;;
+      i)
+        restore_identities_dump="${OPTARG}"
+        ;;
+      P)
+        participant_id="${OPTARG}"
         ;;
       ?)
         subcmd_help
@@ -199,7 +213,7 @@ function subcmd_start {
   fi
 }
 function usage_start {
-  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w]"
+  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w] [-t <image_tag>] [-i <identities_dump>] [-P <participant_id>]"
   _info "      -a: Enable authentication"
   _info "      -l: Start the validator against a local SV (for integration tests). Default is against a cluster determined by GCP_CLUSTER_HOSTNAME"
   _info "      -d: Use images from the DA-internal repository (default: use locally built images)"
@@ -208,6 +222,8 @@ function usage_start {
   _info "      -M: Use this flag when bumping the migration ID as part of a migration"
   _info "      -w: Wait for the validator to be ready"
   _info "      -t: Use a specific image tag (default: current snapshot). Implies -d"
+  _info "      -i <identities_dump>: restore identities from a dump file"
+  _info "      -P <participant_id>: participant identifier (by default, identical to the party hint which is hard-coded in this script to 'da-composeValidator-1')"
 }
 
 subcommand_whitelist[stop]='stop a validator'
@@ -444,6 +460,21 @@ function subcmd_restore_node {
   docker exec -i compose-postgres-splice-1 psql -U cnadmin participant-"$MIGRATION_ID" < "$participant_backup_file"
   docker compose -f "${REPO_ROOT}/cluster/deployment/compose/compose.yaml" down
 }
+
+subcommand_whitelist[identities_dump]='Fetch an identities dump from the validator'
+function subcmd_identities_dump {
+
+  if [ $# -lt 1 ]; then
+    _error "Usage: $SCRIPTNAME identities_dump <output_file>"
+  fi
+
+  output_file=$1
+
+  token=$("$REPO_ROOT/cluster/deployment/compose/token.py" administrator)
+  curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
+}
+
+
 
 ################################
 ### Main

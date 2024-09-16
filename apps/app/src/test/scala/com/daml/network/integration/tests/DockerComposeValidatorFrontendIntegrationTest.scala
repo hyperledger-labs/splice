@@ -21,6 +21,7 @@ class DockerComposeValidatorFrontendIntegrationTest
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
 
+  // TODO(#14303): There's quite a bit of copy-pasting in this test, consider better code reuse
   "docker-compose based validator works" in { implicit env =>
     val aliceTap = 123.4
     val builder = new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-w")
@@ -90,6 +91,8 @@ class DockerComposeValidatorFrontendIntegrationTest
       "0",
     ) !
 
+    val identities = backupsDir.resolve("identities.json")
+
     // Spin up the validator node again
     val ret2 = builder.!
     if (ret2 != 0) {
@@ -114,6 +117,110 @@ class DockerComposeValidatorFrontendIntegrationTest
             taps should have length 1
             taps.head.tapAmount shouldBe walletUsdToAmulet(BigDecimal.valueOf(aliceTap))
           }
+        }
+        clue("Logout Alice") {
+          click on find(id("logout-button")).value
+        }
+      }
+
+      clue("Getting participant identities dump from validator") {
+        if (
+          Seq(
+            "build-tools/splice-compose.sh",
+            "identities_dump",
+            identities.toAbsolutePath.toString,
+          ).! != 0
+        ) {
+          fail("Failed to create identities dump")
+        }
+      }
+    } finally {
+      Seq("build-tools/splice-compose.sh", "stop", "-D", "-f") !
+    }
+
+    // Spin up the validator one last time, this one recovering from identities dump
+    val ret3 = new ProcessBuilder(
+      "build-tools/splice-compose.sh",
+      "start",
+      "-l",
+      "-w",
+      "-i",
+      identities.toAbsolutePath.toString,
+      "-P",
+      "da-composeValidator-13",
+    ).!
+    if (ret3 != 0) {
+      fail("Failed to start docker-compose validator (when recovering from identities dump)")
+    }
+    try {
+      withFrontEnd("selfhosted") { implicit webDriver =>
+        eventuallySucceeds()(go to s"http://wallet.localhost")
+        clue("Alice can onboard again") {
+          actAndCheck(
+            "Login as alice",
+            loginOnCurrentPage(80, "alice", "wallet.localhost"),
+          )(
+            "Alice can re-onboard",
+            _ => {
+              find(id("onboard-button")).value.text should not be empty
+            },
+          )
+        }
+        actAndCheck(
+          "onboard alice",
+          click on "onboard-button",
+        )(
+          "Alice is logged in and maintained her balance",
+          _ => {
+            seleniumText(find(id("logged-in-user"))) should startWith("alice")
+            val balanceUsd = find(id("wallet-balance-usd"))
+              .valueOrFail("Couldn't find balance")
+              .text
+              .split(" ")
+              .head
+            balanceUsd.toDouble should be > aliceTap - 5.0
+          },
+        )
+        clue("Logout Alice") {
+          click on find(id("logout-button")).value
+        }
+      }
+
+      clue("Stop the validator (without wiping its data)") {
+        Seq("build-tools/splice-compose.sh", "stop") !
+      }
+
+      clue("Restart the validator, with the new participant ID") {
+        val ret4 = new ProcessBuilder(
+          "build-tools/splice-compose.sh",
+          "start",
+          "-l",
+          "-w",
+          "-P",
+          "da-composeValidator-13",
+        ).!
+        if (ret4 != 0) {
+          fail("Failed to start docker-compose validator (with the new participant ID)")
+        }
+      }
+      withFrontEnd("selfhosted") { implicit webDriver =>
+        eventuallySucceeds()(go to s"http://wallet.localhost")
+        clue("Alice can login and is already onboarded") {
+          actAndCheck()(
+            s"Login as alice",
+            loginOnCurrentPage(80, "alice", "wallet.localhost"),
+          )(
+            "Alice is already onboarded, and still sees here balance",
+            _ => {
+              seleniumText(find(id("logged-in-user"))) should startWith("alice")
+              val balanceUsd = find(id("wallet-balance-usd"))
+                .valueOrFail("Couldn't find balance")
+                .text
+                .split(" ")
+                .head
+              balanceUsd.toDouble should be > aliceTap - 5.0
+            },
+          )
         }
       }
     } finally {

@@ -8,6 +8,11 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* The docker-compose validator now supports recovering from a node identities dump in case of a complete disaster.
+
 0.2.1
 -----
 

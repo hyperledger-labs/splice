@@ -649,15 +649,8 @@ Re-onboard a validator and recover balances of all users it hosts
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved by deploying another validator node with control over the validator's participant keys.
 
-In order to be able to recover the data, you must have a backup of the identities of the validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
-
-From the backup of Node Identities, copy the content of the field ``identities.participant`` and save it as a separate JSON file.
-This file will be used as an identities bootstrap dump for the new validator.
-
-.. code-block:: bash
-
-    jq '.identities.participant' backup.json > dump.json
-
+In order to be able to recover the data, you must have a backup of the identities of the
+validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
 
 We can deploy a new validator node to which the data will be recovered.
 
@@ -666,7 +659,7 @@ Repeat the steps described in :ref:`helm-validator-install` for installing the v
 While doing so, please note the following:
 
 * Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
-  Use the separate JSON file prepared previously.
+  Use the identities backup file as the participant bootstrap dump file.
 
 Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
 Confirm that the wallet balance is as expected. It should be the same as the amount that the original validator wallet user owned.

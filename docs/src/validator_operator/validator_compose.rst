@@ -106,16 +106,17 @@ Deployment
   Where:
 
   a) ``<sponsor_sv_address>`` is the URL of the sv-app app of the SV that is sponsoring you.
-      You should have received this from your SV sponsor, typically starts with `https://sv.sv-N`
-      for some number N.
+     You should have received this from your SV sponsor, typically starts with `https://sv.sv-N`
+     for some number N.
 
-      For example, if your sponsor SV is the GSF, this URL would be |gsf_sv_url|
+     For example, if your sponsor SV is the GSF, this URL would be |gsf_sv_url|
 
-  b) ``<onboarding_secret>`` is the onboarding secret you obtained above. Please surround
-      this with quotes to avoid shell interpretation of special characters.
+  b) ``<onboarding_secret>``
+     is the onboarding secret you obtained above. Please surround
+     this with quotes to avoid shell interpretation of special characters.
 
   c) ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
-      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
+     This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
 
   d) ``$MIGRATION_ID`` is the migration ID of the synchronizer on the target network, as exported above.
 
@@ -210,5 +211,26 @@ Backup and Restore
 
 Please refer to the :ref:`backup and restore section <validator-backups>` for instructions on how to backup and restore your validator node.
 
-Please note that currently recovering a validator from only identitity dumps (as opposed to a full DB backup)
-is not yet supported and will be added soon.
+Re-onboard a validator and recover balances of all users it hosts
+-----------------------------------------------------------------
+
+In the case of a catastrophic failure of the validator node, some data owned by the validator and users
+it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved
+by deploying a new validator node with control over the original validator's participant keys.
+
+In order to be able to recover the data, you must have a backup of the identities of the
+validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
+
+To re-onboard a validator and recover the balances of all users it hosts, type:
+
+.. code-block:: bash
+
+    ./start.sh -s <sponsor_sv_address> -o "" -p <party_hint> -m $MIGRATION_ID -i <node_identities_dump_file> -P <new_participant_id>
+
+where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
+``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
+Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
+
+Once the new validator is up and running, you should be able to login as the administrator
+and see its balance. Other users hosted on the validator would need to re-onboard, but their
+coin balance and CNS entries should be recovered.
