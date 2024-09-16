@@ -37,7 +37,7 @@ jobs:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
-            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep CIRCLE_BUILD_URL"
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep CIRCLE_BUILD_URL --keep SLACK_ACCESS_TOKEN"
           gce_authenticate: true
           cmd: |
             cncluster activate
