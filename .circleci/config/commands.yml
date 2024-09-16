@@ -34,7 +34,7 @@ commands:
             git checkout "$CIRCLE_SHA1"
           }
 
-          for i in $(seq 1 5); do checkout && s=0 && break || s=$? && sleep 5; done; (exit $s)
+          for i in $(seq 1 10); do checkout && s=0 && break || s=$? && sleep 10; done; (exit $s)
     - run:
         name: Checkout submodule
         command: |
