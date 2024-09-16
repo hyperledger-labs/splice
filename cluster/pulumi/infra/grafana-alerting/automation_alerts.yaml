@@ -173,3 +173,71 @@ groups:
           "": ""
           gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
         isPaused: false
+      - uid: ady2ks9ehbw1sb
+        title: Busy Automation
+        condition: threshold
+        data:
+          - refId: runs
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by(namespace, node_type, trigger_name, migration) (rate(cn_trigger_completed_total{trigger_name=~".+", outcome=~".+"}[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: runs
+          - refId: threshold
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - 0.5
+                          - 0
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: runs
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: threshold
+        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
+        panelId: 14
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
+          __panelId__: "14"
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
+          runbook_url: ""
+          severity: |-
+              {{- if (gt $values.failure_pct.Value 1) -}}
+              critical
+              {{- else -}}
+              warning
+              {{- end -}}
+          summary: '{{ index $values "runs" }} trigger runs per second occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+        isPaused: false
