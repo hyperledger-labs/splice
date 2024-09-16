@@ -75,10 +75,6 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
 -(resource.labels.container_name=~"postgres" AND resource.labels.namespace_name="multi-validator")
 -- TODO(#14570): Remove this once we have improved our sv onboarding logic
 -(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
--- TODO(#14624): remove this once all SVs have upgraded testnet to 0.1.19
--jsonPayload.message="pollingTriggerTask failed with an unknown exception, restarting after 30 seconds"
--jsonPayload.message="Consensus not reached."
--jsonPayload.message="refresh_scan_list failed with an unknown exception, not retrying"
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
