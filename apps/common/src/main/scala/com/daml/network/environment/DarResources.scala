@@ -176,7 +176,11 @@ final case class PackageResource(
     others: Seq[DarResource], // Other DARs for the same package
 ) {
   def getPackageIdWithVersion(version: String): Option[String] = {
-    all.find(_.metadata.version.toString() == version).map(_.packageId)
+    getDarResource(version).map(_.packageId)
+  }
+
+  def getDarResource(version: String): Option[DarResource] = {
+    all.find(_.metadata.version.toString() == version)
   }
 
   def all = bootstrap +: others

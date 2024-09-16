@@ -25,6 +25,7 @@ import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.config.SvOnboardingConfig.InitialPackageConfig
 import com.daml.network.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
   DsoPartyHosting,
@@ -71,6 +72,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -84,7 +86,6 @@ class SV1Initializer(
     localSynchronizerNode: LocalSynchronizerNode,
     extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     sv1Config: SvOnboardingConfig.FoundDso,
-    requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
@@ -171,7 +172,7 @@ class SV1Initializer(
             .map(_.nonEmpty),
           participantAdminConnection
             .uploadDarFiles(
-              requiredDars,
+              requiredDars(sv1Config.initialPackageConfig),
               RetryFor.WaitingOnInitDependency,
             )
             .flatMap { _ =>
@@ -451,6 +452,25 @@ class SV1Initializer(
     }
   }
 
+  private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
+    def darsUpToInitialConfig(packageResource: PackageResource, requiredVersion: String) = {
+      packageResource.others
+        .filter { darResource =>
+          val required = PackageVersion.assertFromString(requiredVersion)
+          darResource.metadata.version <= required
+        }
+        .map(UploadablePackage.fromResource)
+    }
+
+    Seq(
+      DarResources.amulet -> initialPackageConfig.amuletVersion,
+      DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
+      DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
+    ).flatMap { case (packageResource, requiredVersion) =>
+      darsUpToInitialConfig(packageResource, requiredVersion)
+    }
+  }
+
   /** A private class to share the dsoStoreWithIngestion and the global domain-id
     * across setup methods.
     */
@@ -528,6 +548,7 @@ class SV1Initializer(
                   sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
                   sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
                   sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
+                  sv1Config.initialPackageConfig.toPackageConfig,
                   sv1Config.initialHoldingFee,
                 )
                 for {

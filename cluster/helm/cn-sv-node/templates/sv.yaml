@@ -274,6 +274,11 @@ spec:
                  read-vs-write-scaling-factor = {{ printf "%.0f" .readVsWriteScalingFactor }}
                }
             {{- end }}
+            {{- if .Values.initialPackageConfigJson }}
+            - name: ADDITIONAL_CONFIG_INITIAL_PACKAGE_CONFIG
+              value: |
+                canton.sv-apps.sv.onboarding.initial-package-config = {{ .Values.initialPackageConfigJson | quote }}
+            {{- end }}
             - name: FAIL_ON_APP_VERSION_MISMATCH
               value: {{ .Values.failOnAppVersionMismatch | quote }}
             {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}

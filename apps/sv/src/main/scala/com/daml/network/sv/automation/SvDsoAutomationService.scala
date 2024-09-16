@@ -35,6 +35,7 @@ import com.daml.network.sv.automation.singlesv.offboarding.{
 }
 import com.daml.network.sv.automation.singlesv.onboarding.*
 import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.config.SvOnboardingConfig.{FoundDso, InitialPackageConfig}
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import com.daml.network.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
@@ -84,7 +85,10 @@ class SvDsoAutomationService(
           clock,
           dsoStore,
           loggerFactory,
-          SvDsoAutomationService.bootstrapPackageIdResolver,
+          SvDsoAutomationService.bootstrapPackageIdResolver(config.onboarding match {
+            case Some(foundDso: FoundDso) => Some(foundDso.initialPackageConfig)
+            case _ => None
+          }),
         ),
       ledgerClient,
       retryProvider,
@@ -458,11 +462,20 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       decentralizedSynchronizerAlias: DomainAlias,
   )
 
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
+  private[automation] def bootstrapPackageIdResolver(
+      initialPackageConfig: Option[InitialPackageConfig]
+  )(template: QualifiedName): Option[String] =
     template.moduleName match {
       // DsoBootstrap is how we create AmuletRules in the first place so we cannot infer the package id for that from AmuletRules.
+      // We could infer it from initialPackageConfig
       case "Splice.DsoBootstrap" =>
-        Some(DarResources.dsoGovernance.bootstrap.packageId)
+        initialPackageConfig
+          .flatMap(config =>
+            DarResources.dsoGovernance.getPackageIdWithVersion(config.dsoGovernanceVersion)
+          )
+          .orElse(
+            Some(DarResources.dsoGovernance.bootstrap.packageId)
+          )
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
       case "Splice.AmuletImport" =>

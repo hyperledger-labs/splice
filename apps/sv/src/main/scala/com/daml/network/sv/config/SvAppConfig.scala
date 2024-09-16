@@ -4,16 +4,17 @@
 package com.daml.network.sv.config
 
 import com.daml.network.auth.AuthConfig
+import com.daml.network.codegen.java.splice
 import com.daml.network.config.{
   AutomationConfig,
   BackupDumpConfig,
-  SpliceDbConfig,
-  SpliceBackendConfig,
-  SpliceParametersConfig,
-  SpliceInstanceNamesConfig,
-  ParticipantClientConfig,
   GcpBucketConfig,
   ParticipantBootstrapDumpConfig,
+  ParticipantClientConfig,
+  SpliceBackendConfig,
+  SpliceDbConfig,
+  SpliceInstanceNamesConfig,
+  SpliceParametersConfig,
 }
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.util.SpliceUtil
@@ -85,6 +86,7 @@ object SvOnboardingConfig {
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
+      initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -95,6 +97,38 @@ object SvOnboardingConfig {
   ) extends SvOnboardingConfig
 
   object JoinWithKey
+
+  final case class InitialPackageConfig(
+      amuletVersion: String,
+      amuletNameServiceVersion: String,
+      dsoGovernanceVersion: String,
+      validatorLifecycleVersion: String,
+      walletVersion: String,
+      walletPaymentsVersion: String,
+  ) {
+    def toPackageConfig = new splice.amuletconfig.PackageConfig(
+      amuletVersion,
+      amuletNameServiceVersion,
+      dsoGovernanceVersion,
+      validatorLifecycleVersion,
+      walletVersion,
+      walletPaymentsVersion,
+    )
+  }
+
+  object InitialPackageConfig {
+    val defaultInitialPackageConfig: InitialPackageConfig = {
+      val fromResources = SpliceUtil.readPackageConfig()
+      InitialPackageConfig(
+        amuletVersion = fromResources.amulet,
+        amuletNameServiceVersion = fromResources.amuletNameService,
+        dsoGovernanceVersion = fromResources.dsoGovernance,
+        validatorLifecycleVersion = fromResources.validatorLifecycle,
+        walletVersion = fromResources.wallet,
+        walletPaymentsVersion = fromResources.walletPayments,
+      )
+    }
+  }
 
   // TODO(#3232) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
 

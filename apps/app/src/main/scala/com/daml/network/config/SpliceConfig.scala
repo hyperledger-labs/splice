@@ -8,6 +8,7 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
+import com.daml.network.environment.DarResources
 import com.daml.network.http.v0.definitions.{
   AppConfiguration,
   Domain,
@@ -29,6 +30,7 @@ import com.daml.network.splitwell.config.{
 }
 import com.daml.network.sv.config.*
 import com.daml.network.sv.SvAppClientConfig
+import com.daml.network.sv.config.SvOnboardingConfig.FoundDso
 import com.daml.network.util.Codec
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
@@ -57,6 +59,10 @@ import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.module.cats.{nonEmptyListReader, nonEmptyListWriter}
+import io.circe.parser.*
+import io.circe.{Decoder, Encoder}
+import io.circe.generic.semiauto.*
+import io.circe.syntax.*
 
 import scala.concurrent.duration.*
 import java.io.File
@@ -68,6 +74,7 @@ import java.nio.file.{Files, Path}
 import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
 case class SpliceConfig(
     override val name: Option[String] = None,
@@ -427,6 +434,16 @@ object SpliceConfig {
       deriveReader[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
       deriveReader[SvOnboardingConfig.JoinWithKey]
+    private implicit val initialPackageConfigDecoder
+        : Decoder[SvOnboardingConfig.InitialPackageConfig] =
+      deriveDecoder
+    implicit val svOnboardingInitialPackageConfigReader
+        : ConfigReader[SvOnboardingConfig.InitialPackageConfig] =
+      ConfigReader.fromNonEmptyStringTry(s =>
+        parse(s).toTry.flatMap {
+          _.as[SvOnboardingConfig.InitialPackageConfig].toTry
+        }
+      )
     implicit val svOnboardingDomainMigrationReader
         : ConfigReader[SvOnboardingConfig.DomainMigration] =
       deriveReader[SvOnboardingConfig.DomainMigration]
@@ -480,20 +497,43 @@ object SpliceConfig {
       deriveReader[BeneficiaryConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
-        // We support joining nodes without sequencers/mediators but
-        // sv1 must alway configure one to bootstrap the domain.
-        val sv1NodeHasSynchronizerConfig = conf.onboarding.fold(true) {
-          _ match {
-            case _: SvOnboardingConfig.FoundDso => conf.localSynchronizerNode.isDefined
+        def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
+          conf.onboarding.fold(true) {
+            case foundDso: SvOnboardingConfig.FoundDso => check(conf, foundDso)
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
           }
-        }
+        // We support joining nodes without sequencers/mediators but
+        // sv1 must alway configure one to bootstrap the domain.
+        val sv1NodeHasSynchronizerConfig =
+          checkFoundDsoConfig((conf, _) => conf.localSynchronizerNode.isDefined)
+        val initialPackageConfigExists =
+          checkFoundDsoConfig((_, foundDsoConf) =>
+            doesInitialPackageConfigExists(foundDsoConf.initialPackageConfig)
+          )
+        val validInitialPackageConfigDependencies =
+          checkFoundDsoConfig((_, foundDsoConf) =>
+            validateInitialPackageConfigDependencies(foundDsoConf.initialPackageConfig)
+          )
         for {
           _ <- Either.cond(
             sv1NodeHasSynchronizerConfig,
             (),
             ConfigValidationFailed("SV1 must always specify a domain config"),
+          )
+          _ <- Either.cond(
+            initialPackageConfigExists,
+            (),
+            ConfigValidationFailed(
+              "Some initialPackageConfig version(s) cannot be found in DarResources"
+            ),
+          )
+          _ <- Either.cond(
+            validInitialPackageConfigDependencies,
+            (),
+            ConfigValidationFailed(
+              "initialPackageConfig is not valid due to inconsistent dependencies"
+            ),
           )
           _ <- Either.cond(
             conf.synchronizerNodes.isEmpty || conf.supportsSoftDomainMigrationPoc,
@@ -726,6 +766,12 @@ object SpliceConfig {
       deriveWriter[SvOnboardingConfig.FoundDso]
     implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
       deriveWriter[SvOnboardingConfig.JoinWithKey]
+    private implicit val initialPackageConfigEncoder
+        : Encoder[SvOnboardingConfig.InitialPackageConfig] =
+      deriveEncoder
+    implicit val svOnboardingInitialPackageConfigWriter
+        : ConfigWriter[SvOnboardingConfig.InitialPackageConfig] =
+      ConfigWriter.stringConfigWriter.contramap(_.asJson.noSpaces)
     implicit val svOnboardingDomainMigrationWriter
         : ConfigWriter[SvOnboardingConfig.DomainMigration] =
       deriveWriter[SvOnboardingConfig.DomainMigration]
@@ -885,6 +931,47 @@ object SpliceConfig {
       .to(config)
       .render(renderer) + "}"
     Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
+  }
+
+  private def packageResourceToRequiredVersions(
+      initialPackageConfig: SvOnboardingConfig.InitialPackageConfig
+  ) = Seq(
+    DarResources.amulet -> initialPackageConfig.amuletVersion,
+    DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
+    DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
+    DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
+    DarResources.wallet -> initialPackageConfig.walletVersion,
+    DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
+  )
+
+  private def doesInitialPackageConfigExists(
+      initialPackageConfig: SvOnboardingConfig.InitialPackageConfig
+  ): Boolean = {
+    packageResourceToRequiredVersions(initialPackageConfig).forall {
+      case (packageResource, version) =>
+        packageResource.getDarResource(version).isDefined
+    }
+  }
+
+  private def validateInitialPackageConfigDependencies(
+      initialPackageConfig: SvOnboardingConfig.InitialPackageConfig
+  ): Boolean = {
+    val packageResourceToVersions = packageResourceToRequiredVersions(initialPackageConfig)
+    val mismatchVersionPackageIds =
+      packageResourceToVersions.flatMap { case (packageResource, requiredVersion) =>
+        val required = PackageVersion.assertFromString(requiredVersion)
+        packageResource.others.collect {
+          case darResource if darResource.metadata.version != required =>
+            darResource.packageId
+        }.toSet
+      }.toSet
+    packageResourceToVersions.forall { case (packageResource, version) =>
+      val darResource = packageResource.getDarResource(version)
+      darResource.exists(
+        // ensure the correct version of dependencies are specified
+        _.dependencyPackageIds.intersect(mismatchVersionPackageIds).isEmpty
+      )
+    }
   }
 }
 

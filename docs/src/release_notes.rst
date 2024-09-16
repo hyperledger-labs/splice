@@ -13,6 +13,8 @@ Upcoming
 
 * The docker-compose validator now supports recovering from a node identities dump in case of a complete disaster.
 
+* Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a DSO.
+
 0.2.1
 -----
 

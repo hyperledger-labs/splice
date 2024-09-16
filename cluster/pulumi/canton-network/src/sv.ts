@@ -17,6 +17,7 @@ import {
   ExactNamespace,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
+  initialPackageConfigJson,
   initialSynchronizerFeesConfig,
   installAuth0Secret,
   installAuth0UISecret,
@@ -372,6 +373,8 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? config.onboarding.roundZeroDuration : undefined,
     initialSynchronizerFeesConfig:
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
+    initialPackageConfigJson:
+      config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,

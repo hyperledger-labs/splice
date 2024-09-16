@@ -54,7 +54,7 @@ trait ConfigScheduleUtil extends TestCommon {
       domainFeesConfig.baseRateBurstAmount.value,
       domainFeesConfig.baseRateBurstWindow,
       domainFeesConfig.readVsWriteScalingFactor.value,
-      holdingFee,
+      holdingFee = holdingFee,
       nextDomainId = nextDomainId,
     )
   }

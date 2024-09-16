@@ -45,7 +45,7 @@ object SpliceUtil {
   private def readDarVersion(resource: DarResource): PackageVersion =
     DarUtil.readDarMetadata(resource.path).version
 
-  private def readPackageConfig(): splice.amuletconfig.PackageConfig = {
+  def readPackageConfig(): splice.amuletconfig.PackageConfig = {
     new splice.amuletconfig.PackageConfig(
       readDarVersion(DarResources.amulet.bootstrap).toString,
       readDarVersion(DarResources.amuletNameService.bootstrap).toString,
@@ -242,6 +242,7 @@ object SpliceUtil {
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
+      initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
@@ -255,6 +256,7 @@ object SpliceUtil {
       initialBaseRateBurstAmount,
       initialBaseRateBurstWindow,
       initialReadVsWriteScalingFactor,
+      initialPackageConfig,
       holdingFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
@@ -269,6 +271,7 @@ object SpliceUtil {
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
+      initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
@@ -292,7 +295,7 @@ object SpliceUtil {
 
       // tick duration
       new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
-      readPackageConfig(),
+      initialPackageConfig,
     )
 
   def defaultAnsConfig(
