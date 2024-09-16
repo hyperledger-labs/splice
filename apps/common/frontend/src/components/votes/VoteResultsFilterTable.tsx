@@ -33,7 +33,7 @@ interface ListVoteResultsTableProps {
   getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
   tableBodyId: string;
   tableType: VoteRequestResultTableType;
-  openModalWithVoteResult: (action: ActionRequiringConfirmation) => void;
+  openModalWithVoteResult: (voteResult: DsoRules_CloseVoteRequestResult) => void;
   accepted: boolean;
   effectiveFrom?: string;
   effectiveTo?: string;
@@ -47,7 +47,7 @@ type VoteRequestResultRow = {
   expiresAt: Date;
   effectiveAt: Date;
   idx: number;
-  action: ActionRequiringConfirmation;
+  voteResult?: DsoRules_CloseVoteRequestResult;
   expired: boolean;
   voteStatus: string[][];
 };
@@ -254,7 +254,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
               result.completedAt
           ),
           idx: index,
-          action: result.request.action,
+          voteResult: result,
           expired: result.outcome.tag === 'VRO_Expired',
           voteStatus: getVoteStatus(result.request.votes),
         }))
@@ -292,7 +292,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   }
 
   const handleRowClick: GridEventListener<'rowClick'> = (params: GridRowParams) => {
-    openModalWithVoteResult(params.row.action);
+    openModalWithVoteResult(params.row.voteResult);
   };
 
   return (

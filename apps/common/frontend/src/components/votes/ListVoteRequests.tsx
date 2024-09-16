@@ -23,6 +23,7 @@ import Container from '@mui/material/Container';
 
 import {
   ActionRequiringConfirmation,
+  DsoRules_CloseVoteRequestResult,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
@@ -101,7 +102,9 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
   const [voteRequestContractId, setVoteRequestContractId] = useState<
     ContractId<VoteRequest> | undefined
   >(undefined);
-  const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
+  const [voteResult, setVoteResult] = useState<DsoRules_CloseVoteRequestResult | undefined>(
+    undefined
+  );
   const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
   const [isVoteResultModalOpen, setVoteResultModalOpen] = useState<boolean>(false);
 
@@ -110,8 +113,8 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     setVoteRequestModalOpen(true);
   };
 
-  const openModalWithVoteResult = (action: ActionRequiringConfirmation) => {
-    setAction(action);
+  const openModalWithVoteResult = (voteResult: DsoRules_CloseVoteRequestResult) => {
+    setVoteResult(voteResult);
     setVoteResultModalOpen(true);
   };
 
@@ -350,7 +353,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     </IconButton>
                   }
                 />
-                <VoteResultModalContent action={action} />
+                <VoteResultModalContent handleClose={handleClose} voteResult={voteResult} />
               </Card>
             </Container>
           </ClickAwayListener>
