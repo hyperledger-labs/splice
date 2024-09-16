@@ -1679,6 +1679,9 @@ function subcmd_pdown_sv(){
     _cluster_must_exist
 
     subcmd_pulumi sv-runbook down --yes --skip-preview
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_down_canton
 }
 
 ###
@@ -1692,6 +1695,9 @@ function subcmd_ci_pdown_sv(){
     fi
 
     subcmd_pulumi sv-runbook down --yes --skip-preview
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_down_canton
 }
 
 ###
