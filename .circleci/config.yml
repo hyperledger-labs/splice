@@ -4173,8 +4173,8 @@ jobs:
           cmd: |
             cncluster activate
 
-            if [[ <<parameters.extra_migrations_reset>> != "" ]]; then
-              export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET="<<parameters.extra_migrations_reset>>"
+            if [ -n "<< parameters.extra_migrations_reset >>" ]; then
+              export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='<< parameters.extra_migrations_reset >>'
             fi
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
