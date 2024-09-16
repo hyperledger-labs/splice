@@ -1512,7 +1512,6 @@ commands:
               git clone "<< parameters.repository >>" << parameters.directory >> && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
-      - setup_sbt_test_job
       - run_bash_command_in_nix:
           cmd_name: dump latest into << parameters.repo_name >>
           cmd: |
@@ -1526,6 +1525,7 @@ commands:
 
   clone_and_update_open_source:
       steps:
+      - setup_sbt_test_job
       - clone_and_update_oss_or_splice:
           repo_name: DA oss
           repository: "git@github.com:digital-asset/decentralized-canton-sync.git"
