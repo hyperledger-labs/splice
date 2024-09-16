@@ -6,7 +6,7 @@ runForAllMigrations(async (stack, migration, sv) => {
   const result = await stack.up(pulumiOpts);
   console.log(`[migration=${migration.migrationId}]Updated stack for ${sv}`);
   console.log(JSON.stringify(result.summary));
-}).catch(err => {
+}, false).catch(err => {
   console.error('Failed to run up');
   console.error(err);
   process.exit(1);

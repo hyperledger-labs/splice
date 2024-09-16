@@ -24,11 +24,11 @@ async function downAllTheStacks() {
 
   await runForAllMigrations(async (stack, migration, sv) => {
     await downStack(migration.migrationId, sv, stack);
-  });
+  }, false);
   for (const migrationId of extraMigrationsToReset) {
     await Promise.all(
       svsToDeploy.map(async sv => {
-        const stack = await stackForMigration(sv, migrationId as DomainMigrationIndex);
+        const stack = await stackForMigration(sv, migrationId as DomainMigrationIndex, false);
         await downStack(migrationId as DomainMigrationIndex, sv, stack);
       })
     );

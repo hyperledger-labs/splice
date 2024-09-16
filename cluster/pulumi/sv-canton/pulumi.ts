@@ -48,13 +48,14 @@ export const pulumiOpts: { parallel: number; onOutput: (output: string) => void 
 
 export async function stackForMigration(
   nodeName: string,
-  migrationId: DomainMigrationIndex
+  migrationId: DomainMigrationIndex,
+  requiresExistingStack: boolean
 ): Promise<automation.Stack> {
   const stackName = `organization/sv-canton/sv-canton.${nodeName}-migration-${migrationId}.${CLUSTER_BASENAME}`;
   const command = await commandPromise;
   // safe to use process.env as we check if we're in a CI env
   // eslint-disable-next-line no-process-env
-  const stackMustAlreadyExist = process.env.CI !== undefined;
+  const stackMustAlreadyExist = process.env.CI !== undefined && requiresExistingStack;
   const stackOpts: automation.LocalProgramArgs = {
     workDir: __dirname,
     stackName: stackName,
@@ -82,7 +83,8 @@ const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) =>
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
 export async function runForAllMigrations(
-  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
+  requiresExistingStack: boolean
 ): Promise<void> {
   console.log(
     `Running for migration ${JSON.stringify(migrations)} and svs ${JSON.stringify(svsToDeploy)}`
@@ -92,7 +94,7 @@ export async function runForAllMigrations(
 
     await Promise.all(
       svsToDeploy.map(async sv => {
-        const stack = await stackForMigration(sv, migration.migrationId);
+        const stack = await stackForMigration(sv, migration.migrationId, requiresExistingStack);
         await runForStack(stack, migration, sv);
       })
     );

@@ -9,7 +9,7 @@ runForAllMigrations(async (stack, migration, sv) => {
   console.error(preview.stderr);
   console.log(preview.stdout);
   console.log(JSON.stringify(preview.changeSummary));
-}).catch(err => {
+}, true).catch(err => {
   console.error('Failed to run preview');
   console.error(err);
   process.exit(1);
