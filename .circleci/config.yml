@@ -1494,27 +1494,46 @@ commands:
           name: Print TARGET_BRANCH for debugging
           command: echo "TARGET_BRANCH set to $TARGET_BRANCH"
 
-  clone_and_update_oss:
+  clone_and_update_oss_or_splice:
+      parameters:
+        repo_name:
+          type: string
+        repository:
+          type: string
+        directory:
+          type: string
       steps:
       - run:
-          name: clone DA oss repo
+          name: clone << parameters.repo_name >> repo
           command: |
             cd ..
             for i in $(seq 1 5)
             do
-              git clone "git@github.com:digital-asset/decentralized-canton-sync.git" oss && s=0 && break || s=$? && sleep 5
+              git clone "<< parameters.repository >>" << parameters.directory >> && s=0 && break || s=$? && sleep 5
             done
             (exit $s)
       - setup_sbt_test_job
       - run_bash_command_in_nix:
-          cmd_name: dump latest into DA oss
+          cmd_name: dump latest into << parameters.repo_name >>
           cmd: |
-            scripts/copy-to-splice.sh ../oss
+            scripts/copy-to-splice.sh ../<< parameters.directory >>
       - run:
-          name: copy circleci-specific files to the DA OSS directory
+          name: copy circleci-specific files to the << parameters.repo_name >> directory
           command: |
-            mkdir -p ../oss/.circleci
-            cp -r .circleci/canton-scripts ../oss/.circleci
+            mkdir -p ../<< parameters.directory >>/.circleci
+            cp -r .circleci/canton-scripts ../<< parameters.directory >>/.circleci
+
+
+  clone_and_update_open_source:
+      steps:
+      - clone_and_update_oss_or_splice:
+          repo_name: DA oss
+          repository: "git@github.com:digital-asset/decentralized-canton-sync.git"
+          directory: oss
+      - clone_and_update_oss_or_splice:
+          repo_name: Splice
+          repository: git@github.com:hyperledger-labs/splice.git
+          directory: splice
 
   wait_for_sv_runbook_deployment:
     parameters:
@@ -3547,7 +3566,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_oss
+      - clone_and_update_open_source
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
@@ -3556,6 +3575,15 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "bundle"
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "update"
+          cmd_retry_count: 3
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
 
@@ -3567,12 +3595,17 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_oss
+      - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
+      - run_bash_command_in_nix:
+          cmd_name: Push changes to Splice
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          cmd: |
+            .circleci/create-splice-pr.sh /home/circleci/splice
 
   # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
