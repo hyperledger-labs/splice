@@ -121,11 +121,11 @@ This repository is in the process of being contributed from the private reposito
 
 As of now, it has the following limitations:
 
-- No CI or other periodic testing is running directly on this repository. We update this
-  repository daily as a dump of a private repository at Digital Asset, which is currently
-  the active development environment for Digital Asset. Over the coming months, we will
-  migrate the CI environment to this repository, and shift our development efforts to be
-  directly against it.
+- No CI or other periodic testing is running directly on this repository. This repository
+  is currently updated daily as a copy of Digital Asset's
+  [open source repository](https://github.com/digital-asset/decentralized-canton-sync).
+  Over the coming months, we will migrate the CI environment to this repository, and
+  shift our development efforts to be directly against it.
 
 - The code currently still refers to terms which are either copyrighted by Digital Asset,
   or otherwise should be removed from this reposotiry, such as Canton and Canton Coin. We
