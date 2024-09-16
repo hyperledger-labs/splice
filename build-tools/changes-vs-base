@@ -11,15 +11,13 @@ if [ -z "$file_path" ]; then
   exit 1
 fi
 
-# Find latest commit where those were modified
-changed_files_hash=$(git log -n 1 --format="%H" -- "${file_path}")
-
 latest_base_version=$("$REPO_ROOT"/build-tools/find_latest_base_version.sh)
 
-if git merge-base --is-ancestor "$latest_base_version" "$changed_files_hash"; then
-    echo "There's been changes in $file_path ($changed_files_hash) since the latest base version ($latest_base_version)."
-    exit 1
-else
+# 'git diff --quiet' exits with 1 if there were differences and 0 means no differences.
+if git diff --quiet "$latest_base_version" HEAD "$file_path"; then
     echo "There's been no changes in $file_path since the latest base version ($latest_base_version)."
     exit 0
+else
+    echo "There's been changes in $file_path since the latest base version ($latest_base_version)."
+    exit 1
 fi
