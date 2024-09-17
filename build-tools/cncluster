@@ -873,13 +873,14 @@ function _cluster_reset() {
     bg_down_stack sv-runbook
     bg_down_stack validator-runbook
 
-    subcmd_pulumi_down_canton
-
     # Wait for all background jobs and capture their exit statuses
     for pid in "${pids[@]}"; do
       wait "$pid"
       statuses+=($?)
     done
+
+    # Run this afterwards as most resources will be removed with the namespace, and we run refresh beforehand, so it should be fast
+    subcmd_pulumi_down_canton
 
     for status in "${statuses[@]}"; do
       if [ "$status" -ne 0 ]; then
