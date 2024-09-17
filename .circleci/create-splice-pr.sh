@@ -50,7 +50,7 @@ fi
 
 git checkout -b "$branch"
 git add .
-git commit -m "Update Splice from CCI" --allow-empty
+git commit -s -m "Update Splice from CCI" --allow-empty
 
 push_with_retries
 
