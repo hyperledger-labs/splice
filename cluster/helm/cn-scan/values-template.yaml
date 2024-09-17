@@ -3,6 +3,10 @@
 
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
+# -- Annotations for the scan pod
+pod:
+  annotations: {}
+
 defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=70 -Dscala.concurrent.context.minThreads=8
 resources:
   limits:

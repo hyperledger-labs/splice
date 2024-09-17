@@ -3,6 +3,10 @@
 
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
+# -- Annotations for the sv-node pods
+pod:
+  annotations: {}
+
 cluster:
   fixedTokens: false
 
