@@ -1,6 +1,8 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
 import com.daml.network.codegen.java.splice.validatorlicense.*
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.{BuildInfo, EnvironmentImpl}
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.{
@@ -9,8 +11,10 @@ import com.daml.network.integration.tests.SpliceTests.{
 }
 import com.daml.network.util.{TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
+import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
 import scala.jdk.OptionConverters.*
 
 class ValidatorLicenseMetadataTimeBasedIntegrationTest
@@ -33,6 +37,11 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
                   contactPoint = "aliceLocal@example.com"
                 ))
         )
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
       )
       .withManualStart
 
@@ -117,6 +126,67 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
           newLicense.data.lastActiveAt should not be license.data.lastActiveAt
           newLicense.data.lastActiveAt.toScala.value shouldBe getLedgerTime.toInstant
           newLicense.data.faucetState shouldBe license.data.faucetState
+        },
+      )
+      succeed
+    }
+  }
+
+  "unclaimed ValidatorLivenessActivityRecord contracts should be expired" in { implicit env =>
+    startAllSync(
+      sv1Backend,
+      sv1ScanBackend,
+      aliceValidatorBackend,
+    )
+    eventually() {
+      val validatorLivenessActivityRecordRounds =
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+            dsoParty
+          )
+          .map(_.data.round.number)
+          .toSet
+
+      validatorLivenessActivityRecordRounds shouldBe Set(0L, 1L)
+    }
+
+    // pause the trigger to avoid collecting further rewards
+    setTriggersWithin(
+      triggersToResumeAtStart = Seq.empty,
+      triggersToPauseAtStart = Seq(
+        aliceValidatorBackend.validatorAutomation.trigger[ReceiveFaucetCouponTrigger]
+      ),
+    ) {
+
+      actAndCheck(
+        "Advance rounds so that issuing rounds 0 and 1 no longer exist",
+        (1 to 5).foreach { _ =>
+          advanceRoundsByOneTick
+        },
+      )(
+        "ValidatorLivenessActivityRecord contracts for round 0 and 1 should be expired",
+        _ => {
+          val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+          issuingRounds.map(_.payload.round.number).toSet shouldBe Set(2L, 3L, 4L)
+
+          val allValidatorLivenessActivityRecord =
+            sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+                dsoParty
+              )
+          allValidatorLivenessActivityRecord shouldBe empty
+
+          // assuming this value is the same in that of round 0 and 1
+          val issuancePerValidatorFaucetCoupon =
+            issuingRounds.headOption.value.payload.optIssuancePerValidatorFaucetCoupon.toScala.value
+
+          val unclaimedRewards = sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(UnclaimedReward.COMPANION)(
+              dsoParty
+            )
+            .map(_.data.amount)
+
+          unclaimedRewards.count(_ == issuancePerValidatorFaucetCoupon) shouldBe 2
         },
       )
       succeed
