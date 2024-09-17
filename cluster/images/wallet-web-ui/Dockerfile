@@ -8,7 +8,7 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 
 ARG base_version
-FROM --platform=$BUILDPLATFORM splice-app:${base_version} AS build
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS build
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 
@@ -20,11 +20,14 @@ RUN xx-apt-get update && \
 COPY docker-entrypoint.sh /custom-docker-entrypoint.sh
 RUN chmod 500 /custom-docker-entrypoint.sh
 
+ARG base_version
+FROM splice-app:${base_version} AS splice
+
 FROM nginx:stable
 
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY --from=build /custom-docker-entrypoint.sh /custom-docker-entrypoint.sh
-COPY --from=build app/splice-node/web-uis/wallet /usr/share/nginx/html/
+COPY --from=splice app/splice-node/web-uis/wallet /usr/share/nginx/html/
 
 COPY default.conf /etc/nginx/conf.d
 COPY config.js /tmpl/config.js.tmpl
