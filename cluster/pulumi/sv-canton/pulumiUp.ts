@@ -1,7 +1,8 @@
-import { pulumiOpts, runForAllMigrations } from './pulumi';
+import { pulumiOptsForMigration, runForAllMigrations } from './pulumi';
 
 runForAllMigrations(async (stack, migration, sv) => {
   console.log(`[migration=${migration.migrationId}]Updating stack for ${sv}`);
+  const pulumiOpts = pulumiOptsForMigration(migration.migrationId, sv);
   await stack.refresh(pulumiOpts);
   const result = await stack.up(pulumiOpts);
   console.log(`[migration=${migration.migrationId}]Updated stack for ${sv}`);

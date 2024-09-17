@@ -2,7 +2,12 @@ import * as automation from '@pulumi/pulumi/automation';
 import { DomainMigrationIndex } from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 
-import { pulumiOpts, runForAllMigrations, stackForMigration, svsToDeploy } from './pulumi';
+import {
+  pulumiOptsForMigration,
+  runForAllMigrations,
+  stackForMigration,
+  svsToDeploy,
+} from './pulumi';
 
 // used in CI clusters that run HDM to ensure everything is cleaned up
 const extraMigrationsToReset =
@@ -15,6 +20,7 @@ async function downAllTheStacks() {
   async function downStack(migrationId: DomainMigrationIndex, sv: string, stack: automation.Stack) {
     console.log(`[migration=${migrationId}]Destroying stack for ${sv}`);
     await stack.cancel();
+    const pulumiOpts = pulumiOptsForMigration(migrationId, sv);
     const refresh = await stack.refresh(pulumiOpts);
     console.log(`Ran refresh: ${JSON.stringify(refresh.summary)}`);
     const destroy = await stack.destroy(pulumiOpts);

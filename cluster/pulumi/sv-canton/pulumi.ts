@@ -39,12 +39,20 @@ const commandPromise = automation.PulumiCommand.get({
   skipVersionCheck: false,
 });
 
-export const pulumiOpts: { parallel: number; onOutput: (output: string) => void } = {
-  parallel: 128,
-  onOutput: (output: string) => {
-    console.log(output);
-  },
-};
+export function pulumiOptsForMigration(
+  migration: DomainMigrationIndex,
+  sv: string
+): {
+  parallel: number;
+  onOutput: (output: string) => void;
+} {
+  return {
+    parallel: 128,
+    onOutput: (output: string) => {
+      console.log(`[migration=${migration},sv=${sv}]${output}`);
+    },
+  };
+}
 
 export async function stackForMigration(
   nodeName: string,
