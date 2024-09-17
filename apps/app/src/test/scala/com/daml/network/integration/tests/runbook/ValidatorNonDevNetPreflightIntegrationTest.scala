@@ -37,11 +37,11 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
           validatorUserName,
           validatorUserPassword,
           // Notably, we expect that the service user is always already onboarded.
-          () => find(id("wallet-balance-cc")) should not be empty,
+          () => find(id("wallet-balance-amulet")) should not be empty,
         )
       }
       clue("Checking that balance is visible") {
-        val balanceText = find(id("wallet-balance-cc")).value.text.trim
+        val balanceText = find(id("wallet-balance-amulet")).value.text.trim
         logger.info(s"Current balance: $balanceText")
       }
     }

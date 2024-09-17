@@ -386,7 +386,7 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
 
   const row = (type: string, label: string, amount: BigNumber) => [
     <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
-    <Typography key={`tx-reward-${type}-cc`} className={`tx-reward-${type}-cc`}>
+    <Typography key={`tx-reward-${type}-amulet`} className={`tx-reward-${type}-amulet`}>
       <AmountDisplay amount={amount} currency="AmuletUnit" />
     </Typography>,
   ];
@@ -451,7 +451,7 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
 
   return (
     <Stack direction="column">
-      <Typography className="tx-amount-cc">
+      <Typography className="tx-amount-amulet">
         {sign}
         <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
       </Typography>

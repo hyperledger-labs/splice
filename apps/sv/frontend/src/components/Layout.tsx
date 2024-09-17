@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
           navLinks={[
             { name: 'Information', path: 'dso' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
-            { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'cc-price' },
+            { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
             { name: 'Delegate Election', path: 'delegate' },
             { name: 'Governance', path: 'votes' },
           ]}

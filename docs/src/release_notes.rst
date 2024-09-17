@@ -10,6 +10,8 @@ Release Notes
 
 Upcoming
 --------
+* SV UI
+  * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
 
 * The docker-compose validator now supports recovering from a node identities dump in case of a complete disaster.
 

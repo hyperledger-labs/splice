@@ -102,7 +102,7 @@ if [ -z "${run_daml_upgrade-}" ]; then
 fi
 
 if [ -z "${run_partial_upgrade-}" ]; then
-  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/cluster"; then
+  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/cluster" && "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/apps/app/src/test/scala/com/daml/network/integration/tests/runbook"; then
     echo "Proceeding with partial upgrade."
     run_partial_upgrade="true"
   else
@@ -112,10 +112,11 @@ if [ -z "${run_partial_upgrade-}" ]; then
 fi
 
 data="{\"branch\": \"$branch\", \"parameters\":{\"run-job\":\"deploy-upgrade\", \"branch-filter\": \"$branch_filter\", \"cluster\": \"$cluster\", \"run-partial-upgrade\": $run_partial_upgrade, \"run-daml-upgrade\": $run_daml_upgrade, \"base-version\": \"$base_version\"}}"
-echo "Running CircleCI request: $data"
+echo "Running CircleCI request:"
+jq -n "$data"
 
 curl --fail-with-body --request POST \
-      --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
-      --header "Circle-Token: ${CIRCLECI_TOKEN}" \
-      --header 'content-type: application/json' \
-      --data "$data"
+  --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
+  --header "Circle-Token: ${CIRCLECI_TOKEN}" \
+  --header 'content-type: application/json' \
+  --data "$data"

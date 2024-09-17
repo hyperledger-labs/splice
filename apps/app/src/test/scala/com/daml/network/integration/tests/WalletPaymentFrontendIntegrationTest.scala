@@ -562,7 +562,7 @@ class WalletPaymentFrontendIntegrationTest
     )
 
     // TODO (#3492): test with fee
-    element.childElement(className("payment-total-cc")).text should matchTextMixedWithNumbers(
+    element.childElement(className("payment-total-amulet")).text should matchTextMixedWithNumbers(
       raw"([0-9.,]+) $amuletNameAcronym".r,
       Seq(expectedTotalCC),
       tolerance,

@@ -58,7 +58,7 @@ class WalletFrontendIntegrationTest
             val feeUpperBound = walletUsdToAmulet(feeUpperBoundUsd)
 
             val (ccTextBefore, usdTextBefore) = eventually() {
-              val ccTextBefore = find(id("wallet-balance-cc")).value.text.trim
+              val ccTextBefore = find(id("wallet-balance-amulet")).value.text.trim
               val usdTextBefore = find(id("wallet-balance-usd")).value.text.trim
               ccTextBefore should not be "..."
               usdTextBefore should not be "..."
@@ -74,7 +74,7 @@ class WalletFrontendIntegrationTest
             )(
               "User sees the updated balance",
               _ => {
-                val ccText = find(id("wallet-balance-cc")).value.text.trim
+                val ccText = find(id("wallet-balance-amulet")).value.text.trim
                 val usdText = find(id("wallet-balance-usd")).value.text.trim
 
                 ccText should not be "..."
@@ -128,7 +128,7 @@ class WalletFrontendIntegrationTest
             "Alice has unchanged balance and sees error message",
             _ => {
               import WalletFrontendTestUtil.*
-              val ccText = find(id("wallet-balance-cc")).value.text.trim
+              val ccText = find(id("wallet-balance-amulet")).value.text.trim
               val usdText = find(id("wallet-balance-usd")).value.text.trim
               val errorMessage = find(className(errorDisplayElementClass)).value.text.trim
 
