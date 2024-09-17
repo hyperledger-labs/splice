@@ -1,0 +1,2337 @@
+openapi: 3.0.0
+info:
+  title: Scan API
+  version: 0.0.1
+tags:
+  - name: scan
+servers:
+  - url: https://example.com/api/scan
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
+  /v0/dso:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getDsoInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+  /v0/dso-party-id:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getDsoPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDsoPartyIdResponse"
+  /v0/closed-rounds:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getClosedRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetClosedRoundsResponse"
+  /v0/open-and-issuing-mining-rounds:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getOpenAndIssuingMiningRounds"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
+  /v0/amulet-rules:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAmuletRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetAmuletRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAmuletRulesResponse"
+  /v0/ans-rules:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAnsRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetAnsRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAnsRulesResponse"
+  /v0/featured-apps:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listFeaturedAppRights"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
+  /v0/featured-apps/{provider_party_id}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupFeaturedAppRight"
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
+  /v0/total-amulet-balance:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTotalAmuletBalance"
+      parameters:
+        - in: query
+          name: asOfEndOfRound
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTotalAmuletBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/wallet-balance:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getWalletBalance"
+      parameters:
+        - in: query
+          name: party_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: asOfEndOfRound
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetWalletBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/amulet-config-for-round:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAmuletConfigForRound"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAmuletConfigForRoundResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/round-of-latest-data:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getRoundOfLatestData"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/rewards-collected:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getRewardsCollected"
+      parameters:
+        - in: query
+          name: round
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRewardsCollectedResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/top-providers-by-app-rewards:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopProvidersByAppRewards"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/top-validators-by-validator-rewards:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorRewards"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/top-validators-by-validator-faucets:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorFaucets"
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorFaucetsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/top-validators-by-purchased-traffic:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByPurchasedTraffic"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByPurchasedTrafficResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/dso-sequencers:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listDsoSequencers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListDsoSequencersResponse"
+  /v0/scans:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listDsoScans"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListDsoScansResponse"
+  /v0/activities:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listActivity"
+      description: |
+        Lists activities in descending order, paged, optionally starting after a provided event id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListActivityRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListActivityResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/transactions:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listTransactionHistory"
+      description: |
+        Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TransactionHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/updates:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdateHistory"
+      description: |
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/updates/{update_id}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdateById"
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/state/acs/snapshot-timestamp:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getDateOfMostRecentSnapshotBefore"
+      description: |
+        Returns the timestamp of the most recent snapshot before the given date, for the given migration_id.
+        This corresponds to the record time of the last transaction in the snapshot.
+      parameters:
+        - name: "before"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+            description: |
+              The endpoint will return the record time of the most recent snapshot before this parameter.
+        - name: "migration_id"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int64
+            description: |
+              The endpoint will return the record time of the most recent snapshot for this migration id.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsSnapshotTimestampResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/state/acs:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshotAt"
+      description: |
+        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AcsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/state/acs/force:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "forceAcsSnapshotNow"
+      description: |
+        Takes a snapshot of the ACS at the current time.
+        Disabled in production environments.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForceAcsSnapshotResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/holdings/state:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsStateAt"
+      description: |
+        Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsStateRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/holdings/summary:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsSummaryAt"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsSummaryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/ans-entries:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listAnsEntries"
+      parameters:
+        - name: "name_prefix"
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListEntriesResponse"
+  /v0/ans-entries/by-party/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupAnsEntryByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/ans-entries/by-name/{name}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupAnsEntryByName"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/acs/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshot"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAcsSnapshotResponse"
+  /v0/aggregated-rounds:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAggregatedRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAggregatedRoundsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/round-totals:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listRoundTotals"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/round-party-totals:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listRoundPartyTotals"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundPartyTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundPartyTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/migrations/schedule:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getMigrationSchedule"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MigrationSchedule"
+        "404":
+          description: "No migration scheduled"
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-identities/{domain_id_prefix}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerIdentities"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerIdentities"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerBootstrappingTransactions"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerBootstrappingTransactions"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/splice-instance-names:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getSpliceInstanceNames"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSpliceInstanceNamesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/voterequest:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listVoteRequestsByTrackingCid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/BatchListVotesByVoteRequestsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteRequestByTrackingCidResponse"
+  /v0/voterequests/{vote_request_contract_id}:
+    get:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "lookupDsoRulesVoteRequest"
+      parameters:
+        - name: "vote_request_contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/LookupDsoRulesVoteRequestResponse"
+  /v0/admin/sv/voterequests:
+    get:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listDsoRulesVoteRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteRequestsResponse"
+  /v0/admin/sv/voteresults:
+    post:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listVoteRequestResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteResultsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
+
+components:
+  schemas:
+    GetSpliceInstanceNamesResponse:
+      type: object
+      required:
+        - network_name
+        - network_favicon_url
+        - amulet_name
+        - amulet_name_acronym
+        - name_service_name
+        - name_service_name_acronym
+      properties:
+        network_name:
+          type: string
+        network_favicon_url:
+          type: string
+        amulet_name:
+          type: string
+        amulet_name_acronym:
+          type: string
+        name_service_name:
+          type: string
+        name_service_name_acronym:
+          type: string
+    GetDsoPartyIdResponse:
+      type: object
+      required: ["dso_party_id"]
+      properties:
+        dso_party_id:
+          type: string
+    GetClosedRoundsResponse:
+      type: object
+      required: ["rounds"]
+      properties:
+        rounds:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    GetOpenAndIssuingMiningRoundsRequest:
+      type: object
+      required:
+        [
+          "cached_open_mining_round_contract_ids",
+          "cached_issuing_round_contract_ids",
+        ]
+      properties:
+        cached_open_mining_round_contract_ids:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_issuing_round_contract_ids:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+    GetOpenAndIssuingMiningRoundsResponse:
+      type: object
+      required:
+        [
+          "open_mining_rounds",
+          "issuing_mining_rounds",
+          "time_to_live_in_microseconds",
+        ]
+      properties:
+        time_to_live_in_microseconds:
+          type: integer
+        open_mining_rounds:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+        issuing_mining_rounds:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+    GetAmuletRulesRequest:
+      type: object
+      properties:
+        cached_amulet_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_amulet_rules_domain_id:
+          type: string
+    GetAmuletRulesResponse:
+      type: object
+      properties:
+        amulet_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["amulet_rules_update"]
+    GetAnsRulesRequest:
+      type: object
+      properties:
+        cached_ans_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_ans_rules_domain_id:
+          type: string
+    GetAnsRulesResponse:
+      type: object
+      properties:
+        ans_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["ans_rules_update"]
+    ListFeaturedAppRightsResponse:
+      type: object
+      required: ["featured_apps"]
+      properties:
+        featured_apps:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    LookupFeaturedAppRightResponse:
+      type: object
+      properties:
+        featured_app_right:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    GetWalletBalanceResponse:
+      type: object
+      required: ["wallet_balance"]
+      properties:
+        wallet_balance:
+          type: string
+    GetTotalAmuletBalanceResponse:
+      type: object
+      required: ["total_balance"]
+      properties:
+        total_balance:
+          type: string
+    GetAmuletConfigForRoundResponse:
+      type: object
+      required:
+        ["amulet_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
+      properties:
+        amulet_create_fee:
+          type: string
+        holding_fee:
+          type: string
+        lock_holder_fee:
+          type: string
+        transfer_fee:
+          $ref: "#/components/schemas/SteppedRate"
+    SteppedRate:
+      type: object
+      required: ["initial", "steps"]
+      properties:
+        initial:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/RateStep"
+    RateStep:
+      type: object
+      required: ["amount", "rate"]
+      properties:
+        amount:
+          type: string
+        rate:
+          type: string
+    GetRoundOfLatestDataResponse:
+      type: object
+      required: ["round", "effectiveAt"]
+      properties:
+        round:
+          type: integer
+          format: int64
+        effectiveAt:
+          type: string
+          format: date-time
+    GetRewardsCollectedResponse:
+      type: object
+      required: ["amount"]
+      properties:
+        amount:
+          type: string
+    GetValidatorTrafficBalanceResponse:
+      type: object
+      required: ["remainingBalance", "totalPurchased"]
+      properties:
+        remainingBalance:
+          type: number
+          format: double
+        totalPurchased:
+          type: number
+          format: double
+    CheckAndUpdateValidatorTrafficBalanceResponse:
+      type: object
+      required: ["approved"]
+      properties:
+        approved:
+          type: boolean
+    GetTopProvidersByAppRewardsResponse:
+      type: object
+      required: ["providersAndRewards"]
+      properties:
+        providersAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    GetTopValidatorsByValidatorRewardsResponse:
+      type: object
+      required: ["validatorsAndRewards"]
+      properties:
+        validatorsAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    PartyAndRewards:
+      type: object
+      required: ["provider", "rewards"]
+      properties:
+        provider:
+          type: string
+        rewards:
+          type: string
+    GetTopValidatorsByValidatorFaucetsResponse:
+      type: object
+      required: ["validatorsByReceivedFaucets"]
+      properties:
+        validatorsByReceivedFaucets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorReceivedFaucets"
+    ValidatorReceivedFaucets:
+      type: object
+      required:
+        [
+          "validator",
+          "numRoundsCollected",
+          "numRoundsMissed",
+          "firstCollectedInRound",
+          "lastCollectedInRound",
+        ]
+      properties:
+        validator:
+          type: string
+        numRoundsCollected:
+          type: integer
+          format: int64
+        numRoundsMissed:
+          type: integer
+          format: int64
+        firstCollectedInRound:
+          type: integer
+          format: int64
+        lastCollectedInRound:
+          type: integer
+          format: int64
+    GetTopValidatorsByPurchasedTrafficResponse:
+      type: object
+      required: ["validatorsByPurchasedTraffic"]
+      properties:
+        validatorsByPurchasedTraffic:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorPurchasedTraffic"
+    ValidatorPurchasedTraffic:
+      type: object
+      required:
+        [
+          "validator",
+          "numPurchases",
+          "totalTrafficPurchased",
+          "totalCcSpent",
+          "lastPurchasedInRound",
+        ]
+      properties:
+        validator:
+          type: string
+        numPurchases:
+          type: integer
+          format: int64
+        totalTrafficPurchased:
+          type: integer
+          format: int64
+        totalCcSpent:
+          type: string
+        lastPurchasedInRound:
+          type: integer
+          format: int64
+    ListImportCratesResponse:
+      type: object
+      required: ["crates"]
+      properties:
+        crates:
+          type: array
+          items:
+            # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+    ListDsoSequencersResponse:
+      type: object
+      required: ["domainSequencers"]
+      properties:
+        domainSequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainSequencers"
+    DomainSequencers:
+      type: object
+      required: ["domainId", "sequencers"]
+      properties:
+        domainId:
+          type: string
+        sequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DsoSequencer"
+    DsoSequencer:
+      type: object
+      required: ["migrationId", "id", "url", "svName", "availableAfter"]
+      properties:
+        migrationId:
+          type: integer
+          format: int64
+        id:
+          type: string
+        url:
+          type: string
+        svName:
+          type: string
+        availableAfter:
+          type: string
+          format: date-time
+    ListDsoScansResponse:
+      type: object
+      required: ["scans"]
+      properties:
+        scans:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainScans"
+    DomainScans:
+      type: object
+      required: ["domainId", "scans"]
+      properties:
+        domainId:
+          type: string
+        scans:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanInfo"
+    ScanInfo:
+      type: object
+      required: ["publicUrl", "svName"]
+      properties:
+        publicUrl:
+          type: string
+        svName:
+          type: string
+    TransactionHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        page_end_event_id:
+          type: string
+          description: |
+            Note that all transactions carry some monotonically-increasing event_id.
+            Omit this page_end_event_id to start reading the first page, from the beginning or the end of the ledger, depending on the sort_order column.
+            A subsequent request can fill the page_end_event_id with the last event_id of the TransactionHistoryResponse to continue reading in the same sort_order.
+            The transaction with event_id == page_end_event_id will be skipped in the next response, making it possible to continuously read pages in the same sort_order.
+        sort_order:
+          description: |
+            Sort order for the transactions. For ascending order, from beginning to the end of the ledger, use "asc".
+            For descending order, from end to beginning of the ledger, use "desc".
+            "asc" is used if the sort_order is omitted.
+          type: string
+          enum:
+            - "asc"
+            - "desc"
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int64
+    TransactionHistoryResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionHistoryResponseItem"
+    TransactionHistoryResponseItem:
+      type: object
+      required:
+        - transaction_type
+        - event_id
+        - date
+        - domain_id
+        - amulet_price
+        - round
+      properties:
+        transaction_type:
+          description: |
+            Describes the type of activity that occurred.
+            Determines if the data for the transaction should be read
+            from the `transfer`, `mint`, or `tap` property.
+          type: string
+          enum:
+            - "transfer"
+            - "mint"
+            - "devnet_tap"
+        event_id:
+          description: |
+            The event id.
+          type: string
+        offset:
+          description: |
+            The ledger offset of the event.
+          type: string
+        date:
+          description: |
+            The effective date of the event.
+          type: string
+          format: date-time
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
+          type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
+        amulet_price:
+          description: |
+            The amulet price for the round at which this transfer was executed.
+          type: string
+        transfer:
+          description: |
+            A (batch) transfer from sender to receivers.
+          $ref: "#/components/schemas/Transfer"
+        mint:
+          description: |
+            The DSO mints amulet for the cases where the DSO rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
+        tap:
+          description: |
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
+    UpdateHistoryRequestAfter:
+      type: object
+      required:
+        - after_migration_id
+        - after_record_time
+      properties:
+        after_migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id from which to start returning transactions. This is inclusive.
+        after_record_time:
+          type: string
+          description: |
+            The record time to start returning transactions from. This only affects
+            transactions with the same migration id as after_migration_id. Higher migration ids
+            are always considered to be later.
+    UpdateHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+        lossless:
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          type: boolean
+    UpdateHistoryResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItem:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransaction"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
+    UpdateHistoryReassignment:
+      type: object
+      description: A contract reassignment between synchronizer. May be an assignment or unassignment.
+      required:
+        - update_id
+        - offset
+        - record_time
+        - event
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        event:
+          description: |
+            The reassignment event. May be an assignment or unassignment.
+          type: object
+          oneOf:
+            - $ref: "#/components/schemas/UpdateHistoryAssignment"
+            - $ref: "#/components/schemas/UpdateHistoryUnassignment"
+    UpdateHistoryAssignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - target_synchronizer
+        - migration_id
+        - unassign_id
+        - created_event
+        - reassignment_counter
+      properties:
+        submitter:
+          description: |
+            The party who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the target synchronizer
+          type: integer
+          format: int64
+        unassign_id:
+          description: |
+            The id of the corresponding unassign event
+          type: string
+        created_event:
+          description: |
+            The corresponding contract create event
+          $ref: "#/components/schemas/CreatedEvent"
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+    UpdateHistoryUnassignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - migration_id
+        - target_synchronizer
+        - unassign_id
+        - reassignment_counter
+        - contract_id
+      properties:
+        submitter:
+          description: |
+            The party who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer from which the contract was reassigned
+          type: integer
+          format: int64
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        unassign_id:
+          description: |
+            The id of the unassign event, to later be correlated to an assign event
+          type: string
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+        contract_id:
+          description: |
+            The id of the unassigned contract
+          type: string
+    UpdateHistoryTransaction:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - workflow_id
+        - command_id
+        - record_time
+        - synchronizer_id
+        - effective_at
+        - offset
+        - root_event_ids
+        - events_by_id
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer.
+          type: integer
+          format: int64
+        workflow_id:
+          description: |
+            The id of the workflow to which this transaction belongs.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        synchronizer_id:
+          description: |
+            The id of the synchronizer through which this transaction was sequenced.
+          type: string
+        effective_at:
+          description: |
+            Ledger effective time.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+          type: string
+        root_event_ids:
+          description: |
+            Roots of the transaction tree.
+          type: array
+          items:
+            type: string
+        events_by_id:
+          description: |
+            Changes to the ledger that were caused by this transaction. Nodes of the transaction tree.
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/TreeEvent"
+    TreeEvent:
+      type: object
+      description: |
+        Either a creation or an exercise of a contract.
+      oneOf:
+        - $ref: "#/components/schemas/CreatedEvent"
+        - $ref: "#/components/schemas/ExercisedEvent"
+      discriminator:
+        propertyName: event_type
+        mapping:
+          created_event: "#/components/schemas/CreatedEvent"
+          exercised_event: "#/components/schemas/ExercisedEvent"
+    CreatedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - create_arguments
+        - created_at
+        - signatories
+        - observers
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        create_arguments:
+          description: |
+            The arguments that have been used to create the contract.
+          type: object
+        created_at:
+          description: |
+            Ledger effective time of the transaction that created the contract.
+          type: string
+          format: date-time
+        signatories:
+          description: |
+            Signatories to the contract.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract.
+          type: array
+          items:
+            type: string
+    ExercisedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - choice
+        - choice_argument
+        - child_event_ids
+        - exercise_result
+        - consuming
+        - acting_parties
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        choice:
+          description: |
+            The choice that was exercised on the target contract.
+          type: string
+        choice_argument:
+          description: |
+            The argument of the exercised choice.
+          type: object
+        child_event_ids:
+          description: |
+            References to further events in the same transaction that appeared as a result of this ExercisedEvent.
+            It contains only the immediate children of this event, not all members of the subtree rooted at this node.
+            The order of the children is the same as the event order in the transaction.
+          type: array
+          items:
+            type: string
+        exercise_result:
+          description: |
+            The result of exercising the choice.
+          type: object
+        consuming:
+          description: |
+            If true, the target contract may no longer be exercised.
+          type: boolean
+        acting_parties:
+          description: |
+            The parties that exercised the choice.
+          type: array
+          items:
+            type: string
+        interface_id:
+          description: |
+            The interface where the choice is defined, if inherited.
+          type: string
+    AcsSnapshotTimestampResponse:
+      type: object
+      required:
+        - record_time
+      properties:
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The record time of the last transaction in the snapshot.
+    AcsRequest:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - page_size
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the ACS.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        after:
+          type: integer
+          format: int64
+          description: |
+            Pagination token for the next page of results.
+        page_size:
+          description: |
+            The maximum number of created events returned for this request.
+          type: integer
+          format: int32
+        party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts in which these party_ids are stakeholders.
+        templates:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts with these template_ids, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
+    HoldingsStateRequest: # subset of AcsRequest
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - page_size
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the ACS.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        after:
+          type: integer
+          format: int64
+          description: |
+            Pagination token for the next page of results.
+        page_size:
+          description: |
+            The maximum number of created events returned for this request.
+          type: integer
+          format: int32
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters by contracts in which these party_ids are the owners of the amulets.
+
+    HoldingsSummaryRequest:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the summary.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            The owners for which to compute the summary.
+        as_of_round:
+          type: integer
+          format: int64
+          description: |
+            Compute holding fees as of this round. Defaults to the earliest open mining round.
+
+    ForceAcsSnapshotResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+    AcsResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - created_events
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+        created_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatedEvent"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as `after` to the `AcsRequest`.
+            Will be empty when there's no more pages.
+
+    HoldingsSummaryResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - computed_as_of_round
+        - summaries
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+        computed_as_of_round:
+          type: integer
+          format: int64
+        summaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsSummary"
+    HoldingsSummary:
+      type: object
+      required:
+        - party_id
+        - total_unlocked_coin
+        - total_locked_coin
+        - total_coin_holdings
+        - accumulated_holding_fees_unlocked
+        - accumulated_holding_fees_locked
+        - accumulated_holding_fees_total
+        - total_available_coin
+      properties:
+        party_id:
+          type: string
+        total_unlocked_coin:
+          type: string
+        total_locked_coin:
+          type: string
+        total_coin_holdings:
+          type: string
+        accumulated_holding_fees_unlocked:
+          type: string
+        accumulated_holding_fees_locked:
+          type: string
+        accumulated_holding_fees_total:
+          type: string
+        total_available_coin:
+          type: string
+
+    ListActivityRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        begin_after_id:
+          type: string
+          description: |
+            Minimal event_id for returned activities.
+            Note that all activities carry some monotonically-increasing event_id. begin_after_id sets the minimum value for event_id's for the query.
+        page_size:
+          description: |
+            The maximum number of activity items returned for this request.
+          type: integer
+          format: int64
+    ListActivityResponse:
+      type: object
+      required:
+        - activities
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListActivityResponseItem"
+    ListActivityResponseItem:
+      type: object
+      required:
+        - activity_type
+        - event_id
+        - date
+        - domain_id
+        - round
+        - amulet_price
+      properties:
+        activity_type:
+          description: |
+            Describes the type of activity that occurred.
+            Determines if the data for the activity should be read
+            from the `transfer`, `mint`, or `tap` property.
+          type: string
+          enum:
+            - "transfer"
+            - "mint"
+            - "devnet_tap"
+        event_id:
+          description: |
+            The event id.
+          type: string
+        offset:
+          description: |
+            The ledger offset of the event.
+          type: string
+        date:
+          description: |
+            The effective date of the event.
+          type: string
+          format: date-time
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
+          type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
+        amulet_price:
+          description: |
+            The amulet price for the round at which this transfer was executed.
+          type: string
+        transfer:
+          description: |
+            A (batch) transfer from sender to receivers.
+          $ref: "#/components/schemas/Transfer"
+        mint:
+          description: |
+            The DSO mints amulet for the cases where the DSO rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
+        tap:
+          description: |
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
+    Transfer:
+      description: |
+        A transfer between one sender and possibly many receivers, provided by an application provider.
+      type: object
+      required:
+        - provider
+        - sender
+        - receivers
+        - balance_changes
+      properties:
+        provider:
+          description: |
+            The application provider.
+          type: string
+        sender:
+          description: |
+            The sender amounts and fees.
+          $ref: "#/components/schemas/SenderAmount"
+        receivers:
+          description: |
+            The amounts and fees per receiver.
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiverAmount"
+        balance_changes:
+          description: |
+            Normalized balance changes per party caused by this transfer.
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceChange"
+    BalanceChange:
+      type: object
+      required:
+        - party
+        - change_to_initial_amount_as_of_round_zero
+        - change_to_holding_fees_rate
+      properties:
+        party:
+          description: |
+            The party for which the balance changes.
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          description: |
+            The change to the total balance introduced by this balance change, normalized to round zero, i.e.,
+            a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
+          type: string
+        change_to_holding_fees_rate:
+          description: |
+            The change of total holding fees introduced by this balance change.
+          type: string
+    AmuletAmount:
+      type: object
+      required:
+        - amulet_owner
+        - amulet_amount
+      properties:
+        amulet_owner:
+          description: |
+            The party that owns the amulet.
+          type: string
+        amulet_amount:
+          description: |
+            The amulet amount.
+          type: string
+    SenderAmount:
+      type: object
+      required:
+        - party
+        - sender_change_fee
+        - sender_change_amount
+        - sender_fee
+        - holding_fees
+      properties:
+        party:
+          description: |
+            The sender who has transferred amulet.
+          type: string
+        input_amulet_amount:
+          description: |
+            Total amount of amulet input into this transfer, before deducting holding fees.
+          type: string
+        input_app_reward_amount:
+          description: |
+            Total amount of app rewards input into this transfer.
+          type: string
+        input_validator_reward_amount:
+          description: |
+            Total amount of validator rewards input into this transfer.
+          type: string
+        input_sv_reward_amount:
+          description: |
+            Total amount of sv rewards input into this transfer.
+          type: string
+        input_validator_faucet_amount:
+          description: |
+            Total amount of validator faucet coupon issuance input into this transfer.
+          type: string
+        sender_change_fee:
+          description: |
+            Fee charged for returning change to the sender,
+            which is the smaller of the left-over balance after paying for all outputs
+            or one amulet create fee.
+          type: string
+        sender_change_amount:
+          description: |
+            The final amount of amulet returned to the sender after paying for all outputs and fees.
+          type: string
+        sender_fee:
+          description: |
+            Total fees paid by the sender, based on receiver's receiver_fee_ratio on outputs
+          type: string
+        holding_fees:
+          description: |
+            Holding fees paid by the sender on their input amulets.
+          type: string
+    ReceiverAmount:
+      type: object
+      required:
+        - party
+        - amount
+        - receiver_fee
+      properties:
+        party:
+          description: |
+            The receiver who will own the created output amulet.
+          type: string
+        amount:
+          description: |
+            The amount of amulet to receive, before deducting receiver's part of the fees.
+          type: string
+        receiver_fee:
+          description: |
+            Total fees paid by the receiver, based on receiver_fee_ratio on outputs
+          type: string
+    ListEntriesResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AnsEntry"
+    LookupEntryByPartyResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "#/components/schemas/AnsEntry"
+    LookupEntryByNameResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "#/components/schemas/AnsEntry"
+    GetAcsSnapshotResponse:
+      type: object
+      required: ["acs_snapshot"]
+      properties:
+        acs_snapshot:
+          description: base64-encoded ACS snapshot for the intersection of the DSO party and the requested party’s ACS
+          type: string
+    AnsEntry:
+      type: object
+      required: ["user", "name", "url", "description"]
+      properties:
+        contract_id:
+          type: string
+        user:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    GetAggregatedRoundsResponse:
+      type: object
+      required: ["start", "end"]
+      properties:
+        start:
+          type: integer
+          format: int64
+        end:
+          type: integer
+          format: int64
+    ListRoundTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundPartyTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundTotalsResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundTotals"
+    ListRoundPartyTotalsResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundPartyTotals"
+    RoundPartyTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "party"
+        - "app_rewards"
+        - "validator_rewards"
+        - "traffic_purchased"
+        - "traffic_purchased_cc_spent"
+        - "traffic_num_purchases"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "cumulative_traffic_purchased"
+        - "cumulative_traffic_purchased_cc_spent"
+        - "cumulative_traffic_num_purchases"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        party:
+          type: string
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        traffic_purchased:
+          type: integer
+          format: int64
+        traffic_purchased_cc_spent:
+          type: string
+        traffic_num_purchases:
+          type: integer
+          format: int64
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        cumulative_traffic_purchased:
+          type: integer
+          format: int64
+        cumulative_traffic_purchased_cc_spent:
+          type: string
+        cumulative_traffic_num_purchases:
+          type: integer
+          format: int64
+    RoundTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "closed_round_effective_at"
+        - "app_rewards"
+        - "validator_rewards"
+        - "change_to_initial_amount_as_of_round_zero"
+        - "change_to_holding_fees_rate"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "total_amulet_balance"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        closed_round_effective_at:
+          type: string
+          format: date-time
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          type: string
+        change_to_holding_fees_rate:
+          type: string
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        total_amulet_balance:
+          type: string
+    MigrationSchedule:
+      type: object
+      required:
+        - "time"
+        - "migration_id"
+      properties:
+        time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+
+    SynchronizerIdentities:
+      type: object
+      required:
+        - sequencer_id
+        - sequencer_identity_transactions
+        - mediator_id
+        - mediator_identity_transactions
+      properties:
+        sequencer_id:
+          type: string
+        sequencer_identity_transactions:
+          type: array
+          items:
+            type: string
+        mediator_id:
+          type: string
+        mediator_identity_transactions:
+          type: array
+          items:
+            type: string
+
+    SynchronizerBootstrappingTransactions:
+      type: object
+      required:
+        - domain_parameters
+        - sequencer_domain_state
+        - mediator_domain_state
+      properties:
+        domain_parameters:
+          type: string
+        sequencer_domain_state:
+          type: string
+        mediator_domain_state:
+          type: string

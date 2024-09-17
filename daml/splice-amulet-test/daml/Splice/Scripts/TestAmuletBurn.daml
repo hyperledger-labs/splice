@@ -1,0 +1,84 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletBurn where
+
+import DA.Assert
+import DA.List (sort)
+import Daml.Script
+
+import Splice.ValidatorLicense
+
+import Splice.Scripts.Util
+
+-- | Note to readers: try commenting suffixes of this script out to
+-- see the various steps in action.
+testAmuletBurn : Script ()
+testAmuletBurn = do
+  -- bootstrap app
+  app <- setupApp
+
+  advanceToNextRoundChange app
+
+  -- -- start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  -- bootstrap user and service provider party
+  validator1 <- setupValidator app "validator1"
+  provider1 <- setupUser app "provider1" validator1
+  provider2 <- setupUser app "provider2" validator1
+  user <- setupUser app "user" validator1
+
+  advanceToIssuanceWithPrice app 0.005
+
+  -- there are two open rounds, draw on these coupons
+  drawOnAllValidatorFaucets app
+  coupons <- query @ValidatorLivenessActivityRecord app.dso
+  [3, 4] === sort (map (._2.round.number) coupons)
+
+  runAmuletDepositBots app
+
+  -- user taps 20 amulet
+  tap app user 20.0
+  runAmuletDepositBots app
+
+  -- user pays provider 1
+  pay app user provider1.primaryParty 5.0
+  runAmuletDepositBots app
+
+  advanceToIssuanceWithPrice app 1.2
+  runAmuletDepositBots app
+
+
+
+  -- test declaration of validator rights after the fact
+  recordValidatorOf app validator1 validator1
+  recordValidatorOf app user.primaryParty validator1
+  recordValidatorOf app provider1.primaryParty validator1
+  recordValidatorOf app provider2.primaryParty provider2.primaryParty
+
+  runAmuletDepositBots app
+
+  -- run some more issuances and transfer
+  advanceToIssuanceWithPrice app 1.3
+  runAmuletDepositBots app
+
+  -- finally rounds 3 and 4 were issuing and the amulet deposit bots consumed the coupons
+  coupons <- query @ValidatorFaucetCoupon app.dso
+  [] === map (._2.round.number) coupons
+
+  -- crash the amulet price to burn more amulet than is issued
+  advanceToIssuanceWithPrice app 0.002
+  runAmuletDepositBots app
+  -- -- the next issuances run with normal prices again
+  advanceToIssuanceWithPrice app 1.5
+  runAmuletDepositBots app
+
+  tap app provider2 75.0
+  runAmuletDepositBots app
+
+  advanceToIssuanceWithPrice app 1.6
+  runAmuletDepositBots app
+
+  return ()

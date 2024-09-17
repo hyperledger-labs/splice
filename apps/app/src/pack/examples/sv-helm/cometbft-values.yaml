@@ -1,0 +1,52 @@
+nodeName: "YOUR_SV_NAME"
+
+sv1:
+  # Replace MIGRATION_ID (part of port number!) with the current migration ID of the global synchronizer.
+  externalAddress: TARGET_HOSTNAME:26MIGRATION_ID16
+
+  ## Uncomment these for DevNet/TestNet:
+  # nodeId: "5af57aa83abcec085c949323ed8538108757be9c"
+  # publicKey: "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+  # keyAddress: "8A931AB5F957B8331BDEF3A0A081BD9F017A777F"
+
+  ## Uncomment these for MainNet:
+  # nodeId: "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0"
+  # publicKey: "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
+  # keyAddress: "9473617BBC80C12F68CC25B5A754D1ED9035886C"
+
+node:
+  id: YOUR_COMETBFT_NODE_ID
+  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+  identifier: "global-domain-MIGRATION_ID-cometbft"
+  # Replace both instances of MIGRATION_ID (also part of port number!) with the current migration ID of the global synchronizer.
+  externalAddress: "global-domain-MIGRATION_ID-cometbft.sv.YOUR_HOSTNAME:26MIGRATION_ID56"
+  keysSecret: "cometbft-keys"
+
+genesis:
+  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+  chainId: "TARGET_CLUSTER-MIGRATION_ID"
+  # Reserved for future use; keep at 0 until further notice
+  chainIdSuffix: "0"  # must be a string value
+
+stateSync:
+  # Uncomment the line below to disable state sync
+  # enable: false
+
+  # Note that the port number is significant in the list of rpcServers
+  rpcServers: "https://sv.sv-2.TARGET_HOSTNAME:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.TARGET_HOSTNAME:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+#   nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: topology.kubernetes.io/zone
+#           operator: In
+#           values:
+#             - antarctica-east1
+#             - antarctica-west1
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+#   disktype: ssd

@@ -1,0 +1,486 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.Install where
+
+import DA.Action (void)
+import DA.Exception
+import DA.Time
+import DA.Foldable (forA_)
+import DA.Optional (isSome)
+
+import Splice.Amulet
+import Splice.Types
+import Splice.AmuletRules
+import Splice.DecentralizedSynchronizer
+
+import Splice.Wallet.Payment
+import Splice.Wallet.Subscriptions
+import Splice.Wallet.TransferOffer
+import Splice.Wallet.BuyTrafficRequest
+import Splice.Wallet.TopUpState
+import Prelude hiding (forA)
+import Splice.Util
+
+
+-- Evaluates an update, catches any exceptions it throws and converts them into an Either
+catchAll: Update a -> Update (Either InvalidTransferReason a)
+catchAll operation =
+  try do
+    fmap (\res -> Right res) operation
+  catch
+    (ex : InvalidTransfer) -> return $ Left $ ex.reason
+    (ex : AnyException) -> return $ Left $ ITR_Other $ message ex
+
+data ExecutionContext = ExecutionContext with
+  dso : Party
+  endUser : Party
+  validator : Party
+  paymentContext : PaymentTransferContext
+
+-- Main function for batched execution of multiple amulet operations.
+-- Given multiple amulet operations and transfer inputs, it executes the operations sequentially while
+-- stringing along the remaining inputs. Returns all outcomes.
+executeAmuletOperationRec : ExecutionContext -> [TransferInput] -> [AmuletOperationOutcome] -> [AmuletOperation] -> Update ([AmuletOperationOutcome])
+executeAmuletOperationRec executionContext inputs prevResults (operation::remainingOperations) = do
+  case operation of
+    CO_AppPayment cid -> do
+      resultE <- catchAll $ exercise cid (AppPaymentRequest_Accept inputs executionContext.paymentContext executionContext.validator)
+      handleResultAcceptAppPayment resultE
+    CO_CompleteAcceptedTransfer cid -> do
+      resultE <- catchAll $ exercise cid (AcceptedTransferOffer_Complete inputs executionContext.paymentContext executionContext.validator)
+      handleResultCompleteAcceptedTransfer resultE
+    CO_SubscriptionAcceptAndMakeInitialPayment cid -> do
+      resultE <- catchAll $ exercise cid (SubscriptionRequest_AcceptAndMakePayment inputs executionContext.paymentContext executionContext.validator)
+      handleResultSubscriptionAcceptAndMakePayment resultE
+    CO_SubscriptionMakePayment cid -> do
+      resultE <- catchAll $ exercise cid (SubscriptionIdleState_MakePayment inputs executionContext.paymentContext executionContext.validator)
+      handleResultSubscriptionMakePayment resultE
+    CO_BuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid -> do
+      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid
+      handleResult COO_BuyMemberTraffic resultE
+    CO_CompleteBuyTrafficRequest cid -> do
+      resultE <- catchAll $ exercise cid (BuyTrafficRequest_Complete inputs executionContext.paymentContext executionContext.validator)
+      handleResultBuyTraffic resultE
+    CO_MergeTransferInputs -> do
+        let transfer = mkMergeAmuletAndRewardsTransfer executionContext.endUser inputs
+        result <- catchAll (exercisePaymentTransfer context transfer)
+        handleResultMergeInputs result
+    CO_Tap tapAmount -> do
+      amuletsum <- catchAll (exercise context.amuletRules (AmuletRules_DevNet_Tap executionContext.endUser tapAmount context.context.openMiningRound))
+      handleResultTap amuletsum
+    ExtAmuletOperation _dummyUnitField -> error "ExtAmuletOperation: bare extension constructors are not allowed at runtime"
+  where
+    context : PaymentTransferContext
+    context = executionContext.paymentContext
+
+    handleResult : (r -> AmuletOperationOutcome) -> Either InvalidTransferReason (r, Optional (ContractId Amulet)) -> Update [AmuletOperationOutcome]
+    handleResult resultConstructor = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right (result, change) -> do
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) change
+        executeAmuletOperationRec executionContext inputAmulets (resultConstructor result :: prevResults) remainingOperations
+
+    handleResultMergeInputs : Either InvalidTransferReason (TransferResult) -> Update [AmuletOperationOutcome]
+    handleResultMergeInputs = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right transferResult -> do
+        let senderChange = transferResult.senderChangeAmulet
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
+
+    handleResultTap : Either InvalidTransferReason (AmuletRules_DevNet_TapResult) -> Update [AmuletOperationOutcome]
+    handleResultTap = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let tappedAmulet = result.amuletSum.amulet
+        executeAmuletOperationRec executionContext (InputAmulet tappedAmulet :: inputs) (COO_Tap result.amuletSum.amulet :: prevResults) remainingOperations
+
+    handleLeft : InvalidTransferReason -> Update [AmuletOperationOutcome]
+    handleLeft errorMsg = executeAmuletOperationRec executionContext inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
+
+    handleResultBuyTraffic : Either InvalidTransferReason (BuyTrafficRequest_CompleteResult) -> Update [AmuletOperationOutcome]
+    handleResultBuyTraffic = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let ((purchasedTraffic, trackingInfo), senderChange) = ((result.purchasedTraffic, result.trackingInfo), result.senderChangeAmulet)
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_CompleteBuyTrafficRequest (purchasedTraffic, trackingInfo) :: prevResults) remainingOperations
+
+    handleResultCompleteAcceptedTransfer : Either InvalidTransferReason (AcceptedTransferOffer_CompleteResult) -> Update [AmuletOperationOutcome]
+    handleResultCompleteAcceptedTransfer = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let ((transferResult, trackingInfo), senderChange) = ((result.transferResult, result.trackingInfo), result.senderChangeAmulet)
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_CompleteAcceptedTransfer (transferResult, trackingInfo) :: prevResults) remainingOperations
+
+    handleResultAcceptAppPayment : Either InvalidTransferReason (AppPaymentRequest_AcceptResult) -> Update [AmuletOperationOutcome]
+    handleResultAcceptAppPayment = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let (acceptedPayment, senderChange) = (result.acceptedPayment, result.senderChangeAmulet)
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_AcceptedAppPayment (acceptedPayment) :: prevResults) remainingOperations
+
+    handleResultSubscriptionAcceptAndMakePayment : Either InvalidTransferReason (SubscriptionRequest_AcceptAndMakePaymentResult) -> Update [AmuletOperationOutcome]
+    handleResultSubscriptionAcceptAndMakePayment = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let (subscriptionPayment, senderChange) = (result.subscriptionPayment, result.senderChange)
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_SubscriptionInitialPayment (subscriptionPayment) :: prevResults) remainingOperations
+
+    handleResultSubscriptionMakePayment : Either InvalidTransferReason (SubscriptionIdleState_MakePaymentResult) -> Update [AmuletOperationOutcome]
+    handleResultSubscriptionMakePayment = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right result -> do
+        let (subscriptionPayment, senderChange) = (result.subscriptionPayment, result.senderChange)
+        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
+        executeAmuletOperationRec executionContext inputAmulets (COO_SubscriptionPayment (subscriptionPayment) :: prevResults) remainingOperations
+
+    handleBuyMemberTraffic: Int -> Text -> Text -> Int -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Amulet))
+    handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCidO = do
+      now <- getTime
+      -- validate and update topupState if provided
+      forA_ topupStateCidO $ \topupStateCid -> do
+        topupState <- fetchAndArchive (ForMemberTraffic with dso = executionContext.dso; memberId, synchronizerId, migrationId)  topupStateCid
+        require "validator party and ValidatorTopUpState match" (executionContext.validator== topupState.validator)
+        -- protect against successive topups being too close together
+        require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
+        void $ create topupState with lastPurchasedAt = now
+      -- auto-tap enough Amulet to buy extra traffic
+      -- Note that auto-tapping is done only to make integration testing of the valdiator top-up loop easier.
+      -- So, we only do this when the choice is exercised from the top-up automation and we are on DevNet.
+      let amuletRulesCid = context.amuletRules
+      amuletRules <- fetchPublicReferenceData (ForDso with dso = executionContext.dso) amuletRulesCid (AmuletRules_Fetch executionContext.validator)
+      newInputs <-
+        -- Check that we are on DevNet and the topupState is defined
+        if (amuletRules.isDevNet && isSome topupStateCidO)
+          then do
+            -- Calculate Amulet required to buy extra traffic
+            (trafficCostAmulet, _) <- computeSynchronizerFees executionContext.validator trafficAmount amuletRules context.context
+            -- Tap enough Amulet to cover extra traffic purchase
+            result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap executionContext.validator trafficCostAmulet context.context.openMiningRound)
+            -- Use only the newly created amulet as input to avoid amulet merges and having to pay for a new change amulet
+            pure $ [InputAmulet result.amuletSum.amulet]
+          else
+            pure inputs
+      -- purchase extra traffic for sequencer member
+      result <- exercise amuletRulesCid
+        (AmuletRules_BuyMemberTraffic newInputs context.context executionContext.validator memberId synchronizerId migrationId trafficAmount)
+      pure (result.purchasedTraffic, result.senderChangeAmulet)
+
+executeAmuletOperationRec _executionContext _inputs prevResults [] = do
+  return prevResults
+
+
+mkMergeAmuletAndRewardsTransfer : Party -> [TransferInput] -> Transfer
+mkMergeAmuletAndRewardsTransfer endUserP inputs = do
+  let transfer = Transfer with
+        sender = endUserP
+        provider = endUserP
+        inputs = inputs
+        outputs = []
+  transfer
+
+-- Enum of the possible ways amulets can be manipulated through the wallet.
+data AmuletOperation
+  = CO_AppPayment (ContractId AppPaymentRequest)
+  | CO_CompleteAcceptedTransfer (ContractId AcceptedTransferOffer)
+  | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
+  | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
+  -- This CO is periodically sent by the wallet to automatically collect outstanding rewards and
+  -- merge amulet contracts
+  | CO_MergeTransferInputs
+  | CO_BuyMemberTraffic with
+      trafficAmount : Int
+      memberId : Text
+      synchronizerId : Text
+      migrationId : Int
+      minTopupInterval: RelTime
+      topupStateCid : Optional (ContractId ValidatorTopUpState)
+  | CO_CompleteBuyTrafficRequest with
+      trafficRequestCid: ContractId BuyTrafficRequest
+  | CO_Tap with
+      tapAmount: Decimal
+  | ExtAmuletOperation with
+      dummyUnitField :  ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Show)
+
+-- Enum of the possible outcomes of operating on a amulet through the wallet.
+data AmuletOperationOutcome
+  = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
+  | COO_CompleteAcceptedTransfer (TransferResult, TransferOfferTrackingInfo)
+  | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
+  | COO_SubscriptionPayment (ContractId SubscriptionPayment)
+  -- Using `Optional` here as the wallet reuses that type for returning a result,
+  -- and needs to communicate to the caller whether a merge happend.
+  | COO_MergeTransferInputs (Optional (ContractId Amulet))
+  | COO_BuyMemberTraffic (ContractId MemberTraffic)
+  | COO_CompleteBuyTrafficRequest ((ContractId MemberTraffic), BuyTrafficRequestTrackingInfo)
+  | COO_Tap (ContractId Amulet)
+  | COO_Error InvalidTransferReason
+  | ExtAmuletOperationOutcome with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Show)
+
+data WalletAppInstall_ExecuteBatchResult = WalletAppInstall_ExecuteBatchResult
+  with
+    endUserName : Text
+      -- The endUserName whose WalletAppInstall was used. This can be confusing as the treasury runs per party
+      -- and just picks some install for an end-user with that party.
+    outcomes: [AmuletOperationOutcome]
+    optEndUserParty : Optional Party
+      -- The primary party on whose wallet the batch was executed. This is useful since the logic parsing
+      -- the tx log entry currently cannot resolve the payload of the WalletAppInstall to get the party from there.
+  deriving (Eq, Show)
+
+data WalletAppInstall_AppPaymentRequest_RejectResult = WalletAppInstall_AppPaymentRequest_RejectResult
+  with
+    terminatedAppPayment : ContractId TerminatedAppPayment
+
+data WalletAppInstall_AppPaymentRequest_ExpireResult = WalletAppInstall_AppPaymentRequest_ExpireResult
+  with
+    terminatedAppPayment : ContractId TerminatedAppPayment
+
+data WalletAppInstall_SubscriptionRequest_RejectResult = WalletAppInstall_SubscriptionRequest_RejectResult
+  with
+    terminatedSubscription : ContractId TerminatedSubscription
+
+data WalletAppInstall_SubscriptionIdleState_CancelSubscriptionResult = WalletAppInstall_SubscriptionIdleState_CancelSubscriptionResult
+  with
+    terminatedSubscription : ContractId TerminatedSubscription
+
+data WalletAppInstall_CreateTransferOfferResult = WalletAppInstall_CreateTransferOfferResult
+  with
+    transferOffer : ContractId TransferOffer
+
+data WalletAppInstall_TransferOffer_AcceptResult = WalletAppInstall_TransferOffer_AcceptResult
+  with
+    acceptedTransferOffer : ContractId AcceptedTransferOffer
+
+data WalletAppInstall_TransferOffer_RejectResult = WalletAppInstall_TransferOffer_RejectResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_TransferOffer_WithdrawResult = WalletAppInstall_TransferOffer_WithdrawResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_TransferOffer_ExpireResult = WalletAppInstall_TransferOffer_ExpireResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_AcceptedTransferOffer_AbortResult = WalletAppInstall_AcceptedTransferOffer_AbortResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_AcceptedTransferOffer_WithdrawResult = WalletAppInstall_AcceptedTransferOffer_WithdrawResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_AcceptedTransferOffer_ExpireResult = WalletAppInstall_AcceptedTransferOffer_ExpireResult
+  with
+    trackingInfo : TransferOfferTrackingInfo
+
+data WalletAppInstall_CreateBuyTrafficRequestResult = WalletAppInstall_CreateBuyTrafficRequestResult
+  with
+    buyTrafficRequest : ContractId BuyTrafficRequest
+
+data WalletAppInstall_BuyTrafficRequest_CancelResult = WalletAppInstall_BuyTrafficRequest_CancelResult
+  with
+    trackingInfo : BuyTrafficRequestTrackingInfo
+
+data WalletAppInstall_BuyTrafficRequest_ExpireResult = WalletAppInstall_BuyTrafficRequest_ExpireResult
+  with
+    trackingInfo : BuyTrafficRequestTrackingInfo
+
+data WalletAppInstall_FeaturedAppRights_CancelResult = WalletAppInstall_FeaturedAppRights_CancelResult
+
+data WalletAppInstall_FeaturedAppRights_SelfGrantResult = WalletAppInstall_FeaturedAppRights_SelfGrantResult
+  with
+    featuredAppRight : ContractId FeaturedAppRight
+
+template WalletAppInstall
+  with
+    dsoParty : Party
+    validatorParty : Party -- The validator operator, who will receive app rewards for the first (locking) leg of payments by this user
+    endUserName : Text -- The participant user name of the end-user
+    endUserParty : Party -- The primary party of the end-user
+  where
+    signatory endUserParty, validatorParty
+
+    -- Takes a batch of commands manipulating amulets, and tries to execute them sequentially in one large Daml transaction.
+    nonconsuming choice WalletAppInstall_ExecuteBatch: WalletAppInstall_ExecuteBatchResult
+      with
+        context : PaymentTransferContext
+        inputs : [TransferInput]
+        operations : [AmuletOperation]
+      controller validatorParty
+      do
+        let executionContext = ExecutionContext with
+              dso = dsoParty
+              endUser = endUserParty
+              validator = validatorParty
+              paymentContext = context
+        accepted <- executeAmuletOperationRec executionContext inputs [] operations
+        return WalletAppInstall_ExecuteBatchResult with
+          endUserName
+          optEndUserParty = Some endUserParty
+          outcomes = reverse accepted
+
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : WalletAppInstall_AppPaymentRequest_RejectResult
+      with
+        cid : ContractId AppPaymentRequest
+      controller validatorParty
+      do result <- exercise cid AppPaymentRequest_Reject
+         return WalletAppInstall_AppPaymentRequest_RejectResult with
+            terminatedAppPayment = result.terminatedAppPayment
+
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Expire : WalletAppInstall_AppPaymentRequest_ExpireResult
+      with
+        cid : ContractId AppPaymentRequest
+      controller validatorParty
+      do result <- exercise cid (AppPaymentRequest_Expire endUserParty)
+         return WalletAppInstall_AppPaymentRequest_ExpireResult with
+            terminatedAppPayment = result.terminatedAppPayment
+
+    nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : WalletAppInstall_SubscriptionRequest_RejectResult
+      with
+        cid : ContractId SubscriptionRequest
+      controller validatorParty
+      do result <- exercise cid SubscriptionRequest_Reject
+         return WalletAppInstall_SubscriptionRequest_RejectResult with
+            terminatedSubscription = result.terminatedSubscription
+
+    nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : WalletAppInstall_SubscriptionIdleState_CancelSubscriptionResult
+      with
+        cid : ContractId SubscriptionIdleState
+      controller validatorParty
+      do result <- exercise cid SubscriptionIdleState_CancelSubscription
+         return WalletAppInstall_SubscriptionIdleState_CancelSubscriptionResult with
+            terminatedSubscription = result.terminatedSubscription
+
+    nonconsuming choice WalletAppInstall_CreateTransferOffer : WalletAppInstall_CreateTransferOfferResult
+      with
+        receiver : Party
+        amount : PaymentAmount
+        description : Text
+        expiresAt: Time
+        trackingId : Text
+      controller validatorParty
+      do
+        transferOffer <- create TransferOffer with
+          sender = endUserParty
+          dso = dsoParty
+          ..
+        return WalletAppInstall_CreateTransferOfferResult with ..
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Accept : WalletAppInstall_TransferOffer_AcceptResult
+      with
+        cid : ContractId TransferOffer
+      controller validatorParty
+      do acceptResult <- exercise cid TransferOffer_Accept
+         return WalletAppInstall_TransferOffer_AcceptResult with
+            acceptedTransferOffer = acceptResult.acceptedTransferOffer
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Reject : WalletAppInstall_TransferOffer_RejectResult
+      with
+        cid : ContractId TransferOffer
+      controller validatorParty
+      do rejectResult <- exercise cid TransferOffer_Reject
+         return WalletAppInstall_TransferOffer_RejectResult with
+           trackingInfo = rejectResult.trackingInfo
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : WalletAppInstall_TransferOffer_WithdrawResult
+      with
+        cid : ContractId TransferOffer
+        reason : Text
+      controller validatorParty
+      do withdrawResult <- exercise cid TransferOffer_Withdraw with ..
+         return WalletAppInstall_TransferOffer_WithdrawResult with
+           trackingInfo = withdrawResult.trackingInfo
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Expire : WalletAppInstall_TransferOffer_ExpireResult
+      with
+        cid : ContractId TransferOffer
+      controller validatorParty
+      do expireResult <- exercise cid $ TransferOffer_Expire with actor = endUserParty
+         return WalletAppInstall_TransferOffer_ExpireResult with
+           trackingInfo = expireResult.trackingInfo
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : WalletAppInstall_AcceptedTransferOffer_AbortResult
+      with
+        cid : ContractId AcceptedTransferOffer
+        reason : Text
+      controller validatorParty
+      do result <- exercise cid $ AcceptedTransferOffer_Abort with ..
+         return WalletAppInstall_AcceptedTransferOffer_AbortResult with
+            trackingInfo = result.trackingInfo
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : WalletAppInstall_AcceptedTransferOffer_WithdrawResult
+      with
+        cid : ContractId AcceptedTransferOffer
+        reason : Text
+      controller validatorParty
+      do result <- exercise cid $ AcceptedTransferOffer_Withdraw with ..
+         return WalletAppInstall_AcceptedTransferOffer_WithdrawResult with
+            trackingInfo = result.trackingInfo
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : WalletAppInstall_AcceptedTransferOffer_ExpireResult
+      with
+        cid : ContractId AcceptedTransferOffer
+      controller validatorParty
+      do result <- exercise cid $ AcceptedTransferOffer_Expire with actor = endUserParty
+         return WalletAppInstall_AcceptedTransferOffer_ExpireResult with
+            trackingInfo = result.trackingInfo
+
+    nonconsuming choice WalletAppInstall_CreateBuyTrafficRequest : WalletAppInstall_CreateBuyTrafficRequestResult
+      with
+        memberId : Text
+        synchronizerId : Text
+        migrationId : Int
+        trafficAmount : Int
+        expiresAt : Time
+        trackingId : Text
+      controller validatorParty
+      do
+        buyTrafficRequest <- create BuyTrafficRequest with
+          dso = dsoParty
+          ..
+        return WalletAppInstall_CreateBuyTrafficRequestResult with ..
+
+    nonconsuming choice WalletAppInstall_BuyTrafficRequest_Cancel : WalletAppInstall_BuyTrafficRequest_CancelResult
+      with
+        requestCid : ContractId BuyTrafficRequest
+        reason : Text
+      controller validatorParty
+      do result <- exercise requestCid $ BuyTrafficRequest_Cancel with reason
+         return WalletAppInstall_BuyTrafficRequest_CancelResult with
+          trackingInfo = result.trackingInfo
+
+    nonconsuming choice WalletAppInstall_BuyTrafficRequest_Expire : WalletAppInstall_BuyTrafficRequest_ExpireResult
+      with
+        requestCid : ContractId BuyTrafficRequest
+      controller validatorParty
+      do result <- exercise requestCid $ BuyTrafficRequest_Expire
+         return WalletAppInstall_BuyTrafficRequest_ExpireResult with
+          trackingInfo = result.trackingInfo
+
+    nonconsuming choice WalletAppInstall_FeaturedAppRights_Cancel : WalletAppInstall_FeaturedAppRights_CancelResult
+      with
+        cid : ContractId FeaturedAppRight
+      controller validatorParty
+      do exercise cid $ FeaturedAppRight_Cancel
+         pure WalletAppInstall_FeaturedAppRights_CancelResult
+
+    nonconsuming choice WalletAppInstall_FeaturedAppRights_SelfGrant : WalletAppInstall_FeaturedAppRights_SelfGrantResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+      controller validatorParty
+      do result <- exercise amuletRulesCid $ AmuletRules_DevNet_FeatureApp endUserParty
+         return WalletAppInstall_FeaturedAppRights_SelfGrantResult with
+           featuredAppRight = result.featuredAppRightCid

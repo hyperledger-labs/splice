@@ -1,0 +1,204 @@
+openapi: 3.0.0
+info:
+  title: Common schemas for Splice API definitions
+  version: 0.0.1
+paths: {}
+components:
+  schemas:
+    ContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+      required:
+        [ "contract" ]
+    AssignedContract:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+      required:
+        - contract
+        - domain_id
+    # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
+    # matches the contract the server would respond with, the server responds with an empty contract property to indicate
+    # that the client's cache is correct.
+    MaybeCachedContract:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+    # As with MaybeCachedContract, but additionally with a "state", which is either
+    # a domain indicating the contract is on that domain or nothing for an in-flight
+    # contract.  With an unmatching contract-id, this response will include both a
+    # contract and a state.  However, the domain will always reflect the contract's
+    # current state, even if the contract-id matches; either the domain echoed back if
+    # it has not changed, or missing if it is in-flight.
+    MaybeCachedContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+    # A map from 'active-contract-id' -> 'MaybeCachedContract'.
+    # At the moment this type is used to let clients know which mining rounds they already have cached,
+    # which mining rounds they should add to their cache and which they should remove from their cache
+    # (those mining rounds who aren't included in the map at all).
+    MaybeCachedContractMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/MaybeCachedContract"
+    # As with 'MaybeCachedContractMap', but include the current domain state for every
+    # mining round that shouldn't be removed, whether cached or not.
+    MaybeCachedContractWithStateMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/MaybeCachedContractWithState"
+
+    # IMPORTANT: only modify this message in a backwards compatible fashion. It is used to read old dumps.
+    NodeIdentitiesDump:
+      type: object
+      required:
+        - id
+        - keys
+        - authorizedStoreSnapshot
+      properties:
+        id:
+          type: string
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeKey"
+        authorizedStoreSnapshot:
+          description: |
+            base64 encoded string of authorized store snapshot
+          type: string
+        version:
+          type: string
+
+    NodeKey:
+      type: object
+      required:
+        - keyPair
+      properties:
+        keyPair:
+          type: string
+        name:
+          type: string
+
+    ParticipantUser:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        primaryParty:
+          type: string
+
+    GetDsoInfoResponse:
+      type: object
+      required:
+        - sv_user
+        - sv_party_id
+        - dso_party_id
+        - voting_threshold
+        - latest_mining_round
+        - amulet_rules
+        - dso_rules
+        - sv_node_states
+      properties:
+        # User representing the SV
+        sv_user:
+          type: string
+        # Party representing the SV
+        sv_party_id:
+          type: string
+        # Party representing the whole DSO
+        dso_party_id:
+          type: string
+        # Threshold required to pass vote requests
+        voting_threshold:
+          type: integer
+        latest_mining_round:
+          $ref: "#/components/schemas/ContractWithState"
+        amulet_rules:
+          $ref: "#/components/schemas/ContractWithState"
+        dso_rules:
+          $ref: "#/components/schemas/ContractWithState"
+        # States the SVs' nodes
+        sv_node_states:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractWithState"
+
+    BatchListVotesByVoteRequestsRequest:
+      type: object
+      required:
+        - vote_request_contract_ids
+      properties:
+        vote_request_contract_ids:
+          type: array
+          items:
+            type: string
+
+    ListVoteRequestByTrackingCidResponse:
+      type: object
+      required:
+        - vote_requests
+      properties:
+        vote_requests:
+          type: array
+          items:
+            $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    LookupDsoRulesVoteRequestResponse:
+      type: object
+      required:
+        - dso_rules_vote_request
+      properties:
+        dso_rules_vote_request:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    ListDsoRulesVoteRequestsResponse:
+      type: object
+      required:
+        - dso_rules_vote_requests
+      properties:
+        dso_rules_vote_requests:
+          type: array
+          items:
+            $ref: "./common-external.yaml#/components/schemas/Contract"
+
+    ListVoteResultsRequest:
+      type: object
+      required:
+        - limit
+      properties:
+        actionName:
+          type: string
+        accepted:
+          type: boolean
+        requester:
+          type: string
+        effectiveFrom:
+          type: string
+        effectiveTo:
+          type: string
+        limit:
+          type: integer
+
+    ListDsoRulesVoteResultsResponse:
+      type: object
+      required:
+        - dso_rules_vote_results
+      properties:
+        dso_rules_vote_results:
+          type: array
+          items:
+            type: object

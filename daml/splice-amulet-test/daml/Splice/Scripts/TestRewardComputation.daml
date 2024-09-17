@@ -1,0 +1,161 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestRewardComputation where
+
+import DA.Assert
+import Daml.Script
+
+import DA.List.Total
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Types
+import Splice.Scripts.Util
+import Splice.ValidatorLicense
+import Splice.Util
+
+testRewardComputation: Script ()
+testRewardComputation = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  let featuredAppRewardCoupon = 5.7
+      unfeaturedAppRewardCoupon = 3.3
+      validatorRewardCoupon = 2.3
+
+  -- bare-create all three kinds of rewards for Alice
+  appCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = aliceValidator.primaryParty
+    amount = featuredAppRewardCoupon
+    round = Round 0
+    featured = True
+
+  appCoupon2 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = aliceValidator.primaryParty
+    amount = unfeaturedAppRewardCoupon
+    round = Round 0
+    featured = False
+
+  validatorCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+    dso = app.dso
+    user = aliceValidator.primaryParty
+    amount = validatorRewardCoupon
+    round = Round 0
+
+  drawOnAllValidatorFaucets app
+  [(validatorActivityRecord, _)] <- queryFilter @ValidatorLivenessActivityRecord aliceValidator.primaryParty (\c -> c.round.number == 0)
+
+  -- assume provider1 operates SV node 1 and provider2 operates SV node 2
+  -- alice owns 99.99% of the stake in provider1, and a 10% stake in provider2
+  -- bob owns another 20% stake in provider2, while provider2 owns the remaining 70%
+  let bpsMultiplier = 10000
+  let svNode1Weight = 10 * bpsMultiplier -- node 1 is a tier 1 node
+  let alice1Weight = 10 * 9999
+  let provider1Weight = svNode1Weight - alice1Weight
+  let svNode2Weight = 3 * bpsMultiplier -- node 2 is a tier 2 node
+  let alice2Weight = 3 * 1000
+  let bob2Weight = 3 * 2000
+  let provider2Weight = svNode2Weight - alice2Weight - bob2Weight
+  let createSvRewardCoupon provider beneficiary weight = submitMulti [app.dso] [] $ createCmd SvRewardCoupon with
+        dso = app.dso
+        sv = provider.primaryParty
+        beneficiary = beneficiary.primaryParty
+        weight
+        round = Round 0
+  -- note: we use aliceValidator as the representation of alice due to the joint testing of ValidatorRewards and others
+  svRewardAlice1 <- createSvRewardCoupon provider1 aliceValidator alice1Weight
+  _svRewardProvider1 <- createSvRewardCoupon provider1 provider1 provider1Weight
+
+  svRewardAlice2 <- createSvRewardCoupon provider2 aliceValidator alice2Weight
+  svRewardBob2 <- createSvRewardCoupon provider2 bob bob2Weight
+  _svRewardProvider2 <- createSvRewardCoupon provider2 provider2 provider2Weight
+
+
+  -- Advance until issuing mining round 0 is opened.
+  runNextIssuance app
+  runNextIssuance app
+
+  -- get context
+  issuingMiningRounds <- queryFilter @IssuingMiningRound app.dso (\r -> r.round == Round 0)
+  let Some (_, issuingMiningRound0) = head issuingMiningRounds
+  [(_, openRound)] <- queryFilter @OpenMiningRound app.dso (\r -> r.round == Round 3)
+  let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
+
+  -- Provider2 cannot redeem Bob's coupon, even with bob's authorization
+  context <- getPaymentTransferContext app provider2
+  submitMultiMustFail [provider1.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = provider1.primaryParty
+      provider = provider1.primaryParty
+      inputs = [ InputSvRewardCoupon svRewardBob2 ]
+      outputs = [ ]
+    context = context.context
+
+
+  -- But bob can redeem the coupon himself
+  context <- getPaymentTransferContext app provider2
+  transferResult <- submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = bob.primaryParty
+      provider = bob.primaryParty
+      inputs = [ InputSvRewardCoupon svRewardBob2 ]
+      outputs = [ ]
+    context = context.context
+  transferResult.summary.senderChangeAmount ===
+    ( intToDecimal bob2Weight * issuingMiningRound0.issuancePerSvRewardCoupon - createFee)
+
+  -- Alice can redeem her coupons and do so even in a single transfer to bob
+  context <- getPaymentTransferContext app aliceValidator
+  transferResult <- submitMulti [aliceValidator.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = aliceValidator.primaryParty
+      provider = aliceValidator.primaryParty
+      inputs = [
+          InputAppRewardCoupon appCoupon1,
+          InputAppRewardCoupon appCoupon2,
+          InputValidatorRewardCoupon validatorCoupon1,
+          InputValidatorLivenessActivityRecord validatorActivityRecord,
+          InputSvRewardCoupon svRewardAlice1,
+          InputSvRewardCoupon svRewardAlice2
+        ]
+      outputs = [ TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = 8.0
+                    lock = None
+                ]
+    context = context.context
+
+  let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
+  let aliceSvWeight = intToDecimal $ alice1Weight + alice2Weight
+  transferResult.summary.inputAppRewardAmount ===
+    featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
+    + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
+  transferResult.summary.inputValidatorRewardAmount ===
+    validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon +
+    expectedValidatorFaucetAmount
+  transferResult.summary.inputValidatorFaucetAmount === Some expectedValidatorFaucetAmount
+  transferResult.summary.inputSvRewardAmount ===
+    aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
+  transferResult.summary.inputAmuletAmount === 0.0
+
+  let change = transferResult.summary.senderChangeAmount
+  require ("Change " <> show change <> "is large enough") $ change >=
+    (featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
+    + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
+    + validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
+    + getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
+    + aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
+    - 8.2) -- 8.0 plus fees
+
+  -- the round 0 faucet coupon is gone
+  [] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
+
+  -- the SvReward coupons of alice and bob are gone
+
+  coupons <- query @SvRewardCoupon app.dso
+  sort (map (._2.beneficiary) coupons) === sort [provider1.primaryParty, provider2.primaryParty]
+
+  return ()

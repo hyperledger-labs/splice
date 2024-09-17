@@ -1,0 +1,91 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: digitalasset-canton-network-docker.jfrog.io/digitalasset
+
+# Node names use as a moniker to identify the node in the CometBFT network
+nodeName: ""
+
+stateSync:
+  # state sync speeds up initialization considerably for large chains.
+  enable: true
+  # at least 2 not necessarily unique comma-separated entries must be provided for rpc_servers if enable is true
+  rpcServers: ""
+  # trust all snapshots from the trust height onwards for a period of 1 week
+  trustPeriod: "168h0m0s"
+
+peers:
+  # Permanent peers to add alongside the sv1
+  # The CometBFT node ID of the peer node
+  #- nodeId:
+  # External address, in the format <host>:<port> that can be used to access the p2p port of the peer
+  #  externalAddress:
+node:
+  # The CometBFT node ID
+  id:
+  # The p2p port exposed by the CometBFT container
+  p2pPort: 26656
+  # The rpc port exposed by the CometBFT container
+  rpcPort: 26657
+  # Identifier used to prefix created resources and as part of the optional Istio ingress
+  identifier:
+  # Number of blocks to keep, used for pruning. 0 -> keep all blocks.
+  # Number of blocks to keep for 30 days with an upper bound of 7k blocks/h.
+  retainBlocks: 5040000
+  # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
+  # A value below 1000 is not recommended.
+  snapshotHeightDelta: 1000
+  # URL that can be used by other nodes to access the p2p port of the node.
+  # Must be set in the format <host>:<port>
+  externalAddress: ""
+  # Either keysSecret or privateKey and validator values must be provided
+  keysSecret: ""
+  # The node private key
+  privateKey: ""
+  validator:
+    keyAddress: ""
+    privateKey: ""
+    publicKey: ""
+
+istioVirtualService:
+  enabled: false
+  gateway: ""
+  # Port must match `externalAddress` port.
+  port: 26656
+
+genesis:
+  chainId: ""
+
+db:
+  volumeSize: 2000Gi
+  volumeStorageClass: premium-rwo
+
+resources:
+  limits:
+    cpu: 4
+    memory: 4Gi
+  requests:
+    cpu: 1
+    memory: 1Gi
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s
+#  labels:
+#    - key: "migration_active"
+#      value: "true"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:
+
+enableAntiAffinity: true
+
+logLevel: debug
+

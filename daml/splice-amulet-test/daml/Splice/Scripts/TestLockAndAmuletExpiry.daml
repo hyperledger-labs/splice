@@ -1,0 +1,281 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestLockAndAmuletExpiry where
+
+import DA.Assert
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Fees
+import Splice.Expiry
+import Splice.Round
+import Splice.Types
+import Splice.RelRound
+import Splice.Schedule
+import Splice.Scripts.Parameters
+import Splice.Scripts.Util
+
+import DA.Foldable (forA_)
+import DA.Time
+
+test : Script ()
+test = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
+  currentTime <- getTime
+  let amuletPrice = 2.5
+      config = scaleAmuletConfig amuletPrice defaultAmuletConfig
+      tickDuration = config.tickDuration
+
+      t00_00 = currentTime
+      t05_00 = addRelRoundN 2 currentTime tickDuration
+      t07_30 = addRelRoundN 3 currentTime tickDuration
+      t12_30 = addRelRoundN 5 currentTime tickDuration
+      t15_00 = addRelRoundN 6 currentTime tickDuration
+      t17_30 = addRelRoundN 7 currentTime tickDuration
+
+      issuingFor0 = days 0
+      issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
+
+      amuletConfigUsd = defaultAmuletConfig
+      transferConfigUsd = amuletConfigUsd.transferConfig
+      issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
+      issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
+      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
+
+  -- Lock expires at T00:12:30
+  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
+  -- Lock expires at T00:15:00
+  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00
+  -- Lock expires at T00:17:30
+  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30
+
+  -- This amulet is estimated to expire at round 5.
+  -- we exploit that there are exactly three open rounds active at any point in time.
+  -- we wait for 2 more rounds to ensure that a amulet can be expired as soon as
+  -- it can definitely not be used as an input to transfer anymore.
+  -- This amulet can still be used until round 7 (5 + 2) which is created at T00:15:00 and opens at T00:17:30
+  let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.transferConfig.holdingFee.rate * 3.5; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
+  let bounded = amountExpiresAt amountExpiresAtRound5
+  bounded === Singleton (Round 5)
+  let (Singleton r) = bounded
+  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Singleton t15_00
+
+  -- lock expires at T00:12:30 before amulet expires at T00:15:00
+  let lockExpireBeforeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
+  assert lockExpireBeforeAmulet
+
+  -- lock expires at T00:15:00 while amulet expires at T00:15:00
+  let lockExpiresAsAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
+  assert $ not lockExpiresAsAmulet
+
+  -- lock expires at T00:17:30 after amulet expires at T00:15:00
+  let lockExpiresAfterAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
+  assert $ not lockExpiresAfterAmulet
+
+  let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
+  -- lock expires at T00:12:30 before amulet with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
+  let lockExpiresBeforeLargeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
+  assert lockExpiresBeforeLargeAmulet
+
+  pure ()
+
+-- From #2336, This test case is to make sure we handle DA.Time overflow
+-- in estimateOpenRoundCreatedAt when the amulet amount is too large
+testLargeAmuletExpiry : Script ()
+testLargeAmuletExpiry = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+
+  let amuletPrice = 2.5
+      configUsd = defaultAmuletConfig
+      transferConfigAmulet = scaleFees (1.0 / amuletPrice) configUsd.transferConfig
+      e = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = transferConfigAmulet.holdingFee
+      Singleton r = amountExpiresAt e
+      expiringRound = Singleton $ addRelRound r (RelRound 2)
+      issuingFor = minutes 5
+      currentMiningRound = OpenMiningRound with
+        dso = app.dso
+        round = Round 1
+        amuletPrice = 1.0
+        opensAt = now
+        targetClosesAt = addRelTime now (minutes 5)
+        issuingFor
+        transferConfigUsd = configUsd.transferConfig
+        issuanceConfig = getValueAsOf issuingFor configUsd.issuanceCurve
+        tickDuration = configUsd.tickDuration
+
+  estimateOpenRoundCreatedAt configUsd.tickDuration currentMiningRound expiringRound === AfterMaxBound
+  pure ()
+
+testExpireLockedAmulet : Script ()
+testExpireLockedAmulet = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
+  passTime (minutes 10) -- pass enough time so that round 2 expires in 10 minutes
+
+  -- Locking the amulet with with initialAmount 0.000005 and created at round 2 but with a
+  -- lock for 10 minutes should fail, as round 2 ends in 10 minutes
+  getLockedAmuletMustFail app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 10)
+  -- Lock the amulet with initialAmount 0.000005 and created at round 2
+  -- As the amulet amount is equal to one round's holding fee, it will be expired at round 3
+  cid <- getLockedAmulet app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
+  Some(lockedAmulet) <- queryContractId @LockedAmulet alice.primaryParty cid
+
+  roundCid <- advanceRound app (Round 3)
+
+  -- Lock is not yet expired
+  -- DSO party fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
+    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+
+  -- Current round is 4
+  roundCid <- advanceRound app (Round 4)
+
+  -- Amulet is not yet expired
+  -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the amulet expires
+  -- DSO party fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
+    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+
+  -- Current round is 5
+  roundCid <- advanceRound app (Round 5)
+
+  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
+
+  -- Amulet is expired
+  -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
+  -- DSO party expires the amulet
+  result <- testChoice [app.dso] [app.dso] $
+    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+  let expireSummary = result.expireSum
+
+  normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
+  expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
+  expireSummary.changeToHoldingFeesRate === - (lockedAmulet.amulet.amount.ratePerRound.rate)
+
+  lockedAmulets <- query @LockedAmulet bob.primaryParty
+  lockedAmulets === []
+
+  pure ()
+
+testExpireAmulet : Script ()
+testExpireAmulet = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- alice own a amulet with initial amount of 1.0
+  [(_, onlyAmulet)] <- query @Amulet alice.primaryParty
+  onlyAmulet.amount.initialAmount === 1.0
+
+  cid <- tap app alice 0.0000200001
+  -- Lock the amulet with initialAmount 0.0000200001 and created at round 1
+  -- As the holding fee is 0.00002 so the amulet will be expired at round 3
+  Some(amulet) <- queryContractId @Amulet alice.primaryParty cid
+
+  amulet.amount.initialAmount === 0.0000200001
+  amulet.amount.createdAt === Round 1
+
+  -- current latest active round is 3
+  latestActiveRoundCid <- advanceRound app (Round 3)
+
+  -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the amulet expires
+  -- DSO party fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
+    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+
+  -- current latest active round is 4
+  latestActiveRoundCid <- advanceRound app (Round 4)
+
+  -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the amulet expires
+  -- DSO party fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
+    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+
+  -- current latest active round is 5
+  latestActiveRoundCid <- advanceRound app (Round 5)
+
+  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
+
+  -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
+  -- DSO party expires the amulet
+  result <- testChoice [app.dso] [app.dso] $
+    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+  let expireSummary = result.expireSum
+
+  normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
+  expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
+  expireSummary.changeToHoldingFeesRate === - (amulet.amount.ratePerRound.rate)
+
+  -- current active current mining round is 3, 4 and 5
+  allActiveOpenMiningRoundCids <- query @OpenMiningRound app.dso
+  forA_ allActiveOpenMiningRoundCids $ \(_, openRound) -> do
+    assert $ openRound.round.number >= 3 && openRound.round.number <= 5
+
+  -- alice now only owns a amulet with initial amount of 1.0
+  [(_, onlyAmulet)] <- query @Amulet alice.primaryParty
+  onlyAmulet.amount.initialAmount === 1.0
+
+  pure ()
+
+advanceRound : AmuletApp -> Round -> Script (ContractId OpenMiningRound)
+advanceRound app expectedRound  = do
+  runNextIssuance app
+  (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
+  Some(currentRound) <- queryContractId @OpenMiningRound app.dso latestActiveRoundCid
+  currentRound.round === expectedRound
+  pure latestActiveRoundCid
+
+addRelRoundN : Int -> Time -> RelTime -> Time
+addRelRoundN n t relTime
+  | n <= 0 = t
+  | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
+
+testChoice : [Party] -> [Party] -> Commands a -> Script a
+testChoice actAs readAs buildCommand = do
+  submitMulti actAs readAs buildCommand
+
+testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
+testChoiceFailed actAs readAs buildCommand = do
+  submitMultiMustFail actAs readAs buildCommand
+  pure ()
+
+getLockedAmuletCmd : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
+getLockedAmuletCmd app owner lockHolder amount lockDuration = do
+  now <- getTime
+  amulet <- tap app owner (amount + 1.0)
+  let transfer = Transfer with
+        sender = owner.primaryParty
+        provider = owner.primaryParty
+        inputs = map InputAmulet [amulet]
+        outputs =
+          [ TransferOutput with
+              receiver = owner.primaryParty
+              amount = amount
+              lock = Some TimeLock with
+                holders = [lockHolder]
+                expiresAt = now `addRelTime` lockDuration
+              receiverFeeRatio = 0.0
+          ]
+  (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app owner.primaryParty
+
+  (rules, _) <- fetchAmuletRulesByKey app.dso
+  return $ exerciseCmd rules
+    AmuletRules_Transfer with
+      transfer, context = amuletTransferContext openRound featuredAppRight
+
+getLockedAmulet : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedAmulet)
+getLockedAmulet app owner lockHolder amount lockDuration = do
+  cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
+  result <- submitMulti [owner.primaryParty, lockHolder] [app.dso] cmd
+  let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
+  pure lockedAmulet
+
+getLockedAmuletMustFail : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
+getLockedAmuletMustFail app owner lockHolder amount lockDuration =  do
+  cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
+  submitMultiMustFail [owner.primaryParty, lockHolder] [app.dso] cmd

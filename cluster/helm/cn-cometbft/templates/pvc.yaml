@@ -1,0 +1,19 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "prefix" (list .Values "cometbft-data") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.node.identifier }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $.Values.db.volumeSize }}
+  storageClassName: {{ $.Values.db.volumeStorageClass }}
+  volumeMode: Filesystem

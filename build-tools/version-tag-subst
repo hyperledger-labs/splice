@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+SNAPSHOT_VERSION="${1:?expected a version as first argument}"
+
+sed --expression="s/VERSION_NUMBER/${SNAPSHOT_VERSION}/g"

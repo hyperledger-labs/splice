@@ -1,0 +1,36 @@
+# Extra patterns to ignore when using Canton with simtime
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+# This works around issues in simtime where in-flight requests
+# end up timing out when we concurrently advance time.
+The sequencer clock timestamp .* is already past the max sequencing time
+# variant of the above for aggregate submissions
+Max sequencing time.*for submission.*is already past the sequencer clock timestamp
+Submission timed out at
+Rejected transaction due to a participant determined timeout
+# This is also present in canton_log.ignore.txt, except in simtime, it happens on non-SV participants too
+Response message for request.*timed out at
+Sequencing result message timed out
+Late processing.*of batch
+The payload to event time bound.*has been been exceeded by payload time
+# Canton GenericStepsError(SequencerTimeoutError) errors and failures caused by it
+Failed to submit submission due to GenericStepsError.*SequencerTimeoutError
+
+# advancing time can result in the sequencer subscriptions being expired (See #7980)
+SEQUENCER_SUBSCRIPTION_LOST.*: Lost subscription to domain .* Will try to recover automatically.
+
+# It seems this happens when a transaction is in-flight and we advance time. We should just retry.
+INTERPRETATION_TIME_EXCEEDED.*: Interpretation time exceeds limit of Ledger Effective Time
+
+# TODO(#8955): investigate and remove once fixed
+INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when only events with timestamps at most.*have been delivered
+
+# TODO(#10887) Figure out where this is coming from
+Request failed for sequencer.*GrpcClientGaveUp: .*/Authentication token refresh failed with grpc error
+Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Health-check stream unexpectedly closed
+
+# This kicks in when an interval is skipped which can easily be caused in simtime mode
+# by bumping the time by more than the reconciliation interval.
+ACS_COMMITMENT_DEGRADATION
+
+# Make sure to have a trailing newline

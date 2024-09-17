@@ -1,0 +1,34 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: cluster-docs-releases
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+  - "{{ (.Values.cluster).cantonHostname }}"
+  {{- if eq (.Values.cluster).hostname  (.Values.cluster).daHostname }}
+  - "{{ (.Values.cluster).daHostname }}"
+  {{- end }}
+  gateways:
+  - cn-http-gateway
+  http:
+  - match:
+      - port: 443
+        uri:
+          prefix: "/cn-release-bundles"
+    route:
+      - destination:
+          port:
+            number: 8080
+          host: gcs-proxy.docs.svc.cluster.local
+  - match:
+      - port: 443
+    route:
+      - destination:
+          port:
+            number: 80
+          host: docs.docs.svc.cluster.local

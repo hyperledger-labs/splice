@@ -1,0 +1,38 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.metrics.enable }}
+{{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: {{ include "prefix" (list .Values "cometbft-sm") }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+  - port: cometbft-metrics
+    interval: {{ .Values.metrics.interval }}
+    {{- if .Values.metrics.labels }}
+    metricRelabelings:
+    {{- range .Values.metrics.labels }}
+      - sourceLabels: [ __name__ ]
+        targetLabel: {{ .key | quote }}
+        replacement: {{ .value | quote }}
+    {{- end }}
+    {{- end }}
+  selector:
+    matchLabels:
+      name: {{ $fullRpcHostName }}
+  {{- if .Values.metrics.migration }}
+  targetLabels:
+    - active_migration
+    - migration_id
+  {{- end }}
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+{{- end }}

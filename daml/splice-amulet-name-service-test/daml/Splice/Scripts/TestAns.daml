@@ -1,0 +1,200 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAns where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Scripts.Util
+import Splice.Ans
+import Splice.Scripts.AnsRulesParameters
+import Splice.Wallet.Subscriptions
+
+
+testWithSubscription : Script ()
+testWithSubscription = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+    dso = app.dso
+    config = defaultAnsRulesConfig
+
+  -- user requests entry
+  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
+    user = alice.primaryParty
+
+  let (entryContext, subscriptionRequest) = (requestSummary.entryCid, requestSummary.requestCid)
+
+  -- amulet wallet selects a large enough amulet
+  amulet <- tap app alice 1.5
+  -- amulet wallet accepts subscription and first payment and locks amulet to DSO party
+
+  paymentContext <- getPaymentTransferContext app alice
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let initialPaymentCid = result.subscriptionPayment
+
+  (_, round) <- getLatestActiveOpenRound app
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
+  [(acceptRewardCid, reward)] <- query @Splice.Amulet.AppRewardCoupon app.dso
+  reward.amount ===
+    transferConfigAmulet.createFee.fee +
+    transferConfigAmulet.lockHolderFee.fee
+  reward.featured === False
+
+  -- DSO party is used to transactionally unlock & transfer amulets and creates ans entry and a subscription in return.
+  appContext <- getAppTransferContext app app.dsoUser
+  collectPaymentSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectInitialEntryPayment with
+    paymentCid = initialPaymentCid
+    transferContext = appContext
+    ansRulesCid
+
+  -- the amulet received by sv is brunt
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
+
+  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @Splice.Amulet.AppRewardCoupon app.dso
+  reward.amount ===
+    transferConfigAmulet.createFee.fee +
+    transferConfigAmulet.transferFee.initialRate * defaultAnsRulesConfig.entryFee
+  reward.featured === False
+
+  Some entry <- queryContractId alice.primaryParty collectPaymentSummary.entryCid
+  Some subscriptionState <- queryContractId alice.primaryParty collectPaymentSummary.subscriptionStateCid
+
+  entry.name === "ans.darth.vader"
+  entry.user === alice.primaryParty
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+  subscriptionState.payData.paymentInterval === defaultAnsRulesConfig.entryLifetime
+
+  -- amulet wallet automatically selects a large enough amulet and initiates a subscription payment during the scheduled renewal period
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.dsoUser
+
+  amulet <- tap app alice 1.5
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let paymentCid = result.subscriptionPayment
+
+  -- DSO party is used to transactionally unlock & transfer amulets and renews directory entry in return
+  renewalSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid = collectPaymentSummary.entryCid
+    transferContext = appContext
+    ansRulesCid
+
+  -- the amulet received by sv is brunt
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
+
+  submitMustFail app.dso $ exerciseCmd renewalSummary.entryCid (AnsEntry_Expire app.dso)
+
+  -- user can't pay earlier than `renewalDuration` from the next due date
+  amulet <- tap app alice 1.5
+  submitMultiMustFail [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+
+  passTime (days 90)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.dsoUser
+
+  -- amulet wallet and DSO party can repeat the "payment and collect" cycle indefinitely
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let paymentCid = result.subscriptionPayment
+  renewalSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid = renewalSummary.entryCid
+    transferContext = appContext
+    ansRulesCid
+
+  -- the amulet received by sv is brunt
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
+
+  submitMustFail app.dso $ exerciseCmd renewalSummary.entryCid (AnsEntry_Expire app.dso)
+
+  -- renewal payment cannot be collected if the entry has expired
+  passTime (days 121)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.dsoUser
+
+  amulet <- tap app alice 1.5
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let paymentCid = result.subscriptionPayment
+  submitMustFail app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid = renewalSummary.entryCid
+    transferContext = appContext
+    ansRulesCid
+
+
+  -- DSO party can eventually expire an unfunded entry
+  runNextIssuance app
+  passTimeToRoundOpen app
+  submit app.dso $ exerciseCmd renewalSummary.entryCid (AnsEntry_Expire app.dso)
+
+  -- DSO party can then also terminate the subscription
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+  passTimeToRoundOpen app
+  appContext <- getAppTransferContext app app.dsoUser
+  submit app.dso $ exerciseCmd paymentCid (SubscriptionPayment_Expire app.dso appContext)
+
+  pure ()
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+    dso = app.dso
+    config = defaultAnsRulesConfig
+
+  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
+    user = alice.primaryParty
+
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd requestSummary.requestCid SubscriptionRequest_Reject
+  submit app.dso $ exerciseCmd requestSummary.entryCid (AnsEntryContext_Terminate app.dso result.terminatedSubscription)
+
+  entryContexts <- query @AnsEntryContext app.dso
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.dso
+  terminatedSubscriptions === []
+  pure ()

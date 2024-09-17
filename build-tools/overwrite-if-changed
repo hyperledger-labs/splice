@@ -1,0 +1,11 @@
+#! /usr/bin/env bash
+
+set -eou pipefail
+
+NEW_CONTENT=$1
+TARGET_FILE=$2
+
+if [[ ! -f "$TARGET_FILE" ]] || ! diff <(echo "$NEW_CONTENT") "$TARGET_FILE"
+then
+    echo "$NEW_CONTENT" > "$TARGET_FILE"
+fi

@@ -1,0 +1,58 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestValidatorOnboarding where
+
+import Daml.Script
+import DA.Assert
+import DA.Time
+
+import Splice.ValidatorOnboarding
+
+testValidatorOnboarding : Script ()
+testValidatorOnboarding = do
+
+  -- allocate the sponsoring sv
+  sv <- allocateParty "sv"
+
+  -- sv creates an onboarding offer
+  let secret = "test"
+  now <- getTime
+  onboarding <- submit sv $ createCmd (ValidatorOnboarding sv secret (addRelTime now (days 2)))
+
+  -- The secret and the party ID of sv (the onboarding sponsor)
+  -- reaches the validator candidate via a secure off-ledger channel.
+
+  -- The candidate sets up his participant and allocates a validator party.
+  validator <- allocateParty "validator"
+
+  -- The candidate contacts the SV node via an API call and presents his secret.
+
+  -- As a result of the API call, the SV node matches the secret to the prepared validator onboarding.
+  _ <- submitMustFail sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Match "typo" validator)
+  _ <- submit sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Match "test" validator)
+
+  [(_, usedSecret)] <- query @UsedSecret sv
+  usedSecret.secret === secret
+  usedSecret.validator === validator
+
+  -- sv can now onboard the validator with the authority granted it via the `DsoRules`
+  return ()
+
+
+testValidatorOnboardingExpire : Script ()
+testValidatorOnboardingExpire = do
+
+  sv <- allocateParty "sv"
+
+  let secret = "test"
+  now <- getTime
+  onboarding <- submit sv $ createCmd (ValidatorOnboarding sv secret (addRelTime now (days 2)))
+
+  _ <- submitMustFail sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Expire)
+
+  passTime(days 2)
+
+  _ <- submit sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Expire)
+
+  return ()

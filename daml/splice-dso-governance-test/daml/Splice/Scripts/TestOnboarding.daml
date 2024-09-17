@@ -1,0 +1,524 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestOnboarding where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.Optional (fromSome)
+import qualified DA.Map as Map
+import Daml.Script
+import DA.Time
+import DA.List
+
+import Splice.ValidatorLicense
+
+import Splice.CometBft
+import Splice.DsoRules
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.SvOnboarding
+
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+import Splice.AmuletRules (AmuletRules)
+import Splice.Types
+
+
+testOnboardValidator : Script ()
+testOnboardValidator = do
+  (app, dso, (_, sv2, _, _)) <- initMainNet
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+
+  now <- getTime
+
+  -- sv2 (not the DSO delegate) onboards the new validator
+  onboardValidator app sv2 "v1" v1
+
+  -- v1 received a validator license
+  [(validatorLicenseCid, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = "v1@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
+
+  -- so v1 is onboarded!
+
+  -- v1 can update its version and contact point
+
+  -- fails without advancing the time
+  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
+    version = "0.2.0"
+    contactPoint = "v1@example2.com"
+
+  passTime (hours 1)
+  metadataUpdateTime <- getTime
+
+  -- works after advancing time
+  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_UpdateMetadata with
+    version = "0.2.0"
+    contactPoint = "v1@example2.com"
+
+  -- license is updated
+  [(validatorLicenseCid, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = Some ValidatorLicenseMetadata with
+      lastUpdatedAt = metadataUpdateTime
+      version = "0.2.0"
+      contactPoint = "v1@example2.com"
+    lastActiveAt = Some metadataUpdateTime
+
+
+  -- activity cannot be reported without advancing time
+  submitMultiMustFail [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+
+  passTime (hours 1)
+  now <- getTime
+
+  submitMulti [v1] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_ReportActive
+  [(_, validatorLicense)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = None
+    metadata = Some ValidatorLicenseMetadata with
+      lastUpdatedAt = metadataUpdateTime
+      version = "0.2.0"
+      contactPoint = "v1@example2.com"
+    lastActiveAt = Some now
+  pure ()
+
+testSvOnboarding : Script ()
+testSvOnboarding = do
+  (app, dso, (_, sv2, sv3, sv4)) <- initMainNet
+  -- we now have enough SVs to achieve BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the DSO delegate) initiates the onboarding of the new sv
+  svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    DsoRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
+
+  -- an onboarding request for svX has been created
+  [(_, svOnboardingRequest)] <- query @SvOnboardingRequest dso
+  svOnboardingRequest === SvOnboardingRequest with
+    candidateName = "svX"
+    candidateParty = svX
+    candidateParticipantId = "svX-participant-id"
+    token
+    sponsor = sv2
+    dso
+    expiresAt = svOnboardingRequest.expiresAt
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
+          newSvParty = svX
+          newSvName = "svX"
+          newParticipantId = "svX-participant-id"
+          reason = "because"
+          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+  executeAllConfirmedActions app
+
+  -- svX is now a confirmed SV
+  [(svOnboardingConfirmedCid, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed dso
+  svOnboardingConfirmed === SvOnboardingConfirmed with
+    svParty = svX
+    svName = "svX"
+    svParticipantId = "svX-participant-id"
+    reason = "because"
+    svRewardWeight = 19
+    dso
+    expiresAt = svOnboardingConfirmed.expiresAt
+
+  -- once svX becomes able to read as DSO party (e.g., after party migration to svX's participant)...
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- run one issuance so we svX joins in a round after round 0
+  runNextIssuance app
+
+  -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
+  [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+
+  -- the rounds need to be passed in the correct order
+  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid = latestRoundCid
+    middleRoundCid
+    latestRoundCid = earliestRoundCid
+    amuletRulesCid
+  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid = earliestRoundCid
+    latestRoundCid = earliestRoundCid
+    amuletRulesCid
+
+  -- svX completes its own onboarding by adding itself to the DsoRules
+  submitMulti [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
+    amuletRulesCid
+
+  checkSvContractInvariants app
+
+  [(_, dsoRules)] <- query @DsoRules dso
+  case Map.lookup svX dsoRules.svs of
+    None -> fail "svX is not an SV"
+    Some info ->
+      -- the new sv joined in the earliest open round
+      info.joinedAsOfRound === earliestRound.round
+  now <- getTime
+  -- now that svX is a sv it can set its CometBFT config to become a CometBFT  validator
+  -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
+  let cometBftConfig = CometBftConfig with
+        nodes = Map.fromList
+          [ ( "svX-node-id-1"
+            , CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 0
+            )
+          , ( "svX-node-id-2"
+            , CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 1
+            )
+          ]
+        governanceKeys = [GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
+        sequencingKeys = []
+
+  let sequencerConfig = Some SequencerConfig with
+        migrationId = 0
+        sequencerId = "sequencer-id"
+        url = "sequencer.address:1234"
+        availableAfter = Some now
+
+  let mediatorConfig = Some MediatorConfig with
+        mediatorId = "mediator-id"
+
+  let scanConfig = Some ScanConfig with
+        publicUrl = "https://scan1234.example.com"
+
+  let newNodeConfig = SynchronizerNodeConfig with
+        cometBft = cometBftConfig
+        sequencer = sequencerConfig
+        mediator = mediatorConfig
+        scan = scanConfig
+        legacySequencerConfig = None
+
+  setSynchronizerNodeConfig app svX dsoRules.config.decentralizedSynchronizer.lastSynchronizerId newNodeConfig
+
+  -- check that the config was actually set
+  (_, nodeState) <- getSvNodeState app svX
+  let actualConfig =
+        Map.lookup dsoRules.config.decentralizedSynchronizer.lastSynchronizerId nodeState.state.synchronizerNodes
+  actualConfig === Some newNodeConfig
+
+  pure ()
+
+
+testSvOnboardingRequestExpiry : Script ()
+testSvOnboardingRequestExpiry = do
+  (app, _, (_, sv2, _, _)) <- initMainNet
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the DSO delegate) initiates the onboarding of the new sv
+  result <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    DsoRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
+  let svOnboardingRequestCid = result.onboardingRequest
+
+  -- DSO delegate tries to expire the onboarding, but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+  -- wait for the onboarding to expire
+  passTime (hours 25)
+
+  -- DSO delegate expires the onboarding
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+  pure ()
+
+
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV : Script ()
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
+  (app, dso, (_, sv2, _, _)) <- initMainNet
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the DSO delegate) initiates the onboarding of the new sv
+  onboardingResult <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    DsoRules_StartSvOnboarding "svX" svX "svx-participant-id" token sv2
+  let svOnboardingRequestCid = onboardingResult.onboardingRequest
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- DSO delegate cannot archive the onboarding as svX is not yet added as sv
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+  -- create a SvOnboardingConfirmed contract
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
+    newSvParty = svX
+    newSvName = "svX"
+    newSvRewardWeight = 19
+    newSvParticipantId = "svX-participant-id"
+    joinedAsOfRound = (Round 3)
+
+  -- DSO delegate can archive the onboarding as svX is added as sv
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+  -- check status report invaraints
+  checkSvContractInvariants app
+
+
+testSvOnboardingConfirmedExpiry : Script ()
+testSvOnboardingConfirmedExpiry = do
+  (app, dso, (_, sv2, sv3, sv4)) <- initMainNet
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
+          newSvParty = svX
+          newSvName = "svX"
+          newParticipantId = "svX-participant-id"
+          newSvRewardWeight = 19
+          reason = "because"
+
+  executeAllConfirmedActions app
+
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
+
+  -- DSO delegate tries to expire the confirmation but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+
+  -- wait for the confirmation to expire
+  passTime (hours 25)
+
+  -- DSO delegate expires the confirmation
+  _ <- dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireSvOnboardingConfirmed with
+        cid = svOnboardingConfirmedCid
+
+  [(_, dsoRules)] <- query @DsoRules dso
+  Map.keys (dsoRules.offboardedSvs) === [svX]
+
+
+testSvNameUniquenessNotInDevNet : Script ()
+testSvNameUniquenessNotInDevNet = do
+  -- When it is not in devnet, a new SV party cannot dynamically replace an existing SV party for the same SV name.
+  (_, dso, (_, sv2, _, _)) <- initMainNet
+
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
+
+  svX <- allocateParty "svX"
+  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "sv2-participant-id" (Round 3)
+
+
+testSvOverwriteInDevNet : Script ()
+testSvOverwriteInDevNet = do
+  (app, dso, (sv1, sv2, _, _)) <- initDevNet
+
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  (fromSome (Map.lookup sv1 dsoRules.svs)).name === "sv1"
+  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
+  svX <- allocateParty "svX"
+
+  -- Failing the template precondition check if the existing sv being overwritten is the current DSO delegate.
+  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv1" 19 "sv1-participant-id" (Round 3)
+
+  -- overwriting existing sv successfully (using a new participant node)
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "svX-participant-id" (Round 3)
+
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  dsoRules.offboardedSvs === Map.fromList [(sv2, OffboardedSvInfo "sv2" "sv2-participant-id")]
+
+  svX2 <- allocateParty "svX2"
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  -- overwriting existing sv again
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX2 "sv2" 19 "svX2-participant-id" (Round 3)
+
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  dsoRules.offboardedSvs === Map.fromList
+    [ (sv2, OffboardedSvInfo "sv2" "sv2-participant-id")
+    , (svX, OffboardedSvInfo "sv2" "svX-participant-id")
+    ]
+
+  -- status reports are OK
+  checkSvContractInvariants app
+
+  pure ()
+
+testSvReonboarding : Script ()
+testSvReonboarding = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+
+  [(_, dsoRules)] <- query @DsoRules dso
+
+  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4]
+
+  initiateAndAcceptVote app [sv1, sv2, sv3] $
+    ARC_DsoRules with
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv4
+  passTime (dsoRules.config.voteRequestTimeout)
+  executeAllDefinitiveVotes app
+
+  [(_, dsoRules)] <- query @DsoRules dso
+  Map.keys dsoRules.svs === [sv1, sv2, sv3]
+  Map.keys dsoRules.offboardedSvs === [sv4]
+  checkSvContractInvariants app
+
+  -- reonboard sv4
+  let token = "mock-token"
+  sv4New <- allocateParty "sv4New"
+
+  svSubmits app sv1 $ \cid -> exerciseCmd cid $
+    DsoRules_StartSvOnboarding "sv4" sv4New "sv4New-participant-id" token sv1
+  forA_ [sv1,sv2,sv3] $ \sv ->
+    svSubmits app sv $ \cid -> exerciseCmd cid $ DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
+          newSvParty = sv4New
+          newSvName = "sv4"
+          newParticipantId = "sv4New-participant-id"
+          reason = "because the sv4 owner still has the right to operate a node"
+          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+  executeAllConfirmedActions app
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
+
+  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  submitMulti [sv4New] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+    sv = sv4New
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
+    amuletRulesCid
+
+  [(_, dsoRules)] <- query @DsoRules dso
+
+  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4New]
+  -- sv4 remaines offboarded
+  Map.keys dsoRules.offboardedSvs === [sv4]
+
+  -- check status reports
+  checkSvContractInvariants app
+
+  pure ()
+
+-- Ensure that duplicated ValidatorLicence contracts are merged
+test_MergeValidatorLicense : Script ()
+test_MergeValidatorLicense = do
+  (_, dso, (sv1, sv2, _, _)) <- initDevNet
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+  now <- getTime
+
+  validatorLicense1Cid <- submit dso $ createCmd ValidatorLicense with
+    validator = v1
+    sponsor = sv1
+    dso
+    faucetState = Some FaucetState with
+      firstReceivedFor = Round 0
+      lastReceivedFor = Round 1
+      numCouponsMissed = 0
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = "v1@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
+
+  validatorLicense2Cid <- submit dso $ createCmd ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    dso
+    faucetState = Some FaucetState with
+      firstReceivedFor = Round 0
+      lastReceivedFor = Round 2
+      numCouponsMissed = 0
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = "v1@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
+
+  -- there are two validator licenses for v1
+  validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  length validatorLicenses === 2
+
+  -- the license with the highest lastReceivedFor is kept
+  [(rulesCid, _)] <- query @DsoRules dso
+  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid])
+  validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
+  length validatorLicenses === 1
+  (head validatorLicenses)._2.faucetState === Some FaucetState with
+    firstReceivedFor = Round 0
+    lastReceivedFor = Round 2
+    numCouponsMissed = 0
+
+  -- we can't merge a single contract
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3])
+
+  -- we can't merge contracts for different validator names
+  [(validatorLicenseSv2Cid, _)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == sv2)
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid])
+
+  pure()

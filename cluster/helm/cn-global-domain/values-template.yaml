@@ -1,0 +1,52 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+enableHealthProbes: true
+
+defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8
+resources:
+  limits:
+    cpu: "3"
+    memory: 4Gi
+  requests:
+    cpu: "1"
+    memory: 2Gi
+
+sequencer:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"
+    databaseName: cantonnet_sequencer
+    port: 5432
+  resources:
+    limits:
+      cpu: "4"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 4Gi
+
+mediator:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"
+    databaseName: cantonnet_mediator
+    port: 5432
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:
+
+enableAntiAffinity: true

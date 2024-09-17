@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "spliceInstanceNames": {
+      "type": "object",
+      "description": "The names unique for the splice instance, must be specified as provided in the docs"
+    }
+  },
+  "allOf": [
+    {
+      "required": [
+        "spliceInstanceNames"
+      ],
+      "properties": {
+        "spliceInstanceNames": {
+          "type": "object",
+          "properties": {
+            "networkName": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-_ ]+$",
+              "description": "The name of the network as provided in the docs"
+            },
+            "networkFaviconUrl": {
+              "type": "string",
+              "pattern": "^http[s]?://.+$",
+              "description": "The URL for the favicon for the network as provided in the docs"
+            },
+            "amuletName": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-_ ]+$",
+              "description": "The name of Amulets on this network, as provided in the docs"
+            },
+            "amuletNameAcronym": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9]+$",
+              "description": "The acronym for the name of Amulets on this network, as provided in the docs"
+            },
+            "nameServiceName": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-_ ]+$",
+              "description": "The name of the Name Service on this network, as provided in the docs"
+            },
+            "nameServiceNameAcronym": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9]+$",
+              "description": "The acornum of the name of Name Service on this network, as provided in the docs"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

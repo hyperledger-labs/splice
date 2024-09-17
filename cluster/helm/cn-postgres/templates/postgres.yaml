@@ -1,0 +1,110 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-configuration"
+  namespace: {{ .Release.Namespace }}
+data:
+  PGDATA: "/var/lib/postgresql/data/pgdata"
+  POSTGRES_DB: "cantonnet"
+  POSTGRES_USER: "cnadmin"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  serviceName: {{ .Release.Name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        namespace: {{ .Release.Namespace }}
+    spec:
+      containers:
+      - name: {{ .Release.Name }}
+        image: postgres:14
+        imagePullPolicy: IfNotPresent
+        args: ["-c", "max_connections={{ .Values.db.maxConnections }}", "-c", "max_wal_size={{ .Values.db.maxWalSize }}"]
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: {{ .Values.persistence.secretName }}
+              key: postgresPassword
+        envFrom:
+        - configMapRef:
+            name: "{{ .Release.Name }}-configuration"
+        livenessProbe:
+          exec:
+            command:
+            - psql
+            - -U
+            - cnadmin
+            - -d
+            - template1
+            - -c
+            - SELECT 1
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+          - containerPort: 5432
+            name: postgresdb
+            protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+          - mountPath: /var/lib/postgresql/data
+            name: {{ $.Values.db.pvcTemplateName }}
+      restartPolicy: Always
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: {{ $.Values.db.pvcTemplateName }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ $.Values.db.volumeSize }}
+      storageClassName: {{ $.Values.db.volumeStorageClass }}
+      volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: postgresdb
+    port: 5432
+    protocol: TCP
+  selector:
+    app: {{ .Release.Name }}

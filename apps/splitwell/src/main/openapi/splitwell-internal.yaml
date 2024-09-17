@@ -1,0 +1,294 @@
+openapi: 3.0.0
+info:
+  title: Splitwell API
+  version: 0.0.1
+tags:
+  - name: splitwell
+servers:
+  - url: https://example.com/api/splitwell
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
+  /splitwell-installs:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listSplitwellInstalls"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSplitwellInstallsResponse"
+  /splitwell-rules:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listSplitwellRules"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSplitwellRulesResponse"
+  /groups:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listGroups"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListGroupsResponse"
+  /group-invites:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listGroupInvites"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListGroupInvitesResponse"
+  /accepted-group-invites:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listAcceptedGroupInvites"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+        - name: "group_id"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListAcceptedGroupInvitesResponse"
+  /balance-updates:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listBalanceUpdates"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+        - name: "group_id"
+          in: "query"
+          required: true
+          schema:
+            type: string
+        - name: "owner_party_id"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListBalanceUpdatesResponse"
+  /balances:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "listBalances"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+        - name: "group_id"
+          in: "query"
+          required: true
+          schema:
+            type: string
+        - name: "owner_party_id"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListBalancesResponse"
+  /connected-domains:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "getConnectedDomains"
+      parameters:
+        - name: "party"
+          in: "query"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetConnectedDomainsResponse"
+  /splitwell-domains:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "getSplitwellDomainIds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSplitwellDomainIdsResponse"
+  /provider-party-id:
+    get:
+      tags: [splitwell]
+      x-jvm-package: splitwell
+      operationId: "getProviderPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetProviderPartyIdResponse"
+components:
+  schemas:
+    SplitwellInstall:
+      type: object
+      required: ["contract_id", "domain_id"]
+      properties:
+        contract_id:
+          type: string
+        domain_id:
+          type: string
+    ListSplitwellInstallsResponse:
+      type: object
+      required: ["installs"]
+      properties:
+        installs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SplitwellInstall"
+    ListSplitwellRulesResponse:
+      type: object
+      required: ["rules"]
+      properties:
+        rules:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/AssignedContract"
+    ListGroupsResponse:
+      type: object
+      required: ["groups"]
+      properties:
+        groups:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    ListGroupInvitesResponse:
+      type: object
+      required: ["group_invites"]
+      properties:
+        group_invites:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    ListAcceptedGroupInvitesResponse:
+      type: object
+      required: ["accepted_group_invites"]
+      properties:
+        accepted_group_invites:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    ListBalanceUpdatesResponse:
+      type: object
+      required: ["balance_updates"]
+      properties:
+        balance_updates:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    ListBalancesResponse:
+      type: object
+      required: ["balances"]
+      properties:
+        balances:
+          type: object
+          additionalProperties:
+            type: string
+    GetConnectedDomainsResponse:
+      type: object
+      required: ["domain_ids"]
+      properties:
+        domain_ids:
+          type: array
+          items:
+            type: string
+    GetSplitwellDomainIdsResponse:
+      type: object
+      required: ["preferred", "other_domain_ids"]
+      properties:
+        preferred:
+          type: string
+        other_domain_ids:
+          type: array
+          items:
+            type: string
+    GetProviderPartyIdResponse:
+      type: object
+      required: ["provider_party_id"]
+      properties:
+        provider_party_id:
+          type: string
