@@ -24,7 +24,14 @@ class DockerComposeValidatorFrontendIntegrationTest
   // TODO(#14303): There's quite a bit of copy-pasting in this test, consider better code reuse
   "docker-compose based validator works" in { implicit env =>
     val aliceTap = 123.4
-    val builder = new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-w")
+    val builder = new ProcessBuilder(
+      "build-tools/splice-compose.sh",
+      "start",
+      "-l",
+      "-w",
+      "-p",
+      "da-composeValidator-1",
+    )
     val ret = builder.!
     if (ret != 0) {
       fail("Failed to start docker-compose validator")
@@ -146,6 +153,8 @@ class DockerComposeValidatorFrontendIntegrationTest
       "-w",
       "-i",
       identities.toAbsolutePath.toString,
+      "-p",
+      "da-composeValidator-1",
       "-P",
       "da-composeValidator-13",
     ).!
@@ -196,6 +205,8 @@ class DockerComposeValidatorFrontendIntegrationTest
           "start",
           "-l",
           "-w",
+          "-p",
+          "da-composeValidator-1",
           "-P",
           "da-composeValidator-13",
         ).!
@@ -231,7 +242,15 @@ class DockerComposeValidatorFrontendIntegrationTest
   "docker-compose based validator with auth works" in { _ =>
     val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
     val builder =
-      new ProcessBuilder("build-tools/splice-compose.sh", "start", "-l", "-a", "-w")
+      new ProcessBuilder(
+        "build-tools/splice-compose.sh",
+        "start",
+        "-l",
+        "-a",
+        "-w",
+        "-p",
+        "da-composeValidator-1",
+      )
     builder
       .environment()
       .put(

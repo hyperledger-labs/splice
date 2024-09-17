@@ -91,7 +91,7 @@ function _start_validator {
     -o "${secret}" \
     -m "${migration_id}" \
     -b \
-    -p "da-composeValidator-1" \
+    -p "${party_hint}" \
     "${extra_flags[@]}" \
       >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
 }
@@ -125,8 +125,9 @@ function subcmd_start {
   migrating=0
   IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
   restore_identities_dump=""
+  party_hint="$(whoami)-composeValidator-1"
   participant_id=""
-  while getopts 'haldn:m:Mwt:i:P:' arg; do
+  while getopts 'haldn:m:Mwt:i:p:P:' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -159,6 +160,9 @@ function subcmd_start {
         ;;
       i)
         restore_identities_dump="${OPTARG}"
+        ;;
+      p)
+        party_hint="${OPTARG}"
         ;;
       P)
         participant_id="${OPTARG}"
@@ -213,7 +217,7 @@ function subcmd_start {
   fi
 }
 function usage_start {
-  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w] [-t <image_tag>] [-i <identities_dump>] [-P <participant_id>]"
+  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w] [-t <image_tag>] [-i <identities_dump>] [-p <party_hint>] [-P <participant_id>]"
   _info "      -a: Enable authentication"
   _info "      -l: Start the validator against a local SV (for integration tests). Default is against a cluster determined by GCP_CLUSTER_HOSTNAME"
   _info "      -d: Use images from the DA-internal repository (default: use locally built images)"
@@ -223,7 +227,8 @@ function usage_start {
   _info "      -w: Wait for the validator to be ready"
   _info "      -t: Use a specific image tag (default: current snapshot). Implies -d"
   _info "      -i <identities_dump>: restore identities from a dump file"
-  _info "      -P <participant_id>: participant identifier (by default, identical to the party hint which is hard-coded in this script to 'da-composeValidator-1')"
+  _info "      -p <party_hint>: party hint (by default, <local_user>-composeValidator-1)"
+  _info "      -P <participant_id>: participant identifier (by default, identical to the party hint)"
 }
 
 subcommand_whitelist[stop]='stop a validator'
