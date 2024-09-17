@@ -40,6 +40,11 @@ You can also use `cncluster request_pam` from the target cluster directory to re
 The command will ask you for a reason and open the GCP PAM UI in your browser at the end of a successful run,
 so that you can check the status of your request there.
 
+For MainNet:
+**Please revoke your own grant once you don't need it anymore!**
+This prevents accidents.
+You can revoke grants (including your own) from the `GRANTS FOR ALL USERS` tab ([link for MainNet](https://console.cloud.google.com/iam-admin/pam/grants/all?folder=113800715154)).
+
 ### Prefer Pulumi over kubectl edit
 
 It can often be tempting to quickly fix an issue with a `kubectl
