@@ -1,0 +1,59 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.metrics.enable }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: {{ .Release.Name }}-sequencer-sm
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: cs-metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sequencer
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+  {{- if .Values.metrics.migration }}
+  targetLabels:
+    - active_migration
+    - migration_id
+  {{- end }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: {{ .Release.Name }}-mediator-sm
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: cm-metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mediator
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+  {{- if .Values.metrics.migration }}
+  targetLabels:
+    - active_migration
+    - migration_id
+  {{- end }}
+
+{{- end }}

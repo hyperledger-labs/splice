@@ -1,0 +1,983 @@
+openapi: 3.0.0
+info:
+  title: Validator API
+  version: 0.0.1
+tags:
+  - name: validator
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /v0/validator-user:
+    get:
+      tags: [validator_public]
+      x-jvm-package: validator_public
+      operationId: "getValidatorUserInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorUserInfoResponse"
+  /v0/register:
+    post:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "register"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RegistrationRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RegistrationResponse"
+
+  /v0/admin/users:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "onboardUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardUserRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardUserResponse"
+
+    get:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "listUsers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListUsersResponse"
+
+  /v0/admin/users/offboard:
+    post:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "offboardUser"
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/admin/participant/identities:
+    get:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "dumpParticipantIdentities"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+
+  /v0/admin/participant/global-domain-connection-config:
+    get:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "getDecentralizedSynchronizerConnectionConfig"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDecentralizedSynchronizerConnectionConfigResponse"
+
+  /v0/admin/domain/data-snapshot:
+    get:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "getValidatorDomainDataSnapshot"
+      parameters:
+        - in: query
+          name: timestamp
+          required: true
+          schema:
+            type: string
+        - name: migration_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: force
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorDomainDataSnapshotResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/app-manager/apps/installed/{provider}/authorize:
+    post:
+      tags: [app_manager]
+      x-jvm-package: app_manager
+      operationId: "authorizeApp"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: ok"
+        404:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/app-manager/apps/installed/{provider}/check-authorizization:
+    post:
+      tags: [app_manager]
+      x-jvm-package: app_manager
+      operationId: "checkAppAuthorized"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                redirect_uri:
+                  type: string
+                state:
+                  type: string
+              required:
+                - redirect_uri
+                - state
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CheckAppAuthorizedResponse"
+        403:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
+
+  /v0/app-manager/apps/installed/{provider}/approve-release-config:
+    post:
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
+      operationId: "approveAppReleaseConfiguration"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveAppReleaseConfigurationRequest"
+      responses:
+        200:
+          description: ok
+        404:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        500:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/app-manager/oauth2/.well-known/openid-configuration:
+    get:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "oauth2OpenIDConfiguration"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OpenIDConfigurationResponse"
+  /v0/app-manager/oauth2/.well-known/jwks.json:
+    get:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "oauth2Jwks"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/JwksResponse"
+  /v0/app-manager/oauth2/token:
+    post:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "oauth2Token"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                client_id:
+                  type: string
+              required:
+                - grant_type
+                - code
+                - redirect_uri
+                - client_id
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+
+  /v0/app-manager/apps/installed:
+    get:
+      tags: [app_manager]
+      x-jvm-package: app_manager
+      operationId: "listInstalledApps"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListInstalledAppsResponse"
+  /v0/app-manager/apps/install:
+    post:
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
+      operationId: "installApp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/InstallAppRequest"
+      responses:
+        "201":
+          description: ok
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+
+  /v0/app-manager/apps/registered:
+    get:
+      tags: [app_manager]
+      x-jvm-package: app_manager
+      operationId: "listRegisteredApps"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListRegisteredAppsResponse"
+
+  /v0/app-manager/apps/registered/name/{name}/configuration/latest/configuration.json:
+    get:
+      tags: [ app_manager_public ]
+      x-jvm-package: app_manager_public
+      operationId: "getLatestAppConfigurationByName"
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAppConfigurationResult"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
+    get:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "getLatestAppConfiguration"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAppConfigurationResult"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/app-manager/apps/registered/{provider}/release/{version}/release.json:
+    get:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "getAppRelease"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AppRelease"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/app-manager/apps/registered/{provider}/publish-release:
+    post:
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
+      operationId: "publishAppRelease"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - release
+              properties:
+                release:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+  /v0/app-manager/apps/registered/{provider}/update-configuration:
+    post:
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
+      operationId: "updateAppConfiguration"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppConfigurationRequest"
+      responses:
+        "201":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+  /v0/app-manager/dars/{dar_hash}:
+    get:
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
+      operationId: "getDarFile"
+      parameters:
+        - name: dar_hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DarFile"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/app-manager/apps/register:
+    post:
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
+      operationId: "registerApp"
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - provider_user_id
+                - configuration
+                - release
+              properties:
+                provider_user_id:
+                  type: string
+                configuration:
+                  type: string
+                  description: |
+                    JSON-encoded AppConfiguration. While OpenAPI supports
+                    specifying an actual JSON object here both guardrails and
+                    the typescript code generator have partially broken support for this.
+                release:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+
+
+components:
+  schemas:
+    OnboardUserRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        party_id:
+          type: string
+          description: |
+            The party id of the user to onboard. This is optional and if not provided
+            a fresh party id will be generated by the backend.
+
+    OnboardUserResponse:
+      type: object
+      required:
+        - party_id
+      properties:
+        party_id:
+          type: string
+
+    RegistrationRequest:
+      type: object
+      nullable: true
+
+    RegistrationResponse:
+      type: object
+      required:
+        - party_id
+      properties:
+        party_id:
+          type: string
+
+    GetValidatorUserInfoResponse:
+      type: object
+      required:
+        - party_id
+        - user_name
+        - featured
+      properties:
+        party_id:
+          type: string
+        user_name:
+          type: string
+        featured:
+          type: boolean
+
+    GetDecentralizedSynchronizerConnectionConfigResponse:
+      type: object
+      required:
+        - sequencer_connections
+      properties:
+        sequencer_connections:
+          $ref: "#/components/schemas/SequencerConnections"
+
+    ListUsersResponse:
+      type: object
+      required:
+        - usernames
+      properties:
+        usernames:
+          type: array
+          items:
+            type: string
+
+    CheckAppAuthorizedResponse:
+      type: object
+      required:
+        - redirect_uri
+      properties:
+        redirect_uri:
+          type: string
+
+    OpenIDConfigurationResponse:
+      type: object
+      required:
+        - issuer
+        - authorization_endpoint
+        - token_endpoint
+        - jwks_uri
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        jwks_uri:
+          type: string
+
+    JwksResponse:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Jwk"
+      required:
+        - keys
+
+    Jwk:
+      type: object
+      properties:
+        kid:
+          type: string
+        kty:
+          type: string
+        alg:
+          type: string
+        use:
+          type: string
+        n:
+          type: string
+        e:
+          type: string
+      required:
+        - kid
+        - kty
+        - alg
+        - use
+        - n
+        - e
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        # TODO(#6839): consider adding expires_in, refresh_token, scope
+      required:
+        - access_token
+        - token_type
+
+    ListInstalledAppsResponse:
+      type: object
+      required:
+        - apps
+      properties:
+        apps:
+          type: array
+          items:
+            "$ref": "#/components/schemas/InstalledApp"
+
+    ListRegisteredAppsResponse:
+      type: object
+      required:
+        - apps
+      properties:
+        apps:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RegisteredApp"
+
+    InstalledApp:
+      type: object
+      required:
+        - provider
+        - latest_configuration
+        - approved_release_configurations
+        - unapproved_release_configurations
+      properties:
+        provider:
+          type: string
+        latest_configuration:
+          $ref: "#/components/schemas/AppConfiguration"
+        approved_release_configurations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseConfiguration"
+        unapproved_release_configurations:
+          description: |
+            The configurations in latest_configuration excluding the ones in
+            approved_release_configurations. We pass this separately to avoid having
+            to do a structural equality check in the frontend.
+          type: array
+          items:
+            $ref: "#/components/schemas/UnapprovedReleaseConfiguration"
+
+    UnapprovedReleaseConfiguration:
+      type: object
+      required:
+        - release_configuration_index
+        - release_configuration
+      properties:
+        release_configuration_index:
+          type: integer
+          format: int32
+        release_configuration:
+          $ref: "#/components/schemas/ReleaseConfiguration"
+
+    RegisteredApp:
+      type: object
+      required:
+        - provider
+        - app_url
+        - configuration
+      properties:
+        provider:
+          type: string
+        app_url:
+          type: string
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"
+
+    AppConfiguration:
+      type: object
+      required:
+        - version
+        - name
+        - ui_uri
+        - allowed_redirect_uris
+        - release_configurations
+      properties:
+        version:
+          type: integer
+          format: int64
+        name:
+          type: string
+        ui_uri:
+          type: string
+        allowed_redirect_uris:
+          type: array
+          items:
+            type: string
+        release_configurations:
+          description: "Multiple release configurations are used to support rolling upgrades."
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseConfiguration"
+
+    GetAppConfigurationResult:
+      type: object
+      required:
+        - provider
+        - configuration
+      properties:
+        provider:
+          type: string
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"
+
+    ReleaseConfiguration:
+      type: object
+      required:
+        - domains
+        - release_version
+        - required_for
+      properties:
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/Domain"
+        release_version:
+          type: string
+        required_for:
+          $ref: "#/components/schemas/Timespan"
+
+    Timespan:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+
+    AppRelease:
+      type: object
+      required:
+        - version
+        - dar_hashes
+      properties:
+        version:
+          type: string
+        dar_hashes:
+          type: array
+          items:
+            type: string
+
+    # The file used in the bundle on upload
+    # TODO(#6839) Consider using AppRelease instead and compute
+    # hashes as part of bundling. Note that this is non-trivial
+    # since it's not just a sha256sum of the DAR file itself. It includes
+    # the purpose which isn't easy to replicate in bash.
+    AppReleaseUpload:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+
+    Domain:
+      type: object
+      required:
+        - alias
+        - url
+      properties:
+        alias:
+          type: string
+        url:
+          type: string
+
+    DarFile:
+      type: object
+      required:
+        - base64_dar
+      properties:
+        # base64 because guardrail doesn't support generating binary files on the client side
+        base64_dar:
+          type: string
+
+    InstallAppRequest:
+      type: object
+      required:
+        - app_url
+      properties:
+        app_url:
+          type: string
+
+    UpdateAppConfigurationRequest:
+      type: object
+      required:
+        - configuration
+      properties:
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"
+
+    ApproveAppReleaseConfigurationRequest:
+      type: object
+      required:
+        - configuration_version
+        - release_configuration_index
+      properties:
+        configuration_version:
+          type: integer
+          format: int64
+        release_configuration_index:
+          description: |
+            Index into the release configurations specified on the app configuration.
+          type: integer
+          format: int32
+
+    SequencerConnections:
+      type: object
+      required:
+        - connections
+        - sequencer_trust_threshold
+        - submission_request_amplification
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SequencerAliasToConnections"
+        sequencer_trust_threshold:
+          type: integer
+          format: int32
+        submission_request_amplification:
+          $ref: "#/components/schemas/SequencerSubmissionRequestAmplification"
+
+    SequencerAliasToConnections:
+      type: object
+      required:
+        - sequencer_alias
+        - endpoints
+        - transport_security
+      properties:
+        sequencer_alias:
+          type: string
+        endpoints:
+          type: array
+          items:
+            type: string
+        transport_security:
+          type: boolean
+
+    Dar:
+      type: object
+      required:
+        - hash
+        - content
+      properties:
+        hash:
+          type: string
+        content:
+          description: |
+            base64 encoded string of a dar package
+          type: string
+
+    DomainMigrationDump:
+      type: object
+      required:
+        - participant
+        - acs_snapshot
+        - acs_timestamp
+        - dars
+        - migration_id
+        - domain_id
+        - created_at
+      properties:
+        participant:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        acs_snapshot:
+          description: |
+            base64 encoded string of acs snapshot for the requested party id
+          type: string
+        acs_timestamp:
+          type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"
+        migration_id:
+          type: integer
+          format: int64
+        domain_id:
+          type: string
+        created_at:
+          type: string
+
+    # Old format for backwards compat
+    # TODO(#13131) Remove this.
+    LegacyDomainMigrationDump:
+      type: object
+      required:
+        - participant
+        - acsSnapshot
+        - acsTimestamp
+        - dars
+        - migrationId
+        - domainId
+        - createdAt
+      properties:
+        participant:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        acsSnapshot:
+          description: |
+            base64 encoded string of acs snapshot for the requested party id
+          type: string
+        acsTimestamp:
+          type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"
+        migrationId:
+          type: integer
+          format: int64
+        domainId:
+          type: string
+        createdAt:
+          type: string
+
+    GetValidatorDomainDataSnapshotResponse:
+      type: object
+      required:
+        - data_snapshot
+        - migration_id
+      properties:
+        data_snapshot:
+          $ref: "#/components/schemas/DomainMigrationDump"
+        migration_id:
+          type: integer
+          format: int64
+
+    SequencerSubmissionRequestAmplification:
+      type: object
+      required:
+        - factor
+        - patience_seconds
+      properties:
+        factor:
+          type: number
+        patience_seconds:
+          type: number

@@ -1,0 +1,39 @@
+participantAddress: "participant"
+
+# URL of sponsoring SV for onboarding your validator, e.g. sv.sv-2.dev.canton.network.global
+svSponsorAddress: "SPONSOR_SV_URL"
+onboardingSecretFrom:
+  secretKeyRef:
+    name: splice-app-validator-onboarding-validator
+    key: secret
+    optional: false
+# Party ID hint for the validator operator party, should be of format <organization>-<function>-<enumerator>,
+# e.g. digitalAsset-finance-1
+validatorPartyHint: ""
+
+# MIGRATION_START
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+migration:
+  id: "MIGRATION_ID"
+  # Uncomment this when redeploying as part of a migration, i.e., MIGRATION_ID was incremented and a migration dump was exported to the attached pvc.
+  # migrating: true
+#MIGRATION_END
+
+persistence:
+  secretName: postgres-secrets
+  host: postgres
+
+# PARTICIPANT_BOOTSTRAP_DUMP_START
+# Uncomment the following block if you want to restore from a participant dump
+# participantIdentitiesDumpImport:
+  # secretName: participant-bootstrap-dump
+# PARTICIPANT_BOOTSTRAP_DUMP_END
+# PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
+# Uncomment the following line if you want to migrate the validator party to a new participant
+  # newParticipantIdentifier: put-some-new-string-never-used-before
+# migrateValidatorParty: true
+# PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
+
+# Replace YOUR_VALIDATOR_NAME with the name you provided for your validator identity.
+# This value will be used for the node identifier of your participant.
+nodeIdentifier: YOUR_VALIDATOR_NAME

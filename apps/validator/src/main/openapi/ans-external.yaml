@@ -1,0 +1,121 @@
+openapi: 3.0.0
+info:
+  title: ANS API
+  version: 0.0.1
+tags:
+  - name: ans
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/entry/create:
+    post:
+      tags: [ans]
+      x-jvm-package: external.ans
+      operationId: "createAnsEntry"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateAnsEntryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateAnsEntryResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/entry/all:
+    get:
+      tags: [ ans ]
+      x-jvm-package: external.ans
+      operationId: "listAnsEntries"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAnsEntriesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+components:
+  schemas:
+    CreateAnsEntryRequest:
+      type: object
+      required:
+        - name
+        - url
+        - description
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+    CreateAnsEntryResponse:
+      type: object
+      required:
+        - name
+        - url
+        - description
+        - entryContextCid
+        - subscriptionRequestCid
+      properties:
+        entryContextCid:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        subscriptionRequestCid:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+    ListAnsEntriesResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnsEntryResponse"
+    AnsEntryResponse:
+      type: object
+      required:
+        - contractId
+        - name
+        - amount
+        - unit
+        - expiresAt
+        - paymentInterval
+        - paymentDuration
+      properties:
+        contractId:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        name:
+          type: string
+        amount:
+          type: string
+        unit:
+          type: string
+        expiresAt:
+          type: string
+        paymentInterval:
+          type: string
+        paymentDuration:
+          type: string

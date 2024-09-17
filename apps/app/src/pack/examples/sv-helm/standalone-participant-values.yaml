@@ -1,0 +1,11 @@
+participantAdminUserNameFrom:
+  secretKeyRef:
+    key: ledger-api-user
+    name: splice-app-validator-ledger-api-auth
+    optional: false
+
+persistence:
+  secretName: postgres-secrets
+  host: postgres
+  databaseName: participant_MIGRATION_ID
+  schema: participant

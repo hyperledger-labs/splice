@@ -1,0 +1,617 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+{-# LANGUAGE ApplicativeDo #-}
+
+module Splice.Scripts.Util where
+
+import Daml.Script
+
+import DA.Action (void, when, unless)
+import DA.Date
+import DA.Exception
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import DA.List.Total
+import DA.Time
+import DA.Assert
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.AmuletConfig (AmuletConfig(..))
+import qualified Splice.AmuletConfig as Unit
+import Splice.Expiry
+import Splice.Issuance
+import Splice.Round
+import Splice.Fees
+import Splice.Types
+import Splice.RelRound
+import Splice.Schedule
+import Splice.ValidatorLicense
+
+import Splice.Scripts.Parameters
+import Splice.Util
+
+-- Bootstrapping Amulet
+-------------------
+
+
+-- | A type to hold the off-ledger information required to interact with the Amulet app.
+data AmuletApp = AmuletApp with
+    dso : Party
+    dsoUser : AmuletUser
+  deriving (Eq, Ord, Show)
+
+demoTime : Time
+demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
+
+
+-- | Setup the DSO party and the contracts defining the Amulet app.
+setupApp : Script AmuletApp
+setupApp = genericSetupApp ""
+
+-- | Setup the DSO party with a specific prefix and the contracts defining the Amulet app.
+genericSetupApp : Text -> Script AmuletApp
+genericSetupApp dsoPrefix = do
+  -- use a time that is easy to reason about in script outputs
+  setTime demoTime
+
+  dso <- allocateParty (dsoPrefix <> "dso-party")
+  dsoUser <- validateUserId (dsoPrefix <> "dummy-dso-user")
+  _ <- createUser (User dsoUser (Some dso)) []
+  let app =  AmuletApp with dso, dsoUser = AmuletUser dsoUser dso
+
+  recordValidatorOf app app.dso app.dso
+
+  _ <- submit dso $ createCmd AmuletRules with
+    configSchedule = defaultAmuletConfigSchedule
+    isDevNet = True
+    ..
+
+  submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
+      amuletPrice = 1.0
+      round0Duration = hours 24 -- extra time for all initial svs to join
+
+  -- return the off-ledger reference to the app for later script steps
+  return app
+
+
+-- AmuletApp users
+--------------
+
+setupValidator : AmuletApp -> Text -> Script Party
+setupValidator app name = do
+  validatorUser <- setupValidator' app name
+  return validatorUser.primaryParty
+
+setupValidator' : AmuletApp -> Text -> Script AmuletUser
+setupValidator' app name = do
+  validatorParty <- allocatePartyWithHint name (PartyIdHint name)
+  sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
+  now <- getTime
+  submitMulti [validatorParty, app.dso] [] $ createCmd ValidatorLicense with
+    dso = app.dso
+    sponsor = sponsorParty
+    validator = validatorParty
+    faucetState = None
+    metadata = Some ValidatorLicenseMetadata with
+      version = "0.1.0"
+      contactPoint = name <> "@example.com"
+      lastUpdatedAt = now
+    lastActiveAt = Some now
+
+  userId <- validateUserId name
+  -- TODO(#2957): remove read-as DSO party.
+  createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.dso]
+  recordValidatorOf app validatorParty validatorParty
+  tap app (AmuletUser userId validatorParty) 1.0
+  let validatorUser = AmuletUser with
+        primaryParty = validatorParty
+        userId = userId
+  return validatorUser
+
+data AmuletUser = AmuletUser
+  with
+    userId : UserId
+    primaryParty : Party
+  deriving (Show, Eq, Ord)
+
+setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
+setupUser app name validator = do
+  user <- allocatePartyWithHint name (PartyIdHint name)
+  userId <- validateUserId name
+  -- TODO(#2957): remove read-as DSO party.
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
+  recordValidatorOf app user validator
+  let u = AmuletUser userId user
+  tap app u 1.0
+  return u
+
+setupSelfHostedUser: AmuletApp -> Text -> Script (AmuletUser, AmuletUser)
+setupSelfHostedUser app name = do
+  validator <- setupValidator' app (name <> "_validator")
+  user <- setupUser app name validator.primaryParty
+  return (user, validator)
+
+data DefaultAppWithUsers = DefaultAppWithUsers with
+    app: AmuletApp
+    alice: AmuletUser
+    aliceValidator : AmuletUser
+    bob: AmuletUser
+    charlie: AmuletUser
+    bobValidator: AmuletUser
+    provider1: AmuletUser
+    provider1Validator: AmuletUser
+    provider2: AmuletUser
+    provider2Validator: AmuletUser
+  deriving (Show, Eq, Ord)
+
+setupDefaultAppWithUsers: Script DefaultAppWithUsers
+setupDefaultAppWithUsers = do
+  app <- setupApp
+  (alice, aliceValidator) <- setupSelfHostedUser app "alice"
+  (bob, bobValidator) <- setupSelfHostedUser app "bob"
+  charlie <- setupUser app "charlie" bobValidator.primaryParty
+  (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
+  (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
+  return DefaultAppWithUsers with ..
+
+-- dummy argument to avoid running this script by default.
+getAllValidatorRights : AmuletApp -> Script [ValidatorRight]
+getAllValidatorRights _app = do
+  parties <- listKnownParties
+  map snd <$> query @ValidatorRight (map party parties)
+
+recordValidatorOf : AmuletApp -> Party -> Party -> Script ()
+recordValidatorOf app u v =
+  submitMulti [u, v] [] $
+    void $ createCmd ValidatorRight with dso = app.dso; validator = v; user = u
+
+getUserReadAs : UserId -> Script [Party]
+getUserReadAs user = do
+  rights <- listUserRights user
+  pure [p | CanReadAs p <- rights]
+
+
+-- Issuance automation
+----------------------
+
+-- Advance issuance such that the next transfers use a round with the given amulet-price
+advanceToIssuanceWithPrice : AmuletApp -> Decimal -> Script ()
+advanceToIssuanceWithPrice app amuletPrice = do
+  runNextIssuanceInternal app amuletPrice
+  -- the round with the new price only becomes effective after one tick
+  -- we simulate that by runing another issuance, but run the amulet deposit bots before
+  -- to collect eventual rewards
+  runAmuletDepositBots app
+  runNextIssuanceInternal app amuletPrice
+
+-- | Run the next issuance but don't enforce a specific amulet price.
+runNextIssuance : AmuletApp -> Script ()
+runNextIssuance app = do
+  runNextIssuanceInternal app 1.0
+
+-- | Advance time to next round change
+advanceToNextRoundChange : AmuletApp -> Script ()
+advanceToNextRoundChange app = do
+  [(_, oldest), _, (_, newest)] <- getActiveOpenRoundsSorted app
+  now <- getTime
+  let roundChangePossibleAt = max oldest.targetClosesAt newest.opensAt
+  when (now < roundChangePossibleAt) $ setTime roundChangePossibleAt
+
+-- Only directly call this function if you know what you are doing.
+-- Due to effective-dating, the price you give here is not the amulet price that can be used immediately
+runNextIssuanceInternal : AmuletApp -> Decimal -> Script ()
+runNextIssuanceInternal app amuletPrice = do
+    -- now <- getTime
+    -- passTime (minutes 10)
+    advanceToNextRoundChange app
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound app.dso
+    forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
+      -- app rewards
+      rewards <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        submit app.dso $ exerciseCmd rcid AppRewardCoupon_DsoExpire with closedRoundCid
+      -- validator rewards
+      rewards <- queryFilter @ValidatorRewardCoupon app.dso (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        submit app.dso $ exerciseCmd rcid ValidatorRewardCoupon_DsoExpire with closedRoundCid
+      -- the closed round
+      submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_Archive with
+        closedRoundCid
+
+    -- close issuing rounds that are ready for close
+    now <- getTime
+    imcs <- queryFilter @IssuingMiningRound app.dso (\r -> r.targetClosesAt <= now)
+    forA_ imcs $ \(issuingRoundCid, _) ->
+      submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_Close with
+        issuingRoundCid
+
+    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
+    -- create a new OpenMiningRound
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
+    advanceResult <- submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_AdvanceOpenMiningRounds with
+      amuletPrice
+      roundToArchiveCid
+      middleRoundCid = r2Cid
+      latestRoundCid = r3Cid
+    let closingRoundCid = advanceResult.summarizingRoundCid
+
+    -- compute total burn
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+
+    let summary = OpenMiningRoundSummary with
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+
+    -- create issuing mining round
+    submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with
+      miningRoundCid = closingRoundCid
+      summary
+
+    pure ()
+
+-- Set time so that at least one mining round is open and usable
+passTimeToRoundOpen : AmuletApp -> Script ()
+passTimeToRoundOpen app = do
+  now <- getTime
+  -- only get rounds that won't close soon
+  rounds <- queryFilter @OpenMiningRound app.dso (\round -> now < round.targetClosesAt)
+  case minimumOn (\(_, r) -> r.opensAt) rounds of
+    None -> abort "No open open mining rounds that aren't past their target close time"
+    Some (_, r) -> setTime (max now r.opensAt)
+
+-- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
+skipNRounds : AmuletApp -> Int -> Script ()
+skipNRounds app n = do
+  [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getActiveOpenRoundsSorted app
+
+  let newRound1 = addRelRound r1.round (RelRound n)
+  let newRound2 = addRelRound r2.round (RelRound n)
+  let newRound3 = addRelRound r3.round (RelRound n)
+  submit app.dso
+    $ archiveCmd r1Cid
+    *> createCmd r1 with round = newRound1
+    *> archiveCmd r2Cid
+    *> createCmd r2 with round = newRound2
+    *> archiveCmd r3Cid
+    *> createCmd r3 with round = newRound3
+  pure ()
+
+-- Asset handling utilities
+---------------------------
+
+submitExerciseAmuletRulesByKey : Choice AmuletRules c r => AmuletApp -> [Party] -> [Party] -> c -> Script r
+submitExerciseAmuletRulesByKey app actors readers arg = do
+  (rules, _) <- fetchAmuletRulesByKey app.dso
+  -- TODO(#2957): remove read-as DSO party.
+  let adjustedReaders = (app.dso :: readers)
+  submitMulti actors adjustedReaders $ exerciseCmd rules arg
+
+submitExerciseAmuletRulesByKey' : Choice AmuletRules c r => AmuletApp -> AmuletUser -> c -> Script r
+submitExerciseAmuletRulesByKey' app user arg = do
+  (rules, _) <- fetchAmuletRulesByKey app.dso
+  submitUser user.userId $ exerciseCmd rules arg
+
+fetchAmuletRulesByKey : Party -> Script (ContractId AmuletRules, AmuletRules)
+fetchAmuletRulesByKey dso =
+  queryAmuletRulesByKey dso >>= \case
+    None -> abort "No active AmuletRules contract"
+    Some rules -> pure rules
+
+queryAmuletRulesByKey : Party -> Script (Optional (ContractId AmuletRules, AmuletRules))
+queryAmuletRulesByKey dso = do
+  amuletRules <- query @AmuletRules dso
+  case amuletRules of
+    [] -> pure None
+    [amuletRules] -> pure (Some amuletRules)
+    rules -> abort $ "Expected 0 or 1 AmuletRules contracts but got " <> show rules
+
+getAmuletRules : AmuletApp -> Script (ContractId AmuletRules, AmuletRules)
+getAmuletRules app = fetchAmuletRulesByKey app.dso
+
+-- | A simple and slightly hacky-way to test payment: it just gathers all amulets from
+-- the sender and transfers the desired amount off of them to the receiver.
+-- The left-over amount is kept.
+pay : AmuletApp -> AmuletUser -> Party -> Decimal -> Script ()
+pay app sender recipient amuletAmount = do
+  payWithTransferFeeRatio app sender recipient amuletAmount 0.0
+
+-- | A simple and slightly hacky-way to test payment: it just gathers all amulets from
+-- the sender and transfers the desired amount off of them to the receiver.
+-- The left-over amount is kept.
+payWithTransferFeeRatio : AmuletApp -> AmuletUser -> Party -> Decimal -> Decimal -> Script ()
+payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
+  -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
+  readAs <- getUserReadAs sender.userId
+  amulets <- getAmuletInputs sender.primaryParty
+  let transfer = Transfer with
+        sender = sender.primaryParty
+        provider = sender.primaryParty
+        inputs = amulets
+        outputs =
+          [  TransferOutput with
+              receiver = recipient
+              amount = amuletAmount
+              receiverFeeRatio = transferFeeRatio
+              lock = None
+          ]
+  (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app sender.primaryParty
+  void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, recipient] readAs
+    AmuletRules_Transfer with
+      transfer, context = amuletTransferContext openRound featuredAppRight
+
+-- | Locks a amulet of the given amount to the given lock holder
+-- for the given time starting at the current time
+-- It gathers all amulets of the sender as input amulets.
+lockTo1 : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
+lockTo1 app sender lockHolder amuletAmount lockDuration = do
+  now <- getTime
+  readAs <- getUserReadAs sender.userId
+  -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
+  amulets <- getAmuletInputs sender.primaryParty
+  let transfer = Transfer with
+        sender = sender.primaryParty
+        provider = sender.primaryParty
+        inputs = amulets
+        outputs =
+          [ TransferOutput with
+              receiver = sender.primaryParty
+              amount = amuletAmount
+              lock = Some TimeLock with
+                holders = [lockHolder]
+                expiresAt = now `addRelTime` lockDuration
+              receiverFeeRatio = 0.0
+          ]
+  (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app sender.primaryParty
+  void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, lockHolder] readAs
+    AmuletRules_Transfer with
+      transfer, context = amuletTransferContext openRound featuredAppRight
+
+-- | Draw on validator faucets for all open rounds.
+drawOnAllValidatorFaucets : AmuletApp -> Script ()
+drawOnAllValidatorFaucets app = do
+  openRounds <- getOpenRoundsSorted app
+  forA_ openRounds $ \openRound -> do
+    licenses <- queryFilter @ValidatorLicense app.dso
+      (\l -> optional True (\state -> state.lastReceivedFor < openRound._2.round) l.faucetState)
+    forA_ licenses $ \(lcid, l) ->
+      -- submitMulti as the OpenMiningRound would be disclosed using explicit disclosure
+      submitMulti [l.validator] [app.dso] $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
+        openRoundCid = openRound._1
+
+-- | Deposit all amulets together with new issuances into a single amulet.
+runAmuletDepositBots : AmuletApp -> Script ()
+runAmuletDepositBots app = do
+  (openRound, _) <- getLatestOpenRound app
+  issuingRounds <- getOpenIssuingRounds app
+  let issuingRoundNumbers = map (._2.round) issuingRounds
+  let mkContext validatorRights = TransferContext with
+        openMiningRound = openRound
+        issuingMiningRounds = Map.fromList [ (round.round, roundCid) | (roundCid, round) <- issuingRounds ]
+        validatorRights
+        featuredAppRight = None
+  -- iterate over all validator rights to use the right readAs values
+  -- TODO(M4-82): remove the need for reading as the validator
+  allValidatorRights <- getAllValidatorRights app
+  forA_ allValidatorRights $ \validatorRight -> do
+    -- get all burns for this user
+    let user = validatorRight.user
+    validatorRights <- getValidatorRights user
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.provider == user
+
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.user `Map.member` validatorRights
+
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.validator == user
+
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.validator == user
+
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.dso $ \c ->
+      c.round `elem` issuingRoundNumbers && c.beneficiary == user
+
+    -- get all amulets of this user
+    amulets <- getAmuletInputs user
+    -- Need readAs rights for all hosted users to collect their validator rewards,
+    -- and readAs rights for the validator to see mining round state contracts
+    -- TODO(M4-82): remove the need for reading as the validator
+    let readAs = Map.keys validatorRights ++ [validatorRight.validator]
+    -- merge multiple of them into a single amulet to minimize the holding fees
+    let transfer = Transfer with
+          sender = user
+          provider = user
+          inputs =
+              map (InputAppRewardCoupon . fst) appRewardCoupons ++
+              map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
+              map (mkInputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
+              map (InputValidatorLivenessActivityRecord . fst) validatorLivenessActivityRecords ++
+              map (InputSvRewardCoupon . fst) svRewardCoupons ++
+              amulets
+          outputs = []
+    -- merge multiple amulets or rewards and claim rewards even if there are no amulets yet
+    when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null amulets)) $ void $
+      submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with
+        transfer
+        context = mkContext validatorRights
+
+  -- sanity check: test that the amulet deposit bot merged all amulets
+  amulets <- query @Amulet app.dso
+  let amuletOwners = map (._2.owner) amulets
+  require "Owners of amulets must be unique" (unique amuletOwners)
+  pure ()
+
+-- | Retrieve the list of all amulets that the given party can use as transfer inputs.
+getAmuletInputs : Party -> Script [TransferInput]
+getAmuletInputs sender = do
+  amulets <- queryFilter @Amulet sender (\amulet -> amulet.owner == sender)
+  pure [ InputAmulet amuletCid | (amuletCid, _) <- amulets]
+
+-- | Retrieve a list of all issuing mining rounds that are currently open.
+getOpenIssuingRounds : AmuletApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
+getOpenIssuingRounds app = do
+  now <- getTime
+  miningRounds <- query @IssuingMiningRound app.dso
+  return [ (cid, r) | (cid, r) <- miningRounds, r.opensAt <= now ]
+
+-- | All validator rights for the given user.
+getValidatorRights : Party -> Script (Map.Map Party (ContractId ValidatorRight))
+getValidatorRights validator = do
+  rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
+  return $ Map.fromList [ (right.user, rightCid) | (rightCid, right) <- rights ]
+
+-- Primarily used by submitters to decide against which round they should try to transact.
+getLatestOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestOpenRound app = do
+  now <- getTime
+  -- only get open rounds
+  rounds <- queryFilter @OpenMiningRound app.dso (\round -> now >= round.opensAt)
+  case maximumOn (\(_, r) -> r.round) rounds of
+    None -> abort "No open open mining rounds"
+    Some r-> pure r
+
+getLatestActiveOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestActiveOpenRound app = do
+  -- get active rounds
+  rounds <- query @OpenMiningRound app.dso
+  case maximumOn (\(_, r) -> r.round) rounds of
+    None -> abort "No active open mining rounds"
+    Some r-> pure r
+
+getOpenRoundsSorted : AmuletApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getOpenRoundsSorted app = do
+  now <- getTime
+  -- only get rounds that are actually open as-of now
+  rounds <- queryFilter @OpenMiningRound app.dso (\round -> now >= round.opensAt)
+  return $ sortOn (\(_, openRound) -> openRound.round) rounds
+
+getActiveOpenRoundsSorted : AmuletApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getActiveOpenRoundsSorted app = do
+  rounds <- query @OpenMiningRound app.dso
+  return $ sortOn (\(_, openRound) -> openRound.round) rounds
+
+getFeaturedAppRight : AmuletApp -> Party -> Script (Optional (ContractId FeaturedAppRight))
+getFeaturedAppRight app provider = do
+  rounds <- query @FeaturedAppRight provider
+  return $ DA.List.Total.head [ cid | (cid, round) <- rounds, round.dso == app.dso ]
+
+getAppTransferContext : AmuletApp -> AmuletUser -> Script AppTransferContext
+getAppTransferContext app provider = do
+  openMiningRound <- fst <$> getLatestOpenRound app
+  amuletRules <- fst <$> fetchAmuletRulesByKey app.dso
+  featuredAppRight <- getFeaturedAppRight app provider.primaryParty
+  pure AppTransferContext with
+    amuletRules
+    openMiningRound
+    featuredAppRight
+
+getAppTransferContextForRound : AmuletApp -> AmuletUser -> Round -> Script AppTransferContext
+getAppTransferContextForRound app provider round = do
+  openMiningRounds <- getOpenRoundsSorted app
+  openMiningRound <- case find (\(_, payload) -> payload.round == round) openMiningRounds of
+        None -> abort ("No open mining round for round " <> show round)
+        Some (cid, _) -> pure cid
+  amuletRules <- fst <$> fetchAmuletRulesByKey app.dso
+  featuredAppRight <- getFeaturedAppRight app provider.primaryParty
+  pure AppTransferContext with
+    amuletRules
+    openMiningRound
+    featuredAppRight
+
+getPaymentTransferContext : AmuletApp -> AmuletUser -> Script PaymentTransferContext
+getPaymentTransferContext app user = do
+  getPaymentTransferContextFeaturedApp app user None
+
+getPaymentTransferContextFeaturedApp : AmuletApp -> AmuletUser -> Optional(ContractId FeaturedAppRight) -> Script PaymentTransferContext
+getPaymentTransferContextFeaturedApp app user featuredAppRight = do
+  context <- getTransferContext app user featuredAppRight
+  amuletRules <- fst <$> fetchAmuletRulesByKey app.dso
+  pure PaymentTransferContext with ..
+
+
+getTransferContext : AmuletApp -> AmuletUser -> Optional(ContractId FeaturedAppRight) -> Script TransferContext
+getTransferContext app user featuredAppRight = do
+  openMiningRound <- fst <$> getLatestOpenRound app
+  now <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  validatorRights <- query @ValidatorRight user.primaryParty
+  pure TransferContext with
+    issuingMiningRounds = Map.fromList
+      [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now ]
+    validatorRights = Map.fromList
+      [ (right.user, rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
+    openMiningRound
+    featuredAppRight = featuredAppRight
+
+tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Amulet)
+tap app user amount = do
+  (openRound, _) <- getLatestOpenRound app
+  result <- submitExerciseAmuletRulesByKey' app user AmuletRules_DevNet_Tap with
+    receiver = user.primaryParty
+    amount
+    openRound
+  return result.amuletSum.amulet
+
+featureApp : AmuletApp -> AmuletUser -> Script (ContractId FeaturedAppRight)
+featureApp app provider = do
+  result <- submitExerciseAmuletRulesByKey' app provider AmuletRules_DevNet_FeatureApp with
+    provider = provider.primaryParty
+  return result.featuredAppRightCid
+
+getNormalizedBalance: Party -> Script Decimal
+getNormalizedBalance party = do
+  amulets <- query @Amulet party
+  let normalizedAmuletBalance = sum $ map(\(_, c) -> getValueAsOfRound0 c.amount) amulets
+
+  lockedAmulets <- query @LockedAmulet party
+  let normalizedLockedAmuletBalance = sum $ map(\(_, lc) -> lc.amulet.amount.initialAmount + intToDecimal lc.amulet.amount.createdAt.number * lc.amulet.amount.ratePerRound.rate) lockedAmulets
+
+  let sum = normalizedAmuletBalance + normalizedLockedAmuletBalance
+  return sum
+
+getBalanceChangesFromAcs: DefaultAppWithUsers -> Script(Map.Map Party BalanceChange)
+getBalanceChangesFromAcs DefaultAppWithUsers{..} = do
+  amulets <- query @Amulet app.dso
+  lockedAmulets <- query @LockedAmulet app.dso
+  let allAmulets = (map (._2) amulets) ++ map (._2.amulet) lockedAmulets
+
+  let balanceChangeFromAmulet amulet = BalanceChange with
+        changeToInitialAmountAsOfRoundZero = getValueAsOfRound0 amulet.amount
+        changeToHoldingFeesRate = amulet.amount.ratePerRound.rate
+
+  let normalizedBalanceChanges = map(\c -> (c.owner, balanceChangeFromAmulet c)) allAmulets
+  return $ Map.fromListWithR (+) normalizedBalanceChanges
+
+checkBalanceChanges: DefaultAppWithUsers -> Script TransferResult -> Script TransferResult
+checkBalanceChanges d script = do
+  before <- getBalanceChangesFromAcs d
+  result <- script
+  after <- getBalanceChangesFromAcs d
+  Map.unionWith (+) before result.summary.balanceChanges === after
+  return result
+
+assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
+assertError f = do
+  isThrown <-
+    try do
+      let _ = f ()
+      pure False
+    catch (_ : AnyException) -> pure True
+  unless isThrown (abort "expected exception but didn't get one")
+
+getAmuletConfig : AmuletApp -> Script (AmuletConfig Unit.USD)
+getAmuletConfig app = do
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
+  now <- getTime
+  pure $ getValueAsOf now amuletRules.configSchedule

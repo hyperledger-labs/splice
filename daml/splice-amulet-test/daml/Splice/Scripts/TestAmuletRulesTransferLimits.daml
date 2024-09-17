@@ -1,0 +1,102 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletRulesTransferLimits where
+
+import DA.Action
+import DA.Text as Text
+import DA.Time
+import DA.Exception
+import Daml.Script
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Scripts.Util
+import Splice.Schedule
+
+template CheckError
+  with
+    actors : [Party]
+  where
+    signatory actors
+    choice Test_Transfer : ()
+      with
+        context : PaymentTransferContext
+        transfer : Transfer
+        expectedError: Text
+      controller actors
+      do
+        isThrown <-
+          try do
+            exercisePaymentTransfer context transfer
+            pure False
+          catch (e : AnyException) -> if expectedError `Text.isInfixOf` message e then pure True else abort ("UnexpectedException" <> message e)
+        unless isThrown (abort "expected exception but didn't get one")
+
+testTransferExceedsMaxInputs: Script ()
+testTransferExceedsMaxInputs = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    inputAmulets <- forA [1..101] $ \_ -> do
+      amulet <- tap app alice 1.0
+      pure $ InputAmulet amulet
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of inputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = inputAmulets
+          outputs = []
+        context = context
+        expectedError = "More than the maximum number of inputs"
+    return ()
+
+testTransferExceedsMaxOutputs: Script ()
+testTransferExceedsMaxOutputs = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    amulet <- tap app alice 100.0
+    let outputAmulet = TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0
+        outputAmulets = map (const outputAmulet) [1..101]
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of outputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputAmulet amulet]
+          outputs = outputAmulets
+        context = context
+        expectedError = "More than the maximum number of outputs"
+    return ()
+
+testTransferExceedsMaxLockHolders: Script ()
+testTransferExceedsMaxLockHolders = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    [(_, amuletRules)] <- query @AmuletRules app.dso
+    now <- getTime
+    let config = getValueAsOf now amuletRules.configSchedule
+    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
+    amulet <- tap app alice 100.0
+    context <- getPaymentTransferContext app alice
+    now <- getTime
+    let bobParties = map (.primaryParty) bobs
+    -- More than the allowed number of lock holders
+    submitMulti ([alice.primaryParty, charlie.primaryParty] ++ bobParties) [app.dso] $
+      createAndExerciseCmd (CheckError ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputAmulet amulet]
+        outputs =
+          [ TransferOutput with
+              receiver = alice.primaryParty
+              amount = 1.0
+              lock = Some TimeLock with
+                holders = bobParties
+                expiresAt = now `addRelTime` (minutes 1)
+              receiverFeeRatio = 0.0
+          ]
+      context = context
+      expectedError = "Fewer than the allowed number of lock holders"
+    return ()

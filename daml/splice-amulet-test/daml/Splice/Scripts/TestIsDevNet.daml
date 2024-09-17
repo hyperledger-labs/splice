@@ -1,0 +1,43 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestIsDevNet where
+
+import Daml.Script
+
+import Splice.AmuletRules
+
+import Splice.Scripts.Util
+
+
+testAmuletRules : Script ()
+testAmuletRules = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  (round, _) <- getLatestOpenRound app
+  testChoice app [alice.primaryParty] [app.dso] $ \amuletRules ->
+    exerciseCmd amuletRules (AmuletRules_DevNet_Tap alice.primaryParty 5.0 round)
+
+  testChoice app [provider1.primaryParty, app.dso] [app.dso] $ \amuletRules ->
+    exerciseCmd amuletRules (AmuletRules_DevNet_FeatureApp provider1.primaryParty)
+
+  pure ()
+
+testChoice : AmuletApp -> [Party] -> [Party] -> (ContractId AmuletRules -> Commands a) -> Script ()
+testChoice app actAs readAs buildCommand = do
+  setIsDevNetFlag app False
+  Some (amuletRules, _) <- queryAmuletRulesByKey app.dso
+  submitMultiMustFail actAs readAs (buildCommand amuletRules)
+
+  setIsDevNetFlag app True
+  Some (amuletRules, _) <- queryAmuletRulesByKey app.dso
+  submitMulti actAs readAs (buildCommand amuletRules)
+  pure ()
+
+setIsDevNetFlag : AmuletApp -> Bool -> Script ()
+setIsDevNetFlag app isDevNet = do
+  Some (rulesCid, rules) <- queryAmuletRulesByKey app.dso
+  submit app.dso $
+    archiveCmd rulesCid *>
+    createCmd rules with isDevNet
+  pure ()

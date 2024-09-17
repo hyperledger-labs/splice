@@ -1,0 +1,94 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $cnsWebUiLabel := "ans-web-ui" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ $cnsWebUiLabel }}
+    migration: {{ .Values.migration.id | quote }}
+  name: {{ $cnsWebUiLabel }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $cnsWebUiLabel }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $cnsWebUiLabel }}
+        migration: {{ .Values.migration.id | quote }}
+    spec:
+      containers:
+      - name: ans-web-ui
+        image: "{{ .Values.imageRepo }}/ans-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).ans_web_ui) }}"
+        imagePullPolicy: Always
+        env:
+        - name: CN_APP_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: splice-app-cns-ui-auth
+              optional: false
+        - name: CN_APP_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: splice-app-cns-ui-auth
+              optional: false
+        - name: CN_APP_UI_AUTH_AUDIENCE
+          value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
+        - name: CN_APP_UI_NETWORK_NAME
+          value: {{ .Values.spliceInstanceNames.networkName | quote }}
+        - name: CN_APP_UI_NETWORK_FAVICON_URL
+          value: {{ .Values.spliceInstanceNames.networkFaviconUrl | quote }}
+        - name: CN_APP_UI_AMULET_NAME
+          value: {{ .Values.spliceInstanceNames.amuletName | quote }}
+        - name: CN_APP_UI_AMULET_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
+        - name: CN_APP_UI_NAME_SERVICE_NAME
+          value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
+        - name: CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 240Mi
+          limits:
+            cpu: 1
+            memory: 1536Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $cnsWebUiLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: {{ $cnsWebUiLabel }}
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP

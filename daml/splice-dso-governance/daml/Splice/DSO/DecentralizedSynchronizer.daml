@@ -1,0 +1,147 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Data structures and contracts related managing the decentralized synchronizer.
+module Splice.DSO.DecentralizedSynchronizer where
+
+import qualified DA.Map as Map
+
+import Splice.CometBft
+
+-- DSO-level configuration
+-- ==============================
+
+-- | The decentralized synchronizer consists of a series of actual synchronizers.
+-- New synchronizers are created by the SVs for the rare case of needing to roll-out
+-- a BFT protocol upgrade that cannot be rolled out in a backwards compatible fashion.
+--
+-- Note that synchronizers themselves are formed by a cluster of nodes run by the SVs.
+-- As can be seen form `SynchronizerNodeConfig` each sv runs multiple different kinds of
+-- physical nodes.
+data DsoDecentralizedSynchronizerConfig = DsoDecentralizedSynchronizerConfig with
+    synchronizers : Map.Map Text SynchronizerConfig
+      -- ^ The actual synchronizers, numbered sequentially.
+    lastSynchronizerId : Text
+      -- ^ The last allocated synchronizer Id.
+    activeSynchronizerId: Text
+      -- ^ The synchronizer to be used for managing standard DSO and Amulet workflows.
+  deriving (Eq, Show)
+
+-- | The DSO-level configuration of a synchronizer. This contains the shared parameters
+-- of the synchronizer.
+data SynchronizerConfig = SynchronizerConfig with
+    state : SynchronizerState
+      -- ^ The state of this synchronizer
+    cometBftGenesisJson : Text
+      -- ^ The CometBftGenesis json value required for new svs to bring up
+      -- their CometBft nodes for this synchronizer.
+    acsCommitmentReconciliationInterval : Optional Int
+      -- ^ Participants connected to the decentralized synchronizer exchange ACS commitment messages
+      -- every reconciliation interval seconds.
+  deriving (Eq, Show)
+
+-- | The state of a synchronizer.
+data SynchronizerState
+  = DS_Bootstrapping
+    -- ^ The synchronizer is still being bootstrapped, and SVs are required to
+    -- provision their nodes for it.
+  | DS_Operational
+    -- ^ The synchronizer is operational, and thus can be used as
+    -- the active synchronizer.
+  | DS_Decomissioned
+    -- ^ The synchronizer has been decommissioned and svs are now allowed to shutdown
+    -- their nodes for that synchronizer. We track this state explicitly instead of just
+    -- deleting the synchronizer config, as decomissioning likely takes a while, and we
+    -- want to avoid confusion among SV operators when they see errors raised from
+    -- some of their synchronizer nodes.
+  | ExtSynchronizerState
+      -- ^ Extension constructor to work around the current lack of upgrading for variants in Daml 3.0.
+      -- Will serve as the default value in a containing record in case of an extension.
+  deriving (Eq, Show)
+
+
+-- SV-level configuration
+-- ==========================
+
+-- | Config for a sequencer.
+data SequencerConfig = SequencerConfig with
+    migrationId : Int
+      -- ^ The synchronizer migration id corresponding to this sequencer.
+    sequencerId : Text
+      -- ^ The id of the sequencer.
+    url : Text
+      -- ^ The public accessible url of the sequencer.
+    availableAfter : Optional Time
+      -- ^ Any participant should subscribe this sequencer after this time.
+      -- ^ If not set the sequencer is not yet accessible
+  deriving (Eq, Show)
+
+-- | Config for a legacy sequencer, i.e., a migration id that is still up but paused. This is useful to allow validators to catch up.
+data LegacySequencerConfig = LegacySequencerConfig with
+    migrationId : Int
+      -- ^ The synchronizer migration id corresponding to this sequencer.
+    sequencerId : Text
+      -- ^ The id of the sequencer.
+    url : Text
+      -- ^ The public accessible url of the sequencer.
+  deriving (Eq, Show)
+
+-- | Config for a mediator.
+data MediatorConfig = MediatorConfig with
+    mediatorId : Text
+      -- ^ The id of the mediator.
+  deriving (Eq, Show)
+
+-- | Config for a Scan instance.
+data ScanConfig = ScanConfig with
+    publicUrl : Text
+      -- ^ The publicly accessible URL of the Scan instance.
+  deriving (Eq, Show)
+
+-- | A map from synchronizer-ids to the configuration of a sv's node for this synchronizer.
+type SynchronizerNodeConfigMap = Map.Map Text SynchronizerNodeConfig
+
+-- | The configuration of a sv's node for a particular synchronizer.
+data SynchronizerNodeConfig = SynchronizerNodeConfig with
+
+    cometBft : CometBftConfig
+      -- ^ The configuration of this sv's CometBFT nodes and keys.
+
+    sequencer : Optional SequencerConfig
+      -- ^ The configuration of this sv's optional local sequencer.
+
+    mediator : Optional MediatorConfig
+      -- ^ The configuration of this sv's optional local mediator.
+
+    scan: Optional ScanConfig
+      -- ^ The configuration of this sv's optional Scan instance.
+
+    legacySequencerConfig: Optional LegacySequencerConfig
+      -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
+
+  deriving (Eq, Show)
+
+noSynchronizerNodes : SynchronizerNodeConfigMap
+noSynchronizerNodes = Map.empty
+
+data SynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with
+    cometBft : CometBftConfigLimits
+  deriving (Eq, Show)
+
+
+-- default values
+-----------------
+
+emptySynchronizerNodeConfig : SynchronizerNodeConfig
+emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None
+
+
+-- helper functions
+-------------------
+
+validSynchronizerNodeConfig : SynchronizerNodeConfigLimits -> SynchronizerNodeConfig -> Bool
+validSynchronizerNodeConfig limits config =
+  validCometBftConfig limits.cometBft config.cometBft
+
+defaultSynchronizerNodeConfigLimits : SynchronizerNodeConfigLimits
+defaultSynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with cometBft = defaultCometBftConfigLimits

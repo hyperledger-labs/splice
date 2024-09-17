@@ -1,0 +1,27 @@
+# Extra patterns to ignore when shutting down Canton
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
+ledger subscription for admin service .* has completed with error
+io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
+INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
+INDEX_DB_SQL_NON_TRANSIENT_ERROR.*Database is already closed
+Error while running indexer
+handleChunkUpdate failed with error: ShuttingDown
+
+# shutdown can be slower than the timeouts
+Task closing .* did not complete
+Closing .* failed
+Failed to shut down successfully
+shutdown did not complete gracefully in allotted .* seconds
+
+# database pools don't always close cleanly
+failed connection pool health check
+
+# See https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/137888/workflows/a856128a-eb86-4a44-ab2e-d2e377fc118c/jobs/664082
+Delaying setup of new sequencer subscription failed
+
+# db warnings related to shutdowns
+DB_STORAGE_DEGRADATION
+
+# Make sure to have a trailing newline

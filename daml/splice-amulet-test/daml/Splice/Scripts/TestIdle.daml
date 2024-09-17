@@ -1,0 +1,20 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestIdle where
+
+import Daml.Script
+
+import Splice.Scripts.Util
+
+testIdle : Script ()
+testIdle = do
+  -- bootstrap app
+  app <- setupApp
+
+  -- start issuing
+  runNextIssuance app
+  runNextIssuance app
+
+
+  return ()

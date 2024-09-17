@@ -1,0 +1,54 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSvStatus where
+
+import DA.Assert
+import DA.Time
+
+import Daml.Script
+
+import Splice.Types
+import Splice.Scripts.DsoTestUtils
+import Splice.DsoRules
+import Splice.DSO.SvState
+
+
+-- test status report submission, as status report invariants are tested
+-- in the onboarding tests using 'checkSvContractInvariants'
+testStatusReportSubmission : Script ()
+testStatusReportSubmission = do
+
+  (_, dso, (sv1, sv2, _, _)) <- initMainNet
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  now <- getTime
+
+  let mkTime i = addRelTime now (convertMicrosecondsToRelTime i)
+  let dummyStatus dummyNr = SvStatus with
+        createdAt = now
+        cometBftHeight = dummyNr + 1
+        mediatorSynchronizerTime = mkTime $ dummyNr + 2
+        participantSynchronizerTime = mkTime $ dummyNr + 3
+        latestOpenRound = Round (dummyNr + 4)
+  let getStatusReport sv = do
+        [report] <- queryFilter @SvStatusReport dso (\report -> report.sv == sv)
+        pure report
+  let submitStatusReport sv svName dummyNr = do
+        (previousReportCid, prevReport) <- getStatusReport sv
+        submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_SubmitStatusReport with
+          sv
+          previousReportCid
+          status = dummyStatus dummyNr
+        (_, actualNewReport) <- getStatusReport sv
+        let expectedNewReport = SvStatusReport with
+              dso
+              sv
+              svName
+              number = prevReport.number + 1
+              status = Some (dummyStatus dummyNr)
+        expectedNewReport === actualNewReport
+
+  submitStatusReport sv1 "sv1" 10
+  submitStatusReport sv2 "sv2" 20

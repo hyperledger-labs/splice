@@ -1,0 +1,454 @@
+openapi: 3.0.0
+info:
+  title: Wallet API
+  version: 0.0.1
+tags:
+  - name: wallet
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/wallet/transfer-offers:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: external.wallet
+      operationId: "createTransferOffer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTransferOfferRequest"
+      responses:
+        "200":
+          description: The transfer offer has been created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferOfferResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "404":
+          description: |
+            The submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "409":
+          description:
+            A transfer offer with the same tracking id has been created. Check the
+            status endpoint for the current status.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A transfer offer with the same tracking id is currently being processed,
+            which may or may not succeed. Retry submitting the request with exponential
+            back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+    get:
+      tags: [ wallet ]
+      x-jvm-package: external.wallet
+      operationId: "listTransferOffers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTransferOffersResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-offers/{tracking_id}/status:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: external.wallet
+      operationId: "getTransferOfferStatus"
+      parameters:
+        - in: path
+          name: tracking_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An offer with this tracking id is known. Check the response for its status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetTransferOfferStatusResponse"
+        "404":
+          description: |
+            No offer with this tracking id is known.
+            Perhaps it has not yet been submitted or processed; or it has been submitted
+            in the past before the current beginning of the wallet transaction log.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/wallet/buy-traffic-requests:
+    post:
+      description:
+        Create a request to buy traffic. Note that this only creates the request
+        to do so. Refer to the status endpoint to check if the request succeeded.
+      tags: [ wallet ]
+      x-jvm-package: external.wallet
+      operationId: "createBuyTrafficRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateBuyTrafficRequest"
+      responses:
+        "200":
+          description: Request to buy traffic got created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateBuyTrafficRequestResponse"
+        "400":
+          description: Request was invalid, adjust parameters
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "409":
+          description:
+            A request to buy traffic with the same tracking id has been created. Check the
+            status endpoint for the current status.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A request to buy traffic with the same tracking id is currently being processed.
+            Check the status endpoint and resubmit if it returns 404.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          description:
+            Internal server error that requires operator investigation.
+            Retrying for a small number of times with exponential back-off MAY work.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/wallet/buy-traffic-requests/{tracking_id}/status:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: external.wallet
+      operationId: "getBuyTrafficRequestStatus"
+      parameters:
+        - in: path
+          name: tracking_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A request to buy traffic with this tracking id has been submitted before, check the response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetBuyTrafficRequestStatusResponse"
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+          description: No request with this tracking id was found.
+components:
+  schemas:
+    CreateTransferOfferRequest:
+      type: object
+      required:
+        - receiver_party_id
+        - amount
+        - description
+        - expires_at
+        - tracking_id
+      properties:
+        receiver_party_id:
+          type: string
+        amount:
+          type: string
+        description:
+          type: string
+        expires_at:
+          description: |
+            Expiry time of the transfer offer as unix timestamp in microseconds. After this time, the offer can no longer be accepted
+            and automation in the wallet will eventually expire the transfer offer.
+            Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
+            time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
+            for how ledger effective time is bound to the record time of a transaction on a domain.
+          type: integer
+          format: int64
+        tracking_id:
+          description: |
+            tracking id to support exactly once submission. Once submitted, all successive calls with the same tracking id
+            will get rejected with a 409 or 429 status code unless the command fails and the offer did not get created.
+            Clients should create a fresh tracking id when they try to create a new transfer offer. If that command submission fails
+            with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
+            tracking id to ensure they don't create the same offer multiple times.
+          type: string
+
+    BaseGetTransferOfferStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: |
+            The status of the transfer offer.
+            created:
+              The offer has been created and is waiting for the receiver to accept it.
+              contract_id points to the contract_id of the offer and transaction_id to the transaction that created it.
+            accepted:
+              The offer has been accepted by the receiver and is waiting for the wallet automation
+              to complete it by delivering the offered Amulet.
+              contract_id points to the contract id of the accepted offer and transaction_id to the transaction that accepted it
+            completed:
+              The transfer has been completed and the CC amount has been transferred to the receiver.
+              contract_id points to the contract id of the created amulet for the receiver and
+              transaction_id to the transaction of the transfer.
+            failed:
+              The transfer has failed permanently and no CC has been transferred. Refer to
+              failure_reason for details. A new transfer offer can be created with a different tracking_id.
+    TransferOfferCreatedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that created the transfer offer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the created transfer offer
+    TransferOfferAcceptedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that accepted the transfer offer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the accepted transfer offer
+    TransferOfferCompletedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction of the transfer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the created amulet for the receiver
+    TransferOfferFailedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - failure_kind
+          properties:
+            failure_kind:
+              type: string
+              description: |
+                The reason for the failure of the transfer offer.
+                expired:
+                  The transfer offer or the accepted transfer offer expired before it could be completed.
+                rejected:
+                  The receiver rejected the transfer offer or withdrew their accepted offer.
+                withdrawn:
+                  The sender withdraw their offer, e.g., due to insufficient funds or operational reasons.
+              enum:
+                - expired
+                - rejected
+                - withdrawn
+            withdrawn_reason:
+              type: string
+              description: |
+                Human readable description of the reason for the sender withdrawing their offer.
+    GetTransferOfferStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/TransferOfferCreatedResponse"
+        - "$ref": "#/components/schemas/TransferOfferAcceptedResponse"
+        - "$ref": "#/components/schemas/TransferOfferCompletedResponse"
+        - "$ref": "#/components/schemas/TransferOfferFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/TransferOfferCreatedResponse"
+          accepted: "#/components/schemas/TransferOfferAcceptedResponse"
+          completed: "#/components/schemas/TransferOfferCompletedResponse"
+          failed: "#/components/schemas/TransferOfferFailedResponse"
+
+    CreateTransferOfferResponse:
+      type: object
+      required:
+        - offer_contract_id
+      properties:
+        offer_contract_id:
+          type: string
+
+    ListTransferOffersResponse:
+      type: object
+      required:
+        - offers
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    CreateBuyTrafficRequest:
+      type: object
+      required:
+        - receiving_validator_party_id
+        - domain_id
+        - traffic_amount
+        - tracking_id
+        - expires_at
+      properties:
+        receiving_validator_party_id:
+          description: |
+            Traffic will be purchased for the validator hosting this party.
+            If the party is hosted on multiple participants, the request will fail with 400 Bad Request.
+          type: string
+        domain_id:
+          description: |
+            The domain to purchase traffic for.
+          type: string
+        traffic_amount:
+          description: |
+            traffic to purchase in bytes.
+          type: integer
+          format: int64
+        tracking_id:
+          description: |
+            Tracking id to support exactly once submission. Once submitted, all succeessive calls with the same tracking id
+            will get rejected with a 409 or 429 status code unless the command fails and the traffic did not get purchased.
+            Clients should create a fresh tracking id when they try to send a new request to buy traffic. If that command submission fails
+            with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
+            tracking id to ensure they don't purchase traffic multiple times.
+          type: string
+        expires_at:
+          description: |
+            Expiry time of the request to buy traffic as unix timestamp in microseconds. If the request does not
+            succeed before this time, the wallet automation will reject and expire it.
+            Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
+            time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
+            for how ledger effective time is bound to the record time of a transaction on a domain.
+          type: integer
+          format: int64
+
+    CreateBuyTrafficRequestResponse:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
+
+    BaseGetBuyTrafficRequestStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: |
+            The status of the traffic request
+            created:
+              The request to buy traffic has been created and is waiting for
+              the wallet automation to pick it up.
+            completed:
+              The traffic has been purchased.
+              transaction_id points to the transaction that purchased traffic.
+            failed:
+              The request to buy traffic has failed permanently and no CC has been transferred. Refer to
+              failure_reason for details. Use a new tracking_id if you want to retry buying traffic.
+    BuyTrafficRequestCreatedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+    BuyTrafficRequestCompletedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that purchased traffic.
+    BuyTrafficRequestFailedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+        - type: object
+          required:
+            - failure_reason
+          properties:
+            failure_reason:
+              type: string
+              description: |
+                The reason for the failure of the request to buy traffic.
+                expired:
+                  The wallet automation did not process the request in time.
+                rejected:
+                  The wallet automation rejected the request, e.g., due to insufficient funds or operational reasons.
+              enum:
+                - expired
+                - rejected
+            rejection_reason:
+              description: |
+                Human readable description of the rejection reason.
+              type: string
+    GetBuyTrafficRequestStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/BuyTrafficRequestCreatedResponse"
+        - "$ref": "#/components/schemas/BuyTrafficRequestCompletedResponse"
+        - "$ref": "#/components/schemas/BuyTrafficRequestFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/BuyTrafficRequestCreatedResponse"
+          completed: "#/components/schemas/BuyTrafficRequestCompletedResponse"
+          failed: "#/components/schemas/BuyTrafficRequestFailedResponse"

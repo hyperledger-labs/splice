@@ -1,0 +1,117 @@
+openapi: 3.0.0
+info:
+  title: Validator API
+  version: 0.0.1
+tags:
+  - name: validator
+servers:
+  - url: https://example.com/api/validator/jsonApiProxy
+paths:
+  /v1/user:
+    post:
+      tags: [json_api_public]
+      x-jvm-package: json_api_public
+      operationId: "jsonApiUser"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/query:
+    post:
+      tags: [json_api_public]
+      x-jvm-package: json_api_public
+      operationId: "jsonApiQuery"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/create:
+    post:
+      tags: [json_api_public]
+      x-jvm-package: json_api_public
+      operationId: "jsonApiCreate"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/exercise:
+    post:
+      tags: [json_api_public]
+      x-jvm-package: json_api_public
+      operationId: "jsonApiExercise"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+
+
+components:
+  schemas:
+    # A dummy component, to avoid an empty all.ts in the generated typescript
+    Dummy:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string

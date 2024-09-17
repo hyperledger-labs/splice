@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# DO NOT PUSH YOUR SECRETS ON GITHUB; if you intend to publish this code include this filename in `.gitignore`
+export NETWORK_AUTH_JWKS_URL=""
+export NETWORK_AUTH_WELLKNOWN_URL=""
+export NETWORK_AUTH_VALIDATOR_CLIENT_ID=""
+export NETWORK_AUTH_VALIDATOR_CLIENT_SECRET=""
+export NETWORK_AUTH_VALIDATOR_USER_NAME=""

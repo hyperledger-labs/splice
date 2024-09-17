@@ -1,0 +1,838 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestWallet where
+
+import DA.Action
+import DA.Assert
+import DA.Time
+import Daml.Script
+import DA.List
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Schedule
+import Splice.DecentralizedSynchronizer
+import Splice.Wallet.Install
+import Splice.Wallet.Payment
+import Splice.Wallet.Subscriptions
+import Splice.Wallet.TopUpState
+import Splice.Wallet.BuyTrafficRequest
+import Splice.Scripts.Wallet.TestSubscriptions
+
+import Splice.Fees
+import Splice.Scripts.Util
+import Splice.Scripts.Parameters
+
+createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
+createPaymentRequest app provider sender receiverAmounts = do
+  t <- getTime
+  let description = "multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts
+  -- multi-party submit to simplify test
+  submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
+    sender
+    provider
+    dso = app.dso
+    receiverAmounts = map (uncurry ReceiverAmount) receiverAmounts
+    expiresAt = t `addRelTime` minutes 5
+    description
+
+createSingleReceiverPaymentRequest : AmuletApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest)
+createSingleReceiverPaymentRequest app provider sender receiver amount = do
+  createPaymentRequest app provider sender [(receiver, amount)]
+
+acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Amulet -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest amulet = do
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
+  -- TODO(#2957): remove read-as DSO party.
+  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+    inputs = [InputAmulet amulet]
+    context
+    walletProvider
+  return result.acceptedPayment
+
+collectAcceptedPayment : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_CollectResult
+collectAcceptedPayment app provider acceptedAppPayment = do
+  (_, round) <- getLatestOpenRound app
+  collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
+
+collectAcceptedPaymentInRound : AmuletApp -> Round -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_CollectResult
+collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContextForRound app provider round
+  -- multi party submit to simplify test
+  submitMulti (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+
+collectAcceptedPaymentMustFail : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContext app provider
+  -- multi party submit to simplify test
+  _ <- submitMultiMustFail (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  pure ()
+
+checkAmuletPositions : AmuletUser -> [Decimal] -> Script ()
+checkAmuletPositions owner expectedAmounts = do
+    let ownerParty = owner.primaryParty
+    actualAmulets <- queryFilter @Amulet ownerParty (\c -> c.owner == ownerParty)
+    sort (map (._2.amount.initialAmount) actualAmulets) === sort expectedAmounts
+
+testSinglerReceiverAmuletPaymentRequest : Script ()
+testSinglerReceiverAmuletPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  featureApp app provider1
+
+  aliceInitialAmulets <- query @Amulet alice.primaryParty
+
+  let paymentAmount = 41.5 -- chosen to not return sender change
+  amulet <- tap app alice 42.0
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount paymentAmount AmuletUnit)
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
+  -- all of Alice's tapped amulet is used up
+  aliceAmulets <- query @Amulet alice.primaryParty
+  aliceAmulets === aliceInitialAmulets
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = paymentAmount)
+      ]
+    round = lockedAmulet.amulet.amount.createdAt
+    reference = transferRequest
+
+  AcceptedAppPayment_CollectResult [(receiver, amuletCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
+  receiver === bob.primaryParty
+
+  Some amulet <- queryContractId bob.primaryParty amuletCid
+  amulet.amount.initialAmount === paymentAmount
+
+  pure ()
+
+testExpiringAmuletPaymentRequest : Script ()
+testExpiringAmuletPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 30.0 AmuletUnit)
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "alice"
+    dsoParty = app.dso
+    validatorParty = aliceValidator.primaryParty
+
+  -- Try expiring too early
+  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
+
+  passTime (minutes 6)
+
+  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
+
+  pure ()
+
+testSingleReceiverUSDPaymentRequest : Script ()
+testSingleReceiverUSDPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2Amulet
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 30.0 USDUnit)
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
+  [_, _] <- query @Amulet alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 60.0)
+      ]
+    round = lockedAmulet.amulet.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+testAmuletPaymentRequest : Script ()
+testAmuletPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 1.0
+  runAmuletDepositBots app
+
+  validatorUserId <- validateUserId "alice_validator"
+  featuredValidator <- featureApp app (AmuletUser validatorUserId aliceValidator.primaryParty)
+
+  -- retrieve the config
+  config <- getAmuletConfig app
+  let transferConfig = config.transferConfig
+  amulet <- tap app alice 27.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 15.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 AmuletUnit)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty (Some featuredValidator) transferRequest amulet
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedAmulet, lockedAmuletPayload)] <- query @LockedAmulet alice.primaryParty
+  lockedAmuletPayload.amulet.amount.initialAmount ===
+    15.0 +
+    10.0 +
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 15.0 +
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 10.0
+  lockedAmuletPayload.lock.holders === map (.primaryParty) [bob, charlie, provider1]
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 15.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 10.0)
+      ]
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmulet
+    round = lockedAmuletPayload.amulet.amount.createdAt
+    reference = transferRequest
+
+  checkAmuletPositions alice [1.0, 1.615]
+  checkAmuletPositions bob [1.0]
+  checkAmuletPositions charlie [1.0]
+
+  -- Check that the locked-amulet is visible to charlie
+  [(charlieLockedAmuletCid, _)] <- query @LockedAmulet charlie.primaryParty
+  charlieLockedAmuletCid === lockedAmulet
+
+
+  result <- collectAcceptedPayment app alice acceptedPaymentCid
+
+  case sortOn (._1) result.receiverAmulets of
+    [(bob', bobAmulet), (charlie', charlieAmulet)] ->  do
+      bob' === bob.primaryParty
+      charlie' === charlie.primaryParty
+      Some amulet <- queryContractId bob' bobAmulet
+      amulet.amount.initialAmount === 15.0
+      Some amulet <- queryContractId charlie' charlieAmulet
+      amulet.amount.initialAmount === 10.0
+    _ -> abort $ "Expected exactly two amulets but got " <> show result.receiverAmulets
+
+  checkAmuletPositions alice [1.0, 1.615]
+  checkAmuletPositions bob [1.0, 15.0]
+  checkAmuletPositions charlie [1.0, 10.0]
+
+  (_, round) <- getLatestActiveOpenRound app
+
+  [(_, coupon)] <- query @AppRewardCoupon provider1.primaryParty
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
+  coupon.amount ===
+    transferConfigAmulet.transferFee.initialRate * (15.0 + 10.0) +
+    transferConfigAmulet.createFee.fee * 2.0
+  coupon.featured === False
+
+  [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  coupon.amount ===
+    transferConfigAmulet.createFee.fee + -- for one locked amulet
+    transferConfigAmulet.lockHolderFee.fee * 3.0 +
+    transferConfigAmulet.extraFeaturedAppRewardAmount
+  coupon.provider === aliceValidator.primaryParty
+  coupon.featured === True
+
+  pure ()
+
+testAmuletPaymentCollectionRoundInLatestRoundMustFail : Script ()
+testAmuletPaymentCollectionRoundInLatestRoundMustFail = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 1.0
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 27.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 15.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 AmuletUnit)]
+
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
+
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+
+  runNextIssuance app
+
+  collectAcceptedPaymentMustFail app alice acceptedPaymentCid
+
+  collectAcceptedPaymentInRound app acceptedPayment.round alice acceptedPaymentCid
+
+  pure ()
+
+testUSDPaymentRequest : Script ()
+testUSDPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 52.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 10.0 USDUnit),
+      (charlie.primaryParty, PaymentAmount 15.0 USDUnit)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 20.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 30.0)
+      ]
+    round = lockedAmulet.amulet.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+testMixedPaymentRequest : Script ()
+testMixedPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 32.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 10.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 USDUnit)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 10.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 20.0)
+      ]
+    round = lockedAmulet.amulet.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+assertTerminatedPayment : Party -> ContractId AppPaymentRequest -> Script ()
+assertTerminatedPayment p reference = do
+  terminated <- queryFilter @TerminatedAppPayment p (\c -> c.reference == reference)
+  unless (length terminated == 1) $ abort ("Expected one TerminatedAppPayment for " <> show reference <> " but got " <> show terminated)
+
+testTerminatedPayments : Script ()
+testTerminatedPayments = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  featureApp app provider1
+
+  let paymentAmount = 41.5
+
+  let createPaymentRequest = createSingleReceiverPaymentRequest app
+        provider1.primaryParty alice.primaryParty bob.primaryParty
+        (PaymentAmount paymentAmount AmuletUnit)
+
+  paymentRequest <- createPaymentRequest
+  submit alice.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Reject
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  paymentRequest <- createPaymentRequest
+  submit bob.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Withdraw
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  let createAcceptedPayment = do
+        amulet <- tap app alice 42.0
+        paymentRequest <- createPaymentRequest
+        accepted <- acceptPaymentRequest app alice aliceValidator.primaryParty None paymentRequest amulet
+        pure (paymentRequest, accepted)
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  let tickDuration = defaultAmuletConfig.tickDuration
+  passTime (tickDuration + tickDuration + seconds 1) -- pass one full round of time
+  submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  pure ()
+
+testSuccessfulBatchAmuletPaymentRequests : Script ()
+testSuccessfulBatchAmuletPaymentRequests = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 42.0
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 1.0 AmuletUnit)
+  transferRequest2 <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 2.0 AmuletUnit),
+      (alice.primaryParty, PaymentAmount 2.0 AmuletUnit)]
+
+  let endUserName = "wallet_service_participant_user"
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = endUserName
+    dsoParty = app.dso
+    validatorParty = aliceValidator.primaryParty
+
+  context <- getPaymentTransferContext app alice
+  executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    context
+    inputs = [InputAmulet amulet]
+    operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
+
+  let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppPayment payment2Cid] = executeBatchResult.outcomes
+  Some acceptedPayment <- queryContractId alice.primaryParty payment1Cid
+  Some acceptedPayment2 <- queryContractId alice.primaryParty payment2Cid
+  lockedAmulets <- query @LockedAmulet alice.primaryParty
+  let [(lockedAmuletCid, lockedAmulet), (lockedAmuletCid2, lockedAmulet2)] = sortOn (\(_, lockedAmulet) -> lockedAmulet.amulet.amount.initialAmount) lockedAmulets
+  [_, _] <- query @Amulet alice.primaryParty
+
+  -- check results
+  executeBatchResult.endUserName === endUserName
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid
+    amuletReceiverAmounts = [
+      ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 1.0 ]
+    round = lockedAmulet.amulet.amount.createdAt
+    reference = transferRequest
+
+  acceptedPayment2 === AcceptedAppPayment with
+    sender = alice.primaryParty
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 2.0),
+      (ReceiverAmuletAmount with receiver = alice.primaryParty, amuletAmount = 2.0)
+      ]
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid2
+    round = lockedAmulet2.amulet.amount.createdAt
+    reference = transferRequest2
+
+  pure ()
+
+
+testInsufficientFundsBatchAmuletPaymentRequests : Script ()
+testInsufficientFundsBatchAmuletPaymentRequests = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runAmuletDepositBots app
+  amulet <- tap app alice 42.0
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    dsoParty = app.dso
+    validatorParty = aliceValidator.primaryParty
+
+  transferRequest3 <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 10000.0 AmuletUnit)
+  transferRequest4 <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 3.0 AmuletUnit),
+      (alice.primaryParty, PaymentAmount 3.0 AmuletUnit)]
+  -- trying to fulfill the request for 10,000 Amulet will fail
+  context <- getPaymentTransferContext app alice
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
+    context
+
+  -- first command errors, second command is still executed
+  let [COO_Error _, COO_AcceptedAppPayment payment3Cid] = outcomes
+  Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
+
+  -- Only one command executed, so there's only one locked amulet
+  lockedAmulets <- query @LockedAmulet alice.primaryParty
+  let [(lockedAmuletCid4, lockedAmulet4)] = lockedAmulets
+
+  acceptedPayment4 === AcceptedAppPayment with
+    sender = alice.primaryParty
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 3.0),
+      (ReceiverAmuletAmount with receiver = alice.primaryParty, amuletAmount = 3.0)
+      ]
+    provider = provider1.primaryParty
+    dso = app.dso
+    lockedAmulet = lockedAmuletCid4
+    round = lockedAmulet4.amulet.amount.createdAt
+    reference = transferRequest4
+
+  pure ()
+
+
+-- Smoke test - this functionality is tested more extensively in the WalletIntegrationTests
+testCO_MergeTransferInputs : Script ()
+testCO_MergeTransferInputs = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  amulet <- tap app alice 42.0
+  amulet2 <- tap app alice 43.0
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    dsoParty = app.dso
+    validatorParty = aliceValidator.primaryParty
+
+
+  context <- getPaymentTransferContext app alice
+
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet, InputAmulet amulet2]
+    operations = [CO_MergeTransferInputs]
+    context
+
+  let [COO_MergeTransferInputs (Some resultAmulet)] = outcomes
+  aliceAmulets <- query @Amulet alice.primaryParty
+  let [_, (mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceAmulets
+  resultAmulet === mergedAmuletCid
+
+  pure ()
+
+
+-- Test to sanity check that buying member traffic works
+testBuyMemberTraffic : Script ()
+testBuyMemberTraffic = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+  (_, openRound) <- getLatestOpenRound app
+
+  now <- getTime
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
+  let decentralizedSynchronizerConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).decentralizedSynchronizer
+  let synchronizerId = decentralizedSynchronizerConfig.activeSynchronizer
+  let migrationId = 0
+  let testParticipantId = "alice_validator_participant_id"
+
+  -- Test that self top-ups work
+
+  -- set the validator up with some amulet and its own wallet install contract
+  submit aliceValidator.primaryParty $ createCmd $ WalletAppInstall with
+    endUserParty = aliceValidator.primaryParty
+    endUserName = "alice_validator_wallet_user"
+    dsoParty = app.dso
+    validatorParty = aliceValidator.primaryParty
+
+  -- create initial validator top-up state contract
+  topupStateCid <- submit aliceValidator.primaryParty $
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId synchronizerId)
+
+  -- test that buying less extra traffic than the configured min topup amount fails
+  let minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
+  outcome <- executeAmuletOperation app aliceValidator $
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
+  outcome === COO_Error (ITR_InsufficientTopupAmount (minTopupAmount-1) minTopupAmount)
+
+  -- test that providing an invalid decentralized synchronizer ID fails
+  let invalidSynchronizerId = synchronizerId <> "_invalid"
+  invalidTopupStateCid <- submit aliceValidator.primaryParty $
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidSynchronizerId)
+  outcome <- executeAmuletOperation app aliceValidator $
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidSynchronizerId migrationId (minutes 1) (Some invalidTopupStateCid)
+  outcome === COO_Error (ITR_UnknownSynchronizer invalidSynchronizerId)
+  submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
+
+  -- test that creating the initial traffic contract works
+  before <- query @Amulet aliceValidator.primaryParty
+  COO_BuyMemberTraffic trafficCid1 <- executeAmuletOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
+  after <- query @Amulet aliceValidator.primaryParty
+  before === after
+
+  -- validate the state of the member traffic contract
+  Some traffic1 <- queryContractId @MemberTraffic app.dso trafficCid1
+  (amuletSpent, usdSpent) <- calculateSynchronizerFees app minTopupAmount
+  traffic1.totalPurchased === minTopupAmount
+  traffic1.numPurchases === 1
+  traffic1.amuletSpent === amuletSpent
+  traffic1.usdSpent === usdSpent
+
+  -- validate that the topup state got updated
+  [(topupStateCid2, topupState2)] <- query @ValidatorTopUpState aliceValidator.primaryParty
+  topupStateCid2 =/= topupStateCid
+  topupState2.lastPurchasedAt === now
+
+  -- check that no app reward coupons were issued to aliceValidator
+  [] <- query @AppRewardCoupon app.dso
+
+  -- check that a single validator reward coupon was issued over the full purchase amount
+  [(_, coupon)] <- query @ValidatorRewardCoupon aliceValidator.primaryParty
+  coupon === ValidatorRewardCoupon with
+    dso = app.dso
+    round = Round 2
+    amount = amuletSpent
+    user = aliceValidator.primaryParty
+
+  -- topping up too soon fails
+  outcome <- executeAmuletOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2)
+  outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
+
+  -- once a minute has passed, the same topup succeeds
+  passTime (minutes 1)
+  COO_BuyMemberTraffic trafficCid2 <- executeAmuletOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2)
+  Some traffic2 <- queryContractId @MemberTraffic app.dso trafficCid2
+
+  -- check the app reward coupons once more
+  [] <- query @AppRewardCoupon app.dso
+
+  -- Test that third-party top-ups work
+
+  -- advance rounds to ensure that reward coupons issued have a different round number
+  runNextIssuance app
+  (_, openRound2) <- getLatestOpenRound app
+  openRound2.round.number === openRound.round.number + 1
+
+  -- create a wallet install contract and tap some amulets for provider1 validator
+  submit provider1Validator.primaryParty $ createCmd $ WalletAppInstall with
+    endUserParty = provider1Validator.primaryParty
+    endUserName = "provider1_validator_wallet_user"
+    dsoParty = app.dso
+    validatorParty = provider1Validator.primaryParty
+  _ <- tap app provider1Validator 10.0
+
+  -- provider1 purchases extra traffic for the same participant
+  COO_BuyMemberTraffic providerTrafficCid <- executeAmuletOperation app provider1Validator $
+    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId synchronizerId migrationId (minutes 1) None
+
+  -- validate the state of the member traffic contract
+  Some providerTraffic <- queryContractId @MemberTraffic app.dso providerTrafficCid
+  let totalPurchased = minTopupAmount + 1
+  (amuletSpent, usdSpent) <- calculateSynchronizerFees app totalPurchased
+  providerTraffic.totalPurchased === totalPurchased
+  providerTraffic.numPurchases === 1
+  providerTraffic.amuletSpent === amuletSpent
+  providerTraffic.usdSpent === usdSpent
+
+  -- check that the app reward coupons were issued to the provider
+  [] <- query @AppRewardCoupon provider1Validator.primaryParty
+
+  -- Test that top-ups by means of BuyTrafficRequest contracts work
+
+  -- advance rounds to ensure that reward coupons issued have a different round number
+  runNextIssuance app
+  (_, openRound3) <- getLatestOpenRound app
+  openRound3.round.number === openRound2.round.number + 1
+
+  -- create a wallet install contract and tap some amulets for provider2
+  provider2Install <- submitMulti [provider2.primaryParty, provider2Validator.primaryParty] [] $ createCmd $ WalletAppInstall with
+      endUserParty = provider2.primaryParty
+      endUserName = "provider2_wallet_user"
+      dsoParty = app.dso
+      validatorParty = provider2Validator.primaryParty
+  _ <- tap app provider2 10.0
+
+  let createTrafficRequest amount memberId synchronizerId trackingId expiresAt = do
+      result <- submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
+          exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
+            trafficAmount = amount
+            memberId = memberId
+            synchronizerId = synchronizerId
+            migrationId = 0
+            trackingId = trackingId
+            expiresAt = expiresAt
+      return result.buyTrafficRequest
+
+  now <- getTime
+  -- time-expired traffic requests cannot be completed or cancelled, only archived
+  request1 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request1" now
+  COO_Error (ITR_Other ("The requirement 'Contract has not expired' was not met.")) <- executeAmuletOperation app provider2 $
+    CO_CompleteBuyTrafficRequest request1
+  submitMustFail provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Cancel with reason = "not required"
+  result <- submit provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Expire
+  let trackingInfo = result.trackingInfo
+  trackingInfo.endUserParty === provider2.primaryParty
+  trackingInfo.trackingId === "request1"
+
+  -- unexpired traffic requests are completed successfully
+  request2 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request2" (now `addRelTime` minutes 1)
+  COO_CompleteBuyTrafficRequest (requestTrafficCid, trackingInfo) <- executeAmuletOperation app provider2 $
+    CO_CompleteBuyTrafficRequest request2
+  Some requestedTraffic <- queryContractId @MemberTraffic app.dso requestTrafficCid
+  requestedTraffic.totalPurchased === minTopupAmount
+  requestedTraffic.memberId === testParticipantId
+  requestedTraffic.synchronizerId === synchronizerId
+  trackingInfo.trackingId === "request2"
+  trackingInfo.endUserParty === provider2.primaryParty
+  -- check that no app reward coupons were issued to the provider
+  [] <- query @AppRewardCoupon provider2.primaryParty
+
+  -- check that traffic requests can be cancelled by the requester
+  request3 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request3" (now `addRelTime` minutes 1)
+  result <- submit provider2.primaryParty $
+    exerciseCmd request3 BuyTrafficRequest_Cancel with reason = "not required"
+  let trackingInfo = result.trackingInfo
+  trackingInfo.trackingId === "request3"
+  trackingInfo.endUserParty === provider2.primaryParty
+  None <- queryContractId @BuyTrafficRequest provider2.primaryParty request3
+
+  -- Merging traffic contracts
+
+  -- test that the SVs can merge multiple member traffic contracts
+  let trafficCids = [trafficCid1, trafficCid2, providerTrafficCid, requestTrafficCid]
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with trafficCids
+  [(mergedTrafficCid, mergedTraffic)] <- queryFilter @MemberTraffic app.dso (\t -> t.memberId == testParticipantId)
+  assert $ notElem mergedTrafficCid trafficCids
+  mergedTraffic.totalPurchased === 4 * minTopupAmount + 1
+  mergedTraffic.numPurchases === 4
+  mergedTraffic.usdSpent === traffic1.usdSpent + traffic2.usdSpent + providerTraffic.usdSpent + requestedTraffic.usdSpent
+  mergedTraffic.amuletSpent === traffic1.amuletSpent + traffic2.amuletSpent + providerTraffic.amuletSpent + requestedTraffic.amuletSpent
+
+  -- at least 1 contract must be provided to merge
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
+    trafficCids = []
+
+  pure ()
+
+
+testInsufficientFundsBatchSubscriptions : Script ()
+testInsufficientFundsBatchSubscriptions = script do
+  app <- setupApp
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    dsoParty = app.dso
+    validatorParty = validator
+
+  let payData = SubscriptionPayData with
+        paymentInterval = days 28
+        paymentDuration = days 1
+        paymentAmount = PaymentAmount 10.0 USDUnit
+
+  let subscriptionData = SubscriptionData with
+        sender = alice.primaryParty
+        receiver = pizzeria.primaryParty
+        provider = provider.primaryParty
+        dso = app.dso
+        description = "test subscription"
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  context <- getPaymentTransferContext app alice
+  amulet <- tap  app alice 5.0
+  -- TODO(#2957): remove read-as DSO party.
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+
+  amulet <- tap app alice 15.0
+  -- TODO(#2957): remove read-as DSO party.
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+  initialPaymentCid <- case outcomes of
+    [COO_SubscriptionInitialPayment cid] -> pure cid
+    _ -> abort $ "Expected initial subscription payment to succeed but got " <> show outcomes
+
+  (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  passTime (days 27)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  context <- getPaymentTransferContext app alice
+
+  amulet <- tap app alice 5.0
+  -- TODO(#2957): remove read-as DSO party.
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+
+  amulet <- tap app alice 15.0
+  -- TODO(#2957): remove read-as DSO party.
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputAmulet amulet]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  case outcomes of
+    [COO_SubscriptionPayment _] -> pure ()
+    _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
+  pure ()
+
+-- Utilities
+------------
+
+withError : CanAbort m => [AmuletOperationOutcome] -> (InvalidTransferReason -> m a) -> m a
+withError outcomes f = case outcomes of
+  [COO_Error e] -> f e
+  _ -> abort $ "Expected COO_Error but got " <> show outcomes
+
+executeAmuletOperation : AmuletApp -> AmuletUser -> AmuletOperation -> Script AmuletOperationOutcome
+executeAmuletOperation app user op = do
+  [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
+  context <- getPaymentTransferContext app user
+  amulets <- queryFilter @Amulet user.primaryParty (\amulet -> amulet.owner == user.primaryParty)
+  -- TODO(#2957): remove read-as DSO party.
+  result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.dso] $
+    exerciseCmd installCid WalletAppInstall_ExecuteBatch with
+      inputs = [InputAmulet amulet._1 | amulet <- amulets]
+      operations = [op]
+      context
+  let [outcome] = result.outcomes
+  pure outcome
+
+calculateSynchronizerFees : AmuletApp -> Int -> Script (Decimal, Decimal)
+calculateSynchronizerFees app trafficAmount = do
+  now <- getTime
+  [(_, amuletRules)] <- query @AmuletRules app.dso
+  let decentralizedSynchronizerConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).decentralizedSynchronizer
+  let extraTrafficPrice = decentralizedSynchronizerConfig.fees.extraTrafficPrice
+  (_, openRound) <- getLatestOpenRound app
+  let amuletPrice = openRound.amuletPrice
+  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
+  let trafficCostCc = trafficCostUsd / amuletPrice
+  pure (trafficCostCc, trafficCostUsd)

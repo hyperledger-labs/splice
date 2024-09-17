@@ -1,0 +1,7 @@
+# Extra patterns to ignore from the canton-standalone-disaster-recovery log file
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+Request failed for sequencer. Is the server running?
+SEQUENCER_SUBSCRIPTION_LOST
+
+Failed to acknowledge clean timestamp.*CANCELLED

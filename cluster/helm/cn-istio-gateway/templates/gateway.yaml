@@ -1,0 +1,95 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: cn-http-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: istio-ingress
+    istio: ingress
+  servers:
+  - hosts:
+    - "{{ (.Values.cluster).cantonHostname }}"
+    - "*.{{ (.Values.cluster).cantonHostname }}"
+    - "{{ (.Values.cluster).daHostname }}"
+    - "*.{{ (.Values.cluster).daHostname }}"
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).cantonHostname }}"
+    - "*.{{ (.Values.cluster).cantonHostname }}"
+    - "{{ (.Values.cluster).daHostname }}"
+    - "*.{{ (.Values.cluster).daHostname }}"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: cn-apps-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: istio-ingress
+    istio: ingress
+  servers:
+  - port:
+      number: 5108
+      name: grpc-swd-pub
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).cantonHostname }}"
+    - "{{ (.Values.cluster).daHostname }}"
+  {{- $domains := untilStep 0 (int .Values.cometbftPorts.domains) 1 -}}
+  {{- $synchronizerNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
+  {{- range $index, $domain := $domains }}
+  {{- range $index, $synchronizerNode := $synchronizerNodes }}
+  - port:
+      number: 26{{ $domain }}{{ $synchronizerNode }}6
+      name: cometbft-{{ $domain }}-{{ $synchronizerNode }}-gw
+      protocol: TCP
+    hosts:
+      # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+      - "*"
+  {{- end }}
+  {{- end }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: cn-public-http-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: istio-ingress-public
+    istio: ingress-public
+  servers:
+  - hosts:
+    - "public.{{ (.Values.cluster).hostname }}"
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "public.{{ (.Values.cluster).hostname }}"

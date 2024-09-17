@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": ["spliceInstanceNames", "migration", "persistence"],
+  "properties": {
+    "imageRepo": {
+      "type": "string"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "defaultJvmOptions": {
+      "type": "string"
+    },
+    "additionalJvmOptions": {
+      "type": "string"
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "null"]
+            },
+            "memory": {
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "null"]
+            },
+            "memory": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "enable": {
+          "type": "boolean"
+        },
+        "release": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$"
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "required": [
+        "databaseName",
+        "schema",
+        "host",
+        "port",
+        "user",
+        "secretName"
+      ],
+      "properties": {
+        "databaseName": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "user": {
+            "type": "string"
+          },
+          "secretName": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "description": "The migration id of the synchronizer"
+        }
+      }
+    },
+    "failOnAppVersionMismatch": {
+      "type": "boolean"
+    },
+    "cluster": {
+      "type": "object",
+      "properties": {
+        "fixedTokens": {
+          "type": "boolean"
+        }
+      }
+    },
+    "isFirstSv": {
+      "type": "boolean"
+    },
+    "participantAddress": {
+      "type": "string"
+    },
+    "sequencerAddress": {
+      "type": "string"
+    },
+    "livenessProbeInitialDelaySeconds": {
+      "type": "integer"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "enablePostgresMetrics": {
+      "type": "boolean"
+    },
+    "spliceInstanceNames": {
+      "type": "object",
+      "required": [
+        "networkName",
+        "networkFaviconUrl",
+        "amuletName",
+        "amuletNameAcronym",
+        "nameServiceName",
+        "nameServiceNameAcronym"
+      ],
+      "properties": {
+        "networkName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_ ]+$",
+          "description": "The name of the network as provided in the docs"
+        },
+        "networkFaviconUrl": {
+          "type": "string",
+          "pattern": "^http[s]?://.+$",
+          "description": "The URL for the favicon for the network as provided in the docs"
+        },
+        "amuletName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_ ]+$",
+          "description": "The name of Amulets on this network, as provided in the docs"
+        },
+        "amuletNameAcronym": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9]+$",
+          "description": "The acronym for the name of Amulets on this network, as provided in the docs"
+        },
+        "nameServiceName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_ ]+$",
+          "description": "The name of the Name Service on this network, as provided in the docs"
+        },
+        "nameServiceNameAcronym": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9]+$",
+          "description": "The acornum of the name of Name Service on this network, as provided in the docs"
+        }
+      }
+    }
+  }
+}

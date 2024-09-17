@@ -1,0 +1,127 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSynchronizerMigration where
+
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+import DA.List
+
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Schedule
+import Splice.Scripts.Util
+
+import Splice.CometBft
+import Splice.DsoRules
+import Splice.DSO.DecentralizedSynchronizer
+
+import Splice.Scripts.DsoTestUtils
+
+testSynchronizerMigration : Script ()
+testSynchronizerMigration = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+
+  -- SVs decides off-ledger to setup a second synchronizer
+  let newSynchronizerId = "new-synchronizer-id"
+  executeDsoRulesConfigChange app $ \config ->
+    let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
+        newSynchronizerConfig = SynchronizerConfig with
+          state = DS_Bootstrapping
+          cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+          acsCommitmentReconciliationInterval = Some 1800
+        newDecentralizedSynchronizerConfig = decentralizedSynchronizerConfig with
+          synchronizers = Map.insert newSynchronizerId newSynchronizerConfig decentralizedSynchronizerConfig.synchronizers
+          lastSynchronizerId = newSynchronizerId
+    in  config with
+          decentralizedSynchronizer = newDecentralizedSynchronizerConfig
+  now <- getTime
+  -- SV's onboard their nodes and make them known
+  forA_ svs $ \sv -> do
+    setSynchronizerNodeConfig app sv newSynchronizerId $ SynchronizerNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = Some SequencerConfig with
+        migrationId = 0
+        sequencerId = "sequencer-id-" <> partyToText sv
+        url = "sequencer.address:1234"
+        availableAfter = Some now
+      mediator = Some MediatorConfig with
+        mediatorId = "mediator-id-" <> partyToText sv
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
+      legacySequencerConfig = None
+
+  -- SVs mark the synchronizer as operational
+  executeDsoRulesConfigChange app $ \config ->
+    let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
+        newSynchronizerConfig = SynchronizerConfig with
+          state = DS_Operational
+          cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+          acsCommitmentReconciliationInterval = Some 1800
+        newDecentralizedSynchronizerConfig = decentralizedSynchronizerConfig with
+          synchronizers = Map.insert newSynchronizerId newSynchronizerConfig decentralizedSynchronizerConfig.synchronizers
+          lastSynchronizerId = newSynchronizerId
+    in  config with
+          decentralizedSynchronizer = newDecentralizedSynchronizerConfig
+
+  -- once the SVs are confident about the working of the new synchronizer they announce it to their users
+  -- choosing a 30 day headroom until the active synchronizer switches.
+  now <- getTime
+  executeAddAmuletConfigSchedule app $ \configSchedule ->
+    let config = configSchedule.initialValue
+        decentralizedSynchronizerConfig = config.decentralizedSynchronizer
+        newSynchronizerId = "decentralized-synchronizer-id-1"
+        newDecentralizedSynchronizerConfigAnnounce = decentralizedSynchronizerConfig with
+          requiredSynchronizers = Set.insert newSynchronizerId decentralizedSynchronizerConfig.requiredSynchronizers
+        newDecentralizedSynchronizerConfigSwitched = newDecentralizedSynchronizerConfigAnnounce with
+          activeSynchronizer = newSynchronizerId
+    in  Schedule with
+          initialValue = config
+          futureValues = [
+            (addRelTime now (days 30), config with decentralizedSynchronizer = newDecentralizedSynchronizerConfigSwitched
+            )]
+
+  -- At this point we expect the validator apps to start connecting to the newly announced synchronizer,
+  -- and create synchronizer connectivity proof contracts
+  -- TODO(#4894): create synchronizer connectivity proof contracts
+
+
+  -- Once the SV's are confident enough that the switch is not leaving too many users behind they
+  -- can change the switching date.
+
+
+
+  passTime (days 30)
+
+  -- The new synchronizer becomes active, which implies that:
+  -- 1. The SV apps change the synchronizer topology information to allow transferring all of its contracts.
+  --    (once synchronizers support transfer permissions)
+  -- 2. The stakeholders of Amulet and DSO governance contracts transfer them to the new active synchronizer.
+  pure ()
+
+executeDsoRulesConfigChange : AmuletApp -> (DsoRulesConfig -> DsoRulesConfig) -> Script ()
+executeDsoRulesConfigChange app updateConfig = do
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  let newConfig = updateConfig dsoRules.config
+  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+    ARC_DsoRules with
+      dsoAction = SRARC_SetConfig DsoRules_SetConfig with newConfig
+
+
+executeAddAmuletConfigSchedule
+  : AmuletApp -> (Schedule Time (AmuletConfig USD) -> Schedule Time (AmuletConfig USD)) -> Script ()
+executeAddAmuletConfigSchedule app updateConfig = do
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  [(_, amuletRules)] <- query @AmuletRules app.dso
+  let newSchedule = updateConfig amuletRules.configSchedule
+  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
+        newScheduleItem = head newSchedule.futureValues

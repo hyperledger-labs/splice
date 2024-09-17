@@ -1,0 +1,48 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+{{- $fullP2pHostName := include "prefix" (list .Values "cometbft-p2p") }}
+{{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
+{{- with .Values.node }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullP2pHostName }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    name: {{ $fullP2pHostName }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .p2pPort }}
+      targetPort: {{ .p2pPort }}
+      protocol: TCP
+      name: cometbft-p2p
+  selector:
+    app: {{ $.Values.node.identifier }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullRpcHostName }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    name: {{ $fullRpcHostName }}
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .rpcPort }}
+      targetPort: {{ .rpcPort }}
+      protocol: TCP
+      name: cometbft-rpc
+    - port: 26660
+      protocol: TCP
+      name: cometbft-metrics
+  selector:
+    app: {{ $.Values.node.identifier }}
+{{- end }}

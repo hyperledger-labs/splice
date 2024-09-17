@@ -1,0 +1,368 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $validatorAppLabel := "validator-app" }}
+{{- $requiresMigrationPvc := and (not .Values.svValidator) (.Values.migration.attachPvc) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $validatorAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $validatorAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $validatorAppLabel }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $validatorAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
+    spec:
+      containers:
+      - name: validator-app
+        image: "{{ .Values.imageRepo }}/validator-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).validator_app) }}"
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+        - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
+          value: {{ .Values.participantAddress | quote }}
+        {{ if .Values.appDars -}}
+        - name: CN_APP_DARS
+          value: {{ .Values.appDars | toJson | quote }}
+        {{ end }}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- range $ii, $user := .Values.additionalUsers }}
+        - name: {{ $user.name }}
+          {{ if $user.value }}
+          value: {{ $user.value }}
+          {{ end }}
+          {{ if $user.valueFrom }}
+          valueFrom: {{ $user.valueFrom | toYaml | nindent 12 }}
+          {{ end }}
+        {{- end }}
+        {{ if .Values.additionalConfig -}}
+        - name: ADDITIONAL_CONFIG_OTHER
+          value: {{- .Values.additionalConfig | toYaml | indent 12 }}
+        {{ end }}
+        {{ if .Values.svSponsorAddress -}}
+        - name: CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS
+          value: {{ .Values.svSponsorAddress | quote }}
+        {{ if .Values.onboardingSecretFrom -}}
+        - name: CN_APP_VALIDATOR_ONBOARDING_SECRET
+          valueFrom: {{ .Values.onboardingSecretFrom | toYaml | nindent 12 }}
+        {{ else -}}
+        # Onboarding without specifying a secret only works in devnet
+        - name: CN_APP_DEVNET
+          value: "1"
+        {{ end -}}
+        {{ else -}}
+        # Validator has either already been onboarded or
+        # is a supervalidator’s validator that does not need this.
+        - name: ADDITIONAL_CONFIG_NO_ONBOARDING
+          value: |
+            canton.validator-apps.validator_backend.onboarding = null
+        {{ end -}}
+        - name: CN_APP_VALIDATOR_SCAN_ADDRESS
+          value: {{ .Values.scanAddress | quote }}
+        {{ if .Values.validatorWalletUser }}
+        - name: CN_APP_VALIDATOR_WALLET_USER_NAME
+          value: {{ .Values.validatorWalletUser }}
+        {{ end }}
+        {{ if .Values.validatorPartyHint }}
+        - name: CN_APP_VALIDATOR_PARTY_HINT
+          value: {{ .Values.validatorPartyHint }}
+        {{ end }}
+        {{ if (.Values.auth).audience }}
+        - name: CN_APP_VALIDATOR_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        {{ end }}
+        {{ if (.Values.auth).jwksUrl }}
+        - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl | quote }}
+        {{ end }}
+        {{ if .Values.svValidator }}
+        - name: CN_APP_VALIDATOR_SV_VALIDATOR
+          value: "true"
+        {{- include "cn-util-lib.auth0-user-env-var" (dict "appName" "sv" "keyName" "sv") | indent 8}}
+        - name: ADDITIONAL_CONFIG_TRUST_SINGLE_SCAN
+          value: |
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
+        {{ else if .Values.nonSvValidatorTrustSingleScan | default false -}}
+        - name: ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN
+          value: |
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
+        {{ else -}}
+        - name: ADDITIONAL_CONFIG_BFT_SCAN
+          value: |
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
+        {{ end }}
+        {{ if not .Values.useSequencerConnectionsFromScan }}
+        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
+        {{ end }}
+        {{- range $ii, $domain := .Values.extraDomains }}
+        - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
+          value: |
+            canton.validator-apps.validator_backend.domains.extra.{{ $ii }} = {
+              alias = {{ $domain.alias | quote }}
+              url = {{ $domain.url | quote }}
+            }
+        {{- end }}
+        {{- if (.Values.topup).enabled }}
+        - name: ADDITIONAL_CONFIG_TOPUPS
+          value: |
+            canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
+            canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
+        {{- if (.Values.topup).reservedTraffic }}
+            canton.validator-apps.validator_backend.domains.global.reserved-traffic = {{ (.Values.topup).reservedTraffic }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.validator-apps.validator_backend.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = "{{ .databaseName }}"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = ${CN_APP_POSTGRES_PASSWORD}
+                }
+              }
+            }
+        - name: CN_APP_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.persistence.secretName }}
+              key: postgresPassword
+        {{- end }}
+        {{- with .Values.participantIdentitiesDumpPeriodicBackup }}
+        - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_PERIODIC_BACKUP
+          value: |
+            canton.validator-apps.validator_backend.participant-identities-backup = {
+              location {
+                type = gcp
+                bucket {
+                  project-id = {{ .location.bucket.projectId }}
+                  bucket-name = {{ .location.bucket.bucketName }}
+                  credentials {
+                    type = service-account
+                    json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                  }
+                }
+                prefix = {{ .location.prefix | quote }}
+              }
+              backup-interval = {{ .backupInterval }}
+            }
+        - name: CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              key: "json-credentials"
+              name: {{ .location.bucket.secretName }}
+        {{- end }}
+        {{- with .Values.participantIdentitiesDumpImport }}
+        - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_IDENTITIES_DUMP_IMPORT
+          value: |
+            canton.validator-apps.validator_backend.participant-bootstrapping-dump {
+              type = file
+              file = /participant-bootstrapping-dump/content
+              {{ if .newParticipantIdentifier }} new-participant-identifier = {{ .newParticipantIdentifier | quote }} {{ end }}
+            }
+        {{- end }}
+        {{- if  .Values.migrateValidatorParty }}
+        - name: ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY
+          value: |
+            canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = ${_scan.admin-api.address}
+        {{- end }}
+        - name: ADDITIONAL_CONFIG_MIGRATION_ID
+          value: |
+            canton.validator-apps.validator_backend {
+              domain-migration-id = {{ .Values.migration.id }}
+            }
+        {{- if and .Values.migration.migrating (not .Values.svValidator) }}
+        - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
+          value: |
+            canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
+        {{- end }}
+        {{- if and (not .Values.migration.migrating) (not .Values.svValidator) }}
+        - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
+          value: |
+            canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
+        - name: ADDITIONAL_CONFIG_ENABLE_WALLET
+          value: |
+            canton.validator-apps.validator_backend.enable-wallet = {{ .Values.enableWallet | quote }}
+        {{- end }}
+        {{- if .Values.walletSweep }}
+        - name: ADDITIONAL_CONFIG_WALLET_SWEEP
+          value: |
+            canton.validator-apps.validator_backend.wallet-sweep {
+              {{- range $k, $v := .Values.walletSweep }}
+              {{ $k | quote }} {
+                max-balance-usd = {{ $v.maxBalanceUSD }}
+                min-balance-usd = {{ $v.minBalanceUSD }}
+                receiver = {{ $v.receiver | quote }}
+              }
+              {{- end }}
+            }
+        {{- end }}
+        {{- if .Values.autoAcceptTransfers }}
+        - name: ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS
+          value: |
+            canton.validator-apps.validator_backend.auto-accept-transfers {
+              {{- range $k, $v := .Values.autoAcceptTransfers }}
+              {{ $k | quote }} {
+                from-parties = {{ $v.fromParties | toJson }}
+              }
+              {{- end }}
+            }
+        {{- end }}
+        {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
+        - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
+          value: |
+            canton.validator-apps.validator_backend.ingest-update-history-from-participant-begin = false
+        {{ end }}
+        - name: FAIL_ON_APP_VERSION_MISMATCH
+          value: {{ .Values.failOnAppVersionMismatch | quote }}
+        {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "cn-util-lib.log-level" .Values | indent 8}}
+        - name: CN_APP_CONTACT_POINT
+          value: {{ .Values.contactPoint | default "" | quote }}
+        - name: CN_APP_VALIDATOR_PARTICIPANT_IDENTIFIER
+          value: {{ .Values.nodeIdentifier | quote }}
+        ports:
+        - containerPort: 5003
+          name: val-http
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /api/validator/livez
+            port: 5003
+          initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 60 }}
+          periodSeconds: 60
+          failureThreshold: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/validator/readyz
+            port: 5003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 5
+          timeoutSeconds: 3
+        {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
+        volumeMounts:
+        {{- with .Values.participantIdentitiesDumpImport }}
+          - name: participant-bootstrapping-dump-volume
+            mountPath: /participant-bootstrapping-dump
+            readOnly: true
+        {{- end }}
+        {{- if $requiresMigrationPvc }}
+          - name: domain-upgrade-dump-volume
+            mountPath: /domain-upgrade-dump
+        {{- end }}
+        {{- end }}
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.persistence.host }} -p {{ .Values.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
+      volumes:
+      {{- with .Values.participantIdentitiesDumpImport }}
+        - name: participant-bootstrapping-dump-volume
+          secret:
+            secretName: {{ .secretName }}
+      {{- end }}
+      {{- if $requiresMigrationPvc }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            claimName: "domain-migration-validator-pvc"
+      {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $validatorAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $validatorAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: {{ $validatorAppLabel }}
+  ports:
+  - name: val-http
+    port: 5003
+    protocol: TCP
+  - name: metrics
+    port: 10013
+{{- if $requiresMigrationPvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "domain-migration-validator-pvc"
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $validatorAppLabel }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10G
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "cn-util-lib.postgres-metrics" (dict "persistence" .Values.persistence "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
+{{- end}}

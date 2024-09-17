@@ -1,0 +1,116 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package com.daml.ledger.api.v2;
+
+import "com/daml/ledger/api/v2/value.proto";
+
+option csharp_namespace = "Com.Daml.Ledger.Api.V2";
+option java_outer_classname = "TransactionFilterOuterClass";
+option java_package = "com.daml.ledger.api.v2";
+
+// The union of a set of template filters, interface filters, or a wildcard.
+message Filters {
+  // Every filter in the cumulative list expands the scope of the resulting stream. Each interface,
+  // template or wildcard filter means additional events that will match the query.
+  // The impact of include_interface_view and include_created_event_blob fields in the filters will
+  // also be accumulated.
+  // At least one cumulative filter MUST be specified.
+  // A template or an interface SHOULD NOT appear twice in the accumulative field.
+  // A wildcard filter SHOULD NOT be defined more than once in the accumulative field.
+  // Optional
+  repeated CumulativeFilter cumulative = 1;
+}
+
+// A filter that matches all contracts that are either an instance of one of
+// the ``template_filters`` or that match one of the ``interface_filters``.
+message CumulativeFilter {
+  oneof identifier_filter {
+    // A wildcard filter that matches all templates
+    // Optional
+    WildcardFilter wildcard_filter = 1;
+
+    // Include an ``InterfaceView`` for every ``InterfaceFilter`` matching a contract.
+    // The ``InterfaceFilter`` instances MUST each use a unique ``interface_id``.
+    // Optional
+    InterfaceFilter interface_filter = 2;
+
+    // A template for which the data will be included in the
+    // ``create_arguments`` of a matching ``CreatedEvent``.
+    // If a contract is simultaneously selected by a template filter and one or more interface filters,
+    // the corresponding ``include_created_event_blob`` are consolidated using an OR operation.
+    // Optional
+    TemplateFilter template_filter = 3;
+  }
+}
+
+// This filter matches all templates.
+message WildcardFilter {
+  // Whether to include a ``created_event_blob`` in the returned ``CreatedEvent``.
+  // Use this to access the contract create event payload in your API client
+  // for submitting it as a disclosed contract with future commands.
+  // Optional
+  bool include_created_event_blob = 1;
+}
+
+// This filter matches contracts that implement a specific interface.
+message InterfaceFilter {
+  // The interface that a matching contract must implement.
+  // The ``interface_id`` needs to be valid: corresponding interface should be defined in
+  // one of the available packages at the time of the query.
+  // Required
+  Identifier interface_id = 1;
+
+  // Whether to include the interface view on the contract in the returned ``CreatedEvent``.
+  // Use this to access contract data in a uniform manner in your API client.
+  // Optional
+  bool include_interface_view = 2;
+
+  // Whether to include a ``created_event_blob`` in the returned ``CreatedEvent``.
+  // Use this to access the contract create event payload in your API client
+  // for submitting it as a disclosed contract with future commands.
+  // Optional
+  bool include_created_event_blob = 3;
+}
+
+// This filter matches contracts of a specific template.
+message TemplateFilter {
+  // A template for which the payload should be included in the response.
+  // The ``template_id`` needs to be valid: corresponding template should be defined in
+  // one of the available packages at the time of the query.
+  // Required
+  Identifier template_id = 1;
+
+  // Whether to include a ``created_event_blob`` in the returned ``CreatedEvent``.
+  // Use this to access the contract event payload in your API client
+  // for submitting it as a disclosed contract with future commands.
+  // Optional
+  bool include_created_event_blob = 2;
+}
+
+// A filter both for filtering create and archive events as well as for
+// filtering transaction trees.
+message TransactionFilter {
+  // Each key must be a valid PartyIdString (as described in ``value.proto``).
+  // The interpretation of the filter depends on the stream being filtered:
+  // (1) For **transaction tree streams** all party keys used as wildcard filters, and all subtrees
+  //     whose root has one of the listed parties as an informee are returned.
+  //     If there are ``CumulativeFilter``s, those will control returned ``CreatedEvent`` fields where applicable, but will
+  //     not be used for template/interface filtering.
+  // (2) For **transaction and active-contract-set streams** create and archive events are returned for all contracts whose
+  //    stakeholders include at least one of the listed parties and match the
+  //    per-party filter.
+  // Required
+  map<string, Filters> filters_by_party = 1;
+
+  // Wildcard filters that apply to all the parties existing on the participant. The interpretation of the filters is the same
+  // with the per-party filter as described above.
+  // (1) For **transaction tree streams** all subtrees are returned.
+  //     If there are ``CumulativeFilter``s, those will control returned ``CreatedEvent`` fields where applicable, but not
+  //     used for template/interface filtering.
+  // (2) For **transaction and active-contract-set streams** create and archive events are returned for all contracts whose
+  //    stakeholders include at least one of the participant's parties and match the filter.
+  Filters filters_for_any_party = 2;
+}

@@ -1,0 +1,69 @@
+{
+  "name": "ans-frontend",
+  "version": "0.1.0",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "dependencies": {
+    "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
+    "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "5.11.9",
+    "@mui/lab": "^5.0.0-alpha.93",
+    "@mui/material": "^5.14.10",
+    "@tanstack/react-query": "4.29.5",
+    "oidc-client-ts": "2.2.1",
+    "openapi-ts-client": "file:../openapi-ts-client/dist",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-helmet-async": "^2.0.5",
+    "react-oidc-context": "2.2.2",
+    "use-debounce": "^9.0.4",
+    "uuid": "9.0.0",
+    "web-vitals": "2.1.4"
+  },
+  "devDependencies": {
+    "@tanstack/eslint-plugin-query": "4.29.4",
+    "@tanstack/react-query-devtools": "4.29.6",
+    "@testing-library/jest-dom": "5.16.5",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.4.3",
+    "@trivago/prettier-plugin-sort-imports": "4.0.0",
+    "@types/jest": "29.2.0",
+    "@types/node": "18.11.0",
+    "@types/react": "18.0.28",
+    "@types/react-dom": "18.0.11",
+    "@types/uuid": "8.3.4",
+    "@vitejs/plugin-react": "^4.0.4",
+    "common-test-utils": "^0.1.0",
+    "happy-dom": "^11.0.0",
+    "prettier": "2.8.4",
+    "typescript": "4.9.5",
+    "vite": "^5.4.2",
+    "vite-tsconfig-paths": "^4.2.1"
+  },
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "check": "npm run format:check && npm run lint:check",
+    "fix": "npm run format:fix && npm run lint:fix",
+    "format:check": "prettier --check -- src",
+    "format:fix": "prettier --write -- src",
+    "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
+    "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
+    "type:check": "tsc --noEmit",
+    "start": "vite --force",
+    "test": "PORT=0 vitest",
+    "test:sbt": "PORT=0 vitest --run"
+  }
+}

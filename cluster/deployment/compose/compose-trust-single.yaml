@@ -1,0 +1,11 @@
+services:
+  validator:
+    environment:
+      - ADDITIONAL_CONFIG_BFT_SCAN=
+      - |
+        ADDITIONAL_CONFIG_TRUST_SINGLE_SCAN=
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = "${SCAN_ADDRESS}"
+      - |
+        ADDITIONAL_CONFIG_TRUST_SINGLE_SEQUENCER=
+            canton.validator-apps.validator_backend.domains.global.url = "${SEQUENCER_ADDRESS}"
