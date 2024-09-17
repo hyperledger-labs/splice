@@ -21,7 +21,9 @@ class DockerComposeValidatorPreflightIntegrationTest
 
   "docker-compose based validator works against the deployed cluster" in { implicit env =>
     // Assumes a docker network `onvpn` exists, and is connected to the VPN
-    val ret = Seq("build-tools/splice-compose.sh", "start", "-d", "-n", "onvpn", "-w").!
+    val partyHint = "da-composeValidator-1"
+    val ret =
+      Seq("build-tools/splice-compose.sh", "start", "-d", "-n", "onvpn", "-w", "-p", partyHint).!
     if (ret != 0) {
       fail("Failed to start docker-compose validator")
     }
@@ -33,7 +35,7 @@ class DockerComposeValidatorPreflightIntegrationTest
           login(80, "administrator", "wallet.localhost"),
         )(
           "administrator is already onboarded",
-          _ => seleniumText(find(id("logged-in-user"))) should startWith("da-composeValidator-1"),
+          _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
         tapAmulets(123.4)
       }

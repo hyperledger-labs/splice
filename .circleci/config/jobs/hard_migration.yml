@@ -292,7 +292,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             # TODO(#14646): once we deploy from base_version we can remove the -t parameter
-            build-tools/splice-compose.sh start -d -w -n onvpn -t $(cat /tmp/base-version)
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t $(cat /tmp/base-version)
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run pre-migration steps, and wait for a migration dump to be available
@@ -375,9 +375,9 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             if [ -z "<< parameters.upgrade_version >>" ]; then
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1"
             else
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -t << parameters.upgrade_version >>
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1" -t << parameters.upgrade_version >>
             fi
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:

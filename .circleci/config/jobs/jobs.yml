@@ -868,7 +868,7 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            build-tools/splice-compose.sh start -d -w -n onvpn
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:
           name: Store logs
