@@ -174,16 +174,24 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
         }
         // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
         // so for now we go for an ad-hoc logic here.
-        decodedCantonError.exists { err =>
+        val shouldRetry = decodedCantonError.exists { err =>
           err.code match {
             case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true
             case _ => err.isRetryable
           }
         }
+
+        logger.debug(
+          s"Got canton error $decodedCantonError from command $command. Retrying: $shouldRetry"
+        )(tc)
+
+        shouldRetry
       }
 
-      testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
-      testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
+      step("Updating retry policy") {
+        testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
+        testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
+      }
 
       step("Running plugins after") {
         Timed.value(
