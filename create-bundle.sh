@@ -52,6 +52,7 @@ mkdir -p "$RELEASE_DIR"/lib "$RELEASE_DIR"/bin
 
 cp -v "$JARFILE" "$RELEASE_DIR"/lib
 
+"${REPO_ROOT}/build-tools/get-snapshot-version" > "$RELEASE_DIR"/VERSION
 
 shift # shift JARFILE argument out-of-scope
 MAIN_CLASS=$1
@@ -83,7 +84,7 @@ do
             echo "skipping empty $arg"
           else
             echo "copying content from $arg"
-            cp -r "$arg"/* "$RELEASE_DIR"
+            cp -r "$arg"/. "$RELEASE_DIR"
           fi
         else
           echo "copying file $arg"
@@ -111,7 +112,7 @@ do
           if [[ ! -e $target ]]; then
               mkdir -p "$target"
           fi
-          cp -vr "$rename"/* "$target"
+          cp -vr "$rename"/. "$target"
       else
           target_dir=$(dirname "$target")
           if [[ ! -e $target_dir ]]; then

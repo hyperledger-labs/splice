@@ -157,9 +157,16 @@ else
   export PARTICIPANT_IDENTIFIER=${party_hint}
 fi
 
-# TODO(#14303): release tag should be injected by the release pipeline
-# IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
-# export IMAGE_TAG
+if [ -z "${IMAGE_TAG:-}" ]; then
+  if [ ! -f "${script_dir}/../VERSION" ]; then
+    _error_msg "Could not derive image tags automatically, ${script_dir}/../VERSION is missing. Please make sure that file exists, or export an image tag in IMAGE_TAG"
+    exit 1
+  else
+    IMAGE_TAG=$(cat "${script_dir}/../VERSION")
+    _info "Using version ${IMAGE_TAG}"
+    export IMAGE_TAG
+  fi
+fi
 
 if [ -z "${SPLICE_INSTANCE_NAMES:-}" ]; then
   splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
