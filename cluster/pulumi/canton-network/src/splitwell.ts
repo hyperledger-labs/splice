@@ -58,7 +58,6 @@ export async function installSplitwell(
     decentralizedSynchronizerMigrationConfig,
     xns,
     sharedPostgres,
-    participantBootstrapDump,
     'splitwell',
     auth0Client.getCfg(),
     undefined,
@@ -82,7 +81,7 @@ export async function installSplitwell(
         id: decentralizedSynchronizerMigrationConfig.active.migrationId,
       },
       scanAddress: scanAddress,
-      participantHost: participant.name,
+      participantHost: participant.participantAddress,
       persistence: {
         host: swPostgres.address,
         databaseName: pulumi.Output.create(splitwellDbName),
@@ -94,7 +93,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
     defaultVersion,
-    { dependsOn: dependsOn.concat([participant]) }
+    { dependsOn: dependsOn }
   );
 
   const validatorPostgres =
@@ -108,7 +107,7 @@ export async function installSplitwell(
   const validator = await installValidatorApp({
     xns,
     extraDependsOn,
-    dependencies: [participant],
+    dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
@@ -126,7 +125,7 @@ export async function installSplitwell(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     participantBootstrapDump,
-    participantAddress: participant.name,
+    participantAddress: participant.participantAddress,
     topupConfig: topupConfig,
     svValidator: false,
     persistenceConfig: {

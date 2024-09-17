@@ -71,20 +71,19 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig,
     xns,
     defaultPostgres,
-    participantBootstrapDump,
     'validator1',
     auth0Client.getCfg(),
     undefined,
     dependsOn.concat([loopback])
   );
 
-  const extraDependsOn: pulumi.Resource[] = dependsOn.concat([participant, validatorPostgres]);
+  const extraDependsOn: pulumi.Resource[] = dependsOn.concat([validatorPostgres]);
   const scanAddress = `http://scan-app.sv-1:5012`;
 
   const validator = await installValidatorApp({
     validatorWalletUser,
     xns,
-    dependencies: [participant],
+    dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     appDars: [splitwellDarPath],
     // TODO(#14199) Remove this with the next reset
@@ -105,7 +104,7 @@ export async function installValidator1(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
     participantBootstrapDump,
-    participantAddress: participant.name,
+    participantAddress: participant.participantAddress,
     topupConfig,
     svValidator: false,
     scanAddress,

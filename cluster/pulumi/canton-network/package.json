@@ -9,6 +9,7 @@
     "auth0": "^3.4.0",
     "splice-pulumi-common": "1.0.0",
     "splice-pulumi-common-sv": "1.0.0",
+    "splice-pulumi-common-validator": "1.0.0",
     "@google-cloud/storage": "^6.11.0"
   },
   "scripts": {

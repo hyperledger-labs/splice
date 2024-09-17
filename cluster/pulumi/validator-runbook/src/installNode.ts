@@ -1,50 +1,50 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as random from '@pulumi/random';
 import _ from 'lodash';
 import {
   Auth0Client,
+  auth0UserNameEnvVarSource,
   BackupConfig,
   ChartValues,
+  CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
+  clusterSmallDisk,
   CnInput,
   cnsUiSecret,
+  config,
+  daContactPoint,
+  DecentralizedSynchronizerMigrationConfig,
+  defaultVersion,
   exactNamespace,
   ExactNamespace,
   fixedTokens,
-  DecentralizedSynchronizerMigrationConfig,
   imagePullSecret,
   imagePullSecretByNamespaceName,
+  installLoopback,
   installSpliceRunbookHelmChart,
   installSpliceRunbookHelmChartByNamespaceName,
-  installLoopback,
-  installPostgresPasswordSecret,
   installValidatorOnboardingSecret,
-  loadYamlFromFile,
-  REPO_ROOT,
-  CLUSTER_BASENAME,
-  CLUSTER_HOSTNAME,
-  setupBootstrapping,
-  validatorSecrets,
   isDevNet,
-  ValidatorTopupConfig,
-  nonSvValidatorTopupConfig,
+  loadYamlFromFile,
   nonDevNetNonSvValidatorTopupConfig,
-  defaultVersion,
+  nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
-  config,
   preApproveValidatorRunbook,
-  clusterSmallDisk,
-  daContactPoint,
+  REPO_ROOT,
+  setupBootstrapping,
   spliceInstanceNames,
-  autoInitValues,
+  validatorSecrets,
+  ValidatorTopupConfig,
 } from 'splice-pulumi-common';
+import { installParticipant } from 'splice-pulumi-common-validator';
+import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import {
-  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-  VALIDATOR_PARTY_HINT,
   VALIDATOR_MIGRATE_PARTY,
+  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
   VALIDATOR_NEW_PARTICIPANT_ID,
+  VALIDATOR_PARTY_HINT,
 } from './utils';
 
 type BootstrapCliConfig = {
@@ -91,13 +91,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
-  const password = new random.RandomPassword(`${xns.logicalName}-postgres-passwd`, {
-    length: 16,
-    overrideSpecial: '_%@',
-    special: true,
-  }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
-
   const validator = await installValidator({
     xns,
     onboardingSecret,
@@ -108,7 +101,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfigSecret,
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
-    otherDeps: [passwordSecret],
+    otherDeps: [],
     nodeIdentifier: 'validator-runbook',
   });
 
@@ -152,9 +145,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
-    imagePullDeps,
-    otherDeps,
     loopback,
+    imagePullDeps,
     backupConfigSecret,
     backupConfig,
     topupConfig,
@@ -166,54 +158,31 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
     ),
-    { db: { volumeSize: postgresPvcSizeOverride || (clusterSmallDisk ? '240Gi' : undefined) } }
+    { db: { volumeSize: postgresPvcSizeOverride } }
   );
-  const postgres = installSpliceRunbookHelmChart(
+  const postgres = new SplicePostgres(
     xns,
     'postgres',
-    'cn-postgres',
+    // can be removed once base version > 0.2.1
+    `postgres`,
+    'postgres-secrets',
     postgresValues,
-    defaultVersion,
-    {
-      dependsOn: otherDeps,
-    }
+    true
   );
-
-  const participantValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-    }),
-    ...loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-      { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
-    ),
-    metrics: {
-      enable: true,
-    },
-  };
-
-  const participantValuesWithSpecifiedAud: ChartValues = {
-    ...participantValues,
-    auth: {
-      ...participantValues.auth,
-      targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
-    },
-    persistence: {
-      ...participantValues.persistence,
-      postgresName: 'postgres',
-    },
-    enablePostgresMetrics: true,
-    ...autoInitValues('cn-participant', defaultVersion, validatorConfig.nodeIdentifier),
-  };
-
-  const participant = installSpliceRunbookHelmChart(
+  const participantAddress = installParticipant(
+    decentralizedSynchronizerMigrationConfig,
+    decentralizedSynchronizerMigrationConfig.active.migrationId,
     xns,
-    'participant',
-    'cn-participant',
-    participantValuesWithSpecifiedAud,
+    auth0Client.getCfg(),
+    validatorConfig.nodeIdentifier,
+    auth0UserNameEnvVarSource('validator'),
     defaultVersion,
-    { dependsOn: imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : []) }
-  );
+    postgres,
+    undefined,
+    {
+      dependsOn: [postgres],
+    }
+  ).participantAddress;
 
   const fixedTokensValue: ChartValues = {
     cluster: {
@@ -265,6 +234,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     metrics: {
       enable: true,
     },
+    participantAddress,
     participantIdentitiesDumpPeriodicBackup: backupConfig,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
     validatorPartyHint: VALIDATOR_PARTY_HINT || 'digitalasset-testValidator-1',
@@ -319,7 +289,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
-    .concat([participant])
+    .concat(loopback ? [loopback] : [])
     .concat([validatorAppSecret, validatorUISecret])
     .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])

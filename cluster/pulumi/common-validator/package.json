@@ -1,14 +1,9 @@
 {
-  "name": "validator-runbook",
+  "name": "splice-pulumi-common-validator",
+  "version": "1.0.0",
   "main": "src/index.ts",
-  "devDependencies": {
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
-  },
   "dependencies": {
-    "splice-pulumi-common": "1.0.0",
-    "splice-pulumi-common-validator": "1.0.0",
-    "@pulumi/random": "4.14.0"
+    "splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -17,7 +12,6 @@
     "format:fix": "prettier --write -- src",
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
-    "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "lint:check": "eslint --max-warnings=0 -- src"
   }
 }
