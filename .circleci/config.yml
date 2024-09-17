@@ -2596,10 +2596,11 @@ jobs:
           steps:
             - cancel_entire_workflow_if_this_job_failed
 
-  # TODO(#14303): Consider using backup&restore to split this job into two separate jobs,
-  # so that we make the dependencies such that the migration depends on onboarding of the
-  # validator to complete. At the moment, it's quick enough compared to the other things
-  # running in parallel that it doesn't seem to be a problem.
+  # This job spins up a validator, and then waits until migration has been initiated and a
+  # migration dump has been created. Ideally, we'd split it into two jobs, so that triggering
+  # the migration depends on the validator being up, but that would add more complexity to the
+  # workflow, so instead we're just relying on the docker-compose validator being much faster
+  # to spin up than other things that are happening in parallel.
   pre_migration_compose_validator:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -3607,7 +3608,7 @@ jobs:
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
 
-  # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
+  # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
   #               it succeeds.
   deploy_arm_compose_validator:

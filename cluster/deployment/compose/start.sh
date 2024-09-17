@@ -198,11 +198,12 @@ if [ $migrating -eq 1 ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-migrate.yaml")
 fi
 if [ -n "${network_name}" ]; then
-  # TODO(#14303): we take a network_name argument, but the name "onvpn" is hardcoded in the compose-onvpn-network.yaml file.
-  # I don't think there's a way to parameterize it, so we should either auto-generate that, or at least parse it and confirm that
-  # it declares the same name as the network_name argument.
-  extra_compose_files+=("-f" "${script_dir}/compose-onvpn-network.yaml")
   export DOCKER_NETWORK="${network_name}"
+  if ! docker compose -f compose.yaml -f compose-onvpn-network.yaml config -q 2>/dev/null; then
+    _error_msg "When using a custom network name, please edit compose-onvpn-network.yaml to use that name instead of 'onvpn'"
+    exit 1
+  fi
+  extra_compose_files+=("-f" "${script_dir}/compose-onvpn-network.yaml")
 fi
 if [ -n "${restore_identities_dump}" ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-restore-from-id.yaml")

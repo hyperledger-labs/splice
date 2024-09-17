@@ -830,7 +830,7 @@ jobs:
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
 
-  # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
+  # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
   #               it succeeds.
   deploy_arm_compose_validator:
