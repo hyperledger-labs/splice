@@ -6,6 +6,8 @@ import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironme
 import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.BaseTest
 
+import scala.concurrent.duration.FiniteDuration
+
 trait TriggerTestUtil { self: BaseTest =>
 
   /** Enable/Disable triggers before executing a code block
@@ -30,8 +32,10 @@ trait TriggerTestUtil { self: BaseTest =>
     sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
-  def advanceRoundsByOneTickViaAutomation(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    eventually() {
+  def advanceRoundsByOneTickViaAutomation(
+      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    eventually(timeUntilSuccess) {
       advanceOpenMiningRoundTrigger.runOnce().futureValue should be(true)
     }
   }

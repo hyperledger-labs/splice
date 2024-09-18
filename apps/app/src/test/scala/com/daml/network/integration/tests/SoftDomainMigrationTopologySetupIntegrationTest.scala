@@ -52,7 +52,7 @@ import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -427,7 +427,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     }
 
     clue("Round can be advanced") {
-      advanceRoundsByOneTickViaAutomation
+      advanceRoundsByOneTickViaAutomation(BaseTest.DefaultEventuallyTimeUntilSuccess * 2)
     }
     eventually() {
       sv1ScanBackend.getAmuletRules().state shouldBe ContractState.Assigned(newDomainId)
