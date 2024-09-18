@@ -181,6 +181,13 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     undefined,
     {
       dependsOn: [postgres],
+      // aliases and ignore can be removed once base version > 0.2.1
+      aliases: [
+        {
+          name: 'participant',
+        },
+      ],
+      ignoreChanges: ['name'],
     }
   ).participantAddress;
 
