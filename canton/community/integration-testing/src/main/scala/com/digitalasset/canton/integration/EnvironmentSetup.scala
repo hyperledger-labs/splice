@@ -175,9 +175,15 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
         // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
         // so for now we go for an ad-hoc logic here.
         val shouldRetry = decodedCantonError.exists { err =>
-          err.code match {
-            case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true
-            case _ => err.isRetryable
+          // Ideally we'd `case CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown => true`
+          // but unfortunately `error.decodedCantonError` appears to wrap it in a `GenericErrorCode`, so the match doesn't work.
+          // We also cannot pattern match on GenericErrorCode because it's a private class.
+          if (
+            err.code.id == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.id && err.code.category == CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown.category
+          ) {
+            true
+          } else {
+            err.isRetryable
           }
         }
 
