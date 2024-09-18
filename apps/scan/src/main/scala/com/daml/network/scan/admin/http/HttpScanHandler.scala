@@ -30,7 +30,13 @@ import com.daml.network.http.v0.definitions.{
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.{
+  AcsSnapshotStore,
+  ScanHistoryBackfilling,
+  ScanStore,
+  SortOrder,
+  TxLogEntry,
+}
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -677,8 +683,29 @@ class HttpScanHandler(
       updateHistory
         .getUpdates(
           afterO,
+          includeImportUpdates = false,
           PageLimit.tryCreate(request.pageSize),
         )
+        .flatMap { txs =>
+          // TODO(#14076: replace this with a better check for whether this scan instance has replicated all data)
+          if (
+            afterO.isEmpty && txs.headOption.exists(u =>
+              !ScanHistoryBackfilling
+                .isFoundingTransactionTreeUpdate(u.update, store.key.dsoParty.toProtoPrimitive)
+            )
+          ) {
+            logger.debug(s"Expected founding transaction, found ${txs.headOption}")
+            Future.failed(
+              Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"This scan instance has not yet replicated all data. Wait before retrying, or connect to a different scan instance."
+                )
+                .asRuntimeException()
+            )
+          } else {
+            Future.successful(txs)
+          }
+        }
         .map { txs =>
           {
             val lossless = request.lossless.getOrElse(false)

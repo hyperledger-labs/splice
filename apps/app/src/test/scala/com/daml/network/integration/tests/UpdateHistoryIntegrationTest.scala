@@ -1,51 +1,22 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.console.{
-  ParticipantClientReference,
-  ScanAppBackendReference,
-  ScanAppClientReference,
-}
 import com.daml.network.environment.EnvironmentImpl
-import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import com.daml.network.environment.ledger.api.{
-  LedgerClient,
-  Reassignment,
-  ReassignmentUpdate,
-  TransactionTreeUpdate,
-}
-import com.daml.network.http.v0.definitions
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.scan.admin.http.LosslessScanHttpEncodings
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.store.{
-  PageLimit,
-  TreeUpdateWithMigrationId,
-  UpdateHistory,
-  UpdateHistoryTestBase,
-}
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
-  AssignedWrapper,
-  TransactionTreeWrapper,
-  UnassignedWrapper,
-}
-import com.digitalasset.canton.topology.DomainId
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
 
@@ -57,7 +28,7 @@ class UpdateHistoryIntegrationTest
     with TimeTestUtil
     with HasActorSystem
     with HasExecutionContext
-    with UpdateHistoryComparator {
+    with UpdateHistoryTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
@@ -246,109 +217,4 @@ class UpdateHistoryIntegrationTest
     }
   }
 
-  private def compareHistoryViaLosslessScanApi(
-      scanBackend: ScanAppBackendReference,
-      scanClient: ScanAppClientReference,
-  ) = {
-    val historyFromStore = scanBackend.appState.store.updateHistory
-      .getUpdates(
-        None,
-        PageLimit.tryCreate(1000),
-      )
-      .futureValue
-    val historyThroughApi = scanClient
-      .getUpdateHistory(
-        1000,
-        None,
-        true,
-      )
-      .map {
-        case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(http) =>
-          LosslessScanHttpEncodings.httpToLapiTransaction(http)
-        case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(_) =>
-          // TODO(#14067): Support decoding reasssignments, and test this also in the soft migration test where we actually have them
-          fail("Unexpected reassignment")
-      }
-
-    val historyFromStoreWithoutLostData = historyFromStore.map {
-      case TreeUpdateWithMigrationId(update, migrationId) =>
-        TreeUpdateWithMigrationId(
-          UpdateHistoryTestBase.withoutLostData(update, forBackfill = true),
-          migrationId,
-        )
-    }
-
-    historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
-  }
-
-  private def compareHistory(
-      participant: ParticipantClientReference,
-      updateHistory: UpdateHistory,
-      ledgerBegin: ParticipantOffset,
-      mustIncludeReassignments: Boolean = false,
-  ): Assertion = {
-    val ledgerEnd = participant.ledger_api.state.end()
-
-    val actualUpdates = participant.ledger_api.updates
-      .trees(
-        partyIds = Set(updateHistory.updateStreamParty),
-        completeAfter = Int.MaxValue,
-        beginOffset = ledgerBegin,
-        endOffset = Some(ledgerEnd),
-        verbose = false,
-      )
-      .map {
-        case TransactionTreeWrapper(protoTree) =>
-          LedgerClient.GetTreeUpdatesResponse(
-            TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
-            DomainId.tryFromString(protoTree.domainId),
-          )
-        case UnassignedWrapper(protoReassignment, protoUnassignEvent) =>
-          GetTreeUpdatesResponse(
-            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
-            DomainId.tryFromString(protoUnassignEvent.source),
-          )
-        case AssignedWrapper(protoReassignment, protoAssignEvent) =>
-          GetTreeUpdatesResponse(
-            ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
-            DomainId.tryFromString(protoAssignEvent.target),
-          )
-      }
-
-    val recordedUpdates = updateHistory
-      .getUpdates(
-        Some(
-          (
-            0L,
-            // Note that we deliberately do not start from ledger begin here since the ledgerBeginSv1 variable above
-            // only points at the end after initialization.
-            actualUpdates.head.update.recordTime
-              .minusMillis(1L), // include the first element, as otherwise it's excluded
-          )
-        ),
-        PageLimit.tryCreate(actualUpdates.size),
-      )
-      .futureValue
-
-    if (mustIncludeReassignments) {
-      recordedUpdates.filter(_.update match {
-        case LedgerClient
-              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Assign)), _) =>
-          true
-        case _ => false
-      }) should not be empty
-      recordedUpdates.filter(_.update match {
-        case LedgerClient
-              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Unassign)), _) =>
-          true
-        case _ => false
-      }) should not be empty
-    }
-
-    // Note: UpdateHistory does not preserve all information in updates,
-    // so remove fields that are not preserved before comparing.
-    val actualUpdatesWithoutLostData = actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_))
-    val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
-    actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
-  }
 }

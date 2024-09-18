@@ -29,7 +29,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       migrationId: Long = migration1,
   ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
     store
-      .getUpdates(None, PageLimit.tryCreate(1000))
+      .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
       .map(_.filter(_.migrationId == migrationId).map(_.update))
   }
 
@@ -123,10 +123,10 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               domain1,
             )
           )
-          updates.map(withoutLostData(_)) should contain theSameElementsInOrderAs expectedUpdates
-            .map(
-              withoutLostData(_)
-            )
+          val actualWithoutLostData = updates.map(withoutLostData(_, mode = LostInStoreIngestion))
+          val expectedWithoutLostData =
+            expectedUpdates.map(withoutLostData(_, mode = LostInStoreIngestion))
+          actualWithoutLostData should contain theSameElementsInOrderAs expectedWithoutLostData
         }
       }
 
@@ -397,6 +397,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                 after.map { case (migrationId, recordTime) =>
                   (migrationId, CantonTimestamp.assertFromInstant(recordTime))
                 },
+                includeImportUpdates = true,
                 PageLimit.tryCreate(1),
               )
               .futureValue
@@ -444,8 +445,16 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             },
             maxCount = updates.size,
           )
-          all <- storeMigrationId1.getUpdates(None, PageLimit.tryCreate(1000))
-          all2 <- storeMigrationId2.getUpdates(None, PageLimit.tryCreate(1000))
+          all <- storeMigrationId1.getUpdates(
+            None,
+            includeImportUpdates = true,
+            PageLimit.tryCreate(1000),
+          )
+          all2 <- storeMigrationId2.getUpdates(
+            None,
+            includeImportUpdates = true,
+            PageLimit.tryCreate(1000),
+          )
         } yield {
           // It doesn't matter through which store we query since the migration id only matters for ingestion
           all shouldBe all2

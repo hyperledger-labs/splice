@@ -26,11 +26,14 @@ Upcoming
 
   * Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
     splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
+  * Modified ``getUpdateHistory`` Scan API to exclude updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
+    Additionally, the ``getUpdateHistory`` endpoint now also fails on scans that did not yet replicate history from before their SV node joined the network.
 
 * Sequencer
 
   * Fix a bug that prevented initialization during a hard domain migration if there was a proposal in the topology state
     on the old migration id.
+
 
 0.2.0
 -----

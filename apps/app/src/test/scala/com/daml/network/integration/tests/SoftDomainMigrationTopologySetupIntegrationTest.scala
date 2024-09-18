@@ -43,7 +43,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   SplitwellTestUtil,
   TriggerTestUtil,
-  UpdateHistoryComparator,
+  UpdateHistoryTestUtil,
   WalletTestUtil,
 }
 import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
@@ -75,7 +75,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil
     with WalletTestUtil
-    with UpdateHistoryComparator {
+    with UpdateHistoryTestUtil {
 
   // Does not currently handle multiple synchronizers.
   override def runUpdateHistorySanityCheck = false
