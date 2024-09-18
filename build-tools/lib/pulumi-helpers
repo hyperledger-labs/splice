@@ -64,7 +64,8 @@ function _cluster_reset() {
       pids+=($!)
     }
 
-    bg_down_stack canton-network
+    _pulumi_automation_run_down &
+    pids+=($!)
     bg_down_stack multi-validator
     bg_down_stack sv-runbook
     bg_down_stack validator-runbook
@@ -158,5 +159,21 @@ function _cluster_apply() {
     _info "Applying Pulumi Stack"
 
     subcmd_install_data_export_bucket_key
-    subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
+    _pulumi_automation_run_up
+}
+
+function _pulumi_automation_run_up() {
+   if [ $# -eq 1 ]; then
+      npm --prefix "${REPO_ROOT}/cluster/pulumi/$1" run up
+    else
+      npm --prefix "${REPO_ROOT}/cluster/pulumi" run up
+   fi
+}
+
+function _pulumi_automation_run_down() {
+   if [ $# -eq 1 ]; then
+      npm --prefix "${REPO_ROOT}/cluster/pulumi/$1" run down
+    else
+      npm --prefix "${REPO_ROOT}/cluster/pulumi" run down
+   fi
 }

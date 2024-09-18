@@ -1,0 +1,118 @@
+# -*- shell-script -*-
+
+subcommand_whitelist[hard_domain_migration_prepare]='Prepare a hard domain migration'
+
+function subcmd_hard_domain_migration_prepare() {
+
+  _prompt_to_confirm
+  _cluster_must_exist
+
+  if [ "$#" -gt 0 ]; then
+    if ! _contained "$1" "all" "core" "sv"; then
+      _error "Usage: $0 hard_domain_migration_prepare [all|core|sv] [active_version] [upgrade_version] [pulumi-args...]"
+    fi
+    scope="$1"
+    shift
+  else
+    scope="all"
+  fi
+
+  # You can substitute `local` for any of those versions to use the locally built charts
+  if [ "$#" -gt 0 ]; then
+    # the default, active version
+    export CHARTS_VERSION="$1"
+    shift
+  fi
+  if [ "$#" -gt 0 ]; then
+    # the version of the new pods
+    export GLOBAL_DOMAIN_UPGRADE_VERSION="$1"
+    shift
+  fi
+
+  # this ensures we redeploy the pods on the old domain during the prepare step already
+  # so the actual migrate step does not have to redeploy them and is therefore faster.
+  export DISABLE_COMETBFT_STATE_SYNC="true"
+
+  # Throttle SV1's CometBFT block processing during the migration (see #13868)
+  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
+
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_PROVIDER=external
+
+  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
+   _pulumi_automation_run_up
+   subcmd_pulumi_up_canton
+  fi
+
+  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
+    subcmd_pulumi sv-runbook up "$@"
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_up_canton
+  fi
+}
+
+subcommand_whitelist[hard_domain_migration_trigger]='Propose a (nearly immediate) hard domain migration start and vote with SVs 1-4'
+
+function subcmd_hard_domain_migration_trigger() {
+  _prompt_to_confirm
+  _cluster_must_exist
+
+  subcmd_preflight_global_domain_upgrade
+}
+
+subcommand_whitelist[hard_domain_migration_migrate]='Complete a hard domain migration'
+
+function subcmd_hard_domain_migration_migrate() {
+  _prompt_to_confirm
+  _cluster_must_exist
+
+  if [ "$#" -gt 0 ]; then
+    if ! _contained "$1" "all" "core" "sv" "validator"; then
+      _error "Usage: $0 hard_domain_migration_migrate [all|core|sv|validator] [legacy_version] [active_version] [pulumi-args...]"
+    fi
+    scope="$1"
+    shift
+  else
+    scope="all"
+  fi
+
+  # You can substitute `local` for any of those versions to use the locally built charts
+  if [ "$#" -gt 0 ]; then
+    # the version of the old Canton and CometBFT pods
+    export GLOBAL_DOMAIN_LEGACY_VERSION="$1"
+    shift
+  fi
+  if [ "$#" -gt 0 ]; then
+    # the new default, active version
+    export CHARTS_VERSION="$1"
+    shift
+  fi
+
+  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_PROVIDER=external
+  export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
+  export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
+  # Throttle SV1's CometBFT block processing during the migration (see #13868)
+  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
+
+  # pulumi will show a preview and ask us to confirm each deployment step
+
+  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
+    subcmd_pulumi canton-network up "$@"
+    subcmd_pulumi_up_canton
+    # We need to redeploy infra to update the `/version` endpoint
+    subcmd_pulumi infra up "$@"
+  fi
+
+  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
+    export SPLICE_DEPLOY_SV_RUNBOOK=true
+    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
+    subcmd_pulumi_up_canton
+    subcmd_pulumi sv-runbook up "$@"
+  fi
+
+  if [ "$scope" == "all" ] || [ "$scope" == "validator" ]; then
+    subcmd_pulumi validator-runbook up "$@"
+  fi
+}

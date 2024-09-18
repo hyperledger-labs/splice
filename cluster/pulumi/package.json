@@ -20,7 +20,9 @@
         "format:fix": "npm run format:fix --workspaces --if-present",
         "format:check": "npm run format:check --workspaces --if-present",
         "lint:fix": "npm run lint:fix --workspaces --if-present",
-        "lint:check": "npm run lint:check --workspaces --if-present"
+        "lint:check": "npm run lint:check --workspaces --if-present",
+        "up": "ts-node ./pulumiUp.ts",
+        "down": "ts-node ./pulumiDown.ts"
     },
     "workspaces": [
         "common",

@@ -135,7 +135,7 @@ function subcmd_apply() {
         else
             _info "Skipping infra deployment"
         fi
-        subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
+        _pulumi_automation_run_up
     fi
 }
 
@@ -187,7 +187,7 @@ function subcmd_pdown() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi canton-network down --yes --skip-preview
+    _pulumi_automation_run_down
 }
 
 ###
@@ -542,7 +542,7 @@ subcommand_whitelist[pulumi_down_canton]="Preview the changes for the sv-canton 
 function subcmd_pulumi_down_canton() {
   _info "Resetting sv-canton stacks"
   export SPLICE_DEPLOY_SV_RUNBOOK=true
-  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run down
+  _pulumi_automation_run_down "sv-canton"
 }
 
 ###
@@ -550,5 +550,5 @@ subcommand_whitelist[pulumi_up_canton]="Up the sv-canton migrations"
 
 function subcmd_pulumi_up_canton() {
   _info "Updating sv-canton stacks"
-  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run up
+  _pulumi_automation_run_up "sv-canton"
 }
