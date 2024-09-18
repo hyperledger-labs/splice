@@ -1,0 +1,169 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.TransferOffer where
+
+import DA.Text
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Util
+import Splice.Wallet.Payment
+
+data TransferOffer_AcceptResult = TransferOffer_AcceptResult with
+  acceptedTransferOffer : ContractId AcceptedTransferOffer
+
+data TransferOffer_RejectResult = TransferOffer_RejectResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+data TransferOffer_WithdrawResult = TransferOffer_WithdrawResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+data TransferOffer_ExpireResult = TransferOffer_ExpireResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+data AcceptedTransferOffer_WithdrawResult = AcceptedTransferOffer_WithdrawResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+data AcceptedTransferOffer_AbortResult = AcceptedTransferOffer_AbortResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+data AcceptedTransferOffer_ExpireResult = AcceptedTransferOffer_ExpireResult with
+  trackingInfo : TransferOfferTrackingInfo
+
+
+template TransferOffer
+  with
+    sender : Party
+    receiver : Party
+    dso : Party
+    amount : PaymentAmount
+    description : Text
+    expiresAt : Time
+    trackingId : Text -- used to deduplicate requests and query for the status
+  where
+    signatory sender
+    observer receiver
+    ensure (DA.Text.length description < 280)
+
+    choice TransferOffer_Accept : TransferOffer_AcceptResult
+      with
+        controller receiver
+      do
+        now <- getTime
+        require "Offer has not expired" (now < expiresAt)
+        acceptedTransferOffer <- create AcceptedTransferOffer with ..
+        return TransferOffer_AcceptResult with ..
+
+    choice TransferOffer_Reject : TransferOffer_RejectResult
+      with
+      controller receiver
+      do
+        pure TransferOffer_RejectResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
+
+    choice TransferOffer_Withdraw : TransferOffer_WithdrawResult
+      with
+        reason : Text
+      controller sender
+      do
+        pure TransferOffer_WithdrawResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
+
+    -- these expire choices make a clearer transaction tree than reusing withdraw to expire the contracts
+    -- we're not using the ExpiringContract interface because that one returns (), and we need the TrackingInfo
+    choice TransferOffer_Expire : TransferOffer_ExpireResult
+      with
+        actor : Party
+      controller actor
+      do
+        now <- getTime
+        require "Contract has expired" (this.expiresAt <= now)
+        require "Actor is a stakeholder" (actor `elem` stakeholder this)
+        pure TransferOffer_ExpireResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
+
+-- all the fields here are needed for the UserWalletTxLogParser
+data TransferOfferTrackingInfo = TransferOfferTrackingInfo {
+  trackingId : Text; -- used to deduplicate requests and query for the status
+  sender : Party; -- used in UserWalletTxLogParser's filterByParty
+  receiver : Party -- used in UserWalletTxLogParser's filterByParty
+} deriving (Eq, Show)
+
+data AcceptedTransferOffer_CompleteResult = AcceptedTransferOffer_CompleteResult with
+  transferResult: TransferResult
+  trackingInfo : TransferOfferTrackingInfo
+  senderChangeAmulet : Optional (ContractId Amulet)
+
+
+
+template AcceptedTransferOffer
+  with
+    sender : Party
+    receiver : Party
+    dso : Party
+    amount : PaymentAmount
+    expiresAt : Time
+    trackingId : Text
+  where
+    signatory sender, receiver
+
+    choice AcceptedTransferOffer_Complete : AcceptedTransferOffer_CompleteResult
+      with
+        inputs : [TransferInput]
+        transferContext : PaymentTransferContext
+        walletProvider : Party
+      controller sender, walletProvider
+      do
+        now <- getTime
+        require "Offer has not expired" (now < expiresAt)
+        contextRound <- exercise @OpenMiningRound transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
+        amuletAmount <- paymentAmountToAmulet dso contextRound amount
+        let
+          transfer = Transfer with
+            sender
+            -- The sender's wallet provider gets the app rewards
+            provider = walletProvider
+            inputs = inputs
+            outputs =
+              [ TransferOutput with
+                  receiver
+                  amount = amuletAmount
+                  lock = None
+                  receiverFeeRatio = 0.0
+              ]
+        result <- exercisePaymentTransfer transferContext transfer
+        pure AcceptedTransferOffer_CompleteResult with
+          transferResult = result
+          trackingInfo = TransferOfferTrackingInfo { .. }
+          senderChangeAmulet = result.senderChangeAmulet
+
+    choice AcceptedTransferOffer_Withdraw : AcceptedTransferOffer_WithdrawResult
+      with
+        reason : Text
+      controller receiver
+      do
+        pure AcceptedTransferOffer_WithdrawResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
+
+    choice AcceptedTransferOffer_Abort : AcceptedTransferOffer_AbortResult
+      with
+        reason : Text
+      controller sender
+      do
+        pure AcceptedTransferOffer_AbortResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
+
+    -- these expire choices make a clearer transaction tree than reusing withdraw to expire the contracts
+    -- we're not using the ExpiringContract interface because that one returns (), and we need the TrackingInfo
+    choice AcceptedTransferOffer_Expire : AcceptedTransferOffer_ExpireResult
+      with
+        actor : Party
+      controller actor
+      do
+        now <- getTime
+        require "Contract has expired" (this.expiresAt <= now)
+        require "Actor is a stakeholder" (actor `elem` stakeholder this)
+        pure AcceptedTransferOffer_ExpireResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }

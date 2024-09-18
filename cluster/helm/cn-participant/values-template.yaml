@@ -1,0 +1,48 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+enableHealthProbes: true
+
+# -- Annotations for the participant pod
+pod:
+  annotations: {}
+
+defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8
+resources:
+  limits:
+    cpu: "4"
+    memory: 32Gi
+  requests:
+    cpu: "1"
+    memory: 16Gi
+
+auth:
+  jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+  targetAudience: "https://canton.network.global"
+
+participantAdminUserNameFrom:
+  secretKeyRef:
+    key: ledger-api-user
+    name: splice-app-sv-ledger-api-auth
+    optional: false
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
+persistence:
+  secretName: "postgres-secrets"
+  databaseName: cantonnet_participant
+  port: 5432
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:

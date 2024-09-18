@@ -1,0 +1,37 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
+
+{{ $_ := required ".Values.nodeName is required." .Values.nodeName }}
+
+{{ $_ := required ".Values.sv1.nodeId is required." (.Values.sv1).nodeId }}
+{{ $_ := required ".Values.sv1.publicKey is required." (.Values.sv1).publicKey }}
+{{ $_ := required ".Values.sv1.externalAddress is required." (.Values.sv1).externalAddress }}
+{{ $_ := required ".Values.sv1.keyAddress is required." (.Values.sv1).keyAddress }}
+
+{{ $_ := required ".Values.node.id is required." (.Values.node).id }}
+{{ $_ := required ".Values.node.p2pPort is required." (.Values.node).p2pPort }}
+{{ $_ := required ".Values.node.rpcPort is required." (.Values.node).rpcPort }}
+{{ $_ := required ".Values.node.identifier is required." (.Values.node).identifier }}
+{{ $_ := required ".Values.node.externalAddress is required." (.Values.node).externalAddress }}
+
+{{ if not .Values.node.keysSecret  }}
+{{ $_ := required ".Values.node.privateKey is required." (.Values.node).privateKey }}
+{{ $_ := required ".Values.node.validator.privateKey is required." ((.Values.node).validator).privateKey }}
+{{ $_ := required ".Values.node.validator.keyAddress is required." ((.Values.node).validator).keyAddress }}
+{{ $_ := required ".Values.node.validator.publicKey is required." ((.Values.node).validator).publicKey }}
+{{- end}}
+
+{{ $_ := required ".Values.genesis.chainId is required." (.Values.genesis).chainId }}
+{{ $_ := required ".Values.db.volumeSize is required." (.Values.db).volumeSize }}
+{{ $_ := required ".Values.db.volumeStorageClass is required." (.Values.db).volumeStorageClass }}
+
+{{- if (.Values.istioVirtualService).enabled }}
+{{ $_ := required "(.Values.istioVirtualService).port is required." (.Values.istioVirtualService).port }}
+{{ $_ := required "(.Values.istioVirtualService).gateway is required." (.Values.istioVirtualService).gateway }}
+{{- end}}
+
+{{- if (.Values.stateSync).enable }}
+{{ $_ := required "(.Values.stateSync).rpcServers is required." (.Values.stateSync).rpcServers }}
+{{- end}}

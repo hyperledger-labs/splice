@@ -1,0 +1,36 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $ingressName := (.Values.cluster).svIngressName | default (.Values.cluster).svNamespace }}
+{{ if .Values.ingress.splitwell }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: splitwell-runbook-{{ (.Values.cluster).svNamespace }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "splitwell.{{ $ingressName }}.{{ (.Values.cluster).hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+          uri:
+            prefix: "/api/json-api/"
+      route:
+        - destination:
+            port:
+              number: 7575
+            host: participant-{{ ((.Values.ingress).decentralizedSynchronizer).activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+      rewrite:
+        uri: "/"
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 80
+            host: splitwell-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+---
+{{- end }}

@@ -1,0 +1,158 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: {{ .Release.Name }}
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_domain) }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+        - name: CANTON_DOMAIN_POSTGRES_SERVER
+          value: {{ .Values.sequencer.persistence.host }}
+        - name: CANTON_DOMAIN_POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: {{ .Values.sequencer.persistence.secretName }}
+              key: postgresPassword
+        {{- if .Values.sequencer.persistence.databaseName }}
+        - name: CANTON_SEQUENCER_POSTGRES_DB
+          value: {{ .Values.sequencer.persistence.databaseName }}
+        {{- end }}
+        {{- if .Values.mediator.persistence.databaseName }}
+        - name: CANTON_MEDIATOR_POSTGRES_DB
+          value: {{ .Values.mediator.persistence.databaseName }}
+        {{- end }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5008
+          name: cd-pub-api
+          protocol: TCP
+        - containerPort: 5009
+          name: cd-adm-api
+          protocol: TCP
+        - containerPort: 10013
+          name: cd-metrics
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+        startupProbe:
+          failureThreshold: 20
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+      restartPolicy: Always
+      initContainers:
+        - name: {{ .Release.Name }}-init-sequencer
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.sequencer.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} -p {{ .Values.sequencer.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+        - name: {{ .Release.Name }}-init-mediator
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.mediator.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} -p {{ .Values.mediator.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.mediator.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.mediator.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+  - name: cd-pub-api
+    port: 5008
+    protocol: TCP
+  - name: cd-adm-api
+    port: 5009
+    protocol: TCP
+  - name: cm-adm-api
+    port: 5007
+    protocol: TCP
+  - name: cd-metrics
+    port: 10013
+    protocol: TCP

@@ -1,0 +1,31 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $validatorAppLabel := "validator-app" }}
+{{- if .Values.metrics.enable }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+    migration: {{ .Values.migration.id | quote }}
+  name: {{ "validator" }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      app: {{ $validatorAppLabel }}
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+  targetLabels:
+    - migration
+
+{{- end }}

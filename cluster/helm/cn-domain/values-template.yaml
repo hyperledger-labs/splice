@@ -1,0 +1,36 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+# -- Annotations for the domain pods
+pod:
+  annotations: {}
+
+defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8
+resources:
+  limits:
+    cpu: "2"
+    memory: 8Gi
+  requests:
+    cpu: "1"
+    memory: 4Gi
+
+mediator:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"
+
+sequencer:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:

@@ -1,0 +1,376 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletRulesTransfer where
+
+import DA.Assert
+import DA.List
+import DA.Time
+import qualified DA.Map as Map
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Fees
+import Splice.Scripts.Parameters
+import Splice.Scripts.Util
+
+testUsageFees: Script ()
+testUsageFees = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+  now <- getTime
+
+  let amulet1Amount = 33.0
+      amulet2Amount = 33.0
+      amulet3Amount = 34.0
+
+  let outputAmount1 = 59.80
+      outputAmount2 = 10.0
+      outputAmount3 = 20.0
+
+  amulet1 <- tap app alice amulet1Amount
+  amulet2 <- tap app alice amulet2Amount
+  amulet3 <- tap app alice amulet3Amount
+
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet1, amulet2, amulet3]
+      outputs = [ TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                  -- test locking a amulet with no lock-holder
+                , TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = Some TimeLock with
+                      expiresAt = addRelTime now (days 2)
+                      holders = []
+                -- normal receiver amulet
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.4
+                    amount = outputAmount2
+                    lock = None
+                  -- test locking a amulet owned by a non-sender party
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.75
+                    amount = outputAmount3
+                    lock = Some TimeLock with
+                      expiresAt = addRelTime now (days 2)
+                      holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
+
+                ]
+    context = context.context
+
+  let config = scaleFees 1.0 defaultTransferConfig
+      expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
+      expectedSenderTransferFee = expectedTransferFee * 0.6
+      expectedReceiverTransferFee = expectedTransferFee * 0.4
+      expectedLockFee3 =
+        config.createFee.fee + chargeSteppedRate config.transferFee outputAmount3 +
+        config.lockHolderFee.fee -- only one lock fee is charged, as bob is the owner and thus already a controller of the unlock choice
+      expectedSenderLockFee3 = expectedLockFee3 * (1.0 - 0.75)
+      expectedLockFee1 = config.createFee.fee
+      inputAmuletHoldingFees = config.holdingFee.rate * 3.0 -- there are 3 input amulets
+      outputAmuletHoldingFees = config.holdingFee.rate * 4.0  -- there are 4 input amulets
+      outputFees = [config.createFee.fee, expectedLockFee1, expectedTransferFee, expectedLockFee3]
+      senderChangeFee =
+        100.0 - inputAmuletHoldingFees - outputAmount1 - outputAmount2 - outputAmount2 - outputAmount3
+        - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
+        - expectedSenderLockFee3
+
+  let ignoreBalanceChanges = transferResult.summary with balanceChanges = Map.empty
+
+  ignoreBalanceChanges === TransferSummary with
+    inputAppRewardAmount = 0.0
+    inputValidatorRewardAmount = 0.0
+    inputValidatorFaucetAmount = Some 0.0
+    inputSvRewardAmount = 0.0
+    inputAmuletAmount = 100.0
+    balanceChanges = Map.empty
+    holdingFees = inputAmuletHoldingFees
+    outputFees
+    senderChangeFee
+    senderChangeAmount = 0.0
+    amuletPrice = 1.0
+
+  let totalBalanceChange = sum $ Map.values transferResult.summary.balanceChanges
+
+  totalBalanceChange.changeToHoldingFeesRate  === outputAmuletHoldingFees - inputAmuletHoldingFees
+  assertMsg "Partial sender change fee"
+    (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
+
+  aliceAmulets <- query @Amulet alice.primaryParty
+  bobAmulets <- query @Amulet bob.primaryParty
+  sort (map (\(_, c) -> c.amount.initialAmount) aliceAmulets) === [1.0, outputAmount1]
+  sort (map (\(_, c) -> c.amount.initialAmount) bobAmulets) === [1.0, outputAmount2 - expectedReceiverTransferFee]
+
+  [(_, lockedAmulet)] <- query @LockedAmulet bob.primaryParty
+  lockedAmulet.amulet.owner === bob.primaryParty
+  lockedAmulet.amulet.amount.initialAmount === outputAmount3 - expectedLockFee3 * 0.75
+  lockedAmulet.lock.holders === [alice.primaryParty]
+  return ()
+
+testAmuletUsedInRoundBeforeItsCreation: Script ()
+testAmuletUsedInRoundBeforeItsCreation = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  amuletRound2Cid <- tap app alice 100.0
+  Some amuletRound2 <- queryContractId @Amulet alice.primaryParty amuletRound2Cid
+
+  openRoundsSorted <- getOpenRoundsSorted app
+  let (round1Cid, round1) = head openRoundsSorted
+      contextWithRound1 = context with context = context.context with openMiningRound = round1Cid
+
+  -- The input amulet is created in round 2
+  -- OpenMiningRound 1 will be used in the context
+  amuletRound2.amount.createdAt.number === 2
+  round1.round.number === 1
+
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputAmulet amuletRound2Cid]
+        outputs = [ TransferOutput with
+                      receiver = bob.primaryParty
+                      amount = 10.0
+                      lock = None
+                      receiverFeeRatio = 0.4 ]
+      context = contextWithRound1.context
+
+  -- Input amount is exactly 100.0.
+  -- There is no negative amount of holding fee
+  -- i.e., no extra holding fee added to the input amount value.
+  transferResult.summary.inputAmuletAmount === 100.0
+  transferResult.summary.holdingFees === 0.0
+
+  return ()
+
+testAmuletUsedAfterHoldingFeeChanged: Script ()
+testAmuletUsedAfterHoldingFeeChanged = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+  now <- getTime
+
+  let holdingFee = 0.00002
+      smallerHoldingFee = 0.00005
+      transferAmount = 10.0
+
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
+
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
+    newScheduleItem = (
+          addRelTime now (minutes 1),
+          amuletRules.configSchedule.initialValue with
+            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
+              holdingFee = RatePerRound smallerHoldingFee
+        )
+
+  runNextIssuance app
+  amuletRound2Cid <- tap app alice 100.0
+  Some amuletRound2 <- queryContractId @Amulet alice.primaryParty amuletRound2Cid
+
+  runNextIssuance app
+  amuletRound3Cid <- tap app alice 100.0
+  Some amuletRound3 <- queryContractId @Amulet alice.primaryParty amuletRound3Cid
+
+  amuletRound2.amount.createdAt.number === 2
+  amuletRound2.amount.ratePerRound === RatePerRound holdingFee
+
+  amuletRound3.amount.createdAt.number === 3
+  amuletRound3.amount.ratePerRound === RatePerRound smallerHoldingFee
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  context <- getPaymentTransferContext app alice
+
+  -- use the amulet created in round 2 before holding fee changes
+  transferResult2 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
+
+  -- use the amulet created in round 3 when holding fee changes
+  transferResult3 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
+
+  -- Both amulets are used as transfer input at round 7
+
+  -- Actual amount of a amulet created before holding fee change will be computed using the old holding fee
+  -- even if it is used as transfer input at a round with conifig that holding fee is reduced.
+  transferResult2.summary.holdingFees === holdingFee * (7.0 - 2.0)
+
+  -- Smaller holding fee is used as the amulet is created in round 3 when holding fee is redueced
+  transferResult3.summary.holdingFees === smallerHoldingFee * (7.0 - 3.0)
+
+submitTransfer: ContractId AmuletRules -> TransferContext -> Party -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
+submitTransfer amuletRulesCid transferContext dso sender receiver amuletCid amount = do
+  submitMulti [sender, receiver] [dso] $
+    exerciseCmd amuletRulesCid AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = sender
+        provider = sender
+        inputs = [InputAmulet amuletCid]
+        outputs = [ TransferOutput with
+                      receiver
+                      amount
+                      lock = None
+                      receiverFeeRatio = 1.0]
+      context = transferContext
+
+testSenderChangeAndOutput: Script ()
+testSenderChangeAndOutput = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+  let holdingFee = 0.00002
+  let amulet1Amount = 100.0
+  let outputAmount1 = 20.0
+  let outputAmount2 = 30.0
+  let outputAmount3 = 25.0
+  amulet1 <- tap app alice amulet1Amount
+
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+  aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
+
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet1]
+      outputs = [ TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                -- test another output to sender
+                , TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+                -- normal receiver amulet
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount3
+                    lock = None
+                ]
+    context = context.context
+  assertMsg "senderChangeAmount > 0"
+    (transferResult.summary.senderChangeAmount > 0.0)
+  aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
+
+  let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  balanceChange.changeToInitialAmountAsOfRoundZero === aliceNormalizedBalanceAfter - aliceNormalizedBalanceBefore
+  balanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
+  return ()
+
+testSenderNoChange: Script ()
+testSenderNoChange = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+  let holdingFee = 0.00002
+  let amulet1Amount = 100.0
+  let outputAmount1 = 49.7
+  let outputAmount2 = 30.0
+  let outputAmount3 = 20.0
+  amulet1 <- tap app alice amulet1Amount
+
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet1]
+      outputs = [ TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                -- test another output to sender
+                , TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+                -- normal receiver amulet
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount3
+                    lock = None
+                ]
+    context = context.context
+  assertMsg "senderChangeAmount == 0"
+    (transferResult.summary.senderChangeAmount == 0.0)
+
+  let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  balanceChange.changeToHoldingFeesRate === holdingFee
+  return ()
+
+testSenderNoChangeNoSenderOutput: Script ()
+testSenderNoChangeNoSenderOutput = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+  let holdingFee = 0.00002
+  let amulet1Amount = 100.0
+  let outputAmount1 = 58.97
+  let outputAmount2 = 39.98
+  amulet1 <- tap app alice amulet1Amount
+
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet1]
+      outputs = [
+                  TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+
+                ]
+    context = context.context
+  assertMsg "senderChangeAmount == 0"
+    (transferResult.summary.senderChangeAmount == 0.0)
+
+  let Some(bobBalanceChange) = Map.lookup bob.primaryParty transferResult.summary.balanceChanges
+  bobBalanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
+
+  let Some(aliceBalanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  aliceBalanceChange.changeToHoldingFeesRate === negate holdingFee
+
+  return ()

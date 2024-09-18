@@ -1,0 +1,30 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+resources:
+  limits:
+    cpu: "4"
+    memory: 12Gi
+  requests:
+    cpu: "0.5"
+    memory: 1Gi
+
+db:
+  volumeSize: 2800Gi
+  volumeStorageClass: standard-rwo
+  pvcTemplateName: pg-data
+  maxConnections: 300
+  maxWalSize: 2GB
+
+persistence:
+  secretName: "postgres-secrets"
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:
+

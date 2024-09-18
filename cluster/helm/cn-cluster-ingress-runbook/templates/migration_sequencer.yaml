@@ -1,0 +1,29 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if and .Values.ingress.sequencer .Values.withSvIngress }}
+{{- $cluster := .Values.cluster }}
+{{- $releaseNamespace := .Release.Namespace }}
+{{- range $migrationId := .Values.ingress.decentralizedSynchronizer.migrationIds }}
+{{- $ingressName := $cluster.svIngressName | default $cluster.svNamespace }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: sequencer-{{ $cluster.svNamespace }}-domain-{{ $migrationId }}
+  namespace: {{ $releaseNamespace }}
+spec:
+  hosts:
+    - "sequencer-{{ $migrationId }}.{{ $ingressName }}.{{ $cluster.hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 5008
+            host: global-domain-{{ $migrationId }}-sequencer.{{ $cluster.svNamespace }}.svc.cluster.local
+---
+{{- end }}
+{{- end }}

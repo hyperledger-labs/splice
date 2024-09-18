@@ -1,0 +1,1201 @@
+openapi: 3.0.0
+info:
+  title: SV API
+  version: 0.0.1
+tags:
+  - name: sv
+servers:
+  - url: https://example.com/api/sv
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
+  /v0/admin/validator/onboarding/ongoing:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "listOngoingValidatorOnboardings"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListOngoingValidatorOnboardingsResponse"
+  /v0/admin/validator/onboarding/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "prepareValidatorOnboarding"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PrepareValidatorOnboardingRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/validator/licenses:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "listValidatorLicenses"
+      parameters:
+        - name: "after"
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListValidatorLicensesResponse"
+  /v0/admin/domain/cometbft/status:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "getCometBftNodeStatus"
+      responses:
+        "200":
+          description: "Response returned by the CometBFT node, or the error if the call failed"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CometBftNodeStatusOrErrorResponse"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/cometbft/json-rpc:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "cometBftJsonRpcRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CometBftJsonRpcRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CometBftJsonRpcOrErrorResponse"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/admin/domain/cometbft/debug:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "getCometBftNodeDebugDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CometBftNodeDumpOrErrorResponse"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/sequencer/status:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "getSequencerNodeStatus"
+      responses:
+        "200":
+          description: "Status of sequencer node"
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/NodeStatus"
+        "404":
+          description: "Sequencer is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/admin/domain/mediator/status:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "getMediatorNodeStatus"
+      responses:
+        "200":
+          description: "Status of mediator node"
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/NodeStatus"
+        "404":
+          description: "Mediator is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/admin/domain/pause:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "pauseDecentralizedSynchronizer"
+      responses:
+        "200":
+          description: ok
+
+  /v0/admin/domain/unpause:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "unpauseDecentralizedSynchronizer"
+      responses:
+        "200":
+          description: ok
+
+  /v0/admin/domain/migration-dump:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainMigrationDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainMigrationDumpResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "triggerDomainMigrationDump"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TriggerDomainMigrationDumpRequest"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/identities-dump:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getSynchronizerNodeIdentitiesDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSynchronizerNodeIdentitiesDumpResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/data-snapshot:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainDataSnapshot"
+      parameters:
+        - name: timestamp
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: party_id
+          in: query
+          schema:
+            type: string
+        - name: migration_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainDataSnapshotResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/admin/sv/voterequests:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "listDsoRulesVoteRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteRequestsResponse"
+  /v0/admin/sv/voteresults:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "listVoteRequestResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteResultsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
+  /v0/admin/sv/voterequests/{vote_request_contract_id}:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "lookupDsoRulesVoteRequest"
+      parameters:
+        - name: "vote_request_contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/LookupDsoRulesVoteRequestResponse"
+  /v0/admin/sv/electionrequests/create:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "createElectionRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateElectionRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/admin/sv/electionrequests/get:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getElectionRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetElectionRequestResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/admin/sv/votes:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "castVote"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CastVoteRequest"
+      responses:
+        "201":
+          description: Created
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/admin/sv/voterequest:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "listVoteRequestsByTrackingCid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/BatchListVotesByVoteRequestsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteRequestByTrackingCidResponse"
+  /v0/admin/sv/voterequest/create:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "createVoteRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateVoteRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/admin/sv/amulet-price/votes:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "ListAmuletPriceVotes"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListAmuletPriceVotesResponse"
+  /v0/admin/sv/open-mining-rounds:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "ListOpenMiningRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListOpenMiningRoundsResponse"
+  /v0/admin/sv/amulet-price/vote:
+    put:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "UpdateAmuletPriceVote"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateAmuletPriceVoteRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/admin/authorization:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "isAuthorized"
+      responses:
+        "200":
+          description: ok
+        "403":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
+  /v0/onboard/validator:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardValidator"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardValidatorRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+  /v0/onboard/sv/start:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "startSvOnboarding"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/StartSvOnboardingRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+  /v0/onboard/sv/status/{candidate_party_id_or_name}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "getSvOnboardingStatus"
+      parameters:
+        - name: "candidate_party_id_or_name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSvOnboardingStatusResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/onboard/sv/party-migration/authorize:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSvPartyMigrationAuthorize"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeResponse"
+        "400":
+          description: system state not yet valid
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeErrorResponse"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+  /v0/onboard/sv/sequencer:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSvSequencer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvSequencerRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSequencerResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/devnet/onboard/validator/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      description: "faucet for validator candidates self-service"
+      operationId: "devNetOnboardValidatorPrepare"
+      responses:
+        "200":
+          description: ok
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+  /v0/dso:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "getDsoInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/sign_bootstrapping_state:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "signSynchronizerBootstrappingState"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/initialize:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "initializeSynchronizer"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/reconcile-daml-state:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "reconcileSynchronizerDamlState"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  # TODO(#13301) Replace by automation
+  /v0/synchronizer/{domain_id_prefix}/sign_dso_party_to_participant:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_soft_domain_migration_poc
+      operationId: "signDsoPartyToParticipant"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+components:
+  schemas:
+    ListOngoingValidatorOnboardingsResponse:
+      type: object
+      required:
+        - ongoing_validator_onboardings
+      properties:
+        ongoing_validator_onboardings:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorLicensesResponse:
+      type: object
+      required:
+        - validator_licenses
+      properties:
+        validator_licenses:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as URL query parameter `after`.
+
+    PrepareValidatorOnboardingRequest:
+      type: object
+      required:
+        - expires_in # duration in seconds
+      properties:
+        expires_in:
+          type: integer
+          minimum: 1
+
+    PrepareValidatorOnboardingResponse:
+      type: object
+      required:
+        - secret
+      properties:
+        secret:
+          type: string
+
+    OnboardValidatorRequest:
+      type: object
+      required:
+        - party_id
+        - secret
+      properties:
+        party_id:
+          type: string
+        secret:
+          type: string
+        version:
+          type: string
+        contact_point:
+          type: string
+
+    CometBftNodeStatusOrErrorResponse:
+      oneOf:
+        - $ref: "#/components/schemas/CometBftNodeStatusResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
+    CometBftNodeStatusResponse:
+      type: object
+      required:
+        - id
+        - catching_up
+        - voting_power
+      properties:
+        id:
+          type: string
+          description: "The node-id of the CometBFT node"
+        catching_up:
+          type: boolean
+          description: "Is the node still catching up to the other nodes in the network"
+        voting_power:
+          type: number
+          description: "The voting power assigned to the CometBFT node"
+
+    CometBftNodeDumpOrErrorResponse:
+      oneOf:
+        - $ref: "#/components/schemas/CometBftNodeDumpResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
+    CometBftNodeDumpResponse:
+      type: object
+      required:
+        - status
+        - network_info
+        - abci_info
+        - validators
+      properties:
+        status:
+          type: object
+        network_info:
+          type: object
+        abci_info:
+          type: object
+        validators:
+          type: object
+
+    CometBftJsonRpcRequestId:
+      oneOf:
+        - type: string
+        - type: integer
+          format: int64
+
+    CometBftJsonRpcRequest:
+      type: object
+      required:
+        - id
+        - method
+      properties:
+        id:
+          $ref: "#/components/schemas/CometBftJsonRpcRequestId"
+        method:
+          type: string
+          # status, block - used in configure-state-sync.sh
+          # commit, validators, consensus_params - used by the CometBFT Light client for state sync
+          # consensus_state - used for debugging CometBFT issues
+          enum:
+            - status
+            - block
+            - commit
+            - validators
+            - consensus_params
+            - consensus_state
+        params:
+          type: object
+          additionalProperties: true
+
+    CometBftJsonRpcOrErrorResponse:
+      oneOf:
+        - $ref: "#/components/schemas/CometBftJsonRpcResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
+    CometBftJsonRpcResponse:
+      type: object
+      required:
+        - jsonrpc
+        - id
+        - result
+      properties:
+        jsonrpc:
+          type: string
+        id:
+          $ref: "#/components/schemas/CometBftJsonRpcRequestId"
+        result:
+          type: object
+
+    CreateElectionRequest:
+      type: object
+      required:
+        - requester
+        - ranking
+      properties:
+        requester:
+          type: string
+        ranking:
+          type: array
+          items:
+            type: string
+
+    CreateVoteRequest:
+      type: object
+      required:
+        - requester
+        - action
+        - url
+        - description
+        - expiration
+      properties:
+        requester:
+          type: string
+        action:
+          type: object
+        url:
+          type: string
+        description:
+          type: string
+        expiration:
+          type: object
+
+    ListVotesResponse:
+      type: object
+      required:
+        - dso_rules_votes
+      properties:
+        dso_rules_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    CastVoteRequest:
+      type: object
+      required:
+        - vote_request_contract_id
+        - is_accepted
+        - reason_url
+        - reason_description
+      properties:
+        vote_request_contract_id:
+          type: string
+        is_accepted:
+          type: boolean
+        reason_url:
+          type: string
+        reason_description:
+          type: string
+
+    ListAmuletPriceVotesResponse:
+      type: object
+      required:
+        - amulet_price_votes
+      properties:
+        amulet_price_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListOpenMiningRoundsResponse:
+      type: object
+      required:
+        - open_mining_rounds
+      properties:
+        open_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    UpdateAmuletPriceVoteRequest:
+      type: object
+      required:
+        - amulet_price
+      properties:
+        amulet_price:
+          type: string
+
+    StartSvOnboardingRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+
+    BaseSvOnboardingState:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+    SvOnboardingStateRequested:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+            - confirmed_by
+            - required_num_confirmations
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the SvOnboardingRequested contract
+            confirmed_by:
+              type: array
+              items:
+                type: string
+            required_num_confirmations:
+              type: integer
+              format: int32
+              minimum: 1
+    SvOnboardingStateConfirmed:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the SvOnboardingConfirmed contract
+    SvOnboardingStateCompleted:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the DsoRules contract
+    SvOnboardingStateUnknown:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+    GetSvOnboardingStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/SvOnboardingStateRequested"
+        - "$ref": "#/components/schemas/SvOnboardingStateConfirmed"
+        - "$ref": "#/components/schemas/SvOnboardingStateCompleted"
+        - "$ref": "#/components/schemas/SvOnboardingStateUnknown"
+      discriminator:
+        propertyName: state
+        mapping:
+          requested: "#/components/schemas/SvOnboardingStateRequested"
+          confirmed: "#/components/schemas/SvOnboardingStateConfirmed"
+          completed: "#/components/schemas/SvOnboardingStateCompleted"
+          unknown: "#/components/schemas/SvOnboardingStateUnknown"
+
+    OnboardSvPartyMigrationAuthorizeRequest:
+      type: object
+      required:
+        - candidate_party_id
+      properties:
+        candidate_party_id:
+          type: string
+
+    OnboardSvPartyMigrationAuthorizeResponse:
+      type: object
+      required:
+        - acs_snapshot
+      properties:
+        acs_snapshot:
+          type: string
+
+    OnboardSvPartyMigrationAuthorizeErrorResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/AcceptedStateNotFoundErrorResponse"
+        - "$ref": "#/components/schemas/ProposalNotFoundErrorResponse"
+    AcceptedStateNotFoundErrorResponse:
+      type: object
+      required:
+        - accepted_state_not_found
+      properties:
+        accepted_state_not_found:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+    ProposalNotFoundErrorResponse:
+      type: object
+      required:
+        - proposal_not_found
+      properties:
+        proposal_not_found:
+          type: object
+          required:
+            - party_to_participant_base_serial
+          properties:
+            party_to_participant_base_serial:
+              type: integer
+              description: "The serial of the party to participant accepted state as seen by the sponsor"
+
+    OnboardSvSequencerRequest:
+      type: object
+      required:
+        - sequencer_id
+      properties:
+        sequencer_id:
+          type: string
+
+    OnboardSvSequencerResponse:
+      type: object
+      required:
+        - onboarding_state
+      properties:
+        onboarding_state:
+          type: string
+
+    OnboardSvMediatorRequest:
+      type: object
+      required:
+        - mediator_id
+      properties:
+        mediator_id:
+          type: string
+
+    SequencerSnapshot:
+      type: object
+      required:
+        - topology_snapshot
+        - sequencer_snapshot
+      properties:
+        topology_snapshot:
+          type: string
+        sequencer_snapshot:
+          type: string
+
+    TriggerAcsDumpResponse:
+      type: object
+      required:
+        - filename
+        - num_events
+        - offset
+      properties:
+        filename:
+          type: string
+        num_events:
+          type: number
+        offset:
+          type: string
+
+    GetAcsStoreDumpResponse:
+      type: object
+      required:
+        - offset
+        - contracts
+      properties:
+        offset:
+          type: string
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        version:
+          type: string
+
+    GetElectionRequestResponse:
+      type: object
+      required:
+        - ranking
+      properties:
+        ranking:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    SynchronizerNodeIdentities:
+      type: object
+      required:
+        - sv_party_id
+        - dso_party_id
+        - domain_alias
+        - domain_id
+        - participant
+        - sequencer
+        - mediator
+      properties:
+        sv_party_id:
+          type: string
+        dso_party_id:
+          type: string
+        domain_alias:
+          type: string
+        domain_id:
+          type: string
+        participant:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        sequencer:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        mediator:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+
+    DomainDataSnapshot:
+      type: object
+      required:
+        - acs_snapshot
+        - acs_timestamp
+        - dars
+      properties:
+        genesis_state:
+          description: |
+            base64 encoded string of domain genesis state
+          type: string
+        acs_snapshot:
+          description: |
+            base64 encoded string of acs snapshot for the requested party id, or for the dso and sv parties by default
+          type: string
+        acs_timestamp:
+          type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"
+
+    Dar:
+      type: object
+      required:
+        - hash
+        - content
+      properties:
+        hash:
+          type: string
+        content:
+          description: |
+            base64 encoded string of a dar package
+          type: string
+
+    TriggerDomainMigrationDumpRequest:
+      type: object
+      required:
+        - migration_id
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+
+    GetDomainMigrationDumpResponse:
+      type: object
+      required:
+        - migration_id
+        - identities
+        - data_snapshot
+        - created_at
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+        identities:
+          $ref: "#/components/schemas/SynchronizerNodeIdentities"
+        data_snapshot:
+          $ref: "#/components/schemas/DomainDataSnapshot"
+        created_at:
+          type: string
+
+    GetSynchronizerNodeIdentitiesDumpResponse:
+      type: object
+      required:
+        - identities
+      properties:
+        identities:
+          $ref: "#/components/schemas/SynchronizerNodeIdentities"
+
+    GetDomainDataSnapshotResponse:
+      type: object
+      required:
+        - created_at
+        - migration_id
+        - data_snapshot
+      properties:
+        created_at:
+          description: |
+            equal to data_snapshot.acs_timestamp
+          type: string
+        migration_id:
+          type: integer
+          format: int64
+        data_snapshot:
+          $ref: "#/components/schemas/DomainDataSnapshot"

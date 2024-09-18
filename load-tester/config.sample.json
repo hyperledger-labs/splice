@@ -1,0 +1,27 @@
+{
+  "usersPerValidator": 10,
+  "isDevNet": "$IS_DEVNET",
+  "validators": [
+    {
+      "walletBaseUrl": "$K6_WALLET_BASE_URL",
+      "auth": {
+        "kind": "oauth",
+        "oauthDomain": "$K6_OAUTH_DOMAIN",
+        "oauthClientId": "$K6_OAUTH_CLIENT_ID",
+        "usersPassword": "$K6_USERS_PASSWORD",
+        "managementApi": {
+          "clientId": "$AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+          "clientSecret": "$AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
+        },
+        "admin": {
+          "email": "admin@validator1.com",
+          "password": "$K6_VALIDATOR_ADMIN_PASSWORD"
+        }
+      }
+    }
+  ],
+  "test": {
+    "duration": "$K6_TEST_DURATION",
+    "iterationsPerMinute": "$K6_ITERATIONS_PER_MINUTE"
+  }
+}

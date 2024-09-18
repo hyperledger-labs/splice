@@ -1,0 +1,14 @@
+# This does party migration
+ACS_COMMITMENT_MISMATCH
+
+# We've seen this happen due to txs submitted during offboarding of SV4. It can likely happen to other participants than the
+# reonboarded sv123 as well, but we don't want the ignore these messages for all our tests.
+# TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+
+RequestRefused\(SenderUnknown\(.*MED::sv4SvReonboarding
+
+# Caused by svs being off-boarded
+UNAUTHORIZED_TOPOLOGY_TRANSACTION
+
+SEQUENCER_SUBSCRIPTION_LOST

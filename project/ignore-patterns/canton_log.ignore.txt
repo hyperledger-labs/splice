@@ -1,0 +1,107 @@
+# Patterns of entries to be ignored when checking the canton log file (sbt checkErrors).
+# As the Canton log appenders emit errors/warnings to stdout, the patterns listed here will also be applied when checking the sbt output.
+# Patterns must be both
+# - PCRE regular expressions (see https://regex101.com) and
+# - extended regular expressions as used by "grep -E -e".
+# Lines containing only blanks or lines starting with '#' are ignored.
+
+# ExecutionContextMonitor
+Task runner .* is .* overloaded
+
+# This may sometimes lead to subsequent errors (e.g. api server fails to startup), but quite often it can simply be ignored.
+Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
+In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
+
+# Sometimes pops up in the Canton logs. This can happen
+# if the command submission tracker at some point times out but that’s perfectly fine.
+c.d.l.c.s.c.CommandTrackerFlow$ - Completion Stream failed with an error.
+
+# grpc "Half-closed without a request" grpc shutdown flake - might be when client hangs up before server response? https://github.com/grpc/grpc-java/issues/4890
+# reported by daml-repo ErrorInterceptor/ErrorListener added with daml 2.0.0-snapshot.20211220
+# Can probably be removed once https://github.com/digital-asset/daml/issues/13413 is fixed.
+INTERNAL: Half-closed without a request
+
+# We use self-signed ledger API tokens for tests
+HMAC256 JWT Validator is NOT recommended for production environments
+
+# Using an access token for a user that has not yet been allocated produces the following warning.
+# Users are allocated by the validator app, and all apps are starting concurrently.
+PERMISSION_DENIED.*Could not resolve is_deactivated status for user
+
+# TODO(#6839) Try to set things up in a way that doesn't produce this errors.
+# Using multiple auth configs for the long-running Canton instances produces the following warning
+# when authenticating using an auth config that is not the first in the list.
+Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
+Couldn't get jwk from http: com.auth0.jwk.SigningKeyNotFoundException: No key found in https://canton-network-test.us.auth0.com/.well-known/jwks.json
+Couldn't get jwk from http: com.auth0.jwk.NetworkException: Cannot obtain jwks from url http://127.0.0.1:9876/jwks
+
+# Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
+GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
+
+# We can't do log suppression for Canton, so instead we ignore this.
+NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*invoked from sv-participant\.sc
+
+# ...and this, for WalletIntegrationTest
+PERMISSION_DENIED.*Claims do not authorize to act as party 'alice__wallet__user.*aliceParticipant
+
+# TODO(#7924): remove once txs in-flight during party migrations do not produce any more warnings
+# Made as specific as possible to avoid ignoring other SYNC_SERVICE_ALARMS
+SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv[1-4]::.*Discarding.*with all ancestors
+SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv[1-4]::.*Continue processing
+LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
+ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
+A security-sensitive error has been received.*TransactionProcessingSteps:participant=
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash
+
+# Detailed API logging is extremely useful for debugging so we turn this on in our tests.
+Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
+
+# TODO(#8507): investigate and decide if we want to remove it once fixed
+Late processing \(or clock skew\) of batch with counter.*after sequencing
+
+# Shows up during global domain migration test, when the domain is frozen
+Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)
+
+# This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
+.*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
+
+# TODO(#9544): remove once the slowdown in Canton has been fixed
+Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
+
+# Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = DSO and there are more than 1 SV onboarded
+Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties DSO-.*
+
+# TODO(#10160) Remove this ignore once Canton fixes this.
+SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR
+
+# TODO(#10847) Logged when a mediator joins between request and confirmation
+MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown request id
+
+# TODO(#10875) Investigate why Canton starts warning about this
+periodic acknowledgement failed
+
+# TODO(#10887) Figure out where this is coming from
+Token refresh failed with Status.*UNAVAILABLE.*Health-check stream unexpectedly closed
+
+# Sequencers can issue this warning if the SequencerDomainState threshold increases between when a topup request is made and when it is validated
+# TODO(#11018): Remove once Canton does not issue a warning for this expected condition
+INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
+
+# In ValidatorReonboardingIntegrationTest, importing the ACS on the new participant may lead to temporary ACS_COMMITMENT_MISMATCH errors.
+# The new participant can be both the sender or the counterParticipant in the error message.
+ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
+
+# TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+
+# TODO(#14445): remove these ignores if possible
+The operation 'insert block' has failed with an exception
+Now retrying operation 'insert block'
+
+# TODO(#13874): investigate why it happens and remove if possible
+Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
+
+# Make sure to have a trailing newline

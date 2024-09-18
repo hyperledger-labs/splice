@@ -1,0 +1,146 @@
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package com.daml.network.wallet.store;
+
+import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
+
+/* Unknown event, caused the parser failing to parse a transaction tree */
+message UnknownTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+}
+
+message PartyAndAmount {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string party = 1;
+  string amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message TransactionSubtype {
+  string package_id = 1;
+  string module_name = 2;
+  string entity_name = 3;
+  string choice = 4;
+  // The constructor name of the AmuletOperation. Only relevant for WalletAppInstall_ExecuteBatch
+  string amulet_operation = 5;
+}
+
+/** Balance change due to a transfer */
+message TransferTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  TransactionSubtype subtype = 2;
+  google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
+  string provider = 4;
+  PartyAndAmount sender = 5;
+  repeated PartyAndAmount receivers = 6;
+  string sender_holding_fees = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string sv_rewards_used = 11 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+}
+
+/** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */
+message BalanceChangeTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  TransactionSubtype subtype = 2;
+  google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
+  string receiver = 4;
+  string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+/** An event that does not change anyone's amulet balance. */
+message NotificationTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  TransactionSubtype subtype = 2;
+  google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
+  string details = 4;
+}
+
+message TransferOfferStatusCreated {
+  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.TransferOffer.ContractId
+  string transaction_id = 2;
+}
+
+message TransferOfferStatusAccepted {
+  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer.ContractId
+  string transaction_id = 2;
+}
+
+message TransferOfferStatusCompleted {
+  string contract_id = 1; // com.daml.network.codegen.java.splice.amulet.Amulet.ContractId
+  string transaction_id = 2;
+}
+
+message TransferOfferStatusRejected {
+}
+
+message TransferOfferStatusWithdrawn {
+  string reason = 1;
+}
+
+message TransferOfferStatusExpired {
+}
+
+message TransferOfferTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string tracking_id = 1;
+  oneof status {
+    TransferOfferStatusCreated created = 2;
+    TransferOfferStatusAccepted accepted = 3;
+    TransferOfferStatusCompleted completed = 4;
+    TransferOfferStatusRejected rejected = 5;
+    TransferOfferStatusWithdrawn withdrawn = 6;
+    TransferOfferStatusExpired expired = 7;
+  };
+  string sender = 8;
+  string receiver = 9;
+}
+
+message BuyTrafficRequestStatusCreated {
+}
+
+message BuyTrafficRequestStatusCompleted {
+  string transaction_id = 1;
+}
+
+message BuyTrafficRequestStatusRejected {
+  string reason = 1;
+}
+
+message BuyTrafficRequestStatusExpired {
+}
+
+message BuyTrafficRequestTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string tracking_id = 1;
+  oneof status {
+    BuyTrafficRequestStatusCreated created = 2;
+    BuyTrafficRequestStatusCompleted completed = 3;
+    BuyTrafficRequestStatusRejected rejected = 4;
+    BuyTrafficRequestStatusExpired expired = 5;
+  };
+  string buyer = 6;
+}
+

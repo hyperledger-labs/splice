@@ -1,0 +1,106 @@
+[(self: super: {
+  openapi-generator-cli = (super.openapi-generator-cli.override { jre = super.openjdk17; }).overrideAttrs(oldAttrs: rec {
+    # 7.0.1 causes some issues in the generated package.json which break module resolution.
+    version = "6.6.0";
+    jarfilename = "${oldAttrs.pname}-${version}.jar";
+    src = super.fetchurl {
+      url = "mirror://maven/org/openapitools/${oldAttrs.pname}/${version}/${jarfilename}";
+      sha256 = "sha256-lxj/eETolGLHXc2bIKNRNvbbJXv+G4dNseMALpneRgk=";
+    };
+  });
+  jre = super.openjdk17;
+  lnav = super.callPackage ./lnav.nix {};
+  canton = super.callPackage ./canton.nix {};
+  cometbft_driver = super.callPackage ./cometbft-driver.nix {};
+  daml2js = super.callPackage ./daml2js.nix {};
+  python3 = super.python3.override {
+    packageOverrides = pySelf : pySuper : {
+        sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
+    };
+  };
+  pre-commit = super.pre-commit.overrideAttrs (old: {
+    doCheck = false;
+  });
+  geckodriver = super.geckodriver.overrideAttrs (old: rec {
+    version = "0.35.0";
+    src = super.fetchFromGitHub {
+      owner = "mozilla";
+      repo = "geckodriver";
+      rev = "refs/tags/v${version}";
+      sha256 = "sha256-3EJP+y+Egz0kj5e+1FRHPGWfneB/tCCVggmgmylMyDE=";
+    };
+    cargoDeps = old.cargoDeps.overrideAttrs {
+      inherit version;
+      inherit src;
+      outputHash = "sha256-gopI5iOCSzD23mvOues76WIiBtpNf9A6X9NoOULm6Qo=";
+    };
+  });
+  git-search-replace = super.callPackage ./git-search-replace.nix {};
+  sphinx-lint = super.callPackage ./sphinx-lint.nix {};
+  jsonnet = super.callPackage ./jsonnet.nix {};
+  pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
+    let
+      inherit (super.lib.strings) hasPrefix;
+      extraPackages = import ./extra-pulumi-packages.nix {};
+
+      neededResourcePlugins = builtins.map (p: "pulumi-resource-" + p) [
+        "auth0" "gcp" "google-native" "postgresql" "random" "tls" "vault" "command"
+      ];
+
+      isResourcePlugin = d: hasPrefix "pulumi-resource-" d.name;
+
+      isNeededResourcePlugin = d: builtins.any (p: hasPrefix p d.name) neededResourcePlugins;
+
+      keepSrc = d: isNeededResourcePlugin d || ! isResourcePlugin d;
+    in {
+      srcs = (builtins.filter keepSrc previousAttrs.srcs) ++ (map (x: super.fetchurl x) extraPackages.packages.${super.stdenv.hostPlatform.system});
+
+      unpackPhase = ''
+        runHook preunpack
+        for src in $srcs; do
+          # remove file type, the nix prefix path, the platform suffix
+          stripped_name=$(basename $src .tar.gz | cut -d'-' -f2- | sed 's/\(.*\)-.*-.*$/\1/')
+          echo "Unpacking $src to $stripped_name"
+          mkdir -p $stripped_name
+          tar xzf $src -C $stripped_name
+        done
+      '';
+
+      installPhase = ''
+        export PULUMI_HOME=$out
+        mkdir -p $out/plugins
+        mkdir -p $out/bin
+
+        pulumi_components=$(find . -mindepth 1 -maxdepth 1 -type d ! -name "pulumi-resource*")
+        for component in $pulumi_components
+        do
+            mv "$component"/* .
+            rm -r $component
+        done
+        mv pulumi pulumi2
+        mv pulumi2/* .
+        rm -r pulumi2
+
+        # install plugins
+        plugins=$(find . -type d -name "pulumi-resource*")
+        for plugin in $plugins
+        do
+            type=$(basename "$plugin" | sed 's/pulumi-resource-\(.*\)-v.*$/\1/')
+            version=$(basename "$plugin" | sed 's/pulumi-resource-.*-v\(.*\)$/\1/')
+            if [ "$type" = "gcp" ]; then
+                version="v$version"
+            fi
+            echo "Installing $plugin with type $type and version $version"
+            ./pulumi plugin install resource "$type" "$version" -f "$plugin/pulumi-resource-$type"
+            rm -r $plugin
+        done
+
+        # remove unneeded language plugins
+        rm -v pulumi-language-{dotnet,go,java,python,python-exec}
+
+        ${previousAttrs.installPhase}
+      '';
+
+      dontPatchELF = true;
+    });
+})]

@@ -1,0 +1,123 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates to track per-sv state.
+module Splice.DSO.SvState where
+
+import Splice.Types
+
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.Util
+
+
+-- Checked fetches for per-sv state
+---------------------------------------
+
+data ForSv = ForSv with
+    dso : Party
+    svName : Text
+  deriving (Eq, Show)
+
+data ForSvNode = ForSvNode with
+    dso : Party
+    sv : Party
+    svName : Text
+  deriving (Eq, Show)
+
+
+-- Reward collection
+--------------------
+
+-- | Reward collection state of an SV.
+--
+-- Note that we keep some extra aggregates in this state to make it easier to interpret it.
+-- In principle, these could be derived from the transaction history, but that
+-- would be much more onerous to implement.
+data RewardState = RewardState with
+    numRoundsMissed : Int -- ^ Number of rounds for which they missed collecting coupons.
+    numRoundsCollected : Int -- ^ Number of rounds for which they collected coupons.
+    lastRoundCollected : Round -- ^ Last round for which they collected reward coupons.
+    numCouponsIssued : Int -- ^ Number of SV reward coupons issued by them for their beneficiaries.
+  deriving (Eq, Show)
+
+-- | State of reward collection for a sv identified by their sv name.
+template SvRewardState with
+    dso : Party
+    svName : Text
+    state : RewardState
+  where
+    signatory dso
+
+
+-- Node State Management
+------------------------
+
+data NodeState = NodeState with
+    synchronizerNodes : SynchronizerNodeConfigMap
+      -- ^ The config for a synchronizer's CometBFT, sequencer, mediator and scan nodes under control of an SV party.
+  deriving (Eq, Show)
+
+-- | State of a node managed by an SV operator party.
+--
+-- There is exactly one such state per SV operator party.
+-- Even though every SV can operate at most one node at any one time,
+-- there can though be multiple SV node states per SV, as the state of offboarded
+-- nodes is kept around for debugging purposes.
+template SvNodeState with
+    dso : Party
+    sv : Party -- ^ The SV operator party identifying the node.
+    svName : Text -- ^ The SV name in whose name the node is operated.
+    state : NodeState
+  where
+    signatory dso
+
+
+-- SV status reporting
+----------------------
+
+-- | The status of an SV as seen from their SV node's perspective.
+-- We generally add values here that are expected to regularly increase, so that
+-- SV node operators can run alerting off of them.
+data SvStatus = SvStatus with
+    createdAt : Time
+      -- ^ The wall clock time of the SV node at the time when the SV node started to
+      -- gather the data points in this report to submit them.
+    cometBftHeight : Int
+      -- ^ The height of the CometBFT chain at the time of submission
+    mediatorSynchronizerTime : Time
+      -- ^ The latest synchronizer time observed on the mediator at the time of submission
+    participantSynchronizerTime : Time
+      -- ^ The latest synchronizer time observed on the participant at the time of submission
+    latestOpenRound : Round
+      -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
+  deriving (Eq, Show)
+
+-- | A singleton contract per SV party that is used to regularly submit status reports.
+--
+-- Individual status reports serve as a heartbeat for a specific SV party and its associoated SV node
+-- ; and to distribute that SVs view on the network to all other SVs.
+template SvStatusReport with
+    dso : Party
+    sv : Party
+      -- ^ The SV party that submitted this report.
+    svName : Text
+      -- ^ The name of the SV operator whose operator party was used to submit this report.
+    number : Int
+      -- ^ The number of this report, starting from 0.
+    status : Optional SvStatus
+      -- ^ None is used when initially creating the contract upon sv addition.
+  where
+    signatory dso
+
+
+-- instances
+------------
+
+instance HasCheckedFetch SvRewardState ForSv where
+  contractGroupId SvRewardState {..} = ForSv with dso; svName
+
+instance HasCheckedFetch SvNodeState ForSvNode where
+  contractGroupId SvNodeState {..} = ForSvNode with dso; sv; svName
+
+instance HasCheckedFetch SvStatusReport ForSvNode where
+  contractGroupId SvStatusReport {..} = ForSvNode with dso; sv; svName

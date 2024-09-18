@@ -1,0 +1,373 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Splitwell where
+
+import DA.Action (void)
+import DA.Map (Map)
+import qualified DA.Map as M
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.Time
+import DA.Set qualified as Set
+import Splice.AmuletRules (AppTransferContext(..))
+import Splice.Round
+import Splice.Util
+import Splice.Wallet.Payment
+
+-- Stable identifier for a group. We avoid contract keys
+-- but having this as a data type is still useful.
+data GroupKey = GroupKey
+  with
+    owner : Party
+    provider : Party
+    id: GroupId
+  deriving (Show, Eq)
+
+-- | Group id unique per owner
+newtype GroupId = GroupId Text
+  deriving (Show, Eq)
+
+data ForOwner = ForOwner
+  with
+    owner : Party
+    provider : Party
+  deriving (Show, Eq)
+
+data ForApp = ForApp
+  with
+    provider : Party
+  deriving (Show, Eq)
+
+instance HasCheckedFetch Group ForApp where
+  contractGroupId Group{..} = ForApp{..}
+
+instance HasCheckedFetch Group ForOwner where
+  contractGroupId Group{..} = ForOwner{..}
+
+instance HasCheckedFetch Group GroupKey where
+  contractGroupId group = getGroupKey group
+
+
+groupMembers : Group -> [Party]
+groupMembers Group{..} = owner :: members
+
+template SplitwellInstallRequest
+  with
+    provider : Party
+    user : Party
+  where
+    signatory provider, user
+
+    choice SplitwellInstallRequest_Accept : ContractId SplitwellInstall
+      controller provider
+      do create SplitwellInstall with ..
+
+    choice SplitwellInstallRequest_Reject : ()
+      controller provider
+      do pure ()
+
+-- TODO(#7411) Remove this once the synchronizer migration automation
+-- no longer relies on it.
+template SplitwellInstall
+  with
+    provider : Party
+    user : Party
+  where
+    signatory provider, user
+
+template SplitwellRules
+  with
+    provider : Party
+  where
+    signatory provider
+
+    nonconsuming choice SplitwellRules_RequestInstall : ContractId SplitwellInstallRequest
+      with
+        user : Party
+      controller user
+      do create SplitwellInstallRequest with ..
+
+    nonconsuming choice SplitwellRules_RequestGroup : ContractId GroupRequest
+      with
+        group : Group
+        user : Party
+      controller user
+      do group.provider === provider
+         group.owner === user
+         create (GroupRequest group)
+
+    nonconsuming choice SplitwellRules_CreateInvite : ContractId GroupInvite
+      with
+        group : ContractId Group
+        user : Party
+      controller user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
+         exercise group Group_CreateInvite
+
+    nonconsuming choice SplitwellRules_AcceptInvite : ContractId AcceptedGroupInvite
+      with
+        cid : ContractId GroupInvite
+        user : Party
+      controller user
+      -- TODO(#9464): use checked fetches to avoid this exercise being executed on the wrong contract.
+      do exercise cid (GroupInvite_Accept user)
+
+    nonconsuming choice SplitwellRules_Join : ContractId Group
+      with
+        group : ContractId Group
+        cid : ContractId AcceptedGroupInvite
+        user : Party
+      controller user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
+         exercise cid (AcceptedGroupInvite_Join group)
+
+    nonconsuming choice SplitwellRules_EnterPayment : ContractId BalanceUpdate
+      with
+        group : ContractId Group
+        amount : Decimal
+        description : Text
+        user : Party
+      controller user
+      do exercise group Group_EnterPayment with
+           payer = user
+           ..
+
+    nonconsuming choice SplitwellRules_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
+      with
+        group : ContractId Group
+        receiverAmounts : [ReceiverAmuletAmount]
+        user : Party
+      controller user
+      do exercise group Group_InitiateTransfer with
+           sender = user
+           ..
+
+    nonconsuming choice SplitwellRules_Net : ContractId BalanceUpdate
+      with
+        group : ContractId Group
+        balanceChanges : Map Party (Map Party Decimal)
+        user : Party
+      controller user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
+         exercise group Group_Net with
+           ..
+
+-- | Is `a` a subset of `b`?
+subset : forall a . (Ord a) => [a] -> [a] -> Bool
+subset (Set.fromList -> a) (Set.fromList -> b) = a `Set.intersection` b == a
+
+-- Request to create a group, we use a two-step workflow so the provider
+-- can enforce uniqueness of (provider, owner, groupId) via command dedup
+template GroupRequest
+  with
+    group : Group
+  where
+    signatory signatory group
+
+    choice GroupRequest_Accept : ContractId Group
+      controller group.provider
+      do create group
+
+    choice GroupRequest_Reject : ()
+      controller group.provider
+      do pure ()
+
+-- | A round identified by a a given GroupKey.
+-- The member ship can change over time by people joining the group
+-- (and eventually leaving but that is not yet implemented).
+-- Balance updates only affect the current members of a group and
+-- are shared with them by them being signatories on the corresponding update.
+-- This ensures that every party can see accurate balances between themselves &
+-- other members but if they joined later, they can not see balances between
+-- two other parties because they miss changes from before they joined.
+template Group
+  with
+    owner : Party
+    dso : Party
+    members : [Party]
+    id: GroupId
+    provider : Party -- In non-provider centric model: provider = owner
+    acceptDuration : RelTime -- Time user has to accept a transfer request in their wallet
+  where
+    signatory provider, owner, members
+
+    nonconsuming choice Group_CreateInvite : ContractId GroupInvite
+      controller owner
+      do create GroupInvite with group = this, ..
+
+    -- We do not provide the ability for the invitee to directly join the group via an open choice,
+    -- as that would make it impossible for the owner to share one link on which many invitees can join.
+    choice Group_Join : ContractId Group
+      with
+        invitee : Party
+      controller owner, invitee
+      do require "Invitee is not a member" (invitee `notElem` groupMembers this)
+         create this with
+           members = invitee :: members
+
+    nonconsuming choice Group_EnterPayment : ContractId BalanceUpdate
+      with
+        payer : Party
+        amount : Decimal
+        description : Text
+      controller payer
+      do require "payer is a member" (payer `elem` groupMembers this)
+         create BalanceUpdate with
+           group = this
+           update = ExternalPayment with
+             payer, amount, description
+
+    nonconsuming choice Group_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
+      with
+        sender : Party
+        receiverAmounts : [ReceiverAmuletAmount]
+      controller sender
+      do require "sender is a member" (sender `elem` groupMembers this)
+         require "receiver is a member" (fmap (\x -> x.receiver) receiverAmounts `subset` groupMembers this)
+         now <- getTime
+         paymentRequest <- create AppPaymentRequest with
+           sender, provider, dso
+           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.amuletAmount AmuletUnit)) receiverAmounts
+           description = "Transfer from " <> show sender <> " to " <> show (map (.receiver) receiverAmounts)
+           expiresAt = now `addRelTime` acceptDuration
+         deliveryOffer <- create TransferInProgress
+           with
+             group = this
+             sender
+             receiverAmounts
+             reference = paymentRequest
+         pure (deliveryOffer, paymentRequest)
+
+    nonconsuming choice Group_Net : ContractId BalanceUpdate
+      with
+        balanceChanges : Map Party (Map Party Decimal) -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero.
+      controller owner
+      do forA_ (M.toList balanceChanges) $ \(p, balances) -> do
+           require (show p <> " is a member of group: " <> show (groupMembers this)) (p `elem` groupMembers this)
+           let total = sum (M.values balances)
+           require ("Balance change for " <> show p <> " must be 0 but was " <> show total) (total == 0.0)
+           forA_ (M.toList balances) $ \(p', change) -> do
+             -- Note that this also covers the membership change for p'
+             case M.lookup p =<< M.lookup p' balanceChanges of
+               None -> abort $ "No symmetric entry for balance change of " <> show (p, p')
+               Some change' -> require ("Balance change for " <> show (p, p') <> " must be symmetric: " <> show (change, change')) (change == -change')
+         create BalanceUpdate with
+           group = this
+           update = Netting with balanceChanges
+
+getGroupKey : Group -> GroupKey
+getGroupKey Group{..} = GroupKey{..}
+
+transferInProgress_receivers : TransferInProgress -> [Party]
+transferInProgress_receivers TransferInProgress{..} = map (\rq -> rq.receiver) receiverAmounts
+
+template TransferInProgress
+  with
+    group : Group
+    sender : Party
+    receiverAmounts : [ReceiverAmuletAmount]
+    reference : ContractId AppPaymentRequest
+  where
+    signatory signatory group
+
+    choice TransferInProgress_Terminate : ()
+      with
+        actor : Party
+        terminatedAppPaymentCid : ContractId TerminatedAppPayment
+      controller actor
+      do require "Actor is signatory" (actor `elem` signatory this)
+         -- TODO(#9464): use a checkedFetch
+         terminated <- fetchUncheckedAndArchive terminatedAppPaymentCid
+         require "Reference matches" (terminated.reference == reference)
+
+    postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
+      with
+        acceptedPaymentCid : ContractId AcceptedAppPayment
+        transferContext : AppTransferContext
+      controller group.provider
+      do
+         -- archival happens via the consuming AcceptedAppPayment_Colllect choice
+         -- TODO(#9464): use a checkedFetch
+         acceptedPayment <- fetchUncheckedButArchiveLater acceptedPaymentCid
+         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
+         acceptedPayment.sender === sender
+         openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
+         -- TODO(#9464): we should check that the DSO party matches here!
+         let expectedAcceptedPayment = AcceptedAppPayment with
+               sender
+               provider = group.provider
+               amuletReceiverAmounts = receiverAmounts
+               dso = group.dso
+               lockedAmulet = acceptedPayment.lockedAmulet
+               round = openMiningRound.round
+               reference
+         acceptedPayment === expectedAcceptedPayment
+         forA receiverAmounts \ReceiverAmuletAmount{receiver, amuletAmount} ->
+           create BalanceUpdate with
+             group
+             update = Transfer with
+               sender
+               receiver
+               amount = amuletAmount
+
+template BalanceUpdate
+  with
+    group : Group -- The group at the time of the update
+    update : BalanceUpdateType
+  where
+    signatory (signatory group)
+
+data BalanceUpdateType
+  -- | External payment from one person to someone outside of the group.
+  -- These are split equally between the members at that point in time.
+  = ExternalPayment with
+      payer : Party
+      description : Text
+      amount : Decimal -- Amount in Amulet
+  -- | Transfer from sender to receiver to reduce their debt.
+  -- Note that it is possible to transfer preemptively before a bill has been submitted.
+  | Transfer with
+      sender : Party
+      receiver : Party
+      amount : Decimal
+  | -- Net the balances between the parties. This allows us to emulate [splitwell simplify debt feature](https://www.splitwell.com/l/sdv/FgPQSo3Bsev).
+    -- E.g., if Alice owes Bob 10Amulet, and Charlie owes Alice 10Amulet, we can net that to Charlie owing Bob 10Amulet.
+    -- Note that we do not enforce that the resulting balances are simpler but we do enforce
+    -- that the total balance of each party stays the same.
+    Netting with
+      balanceChanges : Map Party (Map Party Decimal)
+      -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero
+      -- and they must be symmetric: If balance for (a,b) goes up by x, balance for (b, a) must go down by x.
+  | ExtBalanceUpdateType with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Show)
+
+template GroupInvite
+  with
+    group : Group
+  where
+    signatory group.owner, group.provider
+    nonconsuming choice GroupInvite_Accept : ContractId AcceptedGroupInvite
+      with
+        invitee : Party
+      controller invitee
+      do create AcceptedGroupInvite with
+           groupKey = getGroupKey group
+           invitee = invitee
+
+template AcceptedGroupInvite
+  with
+    groupKey : GroupKey
+    invitee : Party
+  where
+    signatory groupKey.owner, groupKey.provider, invitee
+    choice AcceptedGroupInvite_Join : ContractId Group
+      with
+        group : ContractId Group
+      controller groupKey.owner
+      do
+         -- archival happens via the Group_Join choice
+         void $ fetchButArchiveLater groupKey group
+         exercise group (Group_Join invitee)

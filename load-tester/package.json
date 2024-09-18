@@ -1,0 +1,33 @@
+{
+  "name": "load-tester",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "node esbuild.config.js",
+    "format:check": "prettier --check -- src",
+    "format:fix": "prettier --write -- src",
+    "lint:check": "eslint --max-warnings=0 src",
+    "lint:fix": "eslint --fix --max-warnings=0 -- src",
+    "type:check": "tsc --noEmit",
+    "check": "npm run type:check; npm run lint:check; npm run format:check",
+    "fix": "npm run format:fix; npm run lint:fix"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^4.3.0",
+    "@types/k6": "^0.47.2",
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.11.0",
+    "@typescript-eslint/parser": "^6.11.0",
+    "esbuild": "^0.19.5",
+    "eslint": "^8.53.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "bignumber.js": "^9.1.1",
+    "zod": "^3.22.4"
+  }
+}

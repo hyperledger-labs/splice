@@ -1,0 +1,104 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestValidatorFaucet where
+
+import DA.Assert
+import DA.Time
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Scripts.Util
+import Splice.ValidatorLicense
+import Splice.Util
+
+test_ValidatorFaucet: Script ()
+test_ValidatorFaucet = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    [(faucetCid, _)] <- query @ValidatorLicense aliceValidator.primaryParty
+
+    let checkActivityRecordsExist round = do
+          coupons <- queryFilter @ValidatorLivenessActivityRecord app.dso (\co -> co.round == round)
+          map (._2) coupons === [ValidatorLivenessActivityRecord with
+                dso = app.dso
+                validator = aliceValidator.primaryParty
+                round]
+
+    let checkActivityRecordsDoNotExist round = do
+          [] <- queryFilter @ValidatorLivenessActivityRecord app.dso (\co -> co.round == round)
+          pure ()
+
+    let checkAliceValidatorBalanceAbove amount = do
+          [(_, amulet)] <- query @Amulet aliceValidator.primaryParty
+          require ("alice's validator has >= " <> show amount <> " amulet") (amulet.amount.initialAmount >= amount)
+
+    [round0, round1, _round2] <- getActiveOpenRoundsSorted app
+
+    -- round0 can be received
+    passTime (hours 1)
+    now <- getTime
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0._1
+    let faucetCid = result.licenseCid
+    Some faucet <- queryContractId @ValidatorLicense aliceValidator.primaryParty faucetCid
+    faucet.lastActiveAt === Some now
+    checkActivityRecordsExist (round0._2.round)
+
+    -- but not twice
+    submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round0._1
+
+    -- round1 can be received
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round1._1
+    let faucetCid = result.licenseCid
+    checkActivityRecordsExist (round1._2.round)
+
+    -- let's collect the rewards for Round 0: requires two issuing round advances
+    -- (create the issuing round and advance time for it to become open)
+    runNextIssuance app
+    runNextIssuance app
+
+    runAmuletDepositBots app
+
+    -- checking that the rewards are gone; we're not checking balances as that logic is tested in
+    -- the rewards issuance tests
+    checkActivityRecordsDoNotExist round0._2.round
+    checkAliceValidatorBalanceAbove 3.0 -- initial 1 Amulet plus 2.85 Amulet from the faucet
+
+    -- also collect the round 1
+    runNextIssuance app
+    runAmuletDepositBots app
+    checkActivityRecordsDoNotExist round1._2.round
+
+    checkAliceValidatorBalanceAbove 6.0 -- an additional 2.85 Amulet from the faucet
+
+    -- testing skipping
+    -------------------
+
+    -- get the new active rounds
+    [round2, round3, _] <- getActiveOpenRoundsSorted app
+
+    -- skip one day
+    passTime (days 1)
+
+    -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round3._1
+    let faucetCid = result.licenseCid
+
+    checkActivityRecordsDoNotExist round2._2.round
+    checkActivityRecordsExist (round3._2.round)
+
+    -- check that the coupons for round 2 and 3 are marked as not collected
+    [(_, license)] <- query @ValidatorLicense aliceValidator.primaryParty
+    let Some faucetState = license.faucetState
+    faucetState.numCouponsMissed === 2
+
+    -- round2 can no longer be received
+    submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_RecordValidatorLivenessActivity with
+      openRoundCid = round2._1
+
+    return ()

@@ -1,0 +1,77 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.BuyTrafficRequest where
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.DecentralizedSynchronizer (MemberTraffic)
+import Splice.Util
+
+
+data BuyTrafficRequestTrackingInfo = BuyTrafficRequestTrackingInfo
+  with
+    trackingId : Text -- ^ used to deduplicate requests and query for the status
+    endUserParty : Party -- ^ used in UserWalletTxLogParser's filterByParty
+  deriving (Eq, Show)
+
+data BuyTrafficRequest_CompleteResult = BuyTrafficRequest_CompleteResult with
+  purchasedTraffic : ContractId MemberTraffic
+  trackingInfo : BuyTrafficRequestTrackingInfo
+  senderChangeAmulet : Optional (ContractId Amulet)
+
+data BuyTrafficRequest_CancelResult = BuyTrafficRequest_CancelResult with
+  trackingInfo : BuyTrafficRequestTrackingInfo
+
+data BuyTrafficRequest_ExpireResult = BuyTrafficRequest_ExpireResult with
+  trackingInfo : BuyTrafficRequestTrackingInfo
+
+-- | A request by an end-user to the wallet's automation to buy traffic
+-- for a sequencer member
+template BuyTrafficRequest
+  with
+    dso : Party
+    endUserParty : Party
+    expiresAt : Time -- ^ Buy the traffic before this time.
+    trackingId : Text -- ^ Used to deduplicate requests
+    trafficAmount : Int
+    memberId : Text
+    synchronizerId : Text
+    migrationId : Int
+  where
+    signatory endUserParty
+
+    choice BuyTrafficRequest_Complete : BuyTrafficRequest_CompleteResult
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        walletProvider : Party
+      controller endUserParty, walletProvider
+      do
+        now <- getTime
+        require "Contract has not expired" (now < expiresAt)
+        result <- exercise context.amuletRules (AmuletRules_BuyMemberTraffic inputs context.context endUserParty memberId synchronizerId migrationId trafficAmount)
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        pure BuyTrafficRequest_CompleteResult with
+          purchasedTraffic = result.purchasedTraffic
+          trackingInfo
+          senderChangeAmulet = result.senderChangeAmulet
+
+    choice BuyTrafficRequest_Cancel : BuyTrafficRequest_CancelResult
+      with
+        reason : Text
+      controller endUserParty
+      do
+        now <- getTime
+        require "Contract has not expired" (now < expiresAt)
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        return BuyTrafficRequest_CancelResult with ..
+
+    choice BuyTrafficRequest_Expire : BuyTrafficRequest_ExpireResult
+      with
+      controller endUserParty
+      do
+        now <- getTime
+        require "Contract has expired" (now >= expiresAt)
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        return BuyTrafficRequest_ExpireResult with ..

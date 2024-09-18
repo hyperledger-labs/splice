@@ -1,0 +1,142 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+{{- with .Values.node }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.node.identifier }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $.Values.node.identifier }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Values.node.identifier }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        {{- toYaml $.Values.pod.annotations | nindent 8 }}
+      labels:
+        app: {{ $.Values.node.identifier }}
+        cn-component: cometbft
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
+    spec:
+      {{- if $.Values.enableAntiAffinity }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: cn-component
+                    operator: In
+                    values:
+                      - cometbft
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: { } # search in all namespaces
+      {{- end }}
+      containers:
+        - name: "cometbft"
+          image: {{ $.Values.imageRepo }}/cometbft:{{ $.Chart.AppVersion }}{{ (($.Values.imageDigests).cometbft) }}
+          imagePullPolicy: Always
+          ports:
+            - name: p2p
+              containerPort: {{ .p2pPort }}
+              protocol: TCP
+            - name: rpc
+              containerPort: {{ .rpcPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: {{ $.Values.livenessProbeInitialDelaySeconds | default 600 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+          volumeMounts:
+            - mountPath: /cometbft/initial-config
+              name: initial-config
+            - mountPath: /cometbft/config
+              name: config
+            - mountPath: /cometbft/initial-data
+              name: initial-data
+            - mountPath: /cometbft/data
+              name: data
+            - mountPath: /tmp
+              name: state-sync
+          env:
+            - name: HOME
+              value: /cometbft
+            - name: STATE_SYNC_ENABLE
+              value: "{{ and $.Values.stateSync.enable (ne $.Values.sv1.nodeId $.Values.node.id) }}"
+            - name: STATE_SYNC_RPC_SERVERS
+              value: "{{ $.Values.stateSync.rpcServers }}"
+            # the trust height will be set to these many blocks earlier than the latest block height
+            # this should always be at least as much as the height interval b/w snapshots
+            - name: STATE_SYNC_MIN_TRUST_HEIGHT_AGE
+              value: "{{ $.Values.stateSync.minTrustHeightAge | default $.Values.node.snapshotHeightDelta }}"
+            - name: STATE_SYNC_TRUST_PERIOD
+              value: "{{ $.Values.stateSync.trustPeriod }}"
+            - name: BASH_XTRACEFD
+              value: "1"
+          command:
+            - /bin/sh
+            - -c
+            - -x
+            - -e
+            - |
+              cp -a "${HOME}"/initial-config/. "${HOME}"/config/
+              "${HOME}"/configure-state-sync.sh "${HOME}"/config/config.toml
+              cp -n "${HOME}"/initial-data/* "${HOME}"/data || :
+              cometbft-canton-network start \
+              {{ include "cliArgs" (list $.Values) | indent 14 | trim }}
+          {{- with $.Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: initial-config
+          projected:
+            sources:
+              - configMap:
+                  name: {{ include "prefix" (list $.Values "config-cometbft") }}
+              - secret:
+                  {{ if not $.Values.node.keysSecret }}
+                  name: {{ include "prefix" (list $.Values "cometbft-keys") }}
+                  {{- else }}
+                  name: {{ $.Values.node.keysSecret }}
+                  {{- end }}
+        - name: config
+          emptyDir: { }
+        - name: initial-data
+          configMap:
+            name: {{ include "prefix" (list $.Values "initial-data") }}
+        - name: state-sync
+          emptyDir:
+            sizeLimit: {{ $.Values.db.volumeSize }}
+        - name: data
+          # It is fine to use a persistent volume claim with a deployment instead of a stateful set,
+          # since we are not going to scale this deployment.
+          persistentVolumeClaim:
+            claimName: {{ include "prefix" (list $.Values "cometbft-data") }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

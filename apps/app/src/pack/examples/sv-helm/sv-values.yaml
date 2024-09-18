@@ -1,0 +1,89 @@
+joinWithKeyOnboarding:
+  sponsorApiUrl: "https://sv.sv-2.TARGET_HOSTNAME"
+
+# Replace YOUR_SV_NAME with the name you provided for your SV identity
+onboardingName: YOUR_SV_NAME
+
+# Replace YOUR_SV_NAME with the name you provided for your SV identity
+nodeIdentifier: YOUR_SV_NAME
+
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNAME"
+auth:
+  # The default value of audience is ``https://canton.network.global``.
+  # If you want to configure a custom audience for SV app backend, uncomment this line and replace OIDC_AUTHORITY_SV_AUDIENCE with the audience of your choice.
+  # audience: "OIDC_AUTHORITY_SV_AUDIENCE"
+  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+cometBFT:
+  enabled: true
+  connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
+
+# MIGRATION_START
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+migration:
+  id: "MIGRATION_ID"
+  # Uncomment these when redeploying as part of a migration,
+  # i.e., MIGRATION_ID was incremented and a migration dump was exported to the attached pvc.
+  # migrating: true
+  # This declares that your sequencer with that migration id is still up. You should remove it
+  # once you take down the sequencer for the prior migration id
+  # legacyId: "MIGRATION_ID_BEFORE_INCREMENTED"
+#MIGRATION_END
+
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+participantAddress: "participant-MIGRATION_ID"
+
+# Please make the ``global-domain-sequencer`` service accessible for other validators to subscribe to, and set the URL below to your sequencer service.
+# Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+domain:
+  sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
+  mediatorAddress: "global-domain-MIGRATION_ID-mediator"
+  sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
+  sequencerAvailabilityDelay: "60 seconds"
+  sequencerPruningConfig:
+    enabled: true
+    pruningInterval: "1 hour"
+    retentionPeriod: "30 days"
+
+# Please make the ``scan`` service `publicUrl` accessible for other validators to read from, and set the URL below to your Scan service.
+# Make sure your cluster's ingress is correctly configured for Scan and can be accessed through the provided URL.
+# internalUrl should point to the same scan instance but must be accessible from the SV app. You can usually just leave the default value here.
+scan:
+  publicUrl: "https://scan.sv.YOUR_HOSTNAME"
+  internalUrl: "http://scan-app.sv:5012"
+
+persistence:
+  host: apps-pg
+  secretName: apps-pg-secret
+
+extraBeneficiaries:
+  # Uncomment as required. This is an ordered list of beneficiary weights.
+  # The weight is split between the beneficiaries in order of the list until there is no weight remaining.
+  # Any remaining weight goes to the SV operator party.
+  #
+  # The same party id can be specified multiple times and the amounts are added up.
+  #
+  # It can be useful to specify more beneficiaries than your current weight allows to account for an upcoming weight change, e.g., specifying
+  # beneficiary X once with weight X and then once with weight Y at the end will mean that this party will get weight X until your weight
+  # increases to allow for it to receive up to X+Y.
+  #
+  # - beneficiary: "BENEFICIARY_1_PARTY_ID"
+  #   weight: 3333
+  # - beneficiary: "BENEFICIARY_2_PARTY_ID"
+  #   weight: 6667
+
+# Contact point for your SV node that can be used by other node operators
+# to reach you if there are issues with your node.
+# This can be a slack username or an email address.
+# If you do not wish to share this, set it to an empty string.
+contactPoint: "YOUR_CONTACT_POINT"
+
+spliceInstanceNames:
+  networkName: # Please provide a value as provided in the docs
+  networkFaviconUrl: # Please provide a value as provided in the docs
+  amuletName: # Please provide a value as provided in the docs
+  amuletNameAcronym: # Please provide a value as provided in the docs
+  nameServiceName: # Please provide a value as provided in the docs
+  nameServiceNameAcronym: # Please provide a value as provided in the docs

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# A small script to standardize handling boolean environment variables.
+# Exits with 0 if and only if the given name corresponds to an env var that is defined, and has value of "true", 1, or "yes".
+# A variable not defined defaults to false, so if you want to set a certain variable to default to true (like we do
+# for IS_DEVNET for example), export it from `.envrc.vars`
+# example usage:
+# if (env-bool IS_DEVNET); then echo "you are in devnet mode"; fi
+# if ! (env-bool IS_DEVNET); then echo "you are NOT in devnet mode"; fi
+
+var=$1
+val=${!var}
+
+if [ -z "$val" ]; then
+  # the variable is not defined, defaulting to false
+  exit 1
+fi
+
+if [ "$val" == "true" ] || [ "$val" == "1" ] || [ "$val" == "yes" ]; then exit 0; fi
+if [ "$val" == "false" ] || [ "$val" == "0" ] || [ "$val" == "no" ]; then exit 1; fi
+
+echo "Warning: Unexpected value for variable $var: $val (defaulting to false)" >&2
+
+exit 1

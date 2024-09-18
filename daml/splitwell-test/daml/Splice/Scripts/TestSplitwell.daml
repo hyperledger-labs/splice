@@ -1,0 +1,239 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSplitwell where
+
+import Splice.Splitwell
+import Splice.Scripts.TestWallet
+
+import DA.Action
+import DA.Foldable (forA_)
+import DA.List (sort)
+import DA.Map (Map)
+import qualified DA.Map as M
+import DA.Assert
+import DA.Time
+import Daml.Script
+import Splice.Scripts.Util
+import Splice.Wallet.Payment
+
+
+createSplitwellRules : AmuletUser -> Script (ContractId SplitwellRules)
+createSplitwellRules provider = do
+  submit provider.primaryParty $ createCmd SplitwellRules with provider = provider.primaryParty, ..
+
+requestGroup : AmuletApp -> AmuletUser -> AmuletUser -> Text -> Script (ContractId GroupRequest)
+requestGroup app p provider id =
+  exerciseSplitwellRules p provider $ SplitwellRules_RequestGroup with
+    group =Group with
+      owner = p.primaryParty
+      provider = provider.primaryParty
+      members = []
+      id = GroupId id
+      dso = app.dso
+      acceptDuration = minutes 5
+    user = p.primaryParty
+
+getSplitwellRules : AmuletUser -> Script (ContractId SplitwellRules)
+getSplitwellRules provider = do
+  rules <- queryFilter @SplitwellRules provider.primaryParty (\rule -> rule.provider == provider.primaryParty)
+  case rules of
+    [(rule, _)] -> pure rule
+    _ -> abort $ "Expected exactly one SplitwellRules but got " <> show rules
+
+exerciseSplitwellRules : Choice SplitwellRules c r => AmuletUser -> AmuletUser -> c -> Script r
+exerciseSplitwellRules user provider arg = exerciseSplitwellRules' user provider [] arg
+
+
+exerciseSplitwellRules' : Choice SplitwellRules c r => AmuletUser -> AmuletUser -> [Party] -> c -> Script r
+exerciseSplitwellRules' user provider readAs arg = do
+  rule <- getSplitwellRules provider
+  submitMulti [user.primaryParty] (provider.primaryParty :: readAs) $ exerciseCmd rule arg
+
+getGroup : AmuletUser -> GroupKey -> Script (ContractId Group)
+getGroup user k = do
+  groups <- queryFilter @Group user.primaryParty (\g -> getGroupKey g == k)
+  case groups of
+    [(group, _)] -> pure group
+    _ -> abort $ "Expected exactly one Group but got " <> show groups
+
+createInvite : AmuletUser -> AmuletUser -> GroupKey -> Script (ContractId GroupInvite)
+createInvite owner provider groupKey = do
+  group <- getGroup owner groupKey
+  exerciseSplitwellRules owner provider SplitwellRules_CreateInvite with user = owner.primaryParty, ..
+
+acceptInvite : AmuletUser -> AmuletUser -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite invitee provider groupOwner inviteCid = do
+  -- No explicit disclosure support in Daml script so we do readAs as the group owner.
+  exerciseSplitwellRules' invitee provider [groupOwner] $ SplitwellRules_AcceptInvite with
+    cid = inviteCid
+    user = invitee.primaryParty
+
+joinAllInvites : AmuletUser -> AmuletUser -> Script ()
+joinAllInvites owner provider = do
+  acceptedInvites <- queryFilter @AcceptedGroupInvite owner.primaryParty (\c -> c.groupKey.owner == owner.primaryParty)
+  forA_ acceptedInvites $ \(cid, invite) -> do
+    group <- getGroup owner (groupKey invite)
+    exerciseSplitwellRules owner provider $ SplitwellRules_Join with
+      group
+      cid
+      user = owner.primaryParty
+
+net : AmuletUser -> AmuletUser -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
+net owner provider groupKey balanceChanges = do
+  group <- getGroup owner groupKey
+  exerciseSplitwellRules owner provider SplitwellRules_Net with
+    user = owner.primaryParty
+    ..
+
+
+-- | Query all balances for the current party in the given group.
+-- Returns a map from parties to their balance in relation to the given party.
+-- Positive: They owe you, negative: you owe them.
+queryBalances : AmuletUser -> GroupKey -> Script (Map Party Decimal)
+queryBalances p k = do
+    updates <- queryFilter @BalanceUpdate p.primaryParty (\u -> getGroupKey u.group == k)
+    pure $ M.filter (/= 0.0) $ foldl f M.empty (map snd updates)
+  where
+    f acc BalanceUpdate{..} = case update of
+      ExternalPayment {..} ->
+        let split = amount / intToNumeric (length group.members + 1) -- TODO(#1451) Make sure nothing gets lost here.
+        in if payer == p.primaryParty
+             then let g acc x
+                        | x == payer = acc
+                        | otherwise = M.insertWith (+) x split acc
+                  in foldl g acc (group.owner :: group.members)
+             else M.insertWith (+) payer (-split) acc
+      Transfer {..}
+        | p.primaryParty == sender -> M.insertWith (+) receiver amount acc
+        | p.primaryParty == receiver -> M.insertWith (+) sender (- amount) acc
+        | otherwise -> acc
+      Netting {..} -> case M.lookup p.primaryParty balanceChanges of
+        None -> acc
+        Some changes -> foldl (\acc (p', v) -> M.insertWith (+) p' v acc) acc (M.toList changes)
+      ExtBalanceUpdateType _dummyUnitField -> error "ExtBalanceUpdate: bare extension constructors are not allowed at runtime"
+
+enterPayment : AmuletUser -> AmuletUser -> GroupKey -> Decimal -> Text -> Script ()
+enterPayment payer provider groupKey amount description = do
+  group <- getGroup payer groupKey
+  void $ exerciseSplitwellRules payer provider $ SplitwellRules_EnterPayment with user = payer.primaryParty, ..
+
+initiateTransfer : AmuletUser -> AmuletUser -> GroupKey -> [ReceiverAmuletAmount] -> Script (ContractId AppPaymentRequest)
+initiateTransfer sender provider groupKey receiverAmounts = do
+  group <- getGroup sender groupKey
+  (_, request) <- exerciseSplitwellRules sender provider SplitwellRules_InitiateTransfer with user = sender.primaryParty, ..
+  pure request
+
+completeTransfer : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer app provider acceptedPaymentCid = do
+  transferContext <- getAppTransferContext app provider
+  Some AcceptedAppPayment{reference} <- queryContractId provider.primaryParty acceptedPaymentCid
+  [(transferInProgress, _)] <- queryFilter @TransferInProgress provider.primaryParty (\c -> c.reference == reference)
+  void $ submitUser provider.userId $ exerciseCmd transferInProgress TransferInProgress_CompleteTransfer with ..
+
+test : Script ()
+test = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  featureApp app provider1
+
+  testCase app Parties with
+    provider = provider1
+    getValidator = const provider1Validator.primaryParty
+    ..
+
+-- | Parties used in the test.
+data Parties = Parties
+  with
+    alice : AmuletUser
+    bob : AmuletUser
+    charlie : AmuletUser
+    provider : AmuletUser
+    getValidator : AmuletUser -> Party
+
+testCase : AmuletApp -> Parties -> Script ()
+testCase app Parties{..} = do
+  createSplitwellRules provider
+
+  groupRequestCid <- requestGroup app alice provider "group0"
+  submit provider.primaryParty $ exerciseCmd groupRequestCid GroupRequest_Accept
+  let groupKey = GroupKey alice.primaryParty provider.primaryParty (GroupId "group0")
+  groupInviteCid <- createInvite alice provider groupKey
+
+  acceptInvite bob provider alice.primaryParty groupInviteCid
+  joinAllInvites alice provider
+
+  acceptInvite charlie provider alice.primaryParty groupInviteCid
+  joinAllInvites alice provider
+
+  Some group <- queryContractId alice.primaryParty =<< getGroup alice groupKey
+  sort group.members === [bob.primaryParty, charlie.primaryParty]
+
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.empty
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.empty
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.empty
+
+  enterPayment alice provider (getGroupKey group) 63.0 "foo"
+
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.fromList [(bob.primaryParty, 21.0), (charlie.primaryParty, 21.0)]
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -21.0)]
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -21.0)]
+
+  enterPayment bob provider (getGroupKey group) 33.0 "foo"
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.fromList [(bob.primaryParty, 10.0), (charlie.primaryParty, 21.0)]
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -10.0), (charlie.primaryParty, 11.0)]
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
+
+  request <- initiateTransfer alice provider (getGroupKey group) [ReceiverAmuletAmount bob.primaryParty 8.0]
+  amulet <- tap app alice 63.0
+  receipt <- acceptPaymentRequest app alice (getValidator alice) None request amulet
+
+  completeTransfer app provider receipt
+
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -18.0), (charlie.primaryParty, 11.0)]
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
+
+  request <- initiateTransfer charlie provider (getGroupKey group) [
+      ReceiverAmuletAmount alice.primaryParty 39.0,
+      ReceiverAmuletAmount bob.primaryParty 11.0
+    ]
+  amulet <- tap app charlie 55.0
+  receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request amulet
+  completeTransfer app provider receipt
+
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, -18.0)]
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, -18.0)]
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.fromList [(alice.primaryParty, 18.0)]
+
+  net alice provider (getGroupKey group) $ M.fromList
+    [ (alice.primaryParty, M.fromList [(bob.primaryParty, -18.0), (charlie.primaryParty, 18.0)])
+    , (bob.primaryParty, M.fromList [(alice.primaryParty, 18.0), (charlie.primaryParty, -18.0)])
+    , (charlie.primaryParty, M.fromList [(alice.primaryParty, -18.0), (bob.primaryParty, 18.0)])
+    ]
+
+  balance <- queryBalances alice (getGroupKey group)
+  balance === M.empty
+  balance <- queryBalances bob (getGroupKey group)
+  balance === M.fromList [(charlie.primaryParty, -18.0)]
+  balance <- queryBalances charlie (getGroupKey group)
+  balance === M.fromList [(bob.primaryParty, 18.0)]
+
+  pure ()

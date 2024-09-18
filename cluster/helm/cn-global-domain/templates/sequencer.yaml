@@ -1,0 +1,181 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}-sequencer
+  name: {{ .Release.Name }}-sequencer
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sequencer
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
+      labels:
+        app: {{ .Release.Name }}-sequencer
+        cn-component: sequencer
+        {{- with $.Values.metrics.migration }}
+        active_migration: {{ .active | quote }}
+        migration_id: {{ .id | quote }}
+        {{- end }}
+    spec:
+      {{- if $.Values.enableAntiAffinity }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: cn-component
+                    operator: In
+                    values:
+                      - sequencer
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {} # search in all namespaces
+      {{- end }}
+      containers:
+        - name: sequencer
+        {{- if eq .Values.sequencer.driver.type "cometbft"}}
+          image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_cometbft_sequencer) }}"
+        {{- else}}
+          image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_sequencer) }}"
+        {{- end}}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+            - name: CANTON_DOMAIN_POSTGRES_SERVER
+              value: {{ .Values.sequencer.persistence.host }}
+            - name: CANTON_DOMAIN_POSTGRES_PORT
+              value: {{ .Values.sequencer.persistence.port | quote }}
+            - name: CANTON_DOMAIN_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.sequencer.persistence.secretName }}
+                  key: postgresPassword
+        {{- if .Values.sequencer.persistence.databaseName }}
+            - name: CANTON_SEQUENCER_POSTGRES_DB
+              value: {{ .Values.sequencer.persistence.databaseName }}
+        {{- end }}
+        {{- if eq .Values.sequencer.driver.type "postgres"}}
+            - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
+              value: {{ .Values.sequencer.driver.address }}
+            - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.sequencer.persistence.secretName }}
+                  key: postgresPassword
+        {{- else if eq .Values.sequencer.driver.type "cometbft"}}
+            - name: SEQUENCER_DRIVER_COMETBFT_HOST
+              value: {{ .Values.sequencer.driver.host }}
+            - name: SEQUENCER_DRIVER_COMETBFT_PORT
+              value: "{{ .Values.sequencer.driver.port }}"
+        {{- end}}
+            {{- with .Values.sequencer.tokenExpirationTime }}
+            - name: SEQUENCER_TOKEN_EXPIRATION_TIME
+              value: "{{ . }}"
+            {{- end }}
+            {{- include "cn-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 12}}
+            {{- include "cn-util-lib.log-level" .Values | indent 12}}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5008
+              name: cs-pub-api
+              protocol: TCP
+            - containerPort: 5009
+              name: cs-adm-api
+              protocol: TCP
+        {{- if .Values.sequencer.resources }}
+          resources: {{- toYaml .Values.sequencer.resources | nindent 12 }}
+        {{- else }}
+          {{- with .Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.enableHealthProbes }}
+          livenessProbe:
+            grpc:
+              port: 5061
+              service: liveness
+            initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 600 }}
+            periodSeconds: 60
+            failureThreshold: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            grpc:
+              port: 5061
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 10
+        {{- end }}
+      restartPolicy: Always
+      initContainers:
+        - name: pg-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.sequencer.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} -p {{ .Values.sequencer.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-sequencer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-sequencer
+    {{- with $.Values.metrics.migration }}
+    active_migration: {{ .active | quote }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-sequencer
+  ports:
+    - name: grpc-cs-pub-api
+      port: 5008
+      protocol: TCP
+    - name: grpc-cs-adm-api
+      port: 5009
+      protocol: TCP
+    - name: cs-metrics
+      port: 10013
+      protocol: TCP
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "cn-util-lib.postgres-metrics" (dict "name" (print "postgres-" (.Values.sequencer.persistence.databaseName | replace "_" "-" ) "-e") "namespace" .Release.Namespace "persistence" .Values.sequencer.persistence "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
+{{- end}}

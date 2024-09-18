@@ -1,0 +1,166 @@
+# -*- shell-script -*-
+
+# common functions for use with bash based clis
+# all functions must be prefixed with _
+
+# make a fancy header
+function _header(){
+  local msg="$@"
+  local vbar
+  printf -v vbar '─%.0s' $(seq $((${#msg} +2)) )
+  local out
+  out+="┌${vbar}┐\n"
+  out+="│ ${msg} │\n"
+  out+="└${vbar}┘\n"
+
+  echo -e "${out}"
+}
+
+
+# prefix some output
+#   $1 - the prefix
+#   $@ - the lines you want to prefix
+#
+#   also will take standard in
+function _prefix(){
+  local format="${1}%s\n"
+  shift
+  if [ $# -gt 0 ]; then
+    echo "$@"
+  else
+    cat
+  fi | while read -r; do
+    printf -- "${format}" "${REPLY}"
+  done
+}
+
+# indent some output
+function _indent(){
+  _prefix '    ' "$@"
+}
+
+
+# issue a user friendly red error and die
+function _error(){
+  local RC=$?
+  ((RC)) || RC=1
+  _error_msg "$@"
+  exit ${RC}
+}
+
+# Issue a log message
+function _log() {
+  echo "$@"
+}
+
+# issue a user friendly red error
+function _error_msg(){
+  echo -e "\e[1;31mERROR: $@\e[0m" >&2
+}
+
+# issue a user friendly green informational message
+function _info(){
+  local first_line="INFO: "
+  while read -r; do
+    printf -- "\e[32;1m%s%s\e[0m\n" "${first_line:-     }" "${REPLY}"
+    unset first_line
+  done < <(echo -e "$@")
+}
+
+
+# issue a user friendly yellow warning
+function _warning(){
+  local first_line="WARNING: "
+  while read -r; do
+    printf -- "\e[33;1m%s%s\e[0m\n" "${first_line:-        }" "${REPLY}"
+    unset first_line
+  done < <(echo -e "$@")
+}
+
+# prints a little green check mark before $@
+function _ok(){
+  echo -e "\e[32;1m✔\e[0m ${@}"
+}
+
+# prints a little red x mark before $@ and sets check to 1 if you are using it
+function _nope(){
+  echo -e "\e[31;1m✘\e[0m ${@}"
+}
+
+
+# Displays a macOS notification with $@ as the message text
+function _notify(){
+  osascript <<EOF
+    display notification "$@" with title "Daml Hub"
+EOF
+}
+
+
+# fetches a file from the internet, saves it to a tempfile, and validates it
+# takes a URL and a SHA256SUM
+# sets environment variable FETCH with absolute path to tempfile
+function _fetch(){
+  printf "\e[35mFETCH: %s\e[0m\n" "$1" >&2
+
+  FETCH="$(curl -sSfLo "$(mktemp)"  -w '%{filename_effective}' "${1}")" || _error "Failed to download ${1}"
+
+  local out
+  out="$(sha256sum -c <<< "${2}  ${FETCH}")" || _error "Failed to checksum ${1} with ${2}"
+  printf "\e[35m       %s\e[0m\n" "$2" "${out}" >&2
+
+  echo "${FETCH}"
+}
+
+
+# classic join function
+# first parameter is char to join on, remaining parameters are the strings to be joined
+function _join(){
+  (
+    IFS="$1"
+    shift
+    echo -e "$*"
+  )
+}
+
+
+# buffer the output of a long command and output it when it is done
+function _pipe_buffer(){
+  local buff="$(mktemp)"
+  cat > "${buff}"
+  cat "${buff}"
+}
+
+
+# just sha returns just the sha without the file names
+function _just_sha(){
+  sha256sum $@ | cut -f1 -d' '
+}
+
+# checks if a function exists
+function _has_func(){
+  [ "$(type -t "$@")" == 'function' ]
+}
+
+
+# copies a function
+function _cp_func(){
+  _has_func $1 || return
+  local code="$(declare -f "$1" | tail -n+2)"
+  eval "function ${2}()${code}"
+}
+
+
+# basic confirm action
+function _confirm(){
+  echo -e "$@"
+  read -p '[y/n]: '
+  [ "${REPLY}" == 'y' ] || exit 0
+}
+
+# run a command with set -x
+function _set_x(){
+  set -x
+  $@ ; RC=$?
+  { set +x; } 2>/dev/null
+  return $RC
+}

@@ -1,0 +1,76 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Table-like contracts for storing the mutable state of the app-provider using
+-- contracts signed by the validator-operator party.
+module Splice.AppManager.Store where
+
+-- | The configuration of an app which defines the
+-- release versions that need to be
+-- installed as well as the synchronizers that users need to
+-- be connected to.
+-- The latest version is the active one.
+-- This is used both on the provider's side to store the registered applications
+-- and on the user’s side as a cache and to guard against the provider mutating it.
+template AppConfiguration
+  with
+    validatorOperator : Party
+    provider : Party
+    version : Int
+    json : Text
+    -- ^ The JSON manifest for the given configuration.
+  where
+    signatory validatorOperator
+
+-- | A release of an app, which associate a concise name,
+-- the 'version', to a transitively closed set of .dars and their metadata
+-- required to configure and install them on a user's validator node.
+-- which defines the DARs that are part of this release.
+-- This is used both on the provider's side to store the registered applications
+-- and on the user’s side as a cache and to guard against the provider mutating it.
+template AppRelease
+  with
+    validatorOperator : Party
+    provider : Party
+    version : Text
+    json : Text
+    -- ^ The JSON manifest for the given release.
+  where
+    signatory validatorOperator
+
+-- | A registered application.
+template RegisteredApp
+  with
+    validatorOperator : Party
+    provider : Party
+ where
+   signatory validatorOperator
+
+-- | An installed application. The version specifies
+-- the configuration that is currently installed.
+-- TODO(#6839) Add a discriminator to support the same app being installed
+-- multiple times.
+template InstalledApp
+  with
+    validatorOperator : Party
+    provider : Party
+    appUrl: Text
+  where
+    signatory validatorOperator
+
+-- | A release config of an installed application
+-- that has been approved by a validator operator.
+template ApprovedReleaseConfiguration
+  with
+    validatorOperator : Party
+    provider : Party
+    configurationVersion : Int
+    -- ^ The configuration version as part of which
+    -- this release config was approved. This only exists for debugging.
+    json : Text
+    -- ^ The JSON of the release config that was approved
+    jsonHash : Text
+    -- ^ Hash of the canonicalized JSON release configuration. This
+    -- can be used for equality comparisons.
+  where
+    signatory validatorOperator
