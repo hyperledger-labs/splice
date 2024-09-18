@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # To clean up dbs in a cluster run the following commands in the cluster directory:
-# ./../../../scripts/unused-databases-delete.sh <migration_id>
+# ./../../../scripts/unused-databases-create-delete-script.sh <migration_id>
 # Copy the output of the script and then create a script using a debug container in the cluster:
 # run `cncluster debug_shell`
 # create a script with the output of the previous command
@@ -53,10 +53,18 @@ do
         continue
     fi
     if [[ $instance == *sequencer* ]]; then
-        db_name="global_domain_${migration_id}_sequencer"
+        if [[ $namespace == "sv" ]]; then
+            db_name="sequencer_${migration_id}"
+        else
+            db_name="global_domain_${migration_id}_sequencer"
+        fi
         secret_name="sequencer-pg-$secret_suffix"
     elif [[ $instance == *mediator* ]]; then
-        db_name="global_domain_${migration_id}_mediator"
+        if [[ $namespace == "sv" ]]; then
+            db_name="mediator_${migration_id}"
+        else
+            db_name="global_domain_${migration_id}_mediator"
+        fi
         secret_name="mediator-pg-$secret_suffix"
     elif [[ $instance == *participant* ]]; then
         db_name="participant_${migration_id}"
