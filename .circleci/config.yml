@@ -921,6 +921,7 @@ commands:
                     CMD_FILE=$(mktemp cmd-XXXXXX.sh)
                     cat \<<'EOF2' > $CMD_FILE
                     set -euo pipefail
+                    echo "Running command"
                     << parameters.cmd >>
             EOF2
                     bash $CMD_FILE
@@ -1275,23 +1276,9 @@ commands:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep CIRCLE_JOB"
           gce_authenticate: true
+          cmd_retry_count: 5 # we have seen this fail several times, see #13863
           cmd: |
-            job_data=$( curl -s --fail -X GET -u "${CIRCLECI_TOKEN}:" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/job" )
-            printf "Job data: %s\n" "$job_data"
-            start=$(jq -r --arg job_name "${CIRCLE_JOB}" '.items[] | select(.name == $job_name) | .started_at' \<<< $job_data)
-            printf "Job start time: %s\n" "$start"
-            # somehow the start date is considered a secret by circleci, which causes it to be replaced with asterisks
-            # changing the date slightly (subtracting one second) avoids this
-            start_minus_one_second=$(date -u -d"$start -1 second" +"%Y-%m-%dT%H:%M:%S%:z")
-            printf "Job start time minus one second: %s\n" "$start_minus_one_second"
-            now=$(date -u +%s)
-            printf "Current time: %s\n" "$now"
-            now_formatted=$(date -u -d @$now +"%Y-%m-%dT%H:%M:%S%:z")
-            printf "Current time formatted: %s\n" "$now_formatted"
-            GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
-            url="https://console.cloud.google.com/logs/query;startTime=$start_minus_one_second;endTime=$now_formatted;query=resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22?project=$CLOUDSDK_CORE_PROJECT"
-            echo "Go to the following URL to see the logs since the job start in Google Cloud:"
-            echo "$url"
+            $REPO_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
