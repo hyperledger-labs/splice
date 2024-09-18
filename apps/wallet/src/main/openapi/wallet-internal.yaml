@@ -1,0 +1,941 @@
+openapi: 3.0.0
+info:
+  title: Wallet API
+  version: 0.0.1
+tags:
+  - name: wallet
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/wallet/user-status:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "userStatus"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatusResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/amulets:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "list"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/tap:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "tap"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TapRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TapResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/429"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+
+  /v0/wallet/self-grant-feature-app-right:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "selfGrantFeatureAppRight"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SelfGrantFeaturedAppRightRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SelfGrantFeaturedAppRightResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/balance:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getBalance"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/app-payment-requests:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAppPaymentRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppPaymentRequestsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/app-payment-requests/{contract_id}:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/app-payment-requests/{contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptAppPaymentRequestResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/429"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+  /v0/wallet/app-payment-requests/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/accepted-app-payments:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAcceptedAppPayments"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAcceptedAppPaymentsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/subscription-requests:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptionRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionRequestsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/subscription-initial-payments:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptionInitialPayments"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionInitialPaymentsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/subscriptions:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptions"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/subscription-requests/{contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptSubscriptionRequestResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/429"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+  /v0/wallet/subscription-requests/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/subscription-requests/{contract_id}:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+    delete:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "cancelSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-offers/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-offers/{contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptTransferOfferResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-offers/{contract_id}/withdraw:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "withdrawTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/accepted-transfer-offers:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAcceptedTransferOffers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAcceptedTransferOffersResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/app-reward-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAppRewardCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppRewardCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/validator-reward-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorRewardCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorRewardCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/validator-faucet-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorFaucetCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorFaucetCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/validator-liveness-activity-records:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorLivenessActivityRecords"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorLivenessActivityRecordsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/sv-reward-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSvRewardCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSvRewardCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/cancel-featured-app-rights:
+    delete:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "cancelFeaturedAppRights"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transactions:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listTransactions"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListTransactionsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTransactionsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+components:
+  schemas:
+    UserStatusResponse:
+      type: object
+      required:
+        - party_id
+        - user_onboarded
+        - user_wallet_installed
+        - has_featured_app_right
+      properties:
+        party_id:
+          type: string
+        user_onboarded:
+          type: boolean
+        user_wallet_installed:
+          type: boolean
+        has_featured_app_right:
+          type: boolean
+
+    ListResponse:
+      type: object
+      required:
+        - amulets
+        - locked_amulets
+      properties:
+        amulets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AmuletPosition"
+        locked_amulets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AmuletPosition"
+
+    AmuletPosition:
+      type: object
+      required:
+        - contract
+        - round
+        - accrued_holding_fee
+        - effective_amount
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+        round:
+          type: integer
+          format: int64
+        accrued_holding_fee:
+          type: string
+        effective_amount:
+          type: string
+
+    TapRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: string
+
+    TapResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          type: string
+
+    SelfGrantFeaturedAppRightRequest:
+      type: object
+      nullable: true
+
+    SelfGrantFeaturedAppRightResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          type: string
+
+    GetBalanceResponse:
+      type: object
+      required:
+        - round
+        - effective_unlocked_qty
+        - effective_locked_qty
+        - total_holding_fees
+      properties:
+        round:
+          type: integer
+          format: int64
+        effective_unlocked_qty:
+          type: string
+        effective_locked_qty:
+          type: string
+        total_holding_fees:
+          type: string
+
+    ListAppPaymentRequestsResponse:
+      type: object
+      required:
+        - payment_requests
+      properties:
+        payment_requests:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    AcceptAppPaymentRequestRequest:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
+
+    AcceptAppPaymentRequestResponse:
+      type: object
+      required:
+        - accepted_payment_contract_id
+      properties:
+        accepted_payment_contract_id:
+          type: string
+
+    RejectAppPaymentRequestRequest:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
+
+    ListAcceptedAppPaymentsResponse:
+      type: object
+      required:
+        - accepted_app_payments
+      properties:
+        accepted_app_payments:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    ListSubscriptionRequestsResponse:
+      type: object
+      required:
+        - subscription_requests
+      properties:
+        subscription_requests:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListSubscriptionInitialPaymentsResponse:
+      type: object
+      required:
+        - initial_payments
+      properties:
+        initial_payments:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    Subscription:
+      type: object
+      required:
+        - subscription
+        - state
+      properties:
+        subscription:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        state:
+          $ref: "#/components/schemas/SubscriptionState"
+    SubscriptionState:
+      oneOf:
+        - $ref: "#/components/schemas/SubscriptionIdleState"
+        - $ref: "#/components/schemas/SubscriptionPaymentState"
+    SubscriptionIdleState:
+      type: object
+      required:
+        - idle
+      properties:
+        idle:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    SubscriptionPaymentState:
+      type: object
+      required:
+        - payment
+      properties:
+        payment:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListSubscriptionsResponse:
+      type: object
+      required:
+        - subscriptions
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+
+    AcceptSubscriptionRequestResponse:
+      type: object
+      required:
+        - initial_payment_contract_id
+      properties:
+        initial_payment_contract_id:
+          type: string
+
+    AcceptTransferOfferResponse:
+      type: object
+      required:
+        - accepted_offer_contract_id
+      properties:
+        accepted_offer_contract_id:
+          type: string
+
+    ListAcceptedTransferOffersResponse:
+      type: object
+      required:
+        - accepted_offers
+      properties:
+        accepted_offers:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListAppRewardCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - app_reward_coupons
+      properties:
+        app_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorRewardCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - validator_reward_coupons
+      properties:
+        validator_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorFaucetCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - validator_faucet_coupons
+      properties:
+        validator_faucet_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorLivenessActivityRecordsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - validator_liveness_activity_records
+      properties:
+        validator_liveness_activity_records:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListSvRewardCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - sv_reward_coupons
+      properties:
+        sv_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListTransactionsRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        begin_after_id:
+          type: string
+        page_size:
+          type: integer
+          format: int64
+
+    PartyAndAmount:
+      type: object
+      required:
+        - party
+        - amount
+      properties:
+        party:
+          type: string
+        amount:
+          type: string
+
+    TransactionSubtype:
+      type: object
+      required:
+        - template_id
+        - choice
+      properties:
+        template_id:
+          type: string
+        choice:
+          type: string
+        amulet_operation:
+          type: string
+
+    BaseListTransactionsResponseItem:
+      type: object
+      required:
+        - transaction_type
+        - transaction_subtype
+        - event_id
+        - date
+      properties:
+        transaction_type:
+          type: string
+        transaction_subtype:
+          $ref: "#/components/schemas/TransactionSubtype"
+        event_id:
+          type: string
+        date:
+          type: string
+          format: date-time
+    TransferResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - provider
+            - sender
+            - receivers
+            - holding_fees
+            - amulet_price
+            - app_rewards_used
+            - validator_rewards_used
+            - sv_rewards_used
+          properties:
+            provider:
+              type: string
+            sender:
+              $ref: "#/components/schemas/PartyAndAmount"
+            receivers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PartyAndAmount"
+            holding_fees:
+              type: string
+            amulet_price:
+              type: string
+            app_rewards_used:
+              type: string
+            validator_rewards_used:
+              type: string
+            sv_rewards_used:
+              type: string
+    BalanceChangeResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - receivers
+            - amulet_price
+          properties:
+            receivers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PartyAndAmount"
+            amulet_price:
+              type: string
+    NotificationResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - details
+          properties:
+            details:
+              type: string
+    UnknownResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+    ListTransactionsResponseItem:
+      oneOf:
+        - $ref: "#/components/schemas/TransferResponseItem"
+        - $ref: "#/components/schemas/BalanceChangeResponseItem"
+        - $ref: "#/components/schemas/NotificationResponseItem"
+        - $ref: "#/components/schemas/UnknownResponseItem"
+      discriminator:
+        propertyName: transaction_type
+        mapping:
+          transfer: "#/components/schemas/TransferResponseItem"
+          balance_change: "#/components/schemas/BalanceChangeResponseItem"
+          notification: "#/components/schemas/NotificationResponseItem"
+          unknown: "#/components/schemas/UnknownResponseItem"
+
+    ListTransactionsResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListTransactionsResponseItem"

@@ -1,0 +1,53 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSteppedRate where
+
+import DA.Assert
+
+import Daml.Script
+import DA.Foldable (forA_)
+
+import Splice.Fees
+
+test : Script ()
+test = script do
+  let example = SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+  -- Negative values & zero are handled gracefully
+  chargeSteppedRate example (-1.0) === 0.0
+  chargeSteppedRate example 0.0 === 0.0
+  -- Values in first step & end of first step get the corresponding rate
+  chargeSteppedRate example 50.0 === 0.01 * 50.0
+  chargeSteppedRate example 100.0 === 0.01 * 100.0
+  -- Values in second step get rate for first step & second step
+  chargeSteppedRate example 900.0 === 0.01 * 100.0 + 0.001 * 800.0
+  chargeSteppedRate example 1100.0 === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 100.0
+  -- Values in third step get rates from all steps
+
+  chargeSteppedRate example 1500.0 === 0.01 * 100.0 + 0.001 * 900.0 + 500.0 * 0.0001
+  chargeSteppedRate example 1001100.0 === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1200.0
+  -- Values after the last step stick with the last rate for everything after
+  -- the last step.
+  chargeSteppedRate example (100.0 + 1000.0 + 1000000.0 + 1.0)
+    === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1201.0
+  chargeSteppedRate example (100.0 + 1000.0 + 1000000.0 + 1000000.0)
+    === 0.01 * 100.0 + 0.001 * 900.0 + 0.0001 * 998900.0 + 0.00001 * 1001200.0
+
+testScaledSteppedRate : Script ()
+testScaledSteppedRate = script do
+  let unscaledRate = SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+  checkAllForScale unscaledRate 0.5
+  checkAllForScale unscaledRate 1.0
+  checkAllForScale unscaledRate 2.0
+
+checkAllForScale : SteppedRate -> Decimal -> Script ()
+checkAllForScale unscaledRate scale = do
+  let scaledRate = scaleSteppedRate scale unscaledRate
+  forA_ (map (._1) unscaledRate.steps) $ \(step) -> do
+    checkScaledSteppedRate unscaledRate scale scaledRate step
+    checkScaledSteppedRate unscaledRate scale scaledRate (step + 0.1)
+    checkScaledSteppedRate unscaledRate scale scaledRate (step / 2.0)
+
+checkScaledSteppedRate : SteppedRate -> Decimal -> SteppedRate -> Decimal -> Script ()
+checkScaledSteppedRate unscaledRate scale scaledRate value = do
+  chargeSteppedRate scaledRate value === (chargeSteppedRate unscaledRate (value / scale)) * scale

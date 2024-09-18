@@ -1,0 +1,202 @@
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package com.daml.network.scan.store;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "scalapb/scalapb.proto";
+
+message PartyBalanceChange {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string change_to_initial_amount_as_of_round_zero = 1 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string change_to_holding_fees_rate = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message SteppedRate {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  message Step {
+    option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+    string from = 1 [(scalapb.field).type = "scala.math.BigDecimal"];
+    string rate = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+  }
+
+  string initial_rate = 1 [(scalapb.field).type = "scala.math.BigDecimal"];
+  repeated Step steps = 2;
+}
+
+message SenderAmount {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string input_amulet_amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string input_app_reward_amount  = 3 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string input_validator_reward_amount = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string sender_change_amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string sender_change_fee = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string sender_fee = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string holding_fees = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  // Added after initial release, so needs to be mapped to an Option in scala
+  string input_sv_reward_amount = 9 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+  string input_validator_faucet_amount = 10 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+}
+
+message ReceiverAmount {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string receiver_fee = 3 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message BalanceChange {
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string change_to_initial_amount_as_of_round_zero = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string change_to_holding_fees_rate = 3 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message ErrorTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+}
+
+message BalanceChangeTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string change_to_initial_amount_as_of_round_zero = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string change_to_holding_fees_rate = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+  map <string, PartyBalanceChange> party_balance_changes = 6 [(scalapb.field).key_type = "com.digitalasset.canton.topology.PartyId"];
+}
+
+message ExtraTrafficPurchaseTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string validator = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  int64 traffic_purchased = 5;
+  string cc_spent = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message OpenMiningRoundTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string amulet_create_fee = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string holding_fee = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string lock_holder_fee = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  SteppedRate transfer_fee = 7;
+}
+
+message ClosedMiningRoundTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  google.protobuf.Timestamp effective_at = 4 [(scalapb.field).type = "java.time.Instant"];
+}
+
+message TransferTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string offset = 2;
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
+  string provider = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  SenderAmount sender = 6;
+  repeated ReceiverAmount receivers = 7;
+  repeated BalanceChange balance_changes = 8;
+  int64 round = 9;
+  string amulet_price = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message TapTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string offset = 2;
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
+  string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  int64 round = 7;
+  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message MintTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string offset = 2;
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
+  string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  int64 round = 7;
+  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message SvRewardTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message AppRewardTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message ValidatorRewardTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  int64 round = 3;
+  string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
+}
+
+message VoteRequestTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  google.protobuf.Struct result = 2 [(scalapb.field).type = "com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
+}

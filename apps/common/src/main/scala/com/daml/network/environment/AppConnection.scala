@@ -1,0 +1,235 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.daml.network.environment
+
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, Uri}
+import org.apache.pekko.stream.Materializer
+import com.daml.network.admin.api.client.{
+  ApiClientRequestLogger,
+  GrpcClientMetrics,
+  GrpcMetricsClientInterceptor,
+}
+import com.daml.network.admin.api.client.HttpAdminAppClient
+import com.daml.network.admin.api.client.TraceContextPropagation.*
+import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
+import com.daml.network.http.HttpClient
+import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
+import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
+import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.{CallCredentials, Status}
+
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
+
+abstract class BaseAppConnection(
+    override val loggerFactory: NamedLoggerFactory
+) extends FlagCloseableAsync
+    with NamedLogging {
+
+  def serviceName: String
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq()
+
+  protected def toFuture[T](e: Either[String, T]): Future[T] =
+    e.fold(
+      // RetryProvider retries UNAVAILABLE by default
+      err => Future.failed(Status.UNAVAILABLE.withDescription(err).asRuntimeException()),
+      Future.successful,
+    )
+
+  protected def runHttpCmd[Res, Result](
+      url: Uri,
+      command: HttpCommand[Res, Result],
+      headers: List[HttpHeader] = List.empty[HttpHeader],
+  )(implicit
+      templateDecoder: TemplateJsonDecoder,
+      httpClient: HttpClient,
+      tc: TraceContext,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Result] = {
+    val client: command.Client = command.createClient(url.toString())
+    for {
+      response <- EitherTUtil.toFuture(
+        command.submitRequest(client, tc.propagate(headers)).leftMap[Throwable] {
+          case Left(throwable) => throwable
+          case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
+        }
+      )
+      result <- toFuture(command.handleResponse(response))
+    } yield result
+  }
+}
+
+object BaseAppConnection {
+  final class UnexpectedHttpResponse(val response: HttpResponse)
+      extends Throwable(s"Unexpected Http Response: $response")
+}
+
+/** Base class for connecting and calling Canton gRPC APIs.
+  */
+abstract class AppConnection(
+    config: ClientConfig,
+    apiLoggingConfig: ApiLoggingConfig,
+    override val loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
+)(implicit ec: ExecutionContextExecutor)
+    extends BaseAppConnection(loggerFactory)
+    with FlagCloseableAsync
+    with NamedLogging {
+  private val channel = new CloseableChannel(
+    ClientChannelBuilder.createChannelToTrustedServer(config),
+    logger,
+    s"$serviceName connection",
+  )
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
+    SyncCloseable(
+      "channel", {
+        channel.channel.shutdownNow()
+        channel.close()
+      },
+    )
+  )
+
+  // This adapted from GrpcCtlRunner but keeps the actual grpc exception
+  // instead of turning everything into a String.
+  protected def runCmd[Req, Res, Result](
+      cmd: GrpcAdminCommand[Req, Res, Result],
+      credentials: Option[CallCredentials] = None,
+  )(implicit traceContext: TraceContext): Future[Result] = {
+    val dso =
+      cmd
+        .createService(channel.channel)
+        .withInterceptors(
+          new ApiClientRequestLogger(
+            loggerFactory,
+            apiLoggingConfig,
+          ),
+          new GrpcMetricsClientInterceptor(grpcClientMetrics),
+        )
+
+    val dsoAuth = credentials match {
+      case Some(creds) => dso.withCallCredentials(creds)
+      case None => dso
+    }
+
+    for {
+      req <- toFuture(cmd.createRequest())
+      response <- TraceContextGrpc.withGrpcContext(traceContext)(cmd.submitRequest(dsoAuth, req))
+      result <- toFuture(cmd.handleResponse(response))
+    } yield result
+  }
+
+}
+
+/** Base class for connecting and calling the HTTP/Admin API exposed by a Splice App.
+  */
+abstract class HttpAppConnection(
+    config: NetworkAppClientConfig,
+    upgradesConfig: UpgradesConfig,
+    override val serviceName: String,
+    override protected[this] val retryProvider: RetryProvider,
+    override val loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
+    templateDecoder: TemplateJsonDecoder,
+    httpClient: HttpClient,
+) extends BaseAppConnection(loggerFactory)
+    with RetryProvider.Has
+    with FlagCloseableAsync
+    with NamedLogging {
+
+  val basePath = s"/api/${serviceName}"
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product"))
+  implicit private val versionInfoPretty: Pretty[HttpAdminAppClient.VersionInfo] =
+    Pretty.adHocPrettyInstance
+
+  def getStatus(): Future[NodeStatus[SpliceStatus]] =
+    runHttpCmd(
+      config.url,
+      HttpAdminAppClient.GetHealthStatus[SpliceStatus](basePath, SpliceStatus.fromHttp),
+    )
+
+  // Fails the future if the node is not active for easy use in waitUntil
+  def checkActive(): Future[Unit] =
+    getStatus().map { status =>
+      if (!status.isActive.getOrElse(false)) {
+        throw Status.FAILED_PRECONDITION
+          .withDescription(show"Node is not active, current status $status")
+          .asRuntimeException()
+      }
+    }
+
+  private def getHttpAppVersionInfo(): Future[HttpAdminAppClient.VersionInfo] = {
+    runHttpCmd(
+      config.url,
+      HttpAdminAppClient.GetVersion(basePath),
+      List(),
+    )
+  }
+
+  def checkVersionCompatibility(retryConnectionOnInitialFailure: Boolean): Future[Unit] = {
+    for {
+      versionInfo <-
+        if (retryConnectionOnInitialFailure) {
+          retryProvider.getValueWithRetries(
+            RetryFor.WaitingOnInitDependency,
+            "app_version",
+            s"app version of ${config.url}",
+            getHttpAppVersionInfo(),
+            logger,
+          )
+        } else {
+          getHttpAppVersionInfo()
+        }
+    } yield {
+      logger.debug(s"Found app version: $versionInfo")(TraceContext.empty)
+      val myVersion = BuildInfo.compiledVersion
+      val compatibleVersion = BuildInfo.compatibleVersion
+      if (versionInfo.version != myVersion && versionInfo.version != compatibleVersion) {
+        val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
+          s"Your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}"
+        if (upgradesConfig.failOnVersionMismatch)
+          sys.error(errorMsg)
+        else
+          logger.info(errorMsg)(TraceContext.empty)
+      } else {
+        logger.debug(
+          s"Version verification passed for $serviceName, server is on the same version as mine, or a compatible one: ${versionInfo}"
+        )(
+          TraceContext.empty
+        )
+      }
+    }
+  }
+}
+
+object HttpAppConnection {
+  private[network] def checkVersionOrClose(
+      conn: HttpAppConnection,
+      retryConnectionOnInitialFailure: Boolean,
+  )(implicit ec: ExecutionContext): Future[conn.type] =
+    conn
+      .checkVersionCompatibility(retryConnectionOnInitialFailure)
+      .transform {
+        case Success(_) => Success(conn)
+        case Failure(e) =>
+          conn.close()
+          Failure(e)
+      }
+}

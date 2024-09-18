@@ -1,0 +1,107 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestPruneAmuletConfigSchedule where
+
+import DA.Assert
+import qualified DA.Map as Map
+import Daml.Script
+import DA.Time
+
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Fees
+import Splice.Schedule
+
+import Splice.DsoRules
+
+import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Parameters
+import Splice.Scripts.Util
+
+testPruneAmuletConfigSchedule : Script ()
+testPruneAmuletConfigSchedule = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
+  Some (amuletRulesCid, _) <- queryAmuletRulesByKey app.dso
+
+  now <- getTime
+  let oneHourLater = addRelTime now (hours 1)
+      twoHoursLater = addRelTime now (hours 2)
+      threeHoursLater = addRelTime now (hours 3)
+
+      amuletConfig_initial = makeAmuletConfig (minutes 10) (RatePerRound 0.000020)
+      amuletConfig1 = makeAmuletConfig (seconds 100) (RatePerRound 0.000004)
+      amuletConfig2 = makeAmuletConfig (seconds 120) (RatePerRound 0.000016)
+      amuletConfig3 = makeAmuletConfig (seconds 170) (RatePerRound 0.000012)
+
+  -- Fails because there is no future config
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
+        newScheduleItem = (oneHourLater, amuletConfig1)
+  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
+        newScheduleItem = (twoHoursLater, amuletConfig2)
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
+  amuletRules.configSchedule === Schedule with
+    initialValue = amuletConfig_initial
+    futureValues = [ (oneHourLater, amuletConfig1), (twoHoursLater, amuletConfig2) ]
+
+  -- Fails because the time is not yet reached
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  passTime (hours 1)
+
+  submitMulti [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
+  amuletRules.configSchedule === Schedule with
+    initialValue = amuletConfig1
+    futureValues = [ (twoHoursLater, amuletConfig2) ]
+
+  -- Fails because the time is not yet reached
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  initiateAndAcceptVote app (Map.keys dsoRules.svs) $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
+        newScheduleItem = (threeHoursLater, amuletConfig3)
+
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
+  amuletRules.configSchedule === Schedule with
+    initialValue = amuletConfig1
+    futureValues = [ (twoHoursLater, amuletConfig2), (threeHoursLater, amuletConfig3) ]
+
+  -- Fails because the time is not yet reached
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  passTime (hours 2)
+
+  submitMulti [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
+  amuletRules.configSchedule === Schedule with
+    initialValue = amuletConfig3
+    futureValues = []
+
+  -- Fails because there is no future config
+  submitMultiMustFail [sv1] [app.dso] $
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+
+  return ()
+
+makeAmuletConfig : RelTime -> RatePerRound -> AmuletConfig USD
+makeAmuletConfig tickDuration holdingFee = defaultAmuletConfig with
+    transferConfig = defaultTransferConfig with holdingFee
+    tickDuration

@@ -1,0 +1,65 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+if [ $# -eq 1 ]; then
+    OVERRIDE_VERSION=$1
+fi
+
+sha=$(git rev-parse HEAD)
+
+# Always use the release version on release branches. This only matters for the ciupgrade tests.
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ $branch == release-line-* && -z ${OVERRIDE_VERSION-} ]]; then
+    OVERRIDE_VERSION="${branch#release-line-}"
+fi
+
+if [ -n "${OVERRIDE_VERSION-}" ]; then
+    echo "${OVERRIDE_VERSION}"
+    exit 0
+fi
+
+set +e
+if ! prefix=$(git show "$sha":VERSION 2>&1); then
+    prefix=$(cat VERSION)
+fi
+set -e
+show_commit_message_sha="${show_commit_message_sha:-$sha}"
+git_commit_message=$(git log -1 --pretty=format:%B "$show_commit_message_sha")
+if [[ $git_commit_message == *"[release]"* ]]; then
+    # release commit - no suffixes
+    echo "$prefix"
+    exit 0
+fi
+
+commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
+number_of_commits=$(git rev-list --count "$sha")
+commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
+
+if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION:-}" ]; then
+    if [ -n "${CI:-}" ]; then
+        >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
+        exit 1
+    fi
+    echo "$prefix-${USER}-dirty"
+    exit 0
+fi
+
+user_suffix=""
+if [ -z "${CI:-}" ]; then
+    user_suffix="-${USER}"
+fi
+
+dirty_suffix=""
+if ! (env-bool CI_IGNORE_DIRTY_REPO) && [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
+    if [ -z "${CI:-}" ]; then
+        dirty_suffix="-dirty"
+    else
+        >&2 echo "Repo was dirty on CI"
+        git status
+        git --no-pager diff --cached
+        exit 1
+    fi
+fi
+
+echo "$prefix$user_suffix-snapshot.$commit_date.$number_of_commits.0.v$commit_sha_8$dirty_suffix"

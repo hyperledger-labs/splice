@@ -1,0 +1,387 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestDecentralizedAutomation where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+
+import Splice.Round
+import Splice.Types
+import Splice.Amulet
+import Splice.AmuletRules
+
+import Splice.DsoRules
+import Splice.Util
+
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+import Splice.Ans
+import Splice.Scripts.AnsRulesParameters
+import Splice.Wallet.Subscriptions
+
+
+-- Automation DSO delegate election
+-----------------------------
+
+unitTestDsoDelegateElectionVoting : Script ()
+unitTestDsoDelegateElectionVoting = do
+  let rankings =
+        [ ("A",   ["A",   "D", "B", "bad"])
+        , ("B",   ["B",   "D", "A", "bad"])
+        , ("bad", ["bad", "D", "A", "B"  ])
+        ]
+  let votes = tallyVotes (map snd rankings) (VotingState Map.empty Set.empty)
+  let candidates = sortOn snd
+        [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
+  let winner = instantRunOffVoting 2 2 rankings
+  trace (votes, candidates, winner) $
+    instantRunOffVoting 2 2 rankings === "B"
+
+
+testDsoDelegateElection : Script ()
+testDsoDelegateElection = do
+
+  (app, dso, (mallory, sv2, sv3, sv4)) <- initMainNet
+
+  -- run an issuance
+  runNextIssuanceD app 1.0
+
+  -- mallory stops acting, which the others detect; they thus request a re-election
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  req1 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
+    requester = sv2
+    ranking = [sv2, sv3, sv4, mallory]
+    reason = ERR_DsoDelegateUnavailable
+  req2 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
+    requester = sv3
+    ranking = [sv3, sv4, sv2, mallory]
+    reason = ERR_DsoDelegateUnavailable
+  req3 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
+    requester = sv4
+    ranking = [sv4, sv3, sv2, mallory]
+    reason = ERR_DsoDelegateUnavailable
+  -- mallory tries to get himself re-elected
+  req4 <- submitMulti [mallory] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
+    requester = mallory
+    ranking = [mallory, sv2, sv3, sv4]
+    reason = ERR_DsoDelegateUnavailable
+  -- mallory does not get re-elected, as sv1 reaches a weak majority first
+  _ <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
+    actor = sv3
+    requestCids = [req1.electionRequestCid, req2.electionRequestCid, req3.electionRequestCid, req4.electionRequestCid]
+
+  [(_, dsoRules)] <- query @DsoRules dso
+  require "SV2 got elected" (dsoRules.dsoDelegate == sv2)
+
+  -- run a few more issuances
+  runNextIssuanceD app 1.1
+  runNextIssuanceD app 1.2
+
+  openRounds <- map snd <$> query @OpenMiningRound app.dso
+
+  -- wow! stuff works :D
+  trace openRounds $ return ()
+
+
+-- | An example of an impersonation attack on the DSO delegate election protected for
+-- via checked fetches.
+testDsoDelegateElection_ImpersonationAttack : Script ()
+testDsoDelegateElection_ImpersonationAttack = do
+  (_app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+
+  -- SV2 attempts to get himself elected w/o any action from the others
+  -- by impersonating the DSO party
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  let epoch = dsoRules.epoch
+  req1 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
+    dso = sv2
+    epoch
+    requester = sv2
+    ranking = [sv2, sv3, sv4, sv1]
+    reason = ERR_DsoDelegateUnavailable
+  req2 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
+    dso = sv2
+    epoch
+    requester = sv3
+    ranking = [sv2, sv3, sv4, sv1]
+    reason = ERR_DsoDelegateUnavailable
+  req3 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
+    dso = sv2
+    epoch
+    requester = sv4
+    ranking = [sv2, sv4, sv3, sv1]
+    reason = ERR_DsoDelegateUnavailable
+
+  -- sv2 has created enough requests and submits them
+  submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
+    actor = sv2
+    requestCids = [req1, req2, req3]
+
+
+testUnclaimedRewardsMerging : Script ()
+testUnclaimedRewardsMerging = do
+  (app, _, _) <- initDevNet
+
+  -- onboard a validator
+  validator1 <- setupValidator app "validator1"
+  provider1 <- setupUser app "provider1" validator1
+
+  forA_ [1..6] do \_ -> generateUnclaimedReward app provider1
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  unclaimedRewards <- query @UnclaimedReward app.dso
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_MergeUnclaimedRewards with
+      amuletRulesCid
+      unclaimedRewardCids = (fmap fst unclaimedRewards)
+
+  unclaimedRewards <- query @UnclaimedReward app.dso
+  length unclaimedRewards === 1
+
+  pure ()
+
+
+
+-- Testing confirmations
+------------------------
+
+testRequiredNumOfConfirmation : Script ()
+testRequiredNumOfConfirmation = do
+  (_, dso, (sv1, sv2, sv3, _)) <- initDevNet
+
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  Map.size dsoRules.svs === 4
+
+  svX <- allocateParty "svX"
+
+  -- create 3 confirmations
+  let action = ARC_DsoRules with
+        dsoAction = SRARC_AddSv $ DsoRules_AddSv with
+          newSvParty = svX
+          newSvName = "svX"
+          newSvRewardWeight = 1
+          newSvParticipantId = "svX-participant-id"
+          joinedAsOfRound = (Round 3)
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  confirmations <- query @Confirmation dso
+  length confirmations === 3
+
+  -- There are 4 SVs in total, which implies f = 1 and thus 3 confirmations are required.
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action
+      amuletRulesCid = Some amuletRulesCid
+      confirmationCids
+
+  -- check that the `action` was executed
+  [(_, dsoRules)] <- query @DsoRules dso
+  require "svX is a sv" (svX `Map.member` dsoRules.svs)
+
+  pure ()
+
+testConfirmationExpiry : Script ()
+testConfirmationExpiry = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- create a single confirmation which will not suffice to initiate an action
+  confirmationResult <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    confirmer = sv1
+    action = ARC_DsoRules with
+      dsoAction = SRARC_AddSv $ DsoRules_AddSv with
+        newSvParty = svX
+        newSvName = "svX"
+        newSvRewardWeight = 1
+        newSvParticipantId = "svX-participant-id"
+        joinedAsOfRound = (Round 3)
+
+  -- DSO delegate tries to expire the confirmation, but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
+
+  -- wait for the confirmation TTL to pass
+  passTime (minutes 5)
+
+  -- DSO delegate expires the confirmation
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
+
+  pure ()
+
+
+-- Testing ANS decentralization
+-------------------------------
+
+testDecentralizedAns : Script ()
+testDecentralizedAns = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
+
+  alice <- setupUser app "alice" app.dso
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  [(ansRulesCid, _)] <- query @AnsRules dso
+
+  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
+    user = alice.primaryParty
+
+  amulet <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let initialPaymentCid = result.subscriptionPayment
+
+  -- SVs create confirmations for collecting the initial payment of the requested ans entry.
+  appContext <- getAppTransferContext app app.dsoUser
+  let collectInitialPaymentAction = ARC_AnsEntryContext with
+        ansEntryContextCid = ansSummary.entryCid
+        ansEntryContextAction = ANSRARC_CollectInitialEntryPayment $ AnsEntryContext_CollectInitialEntryPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          ansRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action = collectInitialPaymentAction
+    return result.confirmation
+
+  confirmations <- query @Confirmation dso
+  length confirmations === 4
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action = collectInitialPaymentAction
+      amuletRulesCid = None
+      confirmationCids
+
+  [(entryCid, entry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
+  [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.dsoUser
+
+  amulet <- tap app alice 1.5
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let paymentCid = result.subscriptionPayment
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_CollectEntryRenewalPayment with
+      ansEntryContextCid = ansSummary.entryCid
+      choiceArg = AnsEntryContext_CollectEntryRenewalPayment with
+        paymentCid
+        entryCid
+        transferContext = appContext
+        ansRulesCid
+
+  [(_, renewedEntry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
+  [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  renewedEntry.expiresAt === addRelTime entry.expiresAt defaultAnsRulesConfig.entryLifetime
+  renewedSubscriptionState.nextPaymentDueAt === renewedEntry.expiresAt
+
+  -- SVs confirm to reject invalid entry payment of ANS request.
+
+  rejectedSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "reject.darth.vader"
+    url = "invalid url which will be rejected by SVs by creating confirmations."
+    description = "ANS Description"
+    user = alice.primaryParty
+
+  amulet <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputAmulet amulet]
+    context = paymentContext
+    walletProvider = app.dso
+  let initialPaymentCid = result.subscriptionPayment
+
+  -- SVs create confirmations for rejecting initial payment of the requested ans entry.
+  appContext <- getAppTransferContext app app.dsoUser
+  let rejectInitialPaymentAction = ARC_AnsEntryContext with
+        ansEntryContextCid = rejectedSummary.entryCid
+        ansEntryContextAction = ANSRARC_RejectEntryInitialPayment $ AnsEntryContext_RejectEntryInitialPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          ansRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action = rejectInitialPaymentAction
+    return result.confirmation
+
+  confirmations <- query @Confirmation dso
+  length confirmations === 4
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action = rejectInitialPaymentAction
+      amuletRulesCid = None
+      confirmationCids
+
+  -- entry is not created
+  [] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
+  -- initial paynment is archived
+  None <- queryContractId @SubscriptionInitialPayment app.dso initialPaymentCid
+
+  pure ()
+
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  (app, dso, (sv1, _, _, _)) <- initDevNet
+
+  alice <- setupUser app "alice" app.dso
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  [(ansRulesCid, _)] <- query @AnsRules dso
+
+  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
+    user = alice.primaryParty
+
+  result <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription)
+
+  entryContexts <- query @AnsEntryContext app.dso
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.dso
+  terminatedSubscriptions === []
+  pure ()

@@ -1,0 +1,27 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletRulesDisclosure where
+
+import Daml.Script
+
+import DA.Foldable (mapA_)
+
+import Splice.Scripts.Util
+
+test : Script ()
+test = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- -- start issuing
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  mapA_ (\_ -> do
+    runNextIssuance app
+    runAmuletDepositBots app
+    pay app alice bob.primaryParty 0.01
+    ) [1,2,3,4,5]
+
+
+  pure ()

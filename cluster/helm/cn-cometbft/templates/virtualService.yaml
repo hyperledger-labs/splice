@@ -1,0 +1,27 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+{{- $fullName := include "prefix" (list .Values "cometbft-vs") }}
+{{- $p2pServiceName := include "prefix" (list .Values "cometbft-p2p") }}
+{{- if (.Values.istioVirtualService).enabled }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    # While documentation says that hosts are optional, leaving this out does not work.
+    - "*"
+  gateways:
+    - {{ .Values.istioVirtualService.gateway }}
+  tcp:
+    - match:
+        - port: {{ .Values.istioVirtualService.port }}
+      route:
+        - destination:
+            host: {{ $p2pServiceName }}.{{ .Release.Namespace }}.svc.cluster.local
+            port:
+              number: {{ .Values.node.p2pPort }}
+{{- end }}

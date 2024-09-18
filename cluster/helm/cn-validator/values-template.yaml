@@ -1,0 +1,64 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+fixedTokens: false
+
+# -- Annotations for the validator pod
+pod:
+  annotations: {}
+
+defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8
+resources:
+  limits:
+    cpu: 3
+    memory: 8Gi
+  requests:
+    cpu: 1
+    memory: 4Gi
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
+persistence:
+  databaseName: cantonnet_validator
+  schema: validator
+  host: postgres
+  port: 5432
+  user: cnadmin
+  secretName: "postgres-secrets"
+
+migration:
+  id: 0
+  migrating: false
+  attachPvc: true
+# pvc used for migrations
+pvc:
+  volumeStorageClass: standard-rwo
+
+useSequencerConnectionsFromScan: true
+
+failOnAppVersionMismatch: true
+
+# This will disable the wallet HTTP server and wallet automations when set to false
+enableWallet: true
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:
+
+spliceInstanceNames:
+  networkName: # Please provide a value as provided in the docs
+  networkFaviconUrl: # Please provide a value as provided in the docs
+  amuletName: # Please provide a value as provided in the docs
+  amuletNameAcronym: # Please provide a value as provided in the docs
+  nameServiceName: # Please provide a value as provided in the docs
+  nameServiceNameAcronym: # Please provide a value as provided in the docs

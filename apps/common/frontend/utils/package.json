@@ -1,0 +1,55 @@
+{
+  "name": "common-frontend-utils",
+  "version": "0.1.0",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.4.4",
+    "web-vitals": "2.1.4",
+    "zod": "3.19.1"
+  },
+  "devDependencies": {
+    "@tanstack/eslint-plugin-query": "4.29.4",
+    "@trivago/prettier-plugin-sort-imports": "4.0.0",
+    "@types/node": "18.11.0",
+    "@types/react": "18.0.28",
+    "@types/react-dom": "18.0.11",
+    "eslint": "8.34.0",
+    "eslint-config-react-app": "7.0.1",
+    "prettier": "2.8.4",
+    "typescript": "4.9.5"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./*": "./lib/*.js"
+  },
+  "main": "lib/index.js",
+  "peerDependencies": {
+    "@mui/icons-material": "5.11.9",
+    "@mui/material": "^5.14.10",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "check": "npm run format:check && npm run lint:check",
+    "fix": "npm run format:fix && npm run lint:fix",
+    "format:check": "prettier --check -- src",
+    "format:fix": "prettier --write -- src",
+    "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
+    "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
+    "start": "tsc --watch"
+  },
+  "types": "lib/index.d.ts"
+}

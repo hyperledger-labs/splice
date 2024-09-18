@@ -1,0 +1,401 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.DsoTestUtils where
+
+
+import DA.Action (unless, when, void, foldlA)
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import qualified DA.Text as T
+import Daml.Script
+import DA.Time
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Issuance
+import Splice.Round
+import Splice.Types
+import Splice.ValidatorLicense
+
+import Splice.Scripts.Util
+import Splice.Scripts.Parameters
+
+import Splice.CometBft
+import Splice.DsoRules
+import Splice.DsoBootstrap
+import Splice.DSO.AmuletPrice
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.SvState
+import Splice.Scripts.AnsRulesParameters
+import Splice.Util
+
+-- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
+bpsMultiplier : Int
+bpsMultiplier = 10000
+
+initMainNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
+initMainNet = initDecentralizedSynchronizer False
+
+initDevNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDevNet = initDecentralizedSynchronizer True
+
+initDecentralizedSynchronizer : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizer isDevNet = do
+  [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
+
+  dso <- allocateParty "dso-party"
+
+  let initialSynchronizerConfig = SynchronizerConfig with
+        state = DS_Operational
+        cometBftGenesisJson = "<genesis-json>"
+        acsCommitmentReconciliationInterval = Some 1800
+  let initialDsoDecentralizedSynchronizerConfig =  DsoDecentralizedSynchronizerConfig with
+        synchronizers = Map.fromList [("synchronizer-id", initialSynchronizerConfig)]
+        lastSynchronizerId = "synchronizer-id"
+        activeSynchronizerId = "synchronizer-id"
+
+  let config = DsoRulesConfig with
+        numUnclaimedRewardsThreshold = 5
+        numMemberTrafficContractsThreshold = 5
+        actionConfirmationTimeout = minutes 5
+        svOnboardingRequestTimeout = hours 1
+        svOnboardingConfirmedTimeout = hours 1
+        voteRequestTimeout = days 7
+        dsoDelegateInactiveTimeout = seconds 70
+        synchronizerNodeConfigLimits = defaultSynchronizerNodeConfigLimits
+        maxTextLength = 1024
+        decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
+        nextScheduledSynchronizerUpgrade = None
+  let amuletConfig = defaultAmuletConfig
+  let ansRulesConfig = defaultAnsRulesConfig
+
+  now <- getTime
+  submit dso $ createAndExerciseCmd
+    DsoBootstrap with
+      dso
+      sv1Party = sv1
+      sv1Name = "sv1"
+      sv1RewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
+      sv1ParticipantId = "sv1-participant-id"
+      sv1SynchronizerNodes = Map.fromList
+        [("synchronizer-id",  SynchronizerNodeConfig with
+                cometBft = CometBftConfig with
+                  nodes = Map.fromList
+                    [("node-id-1", CometBftNodeConfig "validatorPubKey" 1)]
+                  sequencingKeys = map SequencingKeyConfig ["initial-sequencer-key"]
+                  governanceKeys = map GovernanceKeyConfig ["initial-governance-key"]
+                sequencer = Some SequencerConfig with
+                  migrationId = 0
+                  sequencerId = "sequencer-id"
+                  url = "sequencer.address:1234"
+                  availableAfter = Some now
+                mediator = Some MediatorConfig with
+                  mediatorId = "mediator-id"
+                scan = Some ScanConfig with
+                  publicUrl = "https://sv1.example.com"
+                legacySequencerConfig = None
+        )]
+      amuletConfig
+      amuletPrice = 1.0
+      round0Duration = hours 24
+      ansRulesConfig
+      config
+      initialTrafficState = Map.empty
+      isDevNet
+    DsoBootstrap_Bootstrap
+
+  dsoUserId <- validateUserId "dso-user"
+  let app = AmuletApp with
+        dso
+        dsoUser = AmuletUser with
+          userId = dsoUserId
+          primaryParty = dso
+
+  -- add more sv nodes
+  forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
+    [(dsoRulesCid, _)] <- query @DsoRules dso
+    submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid $ DsoRules_OnboardValidator with
+      sponsor = sv1
+      validator = svParty
+      version = Some "0.1.0"
+      contactPoint = Some (svName <> "@example.com")
+    (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
+    submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
+      newSvParty = svParty
+      newSvName = svName
+      newSvRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
+      newSvParticipantId = svName <> "-participant-id"
+      joinedAsOfRound = earliestOpenRound.round
+
+  -- check that the SvStatusReports are present
+  checkSvContractInvariants app
+
+  pure (app, dso, (sv1, sv2, sv3, sv4))
+
+
+getSvInfoByParty : AmuletApp -> Party -> Script SvInfo
+getSvInfoByParty app sv = do
+  [(_, rules)] <- query @DsoRules app.dso
+  case Map.lookup sv rules.svs of
+    None -> fail $ "Not a sv: " <> show sv
+    Some info -> pure info
+
+generateUnclaimedReward : AmuletApp -> AmuletUser -> Script ()
+generateUnclaimedReward app provider1 = do
+  submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = provider1.primaryParty
+    amount = 5.7
+    round = Round 0
+    featured = True
+
+  runNextIssuanceD app 1.0
+
+  pure ()
+
+
+dsoDelegateSubmits : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script a
+dsoDelegateSubmits app mkCommands = do
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
+  submitMulti [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
+
+dsoDelegateSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script ()
+dsoDelegateSubmitsMustFail app mkCommands = do
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
+  submitMultiMustFail [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
+
+svSubmits : AmuletApp -> Party -> (ContractId DsoRules -> Commands a) -> Script a
+svSubmits app sv mkCommands = do
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  submitMulti [sv] [app.dso] $ mkCommands dsoRulesCid
+
+onboardValidator : AmuletApp -> Party -> Text -> Party -> Script ()
+onboardValidator app sponsor validatorName validator = do
+  svSubmits app sponsor $ \cid -> exerciseCmd cid $
+    DsoRules_OnboardValidator sponsor validator (Some "0.1.0") (Some (validatorName <> "@example.com"))
+  pure ()
+
+
+-- | Run the next issuance.
+runNextIssuanceD : AmuletApp -> Decimal -> Script ()
+runNextIssuanceD app amuletPrice = do
+    advanceToNextRoundChange app
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound app.dso
+    [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+    forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
+
+      -- collect all unclaimed rewards into the unclaimed rewards fund
+      validatorRewards <- (queryFilter @ValidatorRewardCoupon app.dso (\r -> r.round == miningRound.round))
+      appRewards <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == miningRound.round)
+      svRewards <- queryFilter @SvRewardCoupon app.dso (\r -> r.round == miningRound.round)
+      validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\r -> r.round == miningRound.round)
+      validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\r -> r.round == miningRound.round)
+      dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+        DsoRules_ClaimExpiredRewards with
+          amuletRulesCid = amuletRulesCid
+          choiceArg = AmuletRules_ClaimExpiredRewards with
+            closedRoundCid = miningRoundCid
+            validatorRewardCouponCids = map fst validatorRewards
+            appCouponCids = map fst appRewards
+            svRewardCouponCids = map fst svRewards
+            optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
+            optValidatorLivenessActivityRecordCids = Some (map fst validatorLivenessActivityRecords)
+
+      -- the closed round
+      confirmAWC_MiningRound_Archive app
+      executeAllConfirmedActions app
+
+    -- close current issuing rounds if there are any
+    now <- getTime
+    imcs <- queryFilter @IssuingMiningRound app.dso (\r -> r.targetClosesAt <= now)
+    forA_ imcs $ \(issuingRoundCid, _) ->
+      submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_Close with
+        issuingRoundCid
+
+    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
+    -- create a new OpenMiningRound
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
+
+    -- set the new agreed price. This should be done with confirmation
+    amuletPriceVoteCids <- updateAgreedAmuletPrice app.dso amuletPrice
+
+    advanceResult <- dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+        DsoRules_AdvanceOpenMiningRounds with
+          amuletRulesCid
+          roundToArchiveCid
+          middleRoundCid = r2Cid
+          latestRoundCid = r3Cid
+          amuletPriceVoteCids
+    let summarizingRoundCid = advanceResult.summarizingRound
+
+    -- compute total burn
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
+
+    let summary = OpenMiningRoundSummary with
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+
+    -- create issuing mining round
+    submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with
+      miningRoundCid = summarizingRoundCid
+      summary
+
+    pure ()
+
+
+confirmAWC_MiningRound_Archive : AmuletApp -> Script ()
+confirmAWC_MiningRound_Archive app = do
+  -- get rules contracts
+  [(dsoRulesCid, rules)] <- query @DsoRules app.dso
+  -- query closed mining rounds and SVs
+  rounds <- query @ClosedMiningRound app.dso
+  -- confirm the archival of all closed rounds
+  forA_ rounds $ \round ->
+    forA_ (Map.keys rules.svs) $ \sv -> do
+      -- mallory does not act
+      unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
+        submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+          action = ARC_AmuletRules with
+            amuletRulesAction = CRARC_MiningRound_Archive $
+              AmuletRules_MiningRound_Archive with
+                closedRoundCid = round._1
+          confirmer = sv
+        pure ()
+
+executeAllConfirmedActions : AmuletApp -> Script ()
+executeAllConfirmedActions app = do
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  [(dsoRulesCid, rules)] <- query @DsoRules app.dso
+  let s = summarizeDso rules
+  -- query all confirmations visible to DSO party
+  confirmations0 <- query @Confirmation app.dso
+  -- execute the actions for which there are enough confirmations
+  let executableConfirmations =
+          filter (const True) -- (\cs -> s.requiredNumConfirmations <= length cs)
+        $ groupEqualOn (\c -> c._2.action) confirmations0
+  forA_ executableConfirmations $ \cs -> do
+    submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+      action = (head cs)._2.action
+      amuletRulesCid = Some amuletRulesCid
+      confirmationCids = map fst cs
+
+executeAllDefinitiveVotes : AmuletApp -> Script ()
+executeAllDefinitiveVotes app = do
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  [(dsoRulesCid, rules)] <- query @DsoRules app.dso
+  let s = summarizeDso rules
+  -- query all voting requests visible to DSO party
+  now <- getTime
+  requests <- query @VoteRequest app.dso
+  forA_ requests $ \(requestCid, request) -> do
+    let activeSvs = Set.fromList $ map (.name) $ Map.values rules.svs
+    let execute = request.voteBefore <= now ||
+          (activeSvs == Set.fromList (Map.keys request.votes))
+    when execute $ do
+      void $ submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+        requestCid
+        amuletRulesCid = Some amuletRulesCid
+
+initiateAndAcceptVote : AmuletApp -> [Party] -> ActionRequiringConfirmation -> Script ()
+initiateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
+initiateAndAcceptVote app (initiator::others) action = do
+    [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    requestCid <- submitMulti [initiator] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+      requester = initiator
+      action
+      reason = Reason with url = ""; body = "let's get it done"
+      voteRequestTimeout = None
+    foldlA (castVote dsoRulesCid) requestCid.voteRequest others
+    executeAllDefinitiveVotes app
+  where
+    castVote dsoRulesCid requestCid sv = do
+      result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+          requestCid
+          vote = Vote with
+            sv
+            accept = True
+            reason = Reason with url = ""; body = "✓"
+      return result.voteRequest
+
+
+-- | Update all currently desired prices to the target price
+updateAgreedAmuletPrice : Party -> Decimal -> Script [ContractId AmuletPriceVote]
+updateAgreedAmuletPrice dso amuletPrice = do
+  votes <- query @AmuletPriceVote dso
+  forA votes $ \(voteCid, vote) ->
+    if (vote.amuletPrice == Some amuletPrice)
+      then pure voteCid
+      else do
+        submit dso $ archiveCmd voteCid
+        submit dso $ createCmd $ vote with amuletPrice = Some amuletPrice
+
+checkSvContractInvariants : AmuletApp -> Script ()
+checkSvContractInvariants app = do
+  checkSvStatusReports app
+  checkSvRewardStates app
+
+checkSvRewardStates : AmuletApp -> Script ()
+checkSvRewardStates app = do
+  rewardStates <- query @SvRewardState app.dso
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  forA_ (Map.values dsoRules.svs) $ \info ->
+    require "Each onboarded andSV name has one SvRewardState contract" $
+      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
+  forA_ (Map.values dsoRules.offboardedSvs) $ \info ->
+    require "Each offboarded and SV name has one SvRewardState contract" $
+      any (\(_, rewardState) -> rewardState.svName == info.name) rewardStates
+  let offAndOnboardedSvs = Set.fromList (map (\info -> info.name) (Map.values dsoRules.svs) <> map (\info -> info.name) (Map.values dsoRules.offboardedSvs))
+  Set.fromList [state.svName | (_, state) <- rewardStates] === offAndOnboardedSvs
+  require "No duplicate SvRewardstate contracts" $
+    length rewardStates == Set.size offAndOnboardedSvs
+
+-- | Check that there's exactly one status report per SV both off-boarded and onboarded.
+checkSvStatusReports : AmuletApp -> Script ()
+checkSvStatusReports app = do
+  [(_, dsoRules)] <- query @DsoRules app.dso
+  let svParties = Map.keys dsoRules.svs
+  let offboardedParties = Map.keys dsoRules.offboardedSvs
+  let expectedSvParties = Set.fromList $ svParties ++ offboardedParties
+  reports <- query @SvStatusReport app.dso
+  let reportingParties = Set.fromList $ [ report.sv | (_, report) <- reports ]
+  reportingParties === expectedSvParties
+
+getSvNodeState : AmuletApp -> Party -> Script (ContractId SvNodeState, SvNodeState)
+getSvNodeState app sv = do
+  [result] <- queryFilter @SvNodeState app.dso (\state -> state.sv == sv)
+  pure result
+
+setSynchronizerNodeConfig : AmuletApp -> Party -> Text -> SynchronizerNodeConfig -> Script (ContractId SvNodeState)
+setSynchronizerNodeConfig app sv synchronizerId newNodeConfig = do
+  (nodeStateCid, _) <- getSvNodeState app sv
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_SetSynchronizerNodeConfig with
+    sv
+    synchronizerId
+    nodeStateCid
+    newNodeConfig
+  pure result.svNodeState
+
+-- Pure utility functions
+-------------------------
+
+-- | O(n^2): group all elements whose projection is equal.
+groupEqualOn : Eq b => (a -> b) -> [a] -> [[a]]
+groupEqualOn _ [] = []
+groupEqualOn proj (x :: xs) =
+    (x :: equal) :: groupEqualOn proj rest
+  where
+    xp = proj x
+    (equal, rest) = partition (\y -> proj y == xp) xs

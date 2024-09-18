@@ -1,0 +1,56 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestSynchronizerSequencerTracking where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import Daml.Script
+
+import Splice.CometBft
+import Splice.DSO.DecentralizedSynchronizer
+
+import Splice.Scripts.DsoTestUtils
+
+testSynchronizerMigration : Script ()
+testSynchronizerMigration = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+      synchronizerId = "synchronizer-id"
+
+  -- SV's onboard their nodes
+  now <- getTime
+  forA_ svs $ \sv -> do
+    setSynchronizerNodeConfig app sv synchronizerId $ SynchronizerNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = Some SequencerConfig with
+        migrationId = 1
+        sequencerId = "sequencer-id-" <> partyToText sv
+        url = "sequencer-" <> partyToText sv <> ".address:1234"
+        availableAfter = Some now
+      mediator = Some MediatorConfig with
+        mediatorId = "mediator-id-" <> partyToText sv
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
+      legacySequencerConfig = Some LegacySequencerConfig with
+        migrationId = 0
+        url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
+        sequencerId = "legacy-sequencer-id-" <> partyToText sv
+
+  -- sequencer info are published to DsoRules and AmuletRules
+  forA_ svs $ \sv -> do
+    (_, nodeState) <- getSvNodeState app sv
+    let  Some synchronizerConfig = Map.lookup synchronizerId nodeState.state.synchronizerNodes
+    synchronizerConfig.sequencer === Some SequencerConfig with
+      migrationId = 1
+      sequencerId = "sequencer-id-" <> partyToText sv
+      url = "sequencer-" <> partyToText sv <> ".address:1234"
+      availableAfter = Some now
+    synchronizerConfig.legacySequencerConfig === Some LegacySequencerConfig with
+      migrationId = 0
+      url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
+      sequencerId = "legacy-sequencer-id-" <> partyToText sv

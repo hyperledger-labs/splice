@@ -1,0 +1,16 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.AnsRulesParameters where
+
+import DA.Time
+
+import Splice.Ans
+
+-- | Default proposal for ANS config
+defaultAnsRulesConfig : AnsRulesConfig
+defaultAnsRulesConfig = AnsRulesConfig with
+  renewalDuration = days 30
+  entryLifetime = days 90
+  entryFee = 1.0
+  descriptionPrefix = "ANS entry: "

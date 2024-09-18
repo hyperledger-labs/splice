@@ -1,0 +1,205 @@
+openapi: 3.0.0
+info:
+  title: Common schemas for Splice API definitions
+  version: 0.0.1
+paths:
+  /status:
+    get:
+      tags: [common]
+      x-jvm-package: external.common_admin
+      operationId: "getHealthStatus"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NodeStatus"
+  /version:
+    get:
+      tags: [common]
+      x-jvm-package: external.common_admin
+      operationId: "getVersion"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Version"
+  /readyz:
+    get:
+      tags: [common]
+      x-jvm-package: external.common_admin
+      operationId: "isReady"
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service_unavailable
+  /livez:
+    get:
+      tags: [common]
+      x-jvm-package: external.common_admin
+      operationId: "isLive"
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service_unavailable
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "401":
+      description: "unauthorized"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "403":
+      description: "forbidden"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "409":
+      description: "conflict"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "429":
+      description: "too many requests"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "500":
+      description: "internal server error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "501":
+      description: "not implemented"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "503":
+      description: "service unavailable"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ContractId:
+      type: string
+
+    Contract:
+      type: object
+      properties:
+        template_id:
+          type: string
+        contract_id:
+          type: string
+        payload:
+          type: object
+        created_event_blob:
+          type: string
+        created_at:
+          type: string
+      required:
+        [
+          "template_id",
+          "contract_id",
+          "payload",
+          "created_event_blob",
+          "created_at"
+        ]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+    # Status definition for health endpoint
+    Status:
+      type: object
+      required:
+        - "id"
+        - "uptime"
+        - "ports"
+        - "active"
+      properties:
+        id:
+          type: string
+        uptime:
+          type: string
+        ports:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        extra:
+          type: string
+          format: binary
+        active:
+          type: boolean
+    # NotInitialized definition for health endpoint
+    NotInitialized:
+      type: object
+      required: [ "active" ]
+      properties:
+        active:
+          type: boolean
+    SuccessStatusResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          $ref: "#/components/schemas/Status"
+    NotInitializedStatusResponse:
+      type: object
+      required:
+        - not_initialized
+      properties:
+        not_initialized:
+          $ref: "#/components/schemas/NotInitialized"
+    FailureStatusResponse:
+      type: object
+      required:
+        - failed
+      properties:
+        failed:
+          $ref: "#/components/schemas/ErrorResponse"
+    NodeStatus:
+      oneOf:
+        - $ref: "#/components/schemas/SuccessStatusResponse"
+        - $ref: "#/components/schemas/NotInitializedStatusResponse"
+        - $ref: "#/components/schemas/FailureStatusResponse"
+
+    Version:
+      type: object
+      required: [ "version", "commit_ts" ]
+      properties:
+        version:
+          type: string
+        commit_ts:
+          type: string
+          format: date-time

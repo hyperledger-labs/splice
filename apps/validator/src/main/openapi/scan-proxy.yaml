@@ -1,0 +1,175 @@
+openapi: 3.0.0
+info:
+  title: Validator API
+  version: 0.0.1
+tags:
+  - name: validator
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/scan-proxy/dso-party-id:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getDsoPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetDsoPartyIdResponse"
+  /v0/scan-proxy/featured-apps/{provider_party_id}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupFeaturedAppRight"
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupFeaturedAppRightResponse"
+  /v0/scan-proxy/open-and-issuing-mining-rounds:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getOpenAndIssuingMiningRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsProxyResponse"
+  /v0/scan-proxy/amulet-rules:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getAmuletRules"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAmuletRulesProxyResponse"
+  /v0/scan-proxy/ans-entries/by-party/{party}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupAnsEntryByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/scan-proxy/ans-entries:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "listAnsEntries"
+      parameters:
+        - name: "name_prefix"
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/ListEntriesResponse"
+  /v0/scan-proxy/ans-entries/by-name/{name}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupAnsEntryByName"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/scan-proxy/ans-rules:
+    post:
+      tags: [scan-proxy]
+      x-jvm-package: scanproxy
+      operationId: "getAnsRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesResponse"
+
+components:
+  schemas:
+    # does not include the TTL, and the contracts are not-MaybeCached
+    GetOpenAndIssuingMiningRoundsProxyResponse:
+      type: object
+      required:
+        [
+          "open_mining_rounds",
+          "issuing_mining_rounds",
+        ]
+      properties:
+        open_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+        issuing_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    # the contract is not-MaybeCached
+    GetAmuletRulesProxyResponse:
+      type: object
+      required:
+        [
+          "amulet_rules",
+        ]
+      properties:
+        amulet_rules:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+

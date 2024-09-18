@@ -1,0 +1,13 @@
+persistence:
+  host: participant-pg
+  port: 5432
+  secretName: participant-pg-secret
+  databaseName: participant_MIGRATION_ID
+  schema: participant
+auth:
+  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # The default value of audience is ``https://canton.network.global``.
+  # If you want to configure a custom audience for Ledger API, uncomment this line and replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice.
+  # targetAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
+enableHealthProbes: true

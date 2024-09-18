@@ -1,0 +1,4 @@
+cluster:
+  hostname: "YOUR_HOSTNAME" # value to complete!
+  svNamespace: "sv"
+withSvIngress: true

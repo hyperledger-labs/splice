@@ -1,0 +1,331 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.Wallet.TestSubscriptions where
+
+import DA.Action
+import DA.Assert
+import DA.Time
+import DA.List
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Wallet.Payment
+import Splice.Wallet.Subscriptions
+
+import Splice.Scripts.Util
+
+data Users = Users with
+  validator : Party
+  alice : AmuletUser
+  pizzeria : AmuletUser
+  provider : AmuletUser
+
+testPayData = SubscriptionPayData (PaymentAmount 12.0 AmuletUnit) (days 28) (days 1)
+
+testSetup : Script (AmuletApp, Users, ContractId SubscriptionRequest)
+testSetup = script do
+  app <- setupApp
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  tap app alice 42.0
+
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  pure (app, Users with .., subscriptionRequestCid)
+
+
+assertTerminatedSubscription : Party -> ContractId SubscriptionRequest -> Script ()
+assertTerminatedSubscription party reference = do
+  aborted <- queryFilter @TerminatedSubscription party (\c -> c.reference == reference)
+  unless (length aborted == 1) $ abort ("Abort one payment request for reference " <> show reference <> " but got " <> show aborted)
+
+testSubscription : Script ()
+testSubscription = script do
+  (app, Users with .., subscriptionRequestCid) <- testSetup
+
+  -- reject...
+  submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
+  assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
+  -- ...and retry
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+  None <- queryContractId alice.primaryParty subscriptionRequestCid
+
+  -- expire...
+  passTime (minutes 21) -- pass one round duration and a bit
+  transferContext <- getAppTransferContext app alice
+  _ <- submitUser alice.userId $ exerciseCmd initialPaymentCid SubscriptionInitialPayment_Expire with actor = alice.primaryParty, transferContext
+  assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
+
+  -- ..and retry
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+
+  (subscriptionCid, subscriptionStateCid, amuletCid) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  Some amulet <- queryContractId pizzeria.primaryParty amuletCid
+  amulet.amount.initialAmount === 12.0
+
+  Some subscription <- queryContractId alice.primaryParty subscriptionCid
+  subscription.subscriptionData === subscriptionData
+  subscription.reference === subscriptionRequestCid
+
+  t <- getTime
+  Some subscriptionState <- queryContractId alice.primaryParty subscriptionStateCid
+  subscriptionState === SubscriptionIdleState with
+    subscription = subscriptionCid
+    subscriptionData
+    payData = testPayData
+    nextPaymentDueAt = t `addRelTime` (days 28)
+    reference = subscriptionRequestCid
+
+testInitialSubscriptionPaymentInLatestRoundMustFail: Script ()
+testInitialSubscriptionPaymentInLatestRoundMustFail = script do
+  (app, Users with .., subscriptionRequestCid) <- testSetup
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+  Some initialPayment <- queryContractId alice.primaryParty initialPaymentCid
+
+  runNextIssuance app
+
+  -- Cannot be collected through latest round.
+  collectInitialSubscriptionPaymentMustFail app provider pizzeria alice.primaryParty initialPaymentCid
+    -- Can still be collected if we select the right round.
+  collectInitialSubscriptionPaymentInRound app initialPayment.round provider pizzeria alice.primaryParty initialPaymentCid
+  pure ()
+
+testSubscriptionPaymentInLatestRoundMustFail : Script ()
+testSubscriptionPaymentInLatestRoundMustFail = script do
+  (app, Users with .., subscriptionRequestCid) <- testSetup
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+
+  (_subscriptionCid, subscriptionStateCid, _pizzeriasAmulet) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  passTime (days 27)
+  -- Make sure we have two open rounds that are set to close in the future.
+  runNextIssuance app
+  runNextIssuance app
+
+  paymentCid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
+  Some payment <- queryContractId alice.primaryParty paymentCid
+
+  runNextIssuance app
+
+  -- Cannot be collected through latest round.
+  collectSubscriptionPaymentMustFail app provider pizzeria alice.primaryParty paymentCid
+  -- Can still be collected if we select the right round.
+  collectSubscriptionPaymentInRound app payment.round provider pizzeria alice.primaryParty paymentCid
+
+  pure ()
+
+testUSDSubscription : Script ()
+testUSDSubscription = script do
+  app <- setupApp
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  featureApp app provider
+  validatorUserId <- validateUserId "validator1"
+  featuredValidator <- featureApp app (AmuletUser validatorUserId validator)
+
+  tap app alice 1.805035 -- chosen such that it exactly covers the required amulet amount & no change is left-over
+  let payData = SubscriptionPayData with
+        paymentInterval = days 28
+        paymentDuration = days 1
+        paymentAmount = PaymentAmount 1.0 USDUnit
+
+  let subscriptionData = SubscriptionData with
+        sender = alice.primaryParty
+        receiver = pizzeria.primaryParty
+        provider = provider.primaryParty
+        dso = app.dso
+        description = "test subscription"
+  advanceToIssuanceWithPrice app 2.0
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator (Some featuredValidator) subscriptionRequestCid
+
+  (_, round) <- getLatestOpenRound app
+
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
+      expectedValidatorRewardInLockLeg =
+          2.0 * transferConfigAmulet.lockHolderFee.fee +
+          transferConfigAmulet.createFee.fee
+      expectedAppRewardInLockLeg = expectedValidatorRewardInLockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
+      expectedValidatorRewardInUnlockLeg =
+          transferConfigAmulet.createFee.fee +
+          transferConfigAmulet.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.amuletPrice)
+      expectedAppRewardInUnlockLeg = expectedValidatorRewardInUnlockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
+  [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon validator
+  reward.amount === expectedAppRewardInLockLeg
+  reward.featured === True
+
+  amulets0 <- query @Amulet pizzeria.primaryParty
+  (_subscriptionCid, subscriptionStateCid, _pizzeriasAmulet) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
+  reward.amount === expectedAppRewardInUnlockLeg
+
+  reward.featured === True
+
+  rewards <- query @Splice.Amulet.ValidatorRewardCoupon alice.primaryParty
+  let amounts = map (._2.amount) rewards
+  sort amounts === sort ([expectedValidatorRewardInLockLeg, expectedValidatorRewardInUnlockLeg])
+
+  amulets1 <- query @Amulet pizzeria.primaryParty
+
+  map (\(_, c) -> c.amount.initialAmount) (amulets1 `diffContracts` amulets0) === [0.5]
+
+  passTime (days 27)
+  runNextIssuance app
+  passTimeToRoundOpen app
+
+  (_, round2) <- getLatestOpenRound app
+
+  let transferConfigAmulet2 = transferConfigAmuletFromOpenRound round2
+      expectedAppRewardInLockLeg2 =
+          2.0 * transferConfigAmulet2.lockHolderFee.fee +
+          transferConfigAmulet2.createFee.fee
+          -- no extra app reward when locking as the transfer below does not pass in the featured app right
+      expectedAppRewardInUnlockLeg2 =
+          transferConfigAmulet2.createFee.fee +
+          transferConfigAmulet2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.amuletPrice) +
+          transferConfigAmulet2.extraFeaturedAppRewardAmount
+
+  payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
+  (subscriptionState2Cid, _pizzeriasAmulet2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
+
+  rewards <- query @Splice.Amulet.AppRewardCoupon validator
+  let amounts = map (._2.amount) rewards
+  sort amounts === sort ([expectedAppRewardInLockLeg, expectedAppRewardInLockLeg2])
+
+  rewards <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
+  let amounts = map (._2.amount) rewards
+  sort amounts === sort ([expectedAppRewardInUnlockLeg, expectedAppRewardInUnlockLeg2])
+
+  amulets2 <- query @Amulet pizzeria.primaryParty
+  map (\(_, c) -> c.amount.initialAmount) (amulets2 `diffContracts` amulets1) === [1.0]
+
+  advanceToIssuanceWithPrice app 0.5
+
+  passTime (days 28)
+  runNextIssuance app
+  passTimeToRoundOpen app
+
+  amulets3 <- query @Amulet pizzeria.primaryParty
+
+  payment3Cid <- makeSubscriptionPayment app alice validator None subscriptionState2Cid
+  (_, amuletCid) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
+  Some amulet <- queryContractId pizzeria.primaryParty amuletCid
+  amulet.amount.initialAmount === 1.0
+
+  amulets4 <- query @Amulet pizzeria.primaryParty
+  let amounts = map (\(_, c) -> c.amount.initialAmount) (amulets4 `diffContracts` amulets3)
+  amounts === [1.0]
+
+  -- alice has no amulets left, as all her amulets have been used up
+  aliceAmulets <- query @Amulet alice.primaryParty
+  aliceAmulets === []
+
+  pure ()
+
+acceptSubscriptionRequestAndMakePayment
+  : AmuletApp -> AmuletUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionRequest
+  -> Script (ContractId SubscriptionInitialPayment)
+acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
+  inputs <- getAmuletInputs sender.primaryParty
+  -- TODO(#2957): remove read-as DSO party.
+  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+    inputs
+    context
+    walletProvider
+  pure result.subscriptionPayment
+
+
+makeSubscriptionPayment
+  : AmuletApp -> AmuletUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState
+  -> Script (ContractId SubscriptionPayment)
+makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
+  inputs <- getAmuletInputs sender.primaryParty
+  -- TODO(#2957): remove read-as DSO party.
+  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+    inputs
+    context
+    walletProvider
+  pure result.subscriptionPayment
+
+
+failMakeSubscriptionPayment
+  : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState -> Script ()
+failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
+  readAs <- getUserReadAs sender.userId
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
+  inputs <- getAmuletInputs sender.primaryParty
+  submitMultiMustFail [sender.primaryParty, walletProvider] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
+    inputs
+    context
+    walletProvider
+
+collectInitialSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
+collectInitialSubscriptionPayment app provider receiver sender payment = do
+  (_, round) <- getLatestOpenRound app
+  collectInitialSubscriptionPaymentInRound app round.round provider receiver sender payment
+
+collectInitialSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
+collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContextForRound app provider round
+  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+    transferContext
+  return (result.subscription, result.subscriptionState, result.amulet)
+
+collectInitialSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
+collectInitialSubscriptionPaymentMustFail app provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContext app provider
+  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+    transferContext
+
+collectSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
+collectSubscriptionPayment app provider receiver sender payment = do
+  (_, round) <- getLatestOpenRound app
+  collectSubscriptionPaymentInRound app round.round provider receiver sender payment
+
+collectSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
+collectSubscriptionPaymentInRound app round provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContextForRound app provider round
+  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+    transferContext
+  return (result.subscriptionState, result.amulet)
+
+collectSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script ()
+collectSubscriptionPaymentMustFail app provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContext app provider
+  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+    transferContext
+
+diffContracts : [(ContractId a, a)] -> [(ContractId a, a)] -> [(ContractId a, a)]
+diffContracts as bs =
+    filter (\(cid, _) -> cid `notElem` bsCids) as
+  where
+    bsCids = map fst bs

@@ -1,0 +1,123 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: docs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docs
+  strategy:
+    type: "Recreate"
+  template:
+    metadata:
+      labels:
+        app: docs
+    spec:
+      containers:
+        - name: docs
+          image: "{{ .Values.imageRepo }}/docs:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).docs) }}"
+          imagePullPolicy: "Always"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 1
+              memory: "1536Mi"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docs
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: docs
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gcs-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: gcs-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gcs-proxy
+  strategy:
+    type: "Recreate"
+  template:
+    metadata:
+      labels:
+        app: gcs-proxy
+    spec:
+      containers:
+        - name: gcs-proxy
+          image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).gcs_proxy) }}"
+          imagePullPolicy: "Always"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 1
+              memory: "512Mi"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gcs-proxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: gcs-proxy
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP

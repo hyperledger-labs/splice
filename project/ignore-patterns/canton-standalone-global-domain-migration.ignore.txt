@@ -1,0 +1,19 @@
+# Extra patterns to ignore from the canton-standalone-disaster-recovery log file
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+# TODO(#10137) Remove once we have a fix for this
+Claims do not authorize to read data for party 'alice__wallet__user.*
+Claims do not authorize to read data for party 'charlie__wallet__user.*
+Claims do not authorize to read data for party 'splitwell__provider.*
+
+# TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+
+# TODO(#10381) Figure out why this happens and remove the ignore.
+ACS_COMMITMENT_MISMATCH
+
+# Those tests spin up a lot of nodes so they can be very slow.
+Max sequencing time.*is already past the sequencer clock timestamp
+
+# This kicks in when an interval is skipped, which can happen as we start canton nodes dynamically
+ACS_COMMITMENT_DEGRADATION.*The participant has activated ACS catchup mode

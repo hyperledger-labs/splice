@@ -1,0 +1,5 @@
+persistence:
+  secretName: mediator-pg-secret
+
+db:
+  volumeSize: 48Gi

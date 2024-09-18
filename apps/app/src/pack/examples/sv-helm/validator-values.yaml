@@ -1,0 +1,79 @@
+scanAddress: "TRUSTED_SCAN_URL"
+# TRUSTED_SINGLE_SCAN_START
+# If you want to configure validator to use a single trusted scan, set ``nonSvValidatorTrustSingleScan`` to true.
+# It will only connect to the scan specified in ``scanAddress``. This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+# nonSvValidatorTrustSingleScan: true
+# TRUSTED_SINGLE_SCAN_END
+
+# TRUSTED_SINGLE_SEQUENCER_START
+# If you want to configure validator to connect to a single trusted sequencer, set ``useSequencerConnectionsFromScan`` to false.
+# and replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
+# This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+# decentralizedSynchronizerUrl: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL"
+# useSequencerConnectionsFromScan: false
+# TRUSTED_SINGLE_SEQUENCER_END
+
+# Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
+# the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
+# not only the suffix ``43b68e1e4978b000cefba352``:
+validatorWalletUser: "OPERATOR_WALLET_USER_ID"
+auth:
+  # If you want to configure a custom audience for Validator app backend, uncomment this line and replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
+  # The default value of audience is ``https://canton.network.global``.
+  # audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
+
+  # If you want to configure a custom audience for ledger API, replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice
+  # The default value of audience is ``https://canton.network.global``.
+  # ledgerApiAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
+
+  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+
+# CONFIGURING_TOPUP_START
+# Configuring a validator's traffic top-up loop
+#
+# enabled - set to false in order to disable automatic traffic top-ups.
+# targetThroughput - target throughput in bytes / second of sequenced traffic. targetThroughput=0 <=> enabled=false
+# minTopupInterval - minimum time interval that must elapse before the next top-up.
+#
+# On each successful top-up, an amount of traffic roughly equivalent to `targetThroughput * minTopupInterval`
+# (possibly with some rounding-up), referred to as the top-up amount, is purchased. The `minTopupInterval` allows
+# validator operators to control the frequency at which automated top-ups happen. Note that the actual top-up amount
+# and top-up interval might be larger due to the DSO requiring a minimal top-up amount larger than `targetThroughput * minTopupInterval`.
+#
+# The next top-up gets triggered when:
+# - the available traffic amount drops below the configured top-up amount
+# - at least minTopupInterval has elapsed since the last one
+# - the validator has sufficient CC in its wallet to buy this much traffic (except on DevNet)
+# CONFIGURING_TOPUP_END
+topup:
+  enabled: true
+  targetThroughput: 20000
+  minTopupInterval: "1m"
+
+# This will disable the wallet HTTP server and wallet automations when set to false
+enableWallet: true
+
+# SWEEP_START
+# If you want funds sweeped out of parties in this validator, uncomment and fill in the following:
+#walletSweep:
+#  "<senderPartyId>":
+#    maxBalanceUSD: <maxBalanceUSD>
+#    minBalanceUSD: <minBalanceUSD>
+#    receiver: "<receiverPartyId>"
+# SWEEP_END
+
+# AUTO_ACCEPT_START
+# To configure the validator to auto-accept transfer offers from specific parties, uncomment and fill in the following:
+#autoAcceptTransfers:
+#  "<receiverPartyId>"
+#    fromParties:
+#      - "<senderPartyId>"
+# AUTO_ACCEPT_END
+
+# Contact point for your validator node that can be used by other node operators
+# to reach you if there are issues with your node.
+# This can be a slack username or an email address.
+# If you do not wish to share this, set it to an empty string.
+contactPoint: "YOUR_CONTACT_POINT"
+
