@@ -63,8 +63,7 @@ case class SvOnboardingToken(
   } yield token
 }
 object SvOnboardingToken {
-
-  val Claim = "https://canton.network.global/sv"
+  val Claim = "https://lfdecentralizedtrust.splice/sv"
 
   def verifyAndDecode(rawToken: String): Either[String, SvOnboardingToken] = for {
     verifier <- getVerifier(rawToken) // extracts the public key

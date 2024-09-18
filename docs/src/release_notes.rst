@@ -17,6 +17,13 @@ Upcoming
 
 * Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a DSO.
 
+* Deployment
+
+  * The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous default value was ``https://canton.network.global``. To continue using the default, provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
+    * ``cn-sv-node``
+    * ``cn-validator``
+  * The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.
+
 0.2.1
 -----
 

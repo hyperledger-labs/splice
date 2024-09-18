@@ -11,6 +11,8 @@ SCRIPTNAME=${0##*/}
 
 declare -A subcommand_whitelist
 
+DEFAULT_AUDIENCE="https://canton.network.global"
+
 function _export_auth0_env_vars {
 
   if [ -z "$GCP_CLUSTER_BASENAME" ]; then
@@ -54,6 +56,11 @@ function _start_validator {
   sv_from_script=$2
   scan=$3
   sequencer=$4
+
+  LEDGER_API_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
+  export LEDGER_API_AUTH_AUDIENCE
+  VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
+  export VALIDATOR_AUTH_AUDIENCE
 
   extra_flags=()
   if [ "$auth" -eq 1 ]; then
@@ -277,6 +284,8 @@ function subcmd_test_before_migration {
 
   USER=alice
 
+  VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
+  export VALIDATOR_AUTH_AUDIENCE
   TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
 
   _info "Onboarding $USER"
@@ -333,6 +342,8 @@ function subcmd_test_before_migration {
 subcommand_whitelist[test_after_migration]='test the validator after the hard domain migration'
 function subcmd_test_after_migration {
 
+  VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
+  export VALIDATOR_AUTH_AUDIENCE
   USER=alice
   TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
 
@@ -474,6 +485,9 @@ function subcmd_identities_dump {
   fi
 
   output_file=$1
+
+  VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
+  export VALIDATOR_AUTH_AUDIENCE
 
   token=$("$REPO_ROOT/cluster/deployment/compose/token.py" administrator)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"

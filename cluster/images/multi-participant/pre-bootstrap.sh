@@ -66,8 +66,7 @@ canton.participants.participant_$index = {
             secret = "test"
 
             # TODO(#2052) Use different audiences per participant.
-            target-audience = "https://canton.network.global"
-            target-audience = \${?AUTH_TARGET_AUDIENCE}
+            target-audience = \${AUTH_TARGET_AUDIENCE}
         }]
         # We need to bump this because we run one stream per user +
         # polling for domain connections which can add up quite a bit

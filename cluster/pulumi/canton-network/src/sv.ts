@@ -13,6 +13,7 @@ import {
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
+  DEFAULT_AUDIENCE,
   defaultVersion,
   ExactNamespace,
   exactNamespace,
@@ -422,7 +423,7 @@ function installSvApp(
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
     auth: {
-      audience: config.auth0Client.getCfg().appToApiAudience['sv'],
+      audience: config.auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,

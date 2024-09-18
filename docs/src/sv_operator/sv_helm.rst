@@ -201,7 +201,8 @@ CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
 
-By default, all audience values are configured to be ``https://canton.network.global``.
+When first starting, it is suggested to configure all three JWT token audiences below to the same value: ``https://canton.network.global``.
+
 Once you can confirm that your setup is working correctly using this (simple) default,
 we recommend that you configure dedicated audience values that match your deployment and URLs.
 You can configure audiences of your choice for the participant ledger API, the validator backend API, and the SV backend API.
@@ -531,7 +532,7 @@ that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml
 Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
-- If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
+- Replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. If you are not ready to use a custom audience, you can use the suggested default ``https://canton.network.global``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)

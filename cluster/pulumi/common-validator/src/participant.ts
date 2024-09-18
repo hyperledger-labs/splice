@@ -6,6 +6,7 @@ import {
   autoInitValues,
   ChartValues,
   DecentralizedSynchronizerMigrationConfig,
+  DEFAULT_AUDIENCE,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
@@ -18,8 +19,6 @@ import {
   SpliceCustomResourceOptions,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
-
-const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 export function installParticipant(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,

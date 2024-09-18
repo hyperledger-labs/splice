@@ -9,7 +9,11 @@ import com.auth0.jwt.algorithms.Algorithm
 // See also: com.daml.ledger.api.auth.Main from the Daml SDK contains utils for generating ledger API access tokens
 object AuthUtil {
 
-  val testAudience: String = "https://canton.network.global"
+  val testAudience: String =
+    sys.env.getOrElse(
+      "OIDC_AUTHORITY_LEDGER_API_AUDIENCE",
+      sys.env("CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE"),
+    )
   val testSecret: String = "test"
   val testSignatureAlgorithm: Algorithm = Algorithm.HMAC256(testSecret)
 

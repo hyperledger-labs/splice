@@ -10,6 +10,7 @@ import {
   CnInput,
   config,
   daContactPoint,
+  DEFAULT_AUDIENCE,
   defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
@@ -238,8 +239,10 @@ export async function installValidatorApp(
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
       enablePostgresMetrics: true,
       auth: {
-        audience: config.secrets.auth0Client.getCfg().appToApiAudience['validator'],
-        ledgerApiAudience: config.secrets.auth0Client.getCfg().appToApiAudience['participant'],
+        audience:
+          config.secrets.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+        ledgerApiAudience:
+          config.secrets.auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
         jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
       },
       walletSweep,

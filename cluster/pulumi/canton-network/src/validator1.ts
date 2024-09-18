@@ -121,6 +121,9 @@ export async function installValidator1(
       'cn-splitwell-web-ui',
       {
         ...spliceInstanceNames,
+        auth: {
+          audience: 'https://canton.network.global',
+        },
         clusterUrl: CLUSTER_HOSTNAME,
       },
       defaultVersion,

@@ -18,10 +18,6 @@ resources:
     cpu: "1"
     memory: 16Gi
 
-auth:
-  jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-  targetAudience: "https://canton.network.global"
-
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user
@@ -37,7 +33,6 @@ persistence:
   secretName: "postgres-secrets"
   databaseName: cantonnet_participant
   port: 5432
-
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

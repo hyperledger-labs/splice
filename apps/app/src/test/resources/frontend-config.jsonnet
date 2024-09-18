@@ -1,40 +1,37 @@
-local auth0Authority = 'https://canton-network-test.us.auth0.com';
-local auth0ClientId = 'Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw';
-local authAudience = 'https://canton.network.global';
 local authScope = 'daml_ledger_api';
 local authSecret = 'test';
 local testAuthSecret = 'test';
 
 
-local authHsUnsafe(secret) = {
+local authHsUnsafe(secret, auth0Config) = {
   algorithm: 'hs-256-unsafe',
   secret: secret,
-  token_audience: authAudience,
+  token_audience: auth0Config.audience,
   token_scope: authScope,
 };
 
-local authRs() = {
+local authRs(auth0Config) = {
   algorithm: 'rs-256',
-  authority: auth0Authority,
-  client_id: auth0ClientId,
-  token_audience: authAudience,
+  authority: auth0Config.authority,
+  client_id: auth0Config.clientId,
+  token_audience: auth0Config.audience,
   token_scope: authScope,
 };
 
 
-local auth(algorithm) =
+local auth(algorithm, auth0Config) =
   if (algorithm == 'rs-256') then
-    { auth: authRs() }
+    { auth: authRs(auth0Config) }
   else if (algorithm == 'hs-256-unsafe') then
-    { auth: authHsUnsafe(authSecret) }
+    { auth: authHsUnsafe(authSecret, auth0Config) }
   else if (algorithm == 'none') then
     {}
   else
     error 'Unknown auth algorithm' + algorithm;
 
-local testAuth(enabled) =
+local testAuth(enabled, auth0Config) =
   if (enabled) then
-    { testAuth: authHsUnsafe(testAuthSecret) }
+    { testAuth: authHsUnsafe(testAuthSecret, auth0Config) }
   else
     {};
 
@@ -109,10 +106,11 @@ local services(node, clusterProtocol, clusterAddress, port) =
 function(
   authAlgorithm='rs-256',
   enableTestAuth,
+  auth0Config,
   validatorNode,
   app,
   clusterProtocol,
   clusterAddress,
   spliceInstanceNames,
   port,
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames
+) auth(authAlgorithm, auth0Config) + testAuth(std.parseJson(enableTestAuth), auth0Config) + services(validatorNode, clusterProtocol, clusterAddress, port) + spliceInstanceNames

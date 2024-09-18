@@ -14,6 +14,7 @@ import {
   config,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
+  DEFAULT_AUDIENCE,
   defaultVersion,
   exactNamespace,
   ExactNamespace,
@@ -60,7 +61,6 @@ const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FIL
 
 const VALIDATOR_WALLET_USER_ID =
   config.optionalEnv('VALIDATOR_WALLET_USER_ID') || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
-const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 

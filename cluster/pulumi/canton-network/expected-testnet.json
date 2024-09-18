@@ -1555,7 +1555,9 @@
         },
         "appDars": [],
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "ledgerApiAudience": "https://canton.network.global"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
@@ -2165,7 +2167,8 @@
           }
         },
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
@@ -2499,6 +2502,7 @@
           }
         ],
         "auth": {
+          "audience": "https://canton.network.global",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
@@ -2649,7 +2653,9 @@
         },
         "appDars": [],
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "ledgerApiAudience": "https://canton.network.global"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
@@ -3178,6 +3184,9 @@
             }
           }
         },
+        "auth": {
+          "audience": "https://canton.network.global"
+        },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -3305,7 +3314,9 @@
           "splice-node/dars/splitwell-current.dar"
         ],
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "ledgerApiAudience": "https://canton.network.global"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",

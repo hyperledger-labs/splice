@@ -50,11 +50,19 @@ function start_frontend() {
   }
 }"
 
+  # Until this is open-sourced, we don't need to extract further
+  local auth0Config="{
+  authority: 'https://${SPLICE_OAUTH_TEST_AUTHORITY}',
+  clientId: '$SPLICE_OAUTH_TEST_FRONTEND_CLIENT_ID',
+  audience: '${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}',
+  }"
+
   jsonnet \
     --tla-str clusterProtocol="http" \
     --tla-str clusterAddress="localhost" \
     --tla-str authAlgorithm="rs-256" \
     --tla-str enableTestAuth="$test_auth" \
+    --tla-code auth0Config="$auth0Config" \
     --tla-str validatorNode="$node_name" \
     --tla-str app="$app" \
     --tla-str port="$port" \

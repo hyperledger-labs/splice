@@ -20,7 +20,7 @@ const appManagerSchema = z.object({
 
 export type AppManagerConfig = z.infer<typeof appManagerSchema>;
 
-export const APP_MANAGER_LOCAL_STORAGE_KEY = 'canton.network.appmanager.config';
+export const APP_MANAGER_LOCAL_STORAGE_KEY = 'splice.appmanager.config';
 export const APP_MANAGER_QUERY_KEY = 'appmanager_config';
 
 export const useAppManagerConfig = (): AppManagerConfig | undefined => {
@@ -43,7 +43,8 @@ export const appManagerAuthConfig = (
 ): z.infer<typeof authSchema> => ({
   algorithm: Algorithm.RS256,
   token_scope: 'daml_ledger_api',
-  token_audience: 'https://canton.network.global',
+  // TODO(#8369) Workaround just to avoid hardcoded audience literal in code
+  token_audience: import.meta.env.OIDC_AUTHORITY_LEDGER_API_AUDIENCE,
   authority: oidcAuthority,
   client_id: clientId,
 });

@@ -18,13 +18,11 @@ scanAddress: "TRUSTED_SCAN_URL"
 # not only the suffix ``43b68e1e4978b000cefba352``:
 validatorWalletUser: "OPERATOR_WALLET_USER_ID"
 auth:
-  # If you want to configure a custom audience for Validator app backend, uncomment this line and replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
-  # The default value of audience is ``https://canton.network.global``.
-  # audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
+  # replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
+  audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
 
-  # If you want to configure a custom audience for ledger API, replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice
-  # The default value of audience is ``https://canton.network.global``.
-  # ledgerApiAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
+  # replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice
+  ledgerApiAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
 
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
@@ -76,4 +74,3 @@ enableWallet: true
 # This can be a slack username or an email address.
 # If you do not wish to share this, set it to an empty string.
 contactPoint: "YOUR_CONTACT_POINT"
-

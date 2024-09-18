@@ -38,6 +38,7 @@ import {
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
+  DEFAULT_AUDIENCE,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -67,8 +68,6 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
-
-const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 export async function installNode(
   auth0Client: Auth0Client,
