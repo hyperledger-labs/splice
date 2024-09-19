@@ -24,6 +24,10 @@ Upcoming
     * ``cn-validator``
   * The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.
 
+* Bugfixes
+
+    * Fix an issue where validators that were already deployed with an invalid ``validatorPartyHint`` were failing to start after a hard domain migration, as the already existing hint was rejected by the validator app.
+
 0.2.1
 -----
 
