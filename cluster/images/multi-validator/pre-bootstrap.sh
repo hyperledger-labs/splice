@@ -103,7 +103,8 @@ canton.validator-apps.validator_backend_$index = {
                 user = $user
                 secret = "test"
                 # TODO(#2052) use actual audience of the target participant
-                audience = \${CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}
+                audience = "https://canton.network.global"
+                audience = \${?CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}
             }
         }
     }
