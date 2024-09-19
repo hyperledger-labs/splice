@@ -199,7 +199,7 @@ if [ $migrating -eq 1 ]; then
 fi
 if [ -n "${network_name}" ]; then
   export DOCKER_NETWORK="${network_name}"
-  if ! docker compose -f compose.yaml -f compose-onvpn-network.yaml config -q 2>/dev/null; then
+  if ! docker compose -f "${script_dir}/compose.yaml" -f "${script_dir}/compose-onvpn-network.yaml" config -q 2>/dev/null; then
     _error_msg "When using a custom network name, please edit compose-onvpn-network.yaml to use that name instead of 'onvpn'"
     exit 1
   fi

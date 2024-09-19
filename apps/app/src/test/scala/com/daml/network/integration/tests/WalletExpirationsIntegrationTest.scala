@@ -155,8 +155,8 @@ class WalletExpirationsIntegrationTest
       val startRound = aliceWalletClient.list().amulets.head.round
 
       // advance 2 rounds.
-      advanceRoundsByOneTickViaAutomation
-      advanceRoundsByOneTickViaAutomation
+      advanceRoundsByOneTickViaAutomation()
+      advanceRoundsByOneTickViaAutomation()
 
       clue("Check wallet after advancing to next 2 round") {
         eventually()(aliceWalletClient.list().amulets.head.round shouldBe startRound + 2)
@@ -174,8 +174,8 @@ class WalletExpirationsIntegrationTest
       }
 
       // advance 2 more rounds.
-      advanceRoundsByOneTickViaAutomation
-      advanceRoundsByOneTickViaAutomation
+      advanceRoundsByOneTickViaAutomation()
+      advanceRoundsByOneTickViaAutomation()
 
       setTriggersWithin(
         Seq.empty,

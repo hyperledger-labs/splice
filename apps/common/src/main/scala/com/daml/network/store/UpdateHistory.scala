@@ -14,6 +14,7 @@ import com.daml.ledger.javaapi.data.{
   ParticipantOffset,
   TransactionTree,
 }
+import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -651,8 +652,9 @@ class UpdateHistory(
       sql"""order by migration_id, record_time, domain_id limit ${limit.limit}"""
   }
 
-  def getTxUpdates(
+  private def getTxUpdates(
       afterO: Option[(Long, CantonTimestamp)],
+      includeImportUpdates: Boolean,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -671,6 +673,11 @@ class UpdateHistory(
       from update_history_transactions
       where
         history_id = $historyId and """ ++ afterFilter ++
+        (if (!includeImportUpdates) {
+           sql""" and workflow_id != ${lengthLimited(IMPORT_ACS_WORKFLOW_ID_PREFIX)}"""
+         } else {
+           sql""
+         }) ++
         sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
     }
 
@@ -781,11 +788,11 @@ class UpdateHistory(
 
   def getUpdates(
       afterO: Option[(Long, CantonTimestamp)],
+      includeImportUpdates: Boolean,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-
     for {
-      txs <- getTxUpdates(afterO, limit)
+      txs <- getTxUpdates(afterO, includeImportUpdates, limit)
       assignments <- getAssignmentUpdates(afterO, limit)
       unassignments <- getUnassignmentUpdates(afterO, limit)
     } yield {

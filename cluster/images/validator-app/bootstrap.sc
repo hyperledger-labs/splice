@@ -6,6 +6,7 @@ def main() {
   )
 
   logger.info("Waiting for validator to finish init...")
+  logger.debug(s"Loaded environment: ${sys.env}")
   validator_backend.waitForInitialization(2.minutes)
 
   // TODO (M3-90): This will later be replaced by the app manager

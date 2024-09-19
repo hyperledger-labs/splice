@@ -468,20 +468,21 @@ object SpliceTests extends LazyLogging {
       }
     }
 
-    def auth0UtilFromEnvVars(domain: String, tenant: String): Auth0Util = {
-      val prefix = tenant match {
+    def auth0UtilFromEnvVars(tenant: String): Auth0Util = {
+      val (mgmtPrefix, domainPrefix) = tenant match {
         // Used for preflight checks
-        case "dev" => "AUTH0_CN"
+        case "dev" => ("AUTH0_CN", "SPLICE_OAUTH_DEV")
         // Used for sv preflight checks
-        case "sv" => "AUTH0_SV"
+        case "sv" => ("AUTH0_SV", "SPLICE_OAUTH_SV_TEST")
         // Used for validator preflight checks
-        case "validator" => "AUTH0_VALIDATOR"
+        case "validator" => ("AUTH0_VALIDATOR", "SPLICE_OAUTH_VALIDATOR_TEST")
         // Used locally
-        case "test" => "AUTH0_TESTS"
+        case "test" => ("AUTH0_TESTS", "SPLICE_OAUTH_TEST")
         case _ => fail(s"Invalid tenant value: $tenant")
       }
-      val clientId = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_ID");
-      val clientSecret = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_SECRET");
+      val domain = s"https://${readMandatoryEnvVar(s"${domainPrefix}_AUTHORITY")}";
+      val clientId = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_ID");
+      val clientSecret = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_SECRET");
 
       retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret, loggerFactory))
     }

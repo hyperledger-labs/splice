@@ -36,9 +36,9 @@ Could not verify JWT token: The provided Algorithm doesn't match the one defined
 # TODO(#2196) Figure out why we get that error
 ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when attempting to fetch resource.
 
-# TODO(#5492) remove once the UI can better handle network disconnects/errors on its own
 ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
+AbortError: The operation was aborted
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:

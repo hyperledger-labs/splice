@@ -3,7 +3,8 @@
 
 package com.daml.network.scan.store
 
-import com.daml.network.environment.ledger.api.LedgerClient
+import com.daml.ledger.javaapi.data as javaApi
+import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import com.daml.network.scan.admin.api.client.BackfillingScanConnection
 import com.daml.network.store.HistoryBackfilling
 import com.daml.network.store.HistoryBackfilling.{DomainRecordTimeRange, MigrationInfo, Outcome}
@@ -15,6 +16,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.control.NonFatal
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** Backfills the scan history by copying data from a remote source history to the destination history.
   *
@@ -114,4 +117,71 @@ object ScanHistoryBackfilling {
       connection: BackfillingScanConnection,
       migrationInfos: Map[Long, MigrationInfo],
   )
+
+  /** Returns whether the given update is the first update in the network.
+    *
+    * Note: The first transaction in the network is submitted by the founding SV node, and contains two root events:
+    * A create event for the `DsoBootstrap` contract, and an exercise event for the `DsoBootstrap_Bootstrap` choice.
+    */
+  def isFoundingTransactionTreeUpdate(
+      treeUpdate: LedgerClient.GetTreeUpdatesResponse,
+      dsoParty: String,
+  ): Boolean = {
+    treeUpdate.update match {
+      case TransactionTreeUpdate(tree) =>
+        val rootEvents = tree.getRootEventIds.asScala.map(tree.getEventsById.get)
+        rootEvents.exists {
+          case created: javaApi.CreatedEvent =>
+            // In `template DsoBootstrap`, the first argument is the DSO party
+            val dsoPartyField = for {
+              firstField <- created.getArguments.getFields.asScala.headOption
+              fieldPartyValue <- firstField.getValue.asParty().toScala
+            } yield fieldPartyValue.getValue
+            created.getTemplateId.getModuleName == "Splice.DsoBootstrap" &&
+            created.getTemplateId.getEntityName == "DsoBootstrap" &&
+            dsoPartyField.contains(dsoParty)
+          case _ => false
+        }
+      case _ => false
+    }
+  }
+
+  /** Returns whether the given update is the first update where the given SV is part of the DSO.
+    * I.e., for this and all future updates, the participant of the given SV will see the same projection of the update
+    * as all other members of the DSO.
+    *
+    * Note: when a new SV joins the network, its party is initially not part of the DSO. During onboarding, the DSO submits
+    * a transaction that exercises the `DsoRules_StartSvOnboarding` choice on the `DsoBootstrap` contract, which creates an
+    * onboarding request contract. At this point, the DSO sees the whole transaction, while the new SV party only sees the create
+    * event for the onboarding request contract.
+    * After that, the new SV party is added to the DSO through topology transactions, and by the time the
+    * `DsoRules_AddConfirmedSv` choice is exercised, the new SV party is guaranteed to be part of the DSO.
+    *
+    * Note that due to constant activity on the network, there might be a few transactions submitted before
+    * `DsoRules_AddConfirmedSv` where the new SV is already part of the DSO.
+    */
+  def isJoiningTransactionTreeUpdate(
+      treeUpdate: LedgerClient.GetTreeUpdatesResponse,
+      svParty: String,
+  ): Boolean = {
+    treeUpdate.update match {
+      case TransactionTreeUpdate(tree) =>
+        val rootEvents = tree.getRootEventIds.asScala.map(tree.getEventsById.get)
+        rootEvents.exists {
+          case exercised: javaApi.ExercisedEvent =>
+            // In `choice DsoRules_AddConfirmedSv`, the first argument is the new SV party
+            val svPartyField = for {
+              argument <- exercised.getChoiceArgument.asRecord().toScala
+              firstField <- argument.getFields.asScala.headOption
+              fieldPartyValue <- firstField.getValue.asParty().toScala
+            } yield fieldPartyValue.getValue
+            exercised.getChoice == "DsoRules_AddConfirmedSv" &&
+            exercised.getTemplateId.getModuleName == "Splice.DsoRules" &&
+            exercised.getTemplateId.getEntityName == "DsoRules" &&
+            svPartyField.contains(svParty)
+          case _ => false
+        }
+      case _ => false
+    }
+  }
 }

@@ -40,7 +40,7 @@ spec:
                   name: splice-app-sv-ui-auth
                   optional: false
             - name: CN_APP_UI_AUTH_AUDIENCE
-              value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
+              value: {{ .Values.auth.audience | quote }}
             - name: CN_APP_UI_NETWORK_NAME
               value: {{ .Values.spliceInstanceNames.networkName | quote }}
             - name: CN_APP_UI_NETWORK_FAVICON_URL

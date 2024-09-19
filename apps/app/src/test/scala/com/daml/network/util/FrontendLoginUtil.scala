@@ -80,7 +80,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
   )(
       afterLoginChecks: (Auth0User, PartyId, WebDriverType) => A
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): A = {
-    val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com", "test")
+    val auth0 = auth0UtilFromEnvVars("test")
     Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
       if (!onboardThroughWalletUI) {
