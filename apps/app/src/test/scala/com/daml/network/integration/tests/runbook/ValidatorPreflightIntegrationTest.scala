@@ -473,17 +473,15 @@ abstract class ValidatorPreflightIntegrationTestBase
 class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
 
   override protected val isDevNet = true
-  override protected val auth0 =
-    auth0UtilFromEnvVars("https://canton-network-validator-test.us.auth0.com", "validator")
+  override protected val auth0 = auth0UtilFromEnvVars("validator")
 
   override protected val validatorName = "validator"
   override protected val validatorPartyHint = "digitalasset-testValidator-1"
-  override protected val validatorAuth0Secret = "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z"
+  override protected val validatorAuth0Secret = sys.env("SPLICE_OAUTH_TEST_CLIENT_ID_VALIDATOR")
   override protected val validatorAuth0Audience = "https://validator.example.com/api"
   override protected val includeSplitwellTests = false
 
-  // TODO(tech-debt): consider de-hardcoding this
-  override protected val validatorWalletUser = "auth0|6526fab5214c99a9a8e1e3cc"
+  override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_TEST_VALIDATOR_WALLET_USER")
 
   // TODO(#8300): remove this check once canton handles sequencer connections more gracefully
   override def checkValidatorIsConnectedToSvRunbook() = "Validator is connected to SV runbook" in {
@@ -508,13 +506,11 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
 class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
 
   override protected val isDevNet = true
-  override protected val auth0 =
-    auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
+  override protected val auth0 = auth0UtilFromEnvVars("dev")
   override protected val validatorName = "validator1"
   override protected val validatorPartyHint = "digitalasset-validator1-1"
-  override protected val validatorAuth0Secret = "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq"
-  override protected val validatorAuth0Audience = "https://canton.network.global"
-
-  // TODO(tech-debt): consider de-hardcoding this
-  override protected val validatorWalletUser = "auth0|63e3d75ff4114d87a2c1e4f5"
+  override protected val validatorAuth0Secret =
+    sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1")
+  override protected val validatorAuth0Audience = sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")
+  override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_DEV_VALIDATOR_WALLET_USER")
 }

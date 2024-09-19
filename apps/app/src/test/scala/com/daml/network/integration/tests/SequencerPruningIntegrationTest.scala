@@ -5,6 +5,7 @@ import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.sv.automation.singlesv.SequencerPruningTrigger
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -59,7 +60,11 @@ class SequencerPruningIntegrationTest
                             port = Port.tryCreate(5901)
                           )
                       ),
-                    )
+                    ),
+                    // We disable the ReconcileSequencerConnectionsTrigger to prevent domain disconnections
+                    // from interfering with traffic top-ups (see #14474)
+                    automation = bobValidatorConfig.automation
+                      .withPausedTrigger[ReconcileSequencerConnectionsTrigger],
                   )
               }
             )

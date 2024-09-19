@@ -243,14 +243,15 @@ sealed trait ScanHttpEncodings {
       httpToJavaExercisedEvent(exercisedHttp)
   }
 
-  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent =
+  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
+    val templateId = parseTemplateId(http.templateId)
     new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       http.eventId,
-      parseTemplateId(http.templateId),
+      templateId,
       http.packageName,
       http.contractId,
-      decodeContractPayload(http.createArguments),
+      decodeContractPayload(templateId, http.createArguments),
       /*createdEventBlob = */ ByteString.EMPTY,
       /*interfaceViews = */ java.util.Collections.emptyMap(),
       /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
@@ -259,22 +260,25 @@ sealed trait ScanHttpEncodings {
       http.observers.asJava,
       http.createdAt.toInstant,
     )
+  }
 
-  def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent =
+  def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent = {
+    val templateId = parseTemplateId(http.templateId)
     new javaApi.ExercisedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       http.eventId,
-      parseTemplateId(http.templateId),
+      templateId,
       http.packageName,
       http.interfaceId.map(parseTemplateId(_)).toJava,
       http.contractId,
       http.choice,
-      decodeChoiceArgument(http.choiceArgument),
+      decodeChoiceArgument(templateId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
       http.childEventIds.asJava,
-      decodeExerciseResult(http.exerciseResult),
+      decodeExerciseResult(templateId, http.choice, http.exerciseResult),
     )
+  }
 
   private def templateIdString(templateId: javaApi.Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
@@ -303,19 +307,27 @@ sealed trait ScanHttpEncodings {
       elc: ErrorLoggingContext
   ): io.circe.Json
 
-  def decodeContractPayload(json: io.circe.Json): javaApi.DamlRecord
+  def decodeContractPayload(templateId: javaApi.Identifier, json: io.circe.Json): javaApi.DamlRecord
 
   def encodeChoiceArgument(event: javaApi.ExercisedEvent)(implicit
       elc: ErrorLoggingContext
   ): io.circe.Json
 
-  def decodeChoiceArgument(json: io.circe.Json): javaApi.Value
+  def decodeChoiceArgument(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: io.circe.Json,
+  ): javaApi.Value
 
   def encodeExerciseResult(event: javaApi.ExercisedEvent)(implicit
       elc: ErrorLoggingContext
   ): io.circe.Json
 
-  def decodeExerciseResult(json: io.circe.Json): javaApi.Value
+  def decodeExerciseResult(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: io.circe.Json,
+  ): javaApi.Value
 
   protected def encodeValueFallback(
       error: String,
@@ -378,14 +390,66 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
         tryParseJson,
       )
 
-  override def decodeContractPayload(json: Json): javaApi.DamlRecord =
-    throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
+  override def decodeContractPayload(
+      templateId: javaApi.Identifier,
+      json: Json,
+  ): javaApi.DamlRecord =
+    ValueJsonCodecCodegen
+      .deserializableContractPayload(templateId, json.noSpaces)
+      .fold(
+        error => throw new RuntimeException(s"Failed to decode contract payload: $error"),
+        withoutFieldLabels,
+      )
 
-  override def decodeChoiceArgument(json: Json): javaApi.Value =
-    throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
+  override def decodeChoiceArgument(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: Json,
+  ): javaApi.Value =
+    ValueJsonCodecCodegen
+      .deserializeChoiceArgument(templateId, choice, json.noSpaces)
+      .fold(
+        error => throw new RuntimeException(s"Failed to decode choice argument: $error"),
+        withoutFieldLabels,
+      )
 
-  override def decodeExerciseResult(json: Json): javaApi.Value =
-    throw new UnsupportedOperationException("Decoding the lossy codegen encoding is unsupported")
+  override def decodeExerciseResult(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: Json,
+  ): javaApi.Value =
+    ValueJsonCodecCodegen
+      .deserializeChoiceResult(templateId, choice, json.noSpaces)
+      .fold(
+        error => throw new RuntimeException(s"Failed to decode choice result: $error"),
+        withoutFieldLabels,
+      )
+
+  /** Recursively removes all field labels from a value.
+    * ValueJsonCodecCodegen returns values with field labels, but we generally don't store field labels in databases.
+    * The labels are removed to make values comparable.
+    */
+  private def withoutFieldLabels(value: javaApi.Value): javaApi.Value = {
+    value match {
+      case record: javaApi.DamlRecord => withoutFieldLabels(record)
+      case list: javaApi.DamlList => javaApi.DamlList.of(list.toList(withoutFieldLabels))
+      case tmap: javaApi.DamlTextMap => javaApi.DamlTextMap.of(tmap.toMap(withoutFieldLabels))
+      case gmap: javaApi.DamlGenMap =>
+        javaApi.DamlGenMap.of(gmap.toMap(withoutFieldLabels, withoutFieldLabels))
+      case opt: javaApi.DamlOptional =>
+        javaApi.DamlOptional.of(opt.getValue.map(withoutFieldLabels))
+      case variant: javaApi.Variant =>
+        new javaApi.Variant(variant.getConstructor, withoutFieldLabels(variant.getValue))
+      case _ => value
+    }
+  }
+  private def withoutFieldLabels(value: javaApi.DamlRecord): javaApi.DamlRecord = {
+    val fields = value.getFields.asScala.toList
+    val fieldsWithoutLabels = fields.map { f =>
+      new javaApi.DamlRecord.Field(withoutFieldLabels(f.getValue))
+    }
+    new javaApi.DamlRecord(fieldsWithoutLabels.asJava)
+  }
 }
 
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.
@@ -415,12 +479,23 @@ case object LosslessScanHttpEncodings extends ScanHttpEncodings {
         .serializeValue(event.getExerciseResult)
     )
 
-  override def decodeContractPayload(json: Json): javaApi.DamlRecord =
+  override def decodeContractPayload(
+      templateId: javaApi.Identifier,
+      json: Json,
+  ): javaApi.DamlRecord =
     ValueJsonCodecProtobuf.deserializeValue(json.toString()).asRecord().get()
 
-  override def decodeChoiceArgument(json: Json): javaApi.Value =
+  override def decodeChoiceArgument(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: Json,
+  ): javaApi.Value =
     ValueJsonCodecProtobuf.deserializeValue(json.toString())
 
-  override def decodeExerciseResult(json: Json): javaApi.Value =
+  override def decodeExerciseResult(
+      templateId: javaApi.Identifier,
+      choice: String,
+      json: Json,
+  ): javaApi.Value =
     ValueJsonCodecProtobuf.deserializeValue(json.toString())
 }

@@ -5,7 +5,7 @@ window.splice_config = {
     algorithm: "rs-256",
     authority: "${CN_APP_UI_AUTH_URL}",
     client_id: "${CN_APP_UI_AUTH_CLIENT_ID}",
-    token_audience: "https://canton.network.global",
+    token_audience: "${CN_APP_UI_AUTH_AUDIENCE}",
     token_scope: "daml_ledger_api",
   },
   services: {

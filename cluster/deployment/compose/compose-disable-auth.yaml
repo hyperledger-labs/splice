@@ -17,7 +17,7 @@ services:
           canton.validator-apps.validator_backend {
             auth={
               algorithm = "hs-256-unsafe"
-              audience = "https://canton.network.global"
+              audience = "${VALIDATOR_AUTH_AUDIENCE}"
               secret = "unsafe"
             }
           }
@@ -28,7 +28,6 @@ services:
 
   wallet-web-ui:
     environment:
-      - CN_APP_UI_AUTH_AUDIENCE=https://canton.network.global
       - SPLICE_APP_UI_UNSAFE=true
       - SPLICE_APP_UI_UNSAFE_SECRET=unsafe
 
@@ -36,4 +35,3 @@ services:
     environment:
       - SPLICE_APP_UI_UNSAFE=true
       - SPLICE_APP_UI_UNSAFE_SECRET=unsafe
-      - CN_APP_UI_AUTH_AUDIENCE=https://canton.network.global

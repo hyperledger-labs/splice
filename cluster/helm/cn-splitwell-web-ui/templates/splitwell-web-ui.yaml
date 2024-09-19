@@ -37,6 +37,8 @@ spec:
               key: url
               name: splice-app-splitwell-ui-auth
               optional: false
+        - name: CN_APP_UI_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
         - name: CN_APP_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}
         - name: CN_APP_UI_NETWORK_NAME

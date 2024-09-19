@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import sys
+import os
 import jwt
 import time
 
@@ -12,8 +13,9 @@ if (len(sys.argv) != 2):
     sys.exit(1)
 
 username = sys.argv[1]
+audience = os.environ.get('VALIDATOR_AUTH_AUDIENCE', 'https://validator.example.com')
 
 iat=int(time.time())
-code = jwt.encode({'iat':iat,'aud':'https://canton.network.global','sub':username}, 'unsafe', algorithm='HS256')
+code = jwt.encode({'iat':iat,'aud':audience,'sub':username}, 'unsafe', algorithm='HS256')
 
 print(code)

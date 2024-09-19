@@ -24,8 +24,8 @@ class AnsAuth0FrontendIntegrationTest
             .focus(_.auth)
             .replace(
               Rs256(
-                "https://canton.network.global",
-                new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"),
+                sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE"),
+                new URL(s"https://${sys.env("SPLICE_OAUTH_TEST_AUTHORITY")}/.well-known/jwks.json"),
               )
             )
         )(c)

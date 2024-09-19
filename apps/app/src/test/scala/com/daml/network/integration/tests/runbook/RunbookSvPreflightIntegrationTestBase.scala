@@ -280,10 +280,10 @@ abstract class RunbookSvPreflightIntegrationTestBase
   }
 
   "Key API endpoints are reachable and functional" in { implicit env =>
-    val auth0 = auth0UtilFromEnvVars("https://canton-network-sv-test.us.auth0.com", "sv")
+    val auth0 = auth0UtilFromEnvVars("sv")
     val token = eventuallySucceeds() {
       getAuth0ClientCredential(
-        "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+        sys.env("SPLICE_OAUTH_SV_TEST_CLIENT_ID_VALIDATOR"),
         "https://validator.example.com/api",
         auth0,
       )(noTracingLogger)

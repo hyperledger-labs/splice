@@ -44,6 +44,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.daml.network.environment.BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
+import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -226,14 +227,35 @@ class BaseLedgerConnection(
       RetryFor.WaitingOnInitDependency,
       "ledger_api_wait_party",
       show"Party $party is observed on ledger API",
-      client.getParties(Seq(party)).map { parties =>
-        if (parties.isEmpty)
+      getParty(party).map { party =>
+        if (party.isEmpty)
           throw Status.NOT_FOUND
             .withDescription(s"Party allocation of $party not observed on ledger API")
             .asRuntimeException()
       },
       logger,
     )
+
+  def getPartyByHint(hint: String, participantAdminConnection: ParticipantAdminConnection)(implicit
+      traceContext: TraceContext
+  ): Future[Option[PartyDetails]] = {
+    for {
+      participantId <- participantAdminConnection.getParticipantId()
+      partyId = PartyId(
+        UniqueIdentifier.tryCreate(
+          hint,
+          participantId.uid.namespace,
+        )
+      )
+      party <- getParty(partyId)
+    } yield party
+  }
+
+  def getParty(
+      party: PartyId
+  )(implicit traceContext: TraceContext): Future[Option[PartyDetails]] = {
+    client.getParties(Seq(party)).map(_.headOption)
+  }
 
   def getUser(user: String, identityProviderId: Option[String] = None)(implicit
       tc: TraceContext

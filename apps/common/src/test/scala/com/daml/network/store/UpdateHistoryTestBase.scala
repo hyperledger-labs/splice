@@ -202,27 +202,49 @@ object UpdateHistoryTestBase {
   final case class ExpectedUnassign(cid: String, domainId: DomainId, targetDomain: DomainId)
       extends ExpectedUpdate
 
-  // Discards data that is not maintained in the update history DB, thus cannot be compared to ledger API.
-  // If forBackfill is true, drops also data we do not preserve for backfilling Scan, at the time of writing,
-  // this is only the commandId. Not that for debug purposes, it is useful to have this field in the DB, but
-  // since it's participant-local, it does not make sense for backfilling.
+  sealed trait LostDataMode
+
+  /** Data lost during ingestion into the UpdateHistory database,
+    * because the database schema does not store all fields.
+    */
+  final case object LostInStoreIngestion extends LostDataMode
+
+  /** Data lost during encoding of data read from the database into HTTP scan API responses.
+    *
+    * Currently, this affects the `commandId` field in the `TransactionTree` object.
+    * For debug purposes, it is useful to have this field in the DB, but
+    * since it's participant-local, it does not make sense to expose it in scan -
+    * otherwise different scan instances would return different data.
+    */
+  final case object LostInScanApi extends LostDataMode
+
+  def withoutLostData(
+      update: TreeUpdateWithMigrationId,
+      mode: LostDataMode,
+  ): TreeUpdateWithMigrationId = {
+    TreeUpdateWithMigrationId(
+      UpdateHistoryTestBase.withoutLostData(update.update, mode),
+      update.migrationId,
+    )
+  }
+
   def withoutLostData(
       response: GetTreeUpdatesResponse,
-      forBackfill: Boolean = false,
+      mode: LostDataMode,
   ): GetTreeUpdatesResponse = {
     response match {
       case GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain) =>
-        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree, forBackfill)), domain)
+        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree, mode)), domain)
       case GetTreeUpdatesResponse(ReassignmentUpdate(transfer), domain) =>
         GetTreeUpdatesResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
       case _ => throw new RuntimeException("Invalid update type")
     }
   }
 
-  private def withoutLostData(tree: TransactionTree, forBackfill: Boolean): TransactionTree = {
+  private def withoutLostData(tree: TransactionTree, mode: LostDataMode): TransactionTree = {
     new TransactionTree(
       /*updateId = */ tree.getUpdateId,
-      /*commandId = */ if (forBackfill) { "" }
+      /*commandId = */ if (mode == LostInScanApi) { "" }
       else {
         tree.getCommandId
       }, // Command IDs are participant-local, so not preserved for backfills

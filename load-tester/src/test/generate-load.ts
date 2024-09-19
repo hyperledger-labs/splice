@@ -34,6 +34,7 @@ export function setup(): ValidatorConf[] {
       const auth0 = new Auth0Manager(
         validator.auth.oauthDomain,
         validator.auth.oauthClientId,
+        validator.auth.audience,
         validator.walletBaseUrl,
         validator.auth.managementApi,
       );

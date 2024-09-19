@@ -53,8 +53,16 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           backfiller = mkBackfilling(source = storeA2, destination = storeB2)
           _ <- backfillAll(backfiller)
           // Check that the updates are the same
-          updatesA <- storeA2.getUpdates(None, PageLimit.tryCreate(1000))
-          updatesB <- storeB2.getUpdates(None, PageLimit.tryCreate(1000))
+          updatesA <- storeA2.getUpdates(
+            None,
+            includeImportUpdates = true,
+            PageLimit.tryCreate(1000),
+          )
+          updatesB <- storeB2.getUpdates(
+            None,
+            includeImportUpdates = true,
+            PageLimit.tryCreate(1000),
+          )
           backfillingComplete <- storeB2.destinationHistory.isBackfillingComplete(2)
         } yield {
           backfillingComplete shouldBe true

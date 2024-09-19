@@ -39,7 +39,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   Contract,
   ContractWithState,
-  UpdateHistoryComparator,
+  UpdateHistoryTestUtil,
   WalletTestUtil,
 }
 import com.daml.network.validator.config.AppManagerConfig
@@ -60,7 +60,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     extends SvIntegrationTestBase
     with ConfigScheduleUtil
     with WalletTestUtil
-    with UpdateHistoryComparator {
+    with UpdateHistoryTestUtil {
 
   // Fails with unexpected CreatedEvent roots
   override protected def runUpdateHistorySanityCheck: Boolean = false

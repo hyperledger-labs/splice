@@ -81,14 +81,12 @@ spec:
         - name: CN_APP_VALIDATOR_PARTY_HINT
           value: {{ .Values.validatorPartyHint }}
         {{ end }}
-        {{ if (.Values.auth).audience }}
         - name: CN_APP_VALIDATOR_AUTH_AUDIENCE
           value: {{ .Values.auth.audience | quote }}
-        {{ end }}
-        {{ if (.Values.auth).jwksUrl }}
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE
+          value: {{ .Values.auth.ledgerApiAudience | quote }}
         - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
-        {{ end }}
         {{ if .Values.svValidator }}
         - name: CN_APP_VALIDATOR_SV_VALIDATOR
           value: "true"
