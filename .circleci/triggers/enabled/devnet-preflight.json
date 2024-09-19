@@ -1,19 +1,15 @@
 {
-  "name": "TestNet Weekly Re-deployment",
-  "description": "Weekly Re-deployment of TestNet",
+  "name": "DevNet Preflight",
+  "description": "Hourly Preflight of DevNet",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "main",
-    "run-job": "deploy-testnet"
+    "branch": "release-line-0.2.1",
+    "run-job": "healthcheck-devnet"
   },
   "timetable": {
     "per-hour": 1,
-    "hours-of-day": [
-      21
-    ],
-    "days-of-week": [
-      "MON"
-    ],
+    "hours-of-day": [1, 7, 13, 19],
+    "days-of-week": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
     "days-of-month": [],
     "months": [
       "JAN",
