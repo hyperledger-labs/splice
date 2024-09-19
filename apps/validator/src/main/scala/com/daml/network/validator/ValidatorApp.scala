@@ -299,26 +299,37 @@ class ValidatorApp(
                       )
                     connection.getOptionalPrimaryParty(config.ledgerApiUser).flatMap {
                       case None =>
-                        // A party has not yet been allocated
-                        // Enforce hint format before allocating it
-                        val pattern = "^[a-zA-Z0-9_]+-[a-zA-Z0-9_]+-[0-9]+$".r
-                        pattern.findFirstMatchIn(hint) match {
-                          case None =>
-                            throw Status.INVALID_ARGUMENT
-                              .withDescription(
-                                s"Validator party hint ($hint) must match pattern <organization>-<function>-<enumerator>, where organization & function are alphanumerical, and enumerator is an integer"
-                              )
-                              .asRuntimeException()
+                        // during HDM the party is not assigned to the user yet, but it's allocated on the participant
+                        connection.getPartyByHint(hint, participantAdminConnection).flatMap {
                           case Some(_) =>
-                        }
-                        appInitStep(
-                          "Creating user primary party and waiting for it to be allocated"
-                        ) {
-                          connection.ensureUserPrimaryPartyIsAllocated(
-                            config.ledgerApiUser,
-                            hint,
-                            participantAdminConnection,
-                          )
+                            logger.info("Party already allocated but not assigned as primary")
+                            connection.ensureUserPrimaryPartyIsAllocated(
+                              config.ledgerApiUser,
+                              hint,
+                              participantAdminConnection,
+                            )
+                          case None =>
+                            // A party has not yet been allocated
+                            // Enforce hint format before allocating it
+                            val pattern = "^[a-zA-Z0-9_]+-[a-zA-Z0-9_]+-[0-9]+$".r
+                            pattern.findFirstMatchIn(hint) match {
+                              case None =>
+                                throw Status.INVALID_ARGUMENT
+                                  .withDescription(
+                                    s"Validator party hint ($hint) must match pattern <organization>-<function>-<enumerator>, where organization & function are alphanumerical, and enumerator is an integer"
+                                  )
+                                  .asRuntimeException()
+                              case Some(_) =>
+                            }
+                            appInitStep(
+                              "Creating user primary party and waiting for it to be allocated"
+                            ) {
+                              connection.ensureUserPrimaryPartyIsAllocated(
+                                config.ledgerApiUser,
+                                hint,
+                                participantAdminConnection,
+                              )
+                            }
                         }
                       case Some(partyId) =>
                         val existingHint = partyId.uid.identifier.str
