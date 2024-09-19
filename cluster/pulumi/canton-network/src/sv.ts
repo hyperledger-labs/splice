@@ -424,6 +424,8 @@ function installSvApp(
     enablePostgresMetrics: true,
     auth: {
       audience: config.auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      ledgerApiAudience:
+        config.auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,

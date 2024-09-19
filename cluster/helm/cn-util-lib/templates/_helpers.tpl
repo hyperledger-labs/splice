@@ -46,7 +46,7 @@
     secretKeyRef:
       key: audience
       name: "splice-app-{{ $keyName }}-ledger-api-auth"
-      optional: true
+      optional: false
 {{- end }}
 {{- end -}}
 {{- define "cn-util-lib.auth0-user-env-var" -}}
