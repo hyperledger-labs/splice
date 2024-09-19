@@ -17,6 +17,13 @@ Upcoming
 
 * Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a DSO.
 
+* SV app
+
+  * Fix a bug where sequencer pruning treated nodes that have not
+    joined after a synchronizer migration with downtime as lagging
+    even when the pruning interval has not yet passed and disabled
+    them preventing them from connecting to the sequencer.
+
 * Deployment
 
   * The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous default value was ``https://canton.network.global``. To continue using the default, provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)

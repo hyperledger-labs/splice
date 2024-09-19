@@ -10,6 +10,7 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
 }
 import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
@@ -47,25 +48,38 @@ class SequencerPruningTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
-      // TODO(#4906): check whether are passing the right domain-id to make this work with soft-domain migration
-      dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
-        rulesAndState.dsoRules.domain,
-        clock.now.toInstant,
-        migrationId,
-      )
-      _ <- dsoRulesActiveSequencerConfig.fold {
-        logger.debug(
-          show"Member info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
-        )
-        Future.unit
-      } { _ =>
-        {
-          logger.debug("Attempt pruning our sequencer...")
-          prune().map { prunedResult =>
-            logger.debug(s"Completed pruning our sequencer with result: $prunedResult")
-          }
-        }
+      domainId <- sequencerAdminConnection.getStatus.map(_.trySuccess.domainId)
+      recordTimeRangeO <- store.updateHistory.getRecordTimeRange(migrationId).map(_.get(domainId))
+      _ <- recordTimeRangeO match {
+        case Some(DomainRecordTimeRange(earliest, latest))
+            if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>
+          for {
+            rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
+            // TODO(#4906): check whether are passing the right domain-id to make this work with soft-domain migration
+            dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+              rulesAndState.dsoRules.domain,
+              clock.now.toInstant,
+              migrationId,
+            )
+            _ <- dsoRulesActiveSequencerConfig.fold {
+              logger.debug(
+                show"Member info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
+              )
+              Future.unit
+            } { _ =>
+              {
+                logger.debug("Attempt pruning our sequencer...")
+                prune().map { prunedResult =>
+                  logger.debug(s"Completed pruning our sequencer with result: $prunedResult")
+                }
+              }
+            }
+          } yield ()
+        case _ =>
+          logger.debug(
+            s"Synchronizer on migration id $migrationId does not yet have $retentionPeriod of data, record time range: $recordTimeRangeO"
+          )
+          Future.unit
       }
     } yield false
 

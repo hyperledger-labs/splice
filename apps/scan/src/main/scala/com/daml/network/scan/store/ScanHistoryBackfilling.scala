@@ -7,7 +7,8 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import com.daml.network.scan.admin.api.client.BackfillingScanConnection
 import com.daml.network.store.HistoryBackfilling
-import com.daml.network.store.HistoryBackfilling.{DomainRecordTimeRange, MigrationInfo, Outcome}
+import com.daml.network.store.HistoryBackfilling.{MigrationInfo, Outcome}
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId

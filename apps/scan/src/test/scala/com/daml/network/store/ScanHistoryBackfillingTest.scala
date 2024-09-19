@@ -2,9 +2,10 @@ package com.daml.network.store
 
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.scan.store.ScanHistoryBackfilling
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.scan.admin.api.client.BackfillingScanConnection
-import com.daml.network.store.HistoryBackfilling.{DomainRecordTimeRange, MigrationInfo}
+import com.daml.network.store.HistoryBackfilling.MigrationInfo
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
